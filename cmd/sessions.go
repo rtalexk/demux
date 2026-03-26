@@ -10,6 +10,7 @@ import (
 	"github.com/rtalex/demux/internal/db"
 	"github.com/rtalex/demux/internal/format"
 	"github.com/rtalex/demux/internal/git"
+	"github.com/rtalex/demux/internal/proc"
 	"github.com/rtalex/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
@@ -80,6 +81,25 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 		headers = append(headers, "BRANCH", "DIRTY", "AHEAD", "BEHIND")
 	}
 
+	allProcs, _ := proc.Snapshot()
+
+	sessionProcCount := map[string]int{}
+	for sessionName, windows := range grouped {
+		primaryCWD := primaryCWDForSession(windows)
+		if primaryCWD == "" {
+			continue
+		}
+		for _, p := range allProcs {
+			cwd, err := proc.CWD(p.PID)
+			if err != nil {
+				continue
+			}
+			if cwd == primaryCWD || git.IsDescendant(cwd, primaryCWD) {
+				sessionProcCount[sessionName]++
+			}
+		}
+	}
+
 	var rows []format.Row
 	for sessionName, windows := range grouped {
 		if isIgnored(cfg, sessionName) {
@@ -101,7 +121,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 		row := sessionRow{
 			session:    sessionName,
 			windows:    fmt.Sprint(len(windows)),
-			procs:      "—",
+			procs:      fmt.Sprint(sessionProcCount[sessionName]),
 			alerts:     fmt.Sprint(len(sessionAlerts)),
 			status:     status,
 			includeGit: sessionsGit,
