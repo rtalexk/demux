@@ -120,8 +120,11 @@ func row(label, value string) string {
 func (d DetailModel) renderSession() []string {
     lines := []string{
         row("repo", d.sessionCWD),
-        row("branch", d.gitInfo.Branch),
     }
+    if d.gitInfo.Worktree != "" {
+        lines = append(lines, row("worktree", d.gitInfo.Worktree))
+    }
+    lines = append(lines, row("branch", d.gitInfo.Branch))
     if ind := gitIndicatorsLong(d.gitInfo); ind != "" {
         lines = append(lines, row("", ind))
     }
@@ -144,6 +147,9 @@ func (d DetailModel) renderWindow() []string {
     }
     if d.windowGit.Branch != "" {
         lines = append(lines, "")
+        if d.windowGit.Worktree != "" {
+            lines = append(lines, row("worktree", d.windowGit.Worktree))
+        }
         lines = append(lines, row("branch", d.windowGit.Branch))
         if ind := gitIndicatorsLong(d.windowGit); ind != "" {
             lines = append(lines, row("", ind))
@@ -182,6 +188,9 @@ func (d DetailModel) renderProc(innerWidth int) []string {
     }
     if d.procGit.Branch != "" {
         lines = append(lines, "")
+        if d.procGit.Worktree != "" {
+            lines = append(lines, row("worktree", d.procGit.Worktree))
+        }
         lines = append(lines, row("branch", d.procGit.Branch))
         if ind := gitIndicatorsLong(d.procGit); ind != "" {
             lines = append(lines, row("", ind))

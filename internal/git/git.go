@@ -16,6 +16,7 @@ type Info struct {
     Ahead    int
     Behind   int
     RepoRoot string
+    Worktree string // non-empty when inside a linked worktree (name of the worktree)
     PR       string
     Loading  bool
 }
@@ -71,6 +72,13 @@ func Fetch(dir string, timeoutMs int) (Info, error) {
 
     rootOut, _ := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--show-toplevel").Output()
     info.RepoRoot = strings.TrimSpace(string(rootOut))
+
+    gitDirOut, _ := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--git-dir").Output()
+    gitDir := strings.TrimSpace(string(gitDirOut))
+    if idx := strings.Index(gitDir, "/worktrees/"); idx >= 0 {
+        info.Worktree = gitDir[idx+len("/worktrees/"):]
+    }
+
     return info, nil
 }
 
