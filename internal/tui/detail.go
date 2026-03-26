@@ -124,10 +124,11 @@ func (d DetailModel) renderSession() []string {
     if d.gitInfo.Worktree != "" {
         lines = append(lines, row("worktree", d.gitInfo.Worktree))
     }
-    lines = append(lines, row("branch", d.gitInfo.Branch))
+    branch := d.gitInfo.Branch
     if ind := gitIndicatorsLong(d.gitInfo); ind != "" {
-        lines = append(lines, row("", ind))
+        branch += "  " + ind
     }
+    lines = append(lines, row("branch", branch))
     if d.prInfo != "" {
         lines = append(lines, row("pr", d.prInfo))
     }
@@ -150,10 +151,11 @@ func (d DetailModel) renderWindow() []string {
         if d.windowGit.Worktree != "" {
             lines = append(lines, row("worktree", d.windowGit.Worktree))
         }
-        lines = append(lines, row("branch", d.windowGit.Branch))
+        branch := d.windowGit.Branch
         if ind := gitIndicatorsLong(d.windowGit); ind != "" {
-            lines = append(lines, row("", ind))
+            branch += "  " + ind
         }
+        lines = append(lines, row("branch", branch))
     }
     if d.windowAlert != nil {
         lines = append(lines, "")
@@ -191,10 +193,11 @@ func (d DetailModel) renderProc(innerWidth int) []string {
         if d.procGit.Worktree != "" {
             lines = append(lines, row("worktree", d.procGit.Worktree))
         }
-        lines = append(lines, row("branch", d.procGit.Branch))
+        branch := d.procGit.Branch
         if ind := gitIndicatorsLong(d.procGit); ind != "" {
-            lines = append(lines, row("", ind))
+            branch += "  " + ind
         }
+        lines = append(lines, row("branch", branch))
     }
     return lines
 }
