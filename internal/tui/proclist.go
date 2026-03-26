@@ -155,7 +155,7 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         if node.IsPaneHeader {
             line = p.renderPaneHeader(node, selected)
         } else if node.IsIdle {
-            line = paneIdleStyle.Render("  idle")
+            line = paneIdleStyle.Render("    idle")
         } else {
             line = p.renderProc(node, selected)
         }
