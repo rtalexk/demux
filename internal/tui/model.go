@@ -107,11 +107,9 @@ func fetchProcs() tea.Cmd {
 		if err != nil {
 			return procDataMsg{}
 		}
-		cwdMap := make(map[int32]string, len(procs))
-		for _, p := range procs {
-			if cwd, err := proc.CWD(p.PID); err == nil {
-				cwdMap[p.PID] = cwd
-			}
+		cwdMap, _ := proc.CWDAll()
+		if cwdMap == nil {
+			cwdMap = make(map[int32]string)
 		}
 		return procDataMsg{procs: procs, cwdMap: cwdMap}
 	}
@@ -170,6 +168,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case procDataMsg:
 		m.procs = msg.procs
 		m.cwdMap = msg.cwdMap
+		if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+			m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+		}
 		m.updateDetailFromSelection()
 	case alertsMsg:
 		m.alerts = msg.alerts
@@ -237,6 +238,10 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.Esc):
 		m.sidebar.MoveToSessionLevel()
+	}
+	// auto-populate proc list whenever a window node is highlighted (no Enter needed)
+	if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+		m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}
 	m.updateDetailFromSelection()
 	return m, nil

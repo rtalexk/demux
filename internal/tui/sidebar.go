@@ -49,17 +49,19 @@ func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map
 	// preserve cursor position, rebuild nodes
 	selectedSession := ""
 	selectedWindow := -1
+	selectedIsSession := false
 	if s.cursor < len(s.nodes) {
 		n := s.nodes[s.cursor]
 		selectedSession = n.Session
 		selectedWindow = n.WindowIndex
+		selectedIsSession = n.IsSession
 	}
 
 	s.rebuildNodes()
 
-	// restore cursor
+	// restore cursor — match IsSession too so window:0 doesn't collapse back to its parent session node
 	for i, n := range s.nodes {
-		if n.Session == selectedSession && n.WindowIndex == selectedWindow {
+		if n.Session == selectedSession && n.WindowIndex == selectedWindow && n.IsSession == selectedIsSession {
 			s.cursor = i
 			break
 		}

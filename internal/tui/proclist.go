@@ -63,10 +63,10 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 			GitInfo:      info,
 		})
 
-		// find processes for this pane by CWD match, include subprocesses as grandchildren
+		// find processes for this pane by CWD match (exact or descendant), include subprocesses as grandchildren
 		for _, pr := range procs {
 			cwd, ok := cwdMap[pr.PID]
-			if !ok || cwd != paneCWD {
+			if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
 				continue
 			}
 			p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
