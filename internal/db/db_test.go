@@ -83,3 +83,32 @@ func TestAlertCreatedAt(t *testing.T) {
 		t.Error("created_at is before insert time")
 	}
 }
+
+func TestAlertByTarget(t *testing.T) {
+	d := openTestDB(t)
+
+	// not found
+	a, err := d.AlertByTarget("s:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a != nil {
+		t.Error("expected nil for missing target")
+	}
+
+	// found
+	d.AlertSet("s:1", "reason", "warn", true)
+	a, err = d.AlertByTarget("s:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == nil {
+		t.Fatal("expected alert, got nil")
+	}
+	if a.Target != "s:1" || a.Level != "warn" || !a.Sticky {
+		t.Errorf("unexpected alert: %+v", a)
+	}
+	if a.CreatedAt.IsZero() {
+		t.Error("CreatedAt should not be zero")
+	}
+}

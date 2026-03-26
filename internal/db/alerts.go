@@ -1,6 +1,10 @@
 package db
 
-import "time"
+import (
+	"database/sql"
+	"errors"
+	"time"
+)
 
 // parseTS handles the varying timestamp formats returned by modernc.org/sqlite.
 func parseTS(s string) time.Time {
@@ -72,8 +76,11 @@ func (d *DB) AlertByTarget(target string) (*Alert, error) {
 	var createdAt string
 	err := row.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &a.Sticky, &createdAt)
 	if err != nil {
-		return nil, nil // not found
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	a.CreatedAt, _ = time.ParseInLocation("2006-01-02 15:04:05", createdAt, time.UTC)
+	a.CreatedAt = parseTS(createdAt)
 	return &a, nil
 }
