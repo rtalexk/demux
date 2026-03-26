@@ -65,6 +65,13 @@ func (d DetailModel) Render(width, height int) string {
 			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render("No selection"),
 		}
 	}
+	maxLines := height - 2
+	if maxLines < 0 {
+		maxLines = 0
+	}
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+	}
 	inner := strings.Join(lines, "\n")
 	return detailBorder.Width(width - 2).Height(height - 2).Render(inner)
 }

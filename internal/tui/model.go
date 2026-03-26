@@ -211,7 +211,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	detailH := 8
+	detailH := 11
 	topH := m.height - detailH - 4
 	sidebarVisibleRows := topH - 2
 	if sidebarVisibleRows < 1 {
@@ -467,7 +467,7 @@ func (m Model) View() string {
 		procW = 10
 	}
 
-	detailH := 8
+	detailH := 11
 	topH := m.height - detailH - 4 // titlebar (3 rows: border+content+border) + statusbar
 
 	sidebar := m.sidebar.Render(sidebarW, topH, m.focus == panelSidebar)
