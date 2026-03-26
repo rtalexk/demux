@@ -17,7 +17,8 @@ var (
     borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
     sessionStyle   = lipgloss.NewStyle().Bold(true)
     windowIndent   = "  "
-    selectedBG     = lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230"))
+    selectedBG       = lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230"))
+    selectedInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
 )
 
 type SidebarNode struct {
@@ -164,7 +165,7 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
         end = len(s.nodes)
     }
     for i := offset; i < end; i++ {
-        lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, width))
+        lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
     }
     if hasBelow {
         lines = append(lines, hintStyle.Render("▼ more"))
@@ -178,7 +179,7 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
     return style.Width(width - 2).Height(height - 2).Render(inner)
 }
 
-func (s SidebarModel) renderNode(node SidebarNode, selected bool, width int) string {
+func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {
     var text string
     if node.IsSession {
         text = s.renderSession(node, width)
@@ -186,7 +187,10 @@ func (s SidebarModel) renderNode(node SidebarNode, selected bool, width int) str
         text = s.renderWindow(node, width)
     }
     if selected {
-        return selectedBG.Render(text)
+        if focused {
+            return selectedBG.Render(text)
+        }
+        return selectedInactive.Render(text)
     }
     return text
 }
