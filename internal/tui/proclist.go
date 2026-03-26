@@ -34,6 +34,7 @@ type ProcListNode struct {
 type ProcListModel struct {
     nodes      []ProcListNode
     cursor     int
+    offset     int // viewport scroll offset (by node index)
     filterText string
     primaryCWD string
 }
@@ -129,9 +130,15 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         return border.Width(width - 2).Height(height - 2).Render(inner)
     }
 
+    hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
     filter := strings.ToLower(p.filterText)
-    var lines []string
 
+    // build the full rendered line list (respecting filter), tracking node index
+    type renderedLine struct {
+        nodeIdx int
+        text    string
+    }
+    var allLines []renderedLine
     for i, node := range p.nodes {
         selected := i == p.cursor
         var line string
@@ -140,28 +147,81 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         } else {
             line = p.renderProc(node, selected)
         }
-        if filter == "" || strings.Contains(strings.ToLower(stripANSI(line)), filter) {
-            lines = append(lines, line)
+        if filter != "" && !strings.Contains(strings.ToLower(stripANSI(line)), filter) {
+            continue
         }
+        allLines = append(allLines, renderedLine{nodeIdx: i, text: line})
     }
+
+    // clamp offset so cursor's line is visible
+    offset := p.offset
+    if p.cursor < offset {
+        offset = p.cursor
+    }
+
+    // determine scroll hints based on node-level offset
+    hasAbove := offset > 0
+    hasBelow := false // determined after we know how many fit
 
     maxRows := height - 2
     if maxRows < 1 {
         maxRows = 1
     }
-    // each entry in lines may itself contain newlines (proc nodes render 2 rows),
-    // so count actual rows to know when to stop
-    var clipped []string
+    contentRows := maxRows
+    if hasAbove {
+        contentRows--
+    }
+    // tentatively check hasBelow: collect rows from offset
     rowCount := 0
-    for _, l := range lines {
-        entryRows := strings.Count(l, "\n") + 1
-        if rowCount+entryRows > maxRows {
+    var visible []string
+    startIdx := 0
+    for i, rl := range allLines {
+        if rl.nodeIdx < offset {
+            continue
+        }
+        if startIdx == 0 {
+            startIdx = i
+        }
+        entryRows := strings.Count(rl.text, "\n") + 1
+        if rowCount+entryRows > contentRows {
+            hasBelow = true
             break
         }
-        clipped = append(clipped, l)
+        visible = append(visible, rl.text)
         rowCount += entryRows
     }
-    inner := strings.Join(clipped, "\n")
+    // if hasBelow discovered, shrink contentRows by 1 and rebuild visible
+    if hasBelow {
+        contentRows = maxRows
+        if hasAbove {
+            contentRows--
+        }
+        contentRows-- // for ▼ hint
+        rowCount = 0
+        visible = visible[:0]
+        for _, rl := range allLines {
+            if rl.nodeIdx < offset {
+                continue
+            }
+            entryRows := strings.Count(rl.text, "\n") + 1
+            if rowCount+entryRows > contentRows {
+                break
+            }
+            visible = append(visible, rl.text)
+            rowCount += entryRows
+        }
+    }
+
+    var resultLines []string
+    if hasAbove {
+        resultLines = append(resultLines, hintStyle.Render("▲ more"))
+    }
+    resultLines = append(resultLines, visible...)
+    if hasBelow {
+        resultLines = append(resultLines, hintStyle.Render("▼ more"))
+    }
+
+    inner := strings.Join(resultLines, "\n")
     return border.Width(width - 2).Height(height - 2).Render(inner)
 }
 
@@ -248,6 +308,24 @@ func nodeDepth(n ProcListNode) int {
         return 0
     }
     return n.Depth
+}
+
+// clampOffset adjusts the viewport offset so the cursor is always visible.
+// visibleNodes is the number of node slots available (accounting for hint rows).
+func (p *ProcListModel) clampOffset(visibleNodes int) {
+    effective := visibleNodes - 2
+    if effective < 1 {
+        effective = 1
+    }
+    if p.cursor < p.offset {
+        p.offset = p.cursor
+    }
+    if p.cursor >= p.offset+effective {
+        p.offset = p.cursor - effective + 1
+    }
+    if p.offset < 0 {
+        p.offset = 0
+    }
 }
 
 // MoveUp moves the cursor one item up (linear navigation).

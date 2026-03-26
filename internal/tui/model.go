@@ -248,6 +248,22 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    contentH := m.height - 4
+    innerW := m.width - m.cfg.SidebarWidth - 2
+    if innerW < 1 {
+        innerW = 1
+    }
+    detailContent := m.detail.ContentLines(innerW)
+    detailH := detailContent + 2
+    if detailH < 4 {
+        detailH = 4
+    }
+    maxDetailH := contentH - 4
+    if detailH > maxDetailH {
+        detailH = maxDetailH
+    }
+    procH := contentH - detailH
+
     switch {
     case key.Matches(msg, keys.Up):
         m.procList.MoveUp()
@@ -272,6 +288,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Log):
         // TODO: tmux popup with scrollback
     }
+    m.procList.clampOffset(procH)
     m.updateDetailFromSelection()
     return m, nil
 }
@@ -470,9 +487,19 @@ func (m Model) View() string {
         procW = 10
     }
 
-    detailH := 11
     // sidebar spans full content height; proclist + detail stack on the right
     contentH := m.height - 4 // 3 (header box) + 1 (status bar)
+    innerW := procW - 2
+    detailContent := m.detail.ContentLines(innerW)
+    detailH := detailContent + 2 // +2 for border
+    minDetailH := 4
+    maxDetailH := contentH - 4 // leave at least 4 rows for proc list
+    if detailH < minDetailH {
+        detailH = minDetailH
+    }
+    if detailH > maxDetailH {
+        detailH = maxDetailH
+    }
     procH := contentH - detailH
 
     sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar)

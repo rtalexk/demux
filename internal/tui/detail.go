@@ -51,7 +51,9 @@ type DetailModel struct {
     procCWD  string
 }
 
-func (d DetailModel) Render(width, height int) string {
+// ContentLines returns the number of visual rows the detail content will occupy
+// at the given inner width (panel width minus border). Long values wrap at valueW.
+func (d DetailModel) ContentLines(innerWidth int) int {
     var lines []string
     switch d.selType {
     case DetailSession:
@@ -59,7 +61,42 @@ func (d DetailModel) Render(width, height int) string {
     case DetailWindow:
         lines = d.renderWindow()
     case DetailProc:
-        lines = d.renderProc()
+        lines = d.renderProc(innerWidth)
+    default:
+        return 1
+    }
+    valueW := innerWidth - 10 // label is 10 wide
+    if valueW < 1 {
+        valueW = 1
+    }
+    total := 0
+    for _, l := range lines {
+        if l == "" {
+            total++
+            continue
+        }
+        plain := stripANSI(l)
+        // plain width = label(10) + value; count wrapped rows
+        rows := (len([]rune(plain)) + innerWidth - 1) / innerWidth
+        if rows < 1 {
+            rows = 1
+        }
+        _ = valueW
+        total += rows
+    }
+    return total
+}
+
+func (d DetailModel) Render(width, height int) string {
+    innerW := width - 2
+    var lines []string
+    switch d.selType {
+    case DetailSession:
+        lines = d.renderSession()
+    case DetailWindow:
+        lines = d.renderWindow()
+    case DetailProc:
+        lines = d.renderProc(innerW)
     default:
         lines = []string{
             lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render("No selection"),
@@ -73,7 +110,7 @@ func (d DetailModel) Render(width, height int) string {
         lines = lines[:maxLines]
     }
     inner := strings.Join(lines, "\n")
-    return detailBorder.Width(width - 2).Height(height - 2).Render(inner)
+    return detailBorder.Width(innerW).Height(height - 2).Render(inner)
 }
 
 func row(label, value string) string {
@@ -119,11 +156,21 @@ func (d DetailModel) renderWindow() []string {
     return lines
 }
 
-func (d DetailModel) renderProc() []string {
+func (d DetailModel) renderProc(innerWidth int) []string {
+    valueW := innerWidth - 10 // label column is 10 wide
+    if valueW < 8 {
+        valueW = 8
+    }
+    cmd := d.proc.Cmdline
+    cmdRunes := []rune(cmd)
+    if len(cmdRunes) > valueW {
+        cmdRunes = append(cmdRunes[:valueW-1], '…')
+        cmd = string(cmdRunes)
+    }
     lines := []string{
         row("name", d.proc.Name),
         row("pid", fmt.Sprint(d.proc.PID)),
-        row("cmd", d.proc.Cmdline),
+        row("cmd", cmd),
         row("uptime", formatProcDuration(d.proc.Uptime)),
         row("memory", fmt.Sprintf("%.1fMB", float64(d.proc.MemRSS)/1024/1024)),
     }
