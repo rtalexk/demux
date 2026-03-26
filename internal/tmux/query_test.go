@@ -7,9 +7,9 @@ import (
 )
 
 func TestParsePanes(t *testing.T) {
-	raw := "mysession\t0\t0\t/home/dev/project\t%1\n" +
-		"mysession\t0\t1\t/home/dev/project/ui\t%2\n" +
-		"mysession\t1\t0\t/home/dev/project\t%3\n"
+	raw := "mysession\t0\t0\t/home/dev/project\t%1\teditor\n" +
+		"mysession\t0\t1\t/home/dev/project/ui\t%2\teditor\n" +
+		"mysession\t1\t0\t/home/dev/project\t%3\tserver\n"
 
 	panes, err := tmux.ParsePanes(raw)
 	if err != nil {
@@ -29,6 +29,9 @@ func TestParsePanes(t *testing.T) {
 	}
 	if panes[0].PaneID != "%1" {
 		t.Errorf("unexpected pane id: %s", panes[0].PaneID)
+	}
+	if panes[0].WindowName != "editor" {
+		t.Errorf("unexpected window name: %s", panes[0].WindowName)
 	}
 }
 

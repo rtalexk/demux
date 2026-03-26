@@ -92,7 +92,7 @@ func runWindows(cmd *cobra.Command, _ []string) error {
 		rows = append(rows, windowRow{
 			session:    windowsSession,
 			window:     fmt.Sprint(wi),
-			name:       fmt.Sprintf("window-%d", wi),
+			name:       wPanes[0].WindowName,
 			panes:      fmt.Sprint(len(wPanes)),
 			procs:      "—",
 			alerts:     fmt.Sprint(alertsByWindow[fmt.Sprint(wi)]),
