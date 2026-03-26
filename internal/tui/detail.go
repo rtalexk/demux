@@ -193,13 +193,13 @@ func (d DetailModel) renderProc(innerWidth int) []string {
 func gitIndicatorsLong(info git.Info) string {
     var parts []string
     if info.Ahead > 0 {
-        parts = append(parts, fmt.Sprintf("↑%d", info.Ahead))
+        parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("↑%d", info.Ahead)))
     }
     if info.Behind > 0 {
-        parts = append(parts, fmt.Sprintf("↓%d", info.Behind))
+        parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("↓%d", info.Behind)))
     }
     if info.Dirty {
-        parts = append(parts, "*")
+        parts = append(parts, gitDirtyStyle.Render("*"))
     }
     return strings.Join(parts, " ")
 }

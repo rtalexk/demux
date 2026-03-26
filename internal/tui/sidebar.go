@@ -19,6 +19,11 @@ var (
     windowIndent   = "  "
     selectedBG       = lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230"))
     selectedInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+
+    // git indicator colours (shared across sidebar and detail panel)
+    gitAheadStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("76"))  // green
+    gitBehindStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // red
+    gitDirtyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // yellow
 )
 
 type SidebarNode struct {
@@ -290,13 +295,13 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
 func compactGitIndicators(info git.Info) string {
     var parts []string
     if info.Ahead > 0 {
-        parts = append(parts, fmt.Sprintf("↑%d", info.Ahead))
+        parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("↑%d", info.Ahead)))
     }
     if info.Behind > 0 {
-        parts = append(parts, fmt.Sprintf("↓%d", info.Behind))
+        parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("↓%d", info.Behind)))
     }
     if info.Dirty {
-        parts = append(parts, "*")
+        parts = append(parts, gitDirtyStyle.Render("*"))
     }
     return strings.Join(parts, " ")
 }
