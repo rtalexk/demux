@@ -59,22 +59,6 @@ error_display = "git err"
 enabled = false
 
 # ---------------------------------------------------------------------------
-# Process type classification
-# Edit these lists to control how process names are coloured in the TUI.
-# ---------------------------------------------------------------------------
-[processes]
-editors = ["nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"]
-agents  = ["claude", "aider", "cursor", "copilot", "continue", "cody"]
-servers = [
-  "railway", "rails", "node", "deno", "bun",
-  "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
-  "cargo", "go", "air", "watchexec",
-  "vite", "webpack", "next", "nuxt",
-  "caddy", "nginx", "httpd",
-]
-shells  = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
-
-# ---------------------------------------------------------------------------
 # Theme (Catppuccin Mocha)
 # ---------------------------------------------------------------------------
 [theme]
@@ -116,6 +100,19 @@ color_clean    = "#a6e3a1"
 color_cpu_low  = "#7f849c"
 color_cpu_med  = "#f9e2af"
 color_cpu_high = "#f38ba8"
+
+# Process type classification — controls how process names are coloured
+[theme.processes]
+editors = ["nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"]
+agents  = ["claude", "aider", "cursor", "copilot", "continue", "cody"]
+servers = [
+  "railway", "rails", "node", "deno", "bun",
+  "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+  "cargo", "go", "air", "watchexec",
+  "vite", "webpack", "next", "nuxt",
+  "caddy", "nginx", "httpd",
+]
+shells = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
 `
 
 func init() {

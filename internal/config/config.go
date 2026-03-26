@@ -20,8 +20,10 @@ type GitConfig struct {
     PR              GitPRConfig `toml:"pr"`
 }
 
-// ThemeConfig holds all theme colour values.
+// ThemeConfig holds all theme colour values and process type classification.
 type ThemeConfig struct {
+    Processes ProcessesConfig `toml:"processes"`
+
     ColorBg       string `toml:"color_bg"`
     ColorSurface  string `toml:"color_surface"`
     ColorRaised   string `toml:"color_raised"`
@@ -66,14 +68,13 @@ type ProcessesConfig struct {
 }
 
 type Config struct {
-    RefreshIntervalMs int             `toml:"refresh_interval_ms"`
-    IgnoredSessions   []string        `toml:"ignored_sessions"`
-    DefaultFormat     string          `toml:"default_format"`
-    StatusBarFormat   string          `toml:"status_bar_format"`
-    SidebarWidth      int             `toml:"sidebar_width"`
-    Git               GitConfig       `toml:"git"`
-    Theme             ThemeConfig     `toml:"theme"`
-    Processes         ProcessesConfig `toml:"processes"`
+    RefreshIntervalMs int         `toml:"refresh_interval_ms"`
+    IgnoredSessions   []string    `toml:"ignored_sessions"`
+    DefaultFormat     string      `toml:"default_format"`
+    StatusBarFormat   string      `toml:"status_bar_format"`
+    SidebarWidth      int         `toml:"sidebar_width"`
+    Git               GitConfig   `toml:"git"`
+    Theme             ThemeConfig `toml:"theme"`
 }
 
 func Default() Config {
@@ -124,18 +125,19 @@ func Default() Config {
             ColorCpuLow:  "#7f849c",
             ColorCpuMed:  "#f9e2af",
             ColorCpuHigh: "#f38ba8",
-        },
-        Processes: ProcessesConfig{
-            Editors: []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"},
-            Agents:  []string{"claude", "aider", "cursor", "copilot", "continue", "cody"},
-            Servers: []string{
-                "railway", "rails", "node", "deno", "bun",
-                "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
-                "cargo", "go", "air", "watchexec",
-                "vite", "webpack", "next", "nuxt",
-                "caddy", "nginx", "httpd",
+
+            Processes: ProcessesConfig{
+                Editors: []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"},
+                Agents:  []string{"claude", "aider", "cursor", "copilot", "continue", "cody"},
+                Servers: []string{
+                    "railway", "rails", "node", "deno", "bun",
+                    "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+                    "cargo", "go", "air", "watchexec",
+                    "vite", "webpack", "next", "nuxt",
+                    "caddy", "nginx", "httpd",
+                },
+                Shells: []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"},
             },
-            Shells: []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"},
         },
     }
 }
