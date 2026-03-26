@@ -82,6 +82,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 	}
 
 	allProcs, _ := proc.Snapshot()
+	cwdByPID, _ := proc.CWDAll()
 
 	sessionProcCount := map[string]int{}
 	for sessionName, windows := range grouped {
@@ -90,8 +91,8 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 		for _, p := range allProcs {
-			cwd, err := proc.CWD(p.PID)
-			if err != nil {
+			cwd, ok := cwdByPID[p.PID]
+			if !ok {
 				continue
 			}
 			if cwd == primaryCWD || git.IsDescendant(cwd, primaryCWD) {

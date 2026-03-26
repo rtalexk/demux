@@ -59,6 +59,8 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	cwdByPID, _ := proc.CWDAll()
+
 	ports, _ := proc.ListeningPorts()
 	portByPID := map[int32]int{}
 	for _, p := range ports {
@@ -121,8 +123,8 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 
 				// child processes matching this pane's CWD
 				for _, p := range allProcs {
-					cwd, err := proc.CWD(p.PID)
-					if err != nil || cwd != paneCWD {
+					cwd, ok := cwdByPID[p.PID]
+					if !ok || cwd != paneCWD {
 						continue
 					}
 					portStr := "—"
