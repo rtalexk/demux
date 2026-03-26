@@ -33,90 +33,65 @@ func modelAt(nodes []ProcListNode, cursor int) ProcListModel {
 
 // ---------- MoveUp tests ----------
 
-func TestMoveUp_Depth0_MovesToPrevHeader(t *testing.T) {
+func TestMoveUp_MovesLinearlyUp(t *testing.T) {
     m := modelAt(buildNodes(), 3) // cursor on second pane header
     m.MoveUp()
-    if m.cursor != 0 {
-        t.Errorf("expected cursor 0 (first pane header), got %d", m.cursor)
+    if m.cursor != 2 {
+        t.Errorf("expected cursor 2, got %d", m.cursor)
     }
 }
 
-func TestMoveUp_Depth0_AtFirstHeader_NoMove(t *testing.T) {
-    m := modelAt(buildNodes(), 0) // already at first pane header
+func TestMoveUp_AtFirstNode_NoMove(t *testing.T) {
+    m := modelAt(buildNodes(), 0)
     m.MoveUp()
     if m.cursor != 0 {
         t.Errorf("expected cursor to stay at 0, got %d", m.cursor)
     }
 }
 
-func TestMoveUp_Depth1_DoesNotCrossPaneHeader(t *testing.T) {
-    // cursor at procB (index 4) — MoveUp should not cross pane header at index 3
+func TestMoveUp_CrossesPaneHeaderLinearly(t *testing.T) {
+    // cursor at procB (index 4) — linear MoveUp goes to pane header at index 3
     m := modelAt(buildNodes(), 4)
     m.MoveUp()
-    // No sibling at depth 1 before the pane header, so cursor stays.
-    if m.cursor != 4 {
-        t.Errorf("expected cursor to stay at 4, got %d", m.cursor)
+    if m.cursor != 3 {
+        t.Errorf("expected cursor 3, got %d", m.cursor)
     }
 }
 
-func TestMoveUp_Depth2_DoesNotCrossParentProcess(t *testing.T) {
-    // cursor at procB-child (index 5) — MoveUp should not cross procB (depth 1)
+func TestMoveUp_CrossesDepthBoundaryLinearly(t *testing.T) {
+    // cursor at procB-child (index 5) — linear MoveUp goes to procB (index 4)
     m := modelAt(buildNodes(), 5)
     m.MoveUp()
-    // No sibling at depth 2 before procB within this scope, so cursor stays.
-    if m.cursor != 5 {
-        t.Errorf("expected cursor to stay at 5, got %d", m.cursor)
-    }
-}
-
-func TestMoveUp_Depth2_MovesToPrevSiblingAtSameDepth(t *testing.T) {
-    // Add a second depth-2 child so there is a peer to move to.
-    nodes := buildNodes()
-    nodes = append(nodes[:3], append([]ProcListNode{
-        {Proc: proc.Process{PID: 10, Name: "procA-child2"}, Depth: 2},
-    }, nodes[3:]...)...)
-    // nodes: [0]=pane0, [1]=procA, [2]=procA-child, [3]=procA-child2, [4]=pane1, ...
-    m := modelAt(nodes, 3) // cursor on procA-child2
-    m.MoveUp()
-    if m.cursor != 2 {
-        t.Errorf("expected cursor 2 (procA-child), got %d", m.cursor)
+    if m.cursor != 4 {
+        t.Errorf("expected cursor 4, got %d", m.cursor)
     }
 }
 
 // ---------- MoveDown tests ----------
 
-func TestMoveDown_Depth0_MovesToNextHeader(t *testing.T) {
+func TestMoveDown_MovesLinearlyDown(t *testing.T) {
     m := modelAt(buildNodes(), 0)
     m.MoveDown()
-    if m.cursor != 3 {
-        t.Errorf("expected cursor 3 (second pane header), got %d", m.cursor)
-    }
-}
-
-func TestMoveDown_Depth0_AtLastHeader_NoMove(t *testing.T) {
-    m := modelAt(buildNodes(), 3)
-    m.MoveDown()
-    if m.cursor != 3 {
-        t.Errorf("expected cursor to stay at 3, got %d", m.cursor)
-    }
-}
-
-func TestMoveDown_Depth1_DoesNotCrossPaneHeader(t *testing.T) {
-    // cursor at procA (index 1) — MoveDown should not cross pane header at index 3
-    m := modelAt(buildNodes(), 1)
-    m.MoveDown()
-    // No depth-1 peer after procA before the next header, so cursor stays.
     if m.cursor != 1 {
-        t.Errorf("expected cursor to stay at 1, got %d", m.cursor)
+        t.Errorf("expected cursor 1, got %d", m.cursor)
     }
 }
 
-func TestMoveDown_Depth2_DoesNotCrossParentProcess(t *testing.T) {
-    // cursor at procA-child (index 2) — MoveDown should not cross pane header (index 3)
+func TestMoveDown_AtLastNode_NoMove(t *testing.T) {
+    nodes := buildNodes()
+    m := modelAt(nodes, len(nodes)-1)
+    m.MoveDown()
+    if m.cursor != len(nodes)-1 {
+        t.Errorf("expected cursor to stay at %d, got %d", len(nodes)-1, m.cursor)
+    }
+}
+
+func TestMoveDown_CrossesPaneHeaderLinearly(t *testing.T) {
+    // cursor at procA-child (index 2) — linear MoveDown goes to pane header at index 3
     m := modelAt(buildNodes(), 2)
     m.MoveDown()
-    if m.cursor != 2 {
-        t.Errorf("expected cursor to stay at 2, got %d", m.cursor)
+    if m.cursor != 3 {
+        t.Errorf("expected cursor 3, got %d", m.cursor)
     }
 }
 

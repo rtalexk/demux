@@ -250,69 +250,17 @@ func nodeDepth(n ProcListNode) int {
     return n.Depth
 }
 
-// MoveUp moves the cursor to the previous sibling at the same depth level.
-// For depth 0 (pane headers): moves to previous pane header.
-// For depth 1/2: moves to previous node of the same depth without crossing a pane header.
+// MoveUp moves the cursor one item up (linear navigation).
 func (p *ProcListModel) MoveUp() {
-    if len(p.nodes) == 0 {
-        return
-    }
-    depth := nodeDepth(p.nodes[p.cursor])
-    for i := p.cursor - 1; i >= 0; i-- {
-        d := nodeDepth(p.nodes[i])
-        if depth == 0 {
-            // only stop at other pane headers
-            if p.nodes[i].IsPaneHeader {
-                p.cursor = i
-                return
-            }
-        } else {
-            // stop at a pane header (don't cross into another pane's scope)
-            if p.nodes[i].IsPaneHeader {
-                return
-            }
-            // for depth 2, stop at a depth-1 node (don't cross parent boundary)
-            if depth == 2 && d == 1 {
-                return
-            }
-            if d == depth {
-                p.cursor = i
-                return
-            }
-        }
+    if p.cursor > 0 {
+        p.cursor--
     }
 }
 
-// MoveDown moves the cursor to the next sibling at the same depth level.
-// For depth 0 (pane headers): moves to next pane header.
-// For depth 1/2: moves to next node of the same depth without crossing a pane header.
+// MoveDown moves the cursor one item down (linear navigation).
 func (p *ProcListModel) MoveDown() {
-    if len(p.nodes) == 0 {
-        return
-    }
-    depth := nodeDepth(p.nodes[p.cursor])
-    for i := p.cursor + 1; i < len(p.nodes); i++ {
-        d := nodeDepth(p.nodes[i])
-        if depth == 0 {
-            // only stop at other pane headers
-            if p.nodes[i].IsPaneHeader {
-                p.cursor = i
-                return
-            }
-        } else {
-            // stop at a pane header (don't cross into another pane's scope)
-            if p.nodes[i].IsPaneHeader {
-                return
-            }
-            // for depth 2, stop at a depth-1 node (don't cross parent boundary)
-            if depth == 2 && d == 1 {
-                return
-            }
-            if d == depth {
-                p.cursor = i
-                return
-            }
-        }
+    if p.cursor < len(p.nodes)-1 {
+        p.cursor++
     }
 }
 
