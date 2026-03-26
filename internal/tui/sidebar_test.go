@@ -34,9 +34,10 @@ func TestClampViewport_cursorBelowWindow(t *testing.T) {
 	s := sidebarWithNodes(makeNodes(10))
 	s.cursor = 7
 	s.offset = 0
-	s.clampViewport(4) // visible rows 0-3; cursor 7 is below
-	if s.offset != 4 {
-		t.Errorf("expected offset=4, got %d", s.offset)
+	// effective = 4-2 = 2; offset = cursor - effective + 1 = 7-2+1 = 6
+	s.clampViewport(4)
+	if s.offset != 6 {
+		t.Errorf("expected offset=6, got %d", s.offset)
 	}
 }
 
@@ -56,21 +57,20 @@ func TestMoveDown_advancesCursorAndClampsViewport(t *testing.T) {
 	s := sidebarWithNodes(makeNodes(5))
 	s.cursor = 0
 	s.offset = 0
-	s.MoveDown(3) // visibleRows=3, window 0-2
+	// effective = 3-2 = 1; cursor=1 >= offset(0)+effective(1) → offset=1
+	s.MoveDown(3)
 	if s.cursor != 1 {
 		t.Errorf("expected cursor=1, got %d", s.cursor)
 	}
-	if s.offset != 0 {
-		t.Errorf("expected offset=0, got %d", s.offset)
-	}
-	// push cursor out of window
+	// cursor=2 >= offset(1)+1 → offset=2
 	s.MoveDown(3)
-	s.MoveDown(3) // cursor=3, window should scroll to 1
+	// cursor=3 >= offset(2)+1 → offset=3
+	s.MoveDown(3)
 	if s.cursor != 3 {
 		t.Errorf("expected cursor=3, got %d", s.cursor)
 	}
-	if s.offset != 1 {
-		t.Errorf("expected offset=1, got %d", s.offset)
+	if s.offset != 3 {
+		t.Errorf("expected offset=3, got %d", s.offset)
 	}
 }
 

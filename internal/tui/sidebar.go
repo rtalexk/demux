@@ -330,11 +330,17 @@ func windowCWDFromPanes(panes []tmux.Pane) string {
 }
 
 func (s *SidebarModel) clampViewport(visibleRows int) {
+	// Reserve 2 rows for the ▲/▼ hint lines so the cursor is always
+	// within the rendered content area regardless of which hints appear.
+	effective := visibleRows - 2
+	if effective < 1 {
+		effective = 1
+	}
 	if s.cursor < s.offset {
 		s.offset = s.cursor
 	}
-	if s.cursor >= s.offset+visibleRows {
-		s.offset = s.cursor - visibleRows + 1
+	if s.cursor >= s.offset+effective {
+		s.offset = s.cursor - effective + 1
 	}
 	if s.offset < 0 {
 		s.offset = 0
