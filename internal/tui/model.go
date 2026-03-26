@@ -563,7 +563,14 @@ func (m Model) View() string {
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            sessionsTitle += "  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(frame)
+            spinner := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(frame)
+            // innerW = sidebarW - 2 (border) - 2 (padding); spinner is 1 rune wide
+            innerW := sidebarW - 4
+            pad := innerW - len([]rune("Sessions")) - 1
+            if pad < 1 {
+                pad = 1
+            }
+            sessionsTitle = "Sessions" + strings.Repeat(" ", pad) + spinner
             break
         }
     }
