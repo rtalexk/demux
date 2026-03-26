@@ -47,83 +47,40 @@ type Theme struct {
 	ColorCpuHigh lipgloss.Color
 }
 
-// DefaultTheme returns the Catppuccin Mocha palette.
-func DefaultTheme() Theme {
-	return Theme{
-		ColorBg:       "#0d0d14",
-		ColorSurface:  "#13131a",
-		ColorRaised:   "#1e1e2e",
-		ColorSelected: "#2a2a4a",
-		ColorBorder:   "#313244",
-
-		ColorFgPrimary: "#cdd6f4",
-		ColorFgSubtext: "#a6adc8",
-		ColorFgMuted:   "#7f849c",
-		ColorFgDim:     "#45455a",
-		ColorFgGhost:   "#313244",
-
-		ColorSession:    "#89b4fa",
-		ColorProcClaude: "#cba6f7",
-		ColorProcServer: "#89dceb",
-		ColorProcEditor: "#b4befe",
-		ColorProcChild:  "#a6adc8",
-
-		ColorGitDirty:  "#f9e2af",
-		ColorGitBehind: "#74c7ec",
-		ColorGitAhead:  "#a6e3a1",
-
-		ColorAlertInfo:  "#89b4fa",
-		ColorAlertWarn:  "#f9e2af",
-		ColorAlertError: "#f38ba8",
-
-		ColorPort:    "#a6e3a1",
-		ColorPortBg:  "#1a3a2a",
-		ColorClean:   "#a6e3a1",
-		ColorCpuLow:  "#7f849c",
-		ColorCpuMed:  "#f9e2af",
-		ColorCpuHigh: "#f38ba8",
-	}
-}
-
-// ThemeFromConfig applies any non-empty overrides from the config on top of the default theme.
+// ThemeFromConfig builds a Theme directly from the config values.
 func ThemeFromConfig(tc config.ThemeConfig) Theme {
-	t := DefaultTheme()
-	applyColor := func(dst *lipgloss.Color, src string) {
-		if src != "" {
-			*dst = lipgloss.Color(src)
-		}
+	return Theme{
+		ColorBg:       lipgloss.Color(tc.ColorBg),
+		ColorSurface:  lipgloss.Color(tc.ColorSurface),
+		ColorRaised:   lipgloss.Color(tc.ColorRaised),
+		ColorSelected: lipgloss.Color(tc.ColorSelected),
+		ColorBorder:   lipgloss.Color(tc.ColorBorder),
+
+		ColorFgPrimary: lipgloss.Color(tc.ColorFgPrimary),
+		ColorFgSubtext: lipgloss.Color(tc.ColorFgSubtext),
+		ColorFgMuted:   lipgloss.Color(tc.ColorFgMuted),
+		ColorFgDim:     lipgloss.Color(tc.ColorFgDim),
+		ColorFgGhost:   lipgloss.Color(tc.ColorFgGhost),
+
+		ColorSession:    lipgloss.Color(tc.ColorSession),
+		ColorProcClaude: lipgloss.Color(tc.ColorProcClaude),
+		ColorProcServer: lipgloss.Color(tc.ColorProcServer),
+		ColorProcEditor: lipgloss.Color(tc.ColorProcEditor),
+		ColorProcChild:  lipgloss.Color(tc.ColorProcChild),
+
+		ColorGitDirty:  lipgloss.Color(tc.ColorGitDirty),
+		ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),
+		ColorGitAhead:  lipgloss.Color(tc.ColorGitAhead),
+
+		ColorAlertInfo:  lipgloss.Color(tc.ColorAlertInfo),
+		ColorAlertWarn:  lipgloss.Color(tc.ColorAlertWarn),
+		ColorAlertError: lipgloss.Color(tc.ColorAlertError),
+
+		ColorPort:    lipgloss.Color(tc.ColorPort),
+		ColorPortBg:  lipgloss.Color(tc.ColorPortBg),
+		ColorClean:   lipgloss.Color(tc.ColorClean),
+		ColorCpuLow:  lipgloss.Color(tc.ColorCpuLow),
+		ColorCpuMed:  lipgloss.Color(tc.ColorCpuMed),
+		ColorCpuHigh: lipgloss.Color(tc.ColorCpuHigh),
 	}
-	applyColor(&t.ColorBg, tc.ColorBg)
-	applyColor(&t.ColorSurface, tc.ColorSurface)
-	applyColor(&t.ColorRaised, tc.ColorRaised)
-	applyColor(&t.ColorSelected, tc.ColorSelected)
-	applyColor(&t.ColorBorder, tc.ColorBorder)
-
-	applyColor(&t.ColorFgPrimary, tc.ColorFgPrimary)
-	applyColor(&t.ColorFgSubtext, tc.ColorFgSubtext)
-	applyColor(&t.ColorFgMuted, tc.ColorFgMuted)
-	applyColor(&t.ColorFgDim, tc.ColorFgDim)
-	applyColor(&t.ColorFgGhost, tc.ColorFgGhost)
-
-	applyColor(&t.ColorSession, tc.ColorSession)
-	applyColor(&t.ColorProcClaude, tc.ColorProcClaude)
-	applyColor(&t.ColorProcServer, tc.ColorProcServer)
-	applyColor(&t.ColorProcEditor, tc.ColorProcEditor)
-	applyColor(&t.ColorProcChild, tc.ColorProcChild)
-
-	applyColor(&t.ColorGitDirty, tc.ColorGitDirty)
-	applyColor(&t.ColorGitBehind, tc.ColorGitBehind)
-	applyColor(&t.ColorGitAhead, tc.ColorGitAhead)
-
-	applyColor(&t.ColorAlertInfo, tc.ColorAlertInfo)
-	applyColor(&t.ColorAlertWarn, tc.ColorAlertWarn)
-	applyColor(&t.ColorAlertError, tc.ColorAlertError)
-
-	applyColor(&t.ColorPort, tc.ColorPort)
-	applyColor(&t.ColorPortBg, tc.ColorPortBg)
-	applyColor(&t.ColorClean, tc.ColorClean)
-	applyColor(&t.ColorCpuLow, tc.ColorCpuLow)
-	applyColor(&t.ColorCpuMed, tc.ColorCpuMed)
-	applyColor(&t.ColorCpuHigh, tc.ColorCpuHigh)
-	return t
 }

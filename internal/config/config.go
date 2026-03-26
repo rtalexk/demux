@@ -20,8 +20,7 @@ type GitConfig struct {
     PR              GitPRConfig `toml:"pr"`
 }
 
-// ThemeConfig holds optional per-color overrides.
-// Any field left empty inherits the default Catppuccin Mocha value.
+// ThemeConfig holds all theme colour values.
 type ThemeConfig struct {
     ColorBg       string `toml:"color_bg"`
     ColorSurface  string `toml:"color_surface"`
@@ -91,6 +90,40 @@ func Default() Config {
             FallbackDisplay: "—",
             ErrorDisplay:    "git err",
             PR:              GitPRConfig{Enabled: false},
+        },
+        Theme: ThemeConfig{
+            ColorBg:       "#0d0d14",
+            ColorSurface:  "#13131a",
+            ColorRaised:   "#1e1e2e",
+            ColorSelected: "#2a2a4a",
+            ColorBorder:   "#313244",
+
+            ColorFgPrimary: "#cdd6f4",
+            ColorFgSubtext: "#a6adc8",
+            ColorFgMuted:   "#7f849c",
+            ColorFgDim:     "#45455a",
+            ColorFgGhost:   "#313244",
+
+            ColorSession:    "#89b4fa",
+            ColorProcClaude: "#cba6f7",
+            ColorProcServer: "#89dceb",
+            ColorProcEditor: "#b4befe",
+            ColorProcChild:  "#a6adc8",
+
+            ColorGitDirty:  "#f9e2af",
+            ColorGitBehind: "#74c7ec",
+            ColorGitAhead:  "#a6e3a1",
+
+            ColorAlertInfo:  "#89b4fa",
+            ColorAlertWarn:  "#f9e2af",
+            ColorAlertError: "#f38ba8",
+
+            ColorPort:    "#a6e3a1",
+            ColorPortBg:  "#1a3a2a",
+            ColorClean:   "#a6e3a1",
+            ColorCpuLow:  "#7f849c",
+            ColorCpuMed:  "#f9e2af",
+            ColorCpuHigh: "#f38ba8",
         },
         Processes: ProcessesConfig{
             Editors: []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"},
