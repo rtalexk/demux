@@ -354,6 +354,9 @@ func stripANSI(s string) string {
     return result.String()
 }
 
+// isSelectable reports whether the cursor may land on n.
+func isSelectable(n ProcListNode) bool { return !n.IsIdle }
+
 // nodeDepth returns the logical depth of a node: 0 for pane headers, otherwise Depth.
 func nodeDepth(n ProcListNode) int {
     if n.IsPaneHeader {
@@ -380,17 +383,23 @@ func (p *ProcListModel) clampOffset(visibleNodes int) {
     }
 }
 
-// MoveUp moves the cursor one item up (linear navigation).
+// MoveUp moves the cursor one item up, skipping idle placeholders.
 func (p *ProcListModel) MoveUp() {
-    if p.cursor > 0 {
-        p.cursor--
+    for i := p.cursor - 1; i >= 0; i-- {
+        if isSelectable(p.nodes[i]) {
+            p.cursor = i
+            return
+        }
     }
 }
 
-// MoveDown moves the cursor one item down (linear navigation).
+// MoveDown moves the cursor one item down, skipping idle placeholders.
 func (p *ProcListModel) MoveDown() {
-    if p.cursor < len(p.nodes)-1 {
-        p.cursor++
+    for i := p.cursor + 1; i < len(p.nodes); i++ {
+        if isSelectable(p.nodes[i]) {
+            p.cursor = i
+            return
+        }
     }
 }
 
@@ -466,7 +475,7 @@ func (p *ProcListModel) peersAtDepth(pos, depth int) []int {
 
     var peers []int
     for i := scopeStart; i <= scopeEnd; i++ {
-        if nodeDepth(p.nodes[i]) == depth {
+        if nodeDepth(p.nodes[i]) == depth && isSelectable(p.nodes[i]) {
             peers = append(peers, i)
         }
     }
@@ -504,5 +513,8 @@ func (p ProcListModel) SelectedNode() *ProcListNode {
         return nil
     }
     n := p.nodes[p.cursor]
+    if !isSelectable(n) {
+        return nil
+    }
     return &n
 }
