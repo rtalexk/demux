@@ -8,25 +8,13 @@ import (
 // activeTheme is set once at startup by initStyles.
 var activeTheme Theme
 
-// Process-type name lists. Populated by initStyles from built-in defaults
-// merged with any extra entries from the user's config.
+// Process-type name lists. Populated by initStyles from config.
 var (
 	activeProcEditors []string
 	activeProcAgents  []string
 	activeProcServers []string
 	activeProcShells  []string
 )
-
-var defaultProcEditors = []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"}
-var defaultProcAgents  = []string{"claude", "aider", "cursor", "copilot", "continue", "cody"}
-var defaultProcServers = []string{
-	"railway", "rails", "node", "deno", "bun",
-	"python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
-	"cargo", "go", "air", "watchexec",
-	"vite", "webpack", "next", "nuxt",
-	"caddy", "nginx", "httpd",
-}
-var defaultProcShells = []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"}
 
 // All package-level lipgloss styles. Populated by initStyles.
 var (
@@ -78,10 +66,10 @@ var (
 func initStyles(t Theme, procs config.ProcessesConfig) {
 	activeTheme = t
 
-	activeProcEditors = append(defaultProcEditors, procs.ExtraEditors...)
-	activeProcAgents  = append(defaultProcAgents, procs.ExtraAgents...)
-	activeProcServers = append(defaultProcServers, procs.ExtraServers...)
-	activeProcShells  = append(defaultProcShells, procs.ExtraShells...)
+	activeProcEditors = procs.Editors
+	activeProcAgents  = procs.Agents
+	activeProcServers = procs.Servers
+	activeProcShells  = procs.Shells
 
 	borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
 	borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)

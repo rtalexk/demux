@@ -60,22 +60,19 @@ enabled = false
 
 # ---------------------------------------------------------------------------
 # Process type classification
-# Each list is appended to the built-in defaults; you only need to list names
-# you want to add, not replace the entire set.
+# Edit these lists to control how process names are coloured in the TUI.
 # ---------------------------------------------------------------------------
 [processes]
-# extra_editors = ["zed", "lapce"]
-# extra_agents  = ["copilot-language-server", "gemini"]
-# extra_servers = ["puma", "sidekiq", "celery", "fastify"]
-# extra_shells  = ["nushell"]
-
-# Built-in defaults (for reference — these are always active):
-#   editors : nvim, vim, vi, nano, emacs, hx, micro, helix
-#   agents  : claude, aider, cursor, copilot, continue, cody
-#   servers : railway, rails, node, deno, bun, python, python3, uvicorn,
-#             gunicorn, fastapi, django, flask, cargo, go, air, watchexec,
-#             vite, webpack, next, nuxt, caddy, nginx, httpd
-#   shells  : zsh, bash, sh, fish, dash, nu, pwsh
+editors = ["nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"]
+agents  = ["claude", "aider", "cursor", "copilot", "continue", "cody"]
+servers = [
+  "railway", "rails", "node", "deno", "bun",
+  "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+  "cargo", "go", "air", "watchexec",
+  "vite", "webpack", "next", "nuxt",
+  "caddy", "nginx", "httpd",
+]
+shells  = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
 
 # ---------------------------------------------------------------------------
 # Theme (Catppuccin Mocha defaults — uncomment and edit to override)

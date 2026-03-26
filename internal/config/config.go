@@ -57,14 +57,13 @@ type ThemeConfig struct {
     ColorCpuHigh string `toml:"color_cpu_high"`
 }
 
-// ProcessesConfig lets users extend the built-in process-type lists.
-// Each field is appended to the default set; entries are matched
-// case-insensitively against the process's friendly name.
+// ProcessesConfig defines which process names belong to each display category.
+// Entries are matched case-insensitively against the process's friendly name.
 type ProcessesConfig struct {
-    ExtraEditors []string `toml:"extra_editors"`
-    ExtraAgents  []string `toml:"extra_agents"`
-    ExtraServers []string `toml:"extra_servers"`
-    ExtraShells  []string `toml:"extra_shells"`
+    Editors []string `toml:"editors"`
+    Agents  []string `toml:"agents"`
+    Servers []string `toml:"servers"`
+    Shells  []string `toml:"shells"`
 }
 
 type Config struct {
@@ -92,6 +91,18 @@ func Default() Config {
             FallbackDisplay: "—",
             ErrorDisplay:    "git err",
             PR:              GitPRConfig{Enabled: false},
+        },
+        Processes: ProcessesConfig{
+            Editors: []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"},
+            Agents:  []string{"claude", "aider", "cursor", "copilot", "continue", "cody"},
+            Servers: []string{
+                "railway", "rails", "node", "deno", "bun",
+                "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+                "cargo", "go", "air", "watchexec",
+                "vite", "webpack", "next", "nuxt",
+                "caddy", "nginx", "httpd",
+            },
+            Shells: []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"},
         },
     }
 }
