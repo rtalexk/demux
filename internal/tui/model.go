@@ -271,7 +271,7 @@ func (m *Model) populateYankFields() {
 		selNode := m.procList.SelectedNode()
 		if selNode != nil && !selNode.IsPaneHeader {
 			pr := selNode.Proc
-			cwd, _ := proc.CWD(pr.PID)
+			cwd := m.cwdMap[pr.PID]
 			portStr := ""
 			if selNode.Port > 0 {
 				portStr = fmt.Sprintf("%d", selNode.Port)
