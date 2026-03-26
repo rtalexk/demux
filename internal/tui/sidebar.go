@@ -30,6 +30,7 @@ type SidebarNode struct {
 type SidebarModel struct {
 	nodes    []SidebarNode
 	cursor   int
+	offset   int // viewport scroll offset
 	sessions map[string]map[int][]tmux.Pane
 	alerts   map[string]db.Alert
 	gitInfo  map[string]git.Info
@@ -119,19 +120,42 @@ func (s *SidebarModel) rebuildNodes() {
 }
 
 func (s SidebarModel) Render(width, height int, focused bool) string {
-	border := borderInactive
-	if focused {
-		border = borderActive
+	visibleRows := height - 2
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	// compute display offset without mutating (Bubbletea passes model by value in View)
+	offset := s.offset
+	if s.cursor < offset {
+		offset = s.cursor
+	}
+	if s.cursor >= offset+visibleRows {
+		offset = s.cursor - visibleRows + 1
+	}
+	if offset < 0 {
+		offset = 0
 	}
 
 	var lines []string
-	for i, node := range s.nodes {
-		line := s.renderNode(node, i == s.cursor, width)
+	end := offset + visibleRows
+	if end > len(s.nodes) {
+		end = len(s.nodes)
+	}
+	for i := offset; i < end; i++ {
+		line := s.renderNode(s.nodes[i], i == s.cursor, width)
 		lines = append(lines, line)
+	}
+	if end < len(s.nodes) {
+		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("▼ more"))
 	}
 
 	inner := strings.Join(lines, "\n")
-	return border.Width(width - 2).Height(height - 2).Render(inner)
+	style := borderInactive
+	if focused {
+		style = borderActive
+	}
+	return style.Width(width - 2).Height(height - 2).Render(inner)
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected bool, width int) string {
@@ -276,16 +300,34 @@ func windowCWDFromPanes(panes []tmux.Pane) string {
 	return ""
 }
 
-func (s *SidebarModel) MoveUp() {
-	if s.cursor > 0 {
-		s.cursor--
+func (s *SidebarModel) clampViewport(visibleRows int) {
+	if s.cursor < s.offset {
+		s.offset = s.cursor
+	}
+	if s.cursor >= s.offset+visibleRows {
+		s.offset = s.cursor - visibleRows + 1
+	}
+	if s.offset < 0 {
+		s.offset = 0
 	}
 }
 
-func (s *SidebarModel) MoveDown() {
+func (s *SidebarModel) MoveUp(visibleRows int) {
+	if s.cursor > 0 {
+		s.cursor--
+	}
+	s.clampViewport(visibleRows)
+}
+
+func (s *SidebarModel) MoveDown(visibleRows int) {
 	if s.cursor < len(s.nodes)-1 {
 		s.cursor++
 	}
+	s.clampViewport(visibleRows)
+}
+
+func (s SidebarModel) WindowsForSession(session string) map[int][]tmux.Pane {
+	return s.sessions[session]
 }
 
 func (s *SidebarModel) ToggleExpand() {

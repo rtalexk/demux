@@ -211,13 +211,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	detailH := 8
+	topH := m.height - detailH - 4
+	sidebarVisibleRows := topH - 2
+	if sidebarVisibleRows < 1 {
+		sidebarVisibleRows = 1
+	}
+
 	switch {
 	case key.Matches(msg, keys.Up):
-		m.sidebar.MoveUp()
+		m.sidebar.MoveUp(sidebarVisibleRows)
 	case key.Matches(msg, keys.Down):
-		m.sidebar.MoveDown()
+		m.sidebar.MoveDown(sidebarVisibleRows)
 	case key.Matches(msg, keys.Tab):
-		m.sidebar.MoveDown()
+		m.sidebar.MoveDown(sidebarVisibleRows)
 	case key.Matches(msg, keys.Enter):
 		if node := m.sidebar.Selected(); node != nil {
 			if node.IsSession {
@@ -461,21 +468,32 @@ func (m Model) View() string {
 	}
 
 	detailH := 8
-	topH := m.height - detailH - 3 // titlebar + statusbar
+	topH := m.height - detailH - 4 // titlebar + separator + statusbar
 
 	sidebar := m.sidebar.Render(sidebarW, topH, m.focus == panelSidebar)
 	procList := m.procList.Render(procW, topH, m.focus == panelProcList)
 	detail := m.detail.Render(m.width-2, detailH)
 
-	dotStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	if !m.pulse {
-		dotStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	}
-	dot := dotStyle.Render("●")
-	titlebar := lipgloss.NewStyle().Bold(true).Padding(0, 1).Render("demux " + dot)
+	// build breadcrumb from current sidebar selection
+	breadcrumb := m.breadcrumb()
+
+	leftHeader := lipgloss.NewStyle().
+		Bold(true).
+		Width(sidebarW).
+		Padding(0, 1).
+		Render("Sessions")
+
+	rightHeader := lipgloss.NewStyle().
+		Width(procW).
+		Padding(0, 1).
+		Render(breadcrumb)
+
+	titlebar := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, rightHeader)
+
+	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", m.width))
 
 	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, procList)
-	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, top, detail)
+	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, separator, top, detail)
 
 	statusBar := ""
 	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
@@ -498,6 +516,23 @@ func (m Model) View() string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
+}
+
+func (m Model) breadcrumb() string {
+	node := m.sidebar.Selected()
+	if node == nil {
+		return ""
+	}
+	if node.IsSession {
+		return node.Session
+	}
+	// window node: find window name from panes
+	windows := m.sidebar.WindowsForSession(node.Session)
+	winName := fmt.Sprintf("%d", node.WindowIndex)
+	if panes, ok := windows[node.WindowIndex]; ok && len(panes) > 0 {
+		winName = panes[0].WindowName
+	}
+	return node.Session + " / " + winName
 }
 
 func primaryCWDForPanes(windows map[int][]tmux.Pane) string {
