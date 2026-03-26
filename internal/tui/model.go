@@ -567,18 +567,21 @@ func (m Model) View() string {
     breadcrumb := m.breadcrumb()
 
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-    sessionsTitle := "Sessions"
+    sessionCount := m.sidebar.SessionCount()
+    sessionCountStr := hintStyle.Render(fmt.Sprintf("(%d)", sessionCount))
+    sessionsTitle := "Sessions " + sessionCountStr
+    titlePlainLen := len([]rune(fmt.Sprintf("Sessions (%d)", sessionCount)))
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
             spinner := spinnerStyle.Render(frame)
             // innerW = sidebarW - 2 (border) - 2 (padding); spinner is 1 rune wide
             innerW := sidebarW - 4
-            pad := innerW - len([]rune("Sessions")) - 1
+            pad := innerW - titlePlainLen - 1
             if pad < 1 {
                 pad = 1
             }
-            sessionsTitle = "Sessions" + strings.Repeat(" ", pad) + spinner
+            sessionsTitle = "Sessions " + sessionCountStr + strings.Repeat(" ", pad) + spinner
             break
         }
     }

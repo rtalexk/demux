@@ -499,6 +499,17 @@ func (s *SidebarModel) TabNextSession(visibleRows int) {
     s.clampViewport(visibleRows)
 }
 
+// SessionCount returns the number of visible (non-ignored) sessions.
+func (s SidebarModel) SessionCount() int {
+    count := 0
+    for _, n := range s.nodes {
+        if n.IsSession {
+            count++
+        }
+    }
+    return count
+}
+
 func (s SidebarModel) Selected() *SidebarNode {
     if s.cursor < 0 || s.cursor >= len(s.nodes) {
         return nil
