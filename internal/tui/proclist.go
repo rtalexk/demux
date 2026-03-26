@@ -259,6 +259,17 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
     return out
 }
 
+var procEditors = []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"}
+var procAgents = []string{"claude", "aider", "cursor", "copilot", "continue", "cody"}
+var procServers = []string{
+    "railway", "rails", "node", "deno", "bun",
+    "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+    "cargo", "go", "air", "watchexec",
+    "vite", "webpack", "next", "nuxt",
+    "caddy", "nginx", "httpd",
+}
+var procShells = []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"}
+
 // procNameStyle returns the appropriate lipgloss style for a process name
 // based on its type and tree depth.
 func procNameStyle(pr proc.Process, depth int) lipgloss.Style {
@@ -267,21 +278,26 @@ func procNameStyle(pr proc.Process, depth int) lipgloss.Style {
     }
     name := strings.ToLower(pr.FriendlyName())
     switch {
-    case name == "nvim" || name == "vim" || name == "vi" || name == "nano" || name == "emacs" || name == "hx":
+    case containsStr(procEditors, name):
         return lipgloss.NewStyle().Foreground(activeTheme.ColorProcEditor)
-    case name == "claude" || strings.HasPrefix(name, "claude-"):
+    case containsStr(procAgents, name) || strings.HasPrefix(name, "claude-"):
         return lipgloss.NewStyle().Foreground(activeTheme.ColorProcClaude)
-    case name == "railway" || name == "rails" || name == "node" || name == "deno" || name == "bun" ||
-        name == "python" || name == "python3" || name == "uvicorn" || name == "gunicorn" ||
-        name == "fastapi" || name == "django" || name == "flask" || name == "cargo" ||
-        name == "go" || name == "air" || name == "watchexec" || name == "vite" || name == "webpack" ||
-        name == "next" || name == "nuxt" || name == "caddy" || name == "nginx" || name == "httpd":
+    case containsStr(procServers, name):
         return lipgloss.NewStyle().Foreground(activeTheme.ColorProcServer)
-    case name == "zsh" || name == "bash" || name == "sh" || name == "fish" || name == "dash":
+    case containsStr(procShells, name):
         return lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
     default:
         return lipgloss.NewStyle().Foreground(activeTheme.ColorFgPrimary)
     }
+}
+
+func containsStr(list []string, s string) bool {
+    for _, v := range list {
+        if v == s {
+            return true
+        }
+    }
+    return false
 }
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
