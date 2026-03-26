@@ -23,10 +23,10 @@ var (
 
 type ProcListNode struct {
     IsPaneHeader bool
+    IsIdle       bool // placeholder row shown when a pane has no processes
     Pane         tmux.Pane
     GitDeviant   bool
     GitInfo      git.Info
-    Empty        bool // true for pane headers with no child processes
     Proc         proc.Process
     Port         int
     Depth        int // 0=pane header, 1=process, 2=subprocess
@@ -106,8 +106,8 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
             }
         }
         if len(p.nodes) == headerIdx+1 {
-            // no children were added — mark pane as idle
-            p.nodes[headerIdx].Empty = true
+            // no children were added — insert an idle placeholder at process depth
+            p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
         }
     }
 }
@@ -154,6 +154,8 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         var line string
         if node.IsPaneHeader {
             line = p.renderPaneHeader(node, selected)
+        } else if node.IsIdle {
+            line = paneIdleStyle.Render("  idle")
         } else {
             line = p.renderProc(node, selected)
         }
@@ -252,11 +254,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
     if selected {
         return selectedBG.Render(text)
     }
-    line := paneHeaderStyle.Render(text)
-    if node.Empty {
-        line += "  " + paneIdleStyle.Render("idle")
-    }
-    return line
+    return paneHeaderStyle.Render(text)
 }
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
