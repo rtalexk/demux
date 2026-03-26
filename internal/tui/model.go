@@ -468,7 +468,7 @@ func (m Model) View() string {
 	}
 
 	detailH := 8
-	topH := m.height - detailH - 3 // titlebar + statusbar
+	topH := m.height - detailH - 4 // titlebar (3 rows: border+content+border) + statusbar
 
 	sidebar := m.sidebar.Render(sidebarW, topH, m.focus == panelSidebar)
 	procList := m.procList.Render(procW, topH, m.focus == panelProcList)
