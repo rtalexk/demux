@@ -20,6 +20,7 @@ type keyMap struct {
     JumpUp        key.Binding
     JumpDown      key.Binding
     Tab           key.Binding
+    ShiftTab      key.Binding
 }
 
 var keys = keyMap{
@@ -40,4 +41,5 @@ var keys = keyMap{
     JumpUp:        key.NewBinding(key.WithKeys("K")),
     JumpDown:      key.NewBinding(key.WithKeys("J")),
     Tab:           key.NewBinding(key.WithKeys("tab")),
+    ShiftTab:      key.NewBinding(key.WithKeys("shift+tab")),
 }

@@ -265,7 +265,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Down):
         m.sidebar.MoveDown(sidebarVisibleRows)
     case key.Matches(msg, keys.Tab):
-        m.sidebar.MoveDown(sidebarVisibleRows)
+        m.sidebar.TabNextSession(sidebarVisibleRows)
+    case key.Matches(msg, keys.ShiftTab):
+        m.sidebar.TabPrevSession(sidebarVisibleRows)
     case key.Matches(msg, keys.Enter):
         if node := m.sidebar.Selected(); node != nil {
             if node.IsSession {

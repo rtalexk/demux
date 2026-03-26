@@ -459,6 +459,60 @@ func (s *SidebarModel) MoveToSessionLevel() {
     }
 }
 
+// TabPrevSession moves the cursor to the previous session node, wrapping around.
+func (s *SidebarModel) TabPrevSession(visibleRows int) {
+    if len(s.nodes) == 0 {
+        return
+    }
+    var sessions []int
+    for i, n := range s.nodes {
+        if n.IsSession {
+            sessions = append(sessions, i)
+        }
+    }
+    if len(sessions) == 0 {
+        return
+    }
+    cur := s.cursor
+    for i := len(sessions) - 1; i >= 0; i-- {
+        if sessions[i] < cur {
+            s.cursor = sessions[i]
+            s.clampViewport(visibleRows)
+            return
+        }
+    }
+    // wrap: go to the last session
+    s.cursor = sessions[len(sessions)-1]
+    s.clampViewport(visibleRows)
+}
+
+// TabNextSession advances the cursor to the next session node, wrapping around.
+func (s *SidebarModel) TabNextSession(visibleRows int) {
+    if len(s.nodes) == 0 {
+        return
+    }
+    var sessions []int
+    for i, n := range s.nodes {
+        if n.IsSession {
+            sessions = append(sessions, i)
+        }
+    }
+    if len(sessions) == 0 {
+        return
+    }
+    cur := s.cursor
+    for _, idx := range sessions {
+        if idx > cur {
+            s.cursor = idx
+            s.clampViewport(visibleRows)
+            return
+        }
+    }
+    // wrap: go back to the first session
+    s.cursor = sessions[0]
+    s.clampViewport(visibleRows)
+}
+
 func (s SidebarModel) Selected() *SidebarNode {
     if s.cursor < 0 || s.cursor >= len(s.nodes) {
         return nil
