@@ -12,23 +12,7 @@ import (
     "github.com/rtalex/demux/internal/tmux"
 )
 
-var (
-    borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
-    borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
-    sessionStyle   = lipgloss.NewStyle().Bold(true)
-    windowIndent   = "   "
-    selectedBG       = lipgloss.NewStyle().Background(selectedBGColor).Foreground(lipgloss.Color("230"))
-    selectedInactive = lipgloss.NewStyle().Foreground(selectedBGColor)
-
-    // git indicator colours (shared across sidebar and detail panel)
-    gitAheadStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("76"))  // green
-    gitBehindStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // red
-    gitDirtyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // yellow
-)
-
-// selectedBGColor is the background colour used for focused-selected rows.
-// Kept as a named value so indicator styles can reuse it.
-const selectedBGColor = lipgloss.Color("62")
+const windowIndent = "   "
 
 type SidebarNode struct {
     Session     string
@@ -149,7 +133,6 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
         offset = 0
     }
 
-    hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
     hasAbove := offset > 0
     hasBelow := offset+visibleRows < len(s.nodes)
 
@@ -229,7 +212,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     var indParts []string
     if info, ok := s.gitInfo[node.Session]; ok {
         if selected && focused {
-            if ind := compactGitIndicatorsOnBG(info, selectedBGColor); ind != "" {
+            if ind := compactGitIndicatorsOnBG(info, activeTheme.ColorSelected); ind != "" {
                 indParts = append(indParts, ind)
             }
         } else {
@@ -241,7 +224,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     for target, a := range s.alerts {
         if strings.HasPrefix(target, node.Session+":") {
             if selected && focused {
-                indParts = append(indParts, alertIconOnBG(a.Level, selectedBGColor))
+                indParts = append(indParts, alertIconOnBG(a.Level, activeTheme.ColorSelected))
             } else {
                 indParts = append(indParts, alertIcon(a.Level))
             }
@@ -267,7 +250,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
         if pad < 0 {
             pad = 0
         }
-        trail := lipgloss.NewStyle().Background(selectedBGColor).Render("  ")
+        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
         return selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
@@ -295,7 +278,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
         devInd := "↪"
         if info, ok := s.gitInfo[gitKey]; ok {
             if selected && focused {
-                if ind := compactGitIndicatorsOnBG(info, selectedBGColor); ind != "" {
+                if ind := compactGitIndicatorsOnBG(info, activeTheme.ColorSelected); ind != "" {
                     devInd += " " + ind
                 }
             } else {
@@ -309,7 +292,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
     if a, ok := s.alerts[target]; ok {
         if selected && focused {
-            indParts = append(indParts, alertIconOnBG(a.Level, selectedBGColor))
+            indParts = append(indParts, alertIconOnBG(a.Level, activeTheme.ColorSelected))
         } else {
             indParts = append(indParts, alertIcon(a.Level))
         }
@@ -333,7 +316,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
         if pad < 0 {
             pad = 0
         }
-        trail := lipgloss.NewStyle().Background(selectedBGColor).Render("  ")
+        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
         return selectedBG.Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
@@ -377,11 +360,11 @@ func compactGitIndicatorsOnBG(info git.Info, bg lipgloss.Color) string {
 func alertIcon(level string) string {
     switch level {
     case "info":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Render("●")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Render("●")
     case "warn":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render("")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Render("")
     case "error":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Render("⚑")
     }
     return ""
 }
@@ -389,11 +372,11 @@ func alertIcon(level string) string {
 func alertIconOnBG(level string, bg lipgloss.Color) string {
     switch level {
     case "info":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Background(bg).Render("●")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Background(bg).Render("●")
     case "warn":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Background(bg).Render("!")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Background(bg).Render("")
     case "error":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Background(bg).Render("✗")
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Background(bg).Render("⚑")
     }
     return ""
 }

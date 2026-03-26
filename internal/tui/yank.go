@@ -6,13 +6,8 @@ import (
     "runtime"
     "strings"
 
-    "github.com/charmbracelet/lipgloss"
 )
 
-var yankStyle = lipgloss.NewStyle().
-    Border(lipgloss.RoundedBorder()).
-    BorderForeground(lipgloss.Color("62")).
-    Padding(1, 2)
 
 type YankField struct {
     Key   string

@@ -69,6 +69,7 @@ type Model struct {
 }
 
 func New(cfg config.Config, database *db.DB) Model {
+    initStyles(ThemeFromConfig(cfg.Theme))
     return Model{
         cfg:     cfg,
         db:      database,
@@ -565,16 +566,12 @@ func (m Model) View() string {
     // build breadcrumb from current sidebar selection
     breadcrumb := m.breadcrumb()
 
-    headerBox := lipgloss.NewStyle().
-        Border(lipgloss.RoundedBorder()).
-        BorderForeground(lipgloss.Color("244"))
-
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     sessionsTitle := "Sessions"
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            spinner := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(frame)
+            spinner := spinnerStyle.Render(frame)
             // innerW = sidebarW - 2 (border) - 2 (padding); spinner is 1 rune wide
             innerW := sidebarW - 4
             pad := innerW - len([]rune("Sessions")) - 1
@@ -585,13 +582,13 @@ func (m Model) View() string {
             break
         }
     }
-    leftHeader := headerBox.
+    leftHeader := headerBoxStyle.
         Bold(true).
         Width(sidebarW - 2).
         Padding(0, 1).
         Render(sessionsTitle)
 
-    rightHeader := headerBox.
+    rightHeader := headerBoxStyle.
         Width(procW - 2).
         Padding(0, 1).
         Render(breadcrumb)

@@ -20,13 +20,51 @@ type GitConfig struct {
     PR              GitPRConfig `toml:"pr"`
 }
 
+// ThemeConfig holds optional per-color overrides.
+// Any field left empty inherits the default Catppuccin Mocha value.
+type ThemeConfig struct {
+    ColorBg       string `toml:"color_bg"`
+    ColorSurface  string `toml:"color_surface"`
+    ColorRaised   string `toml:"color_raised"`
+    ColorSelected string `toml:"color_selected"`
+    ColorBorder   string `toml:"color_border"`
+
+    ColorFgPrimary string `toml:"color_fg_primary"`
+    ColorFgSubtext string `toml:"color_fg_subtext"`
+    ColorFgMuted   string `toml:"color_fg_muted"`
+    ColorFgDim     string `toml:"color_fg_dim"`
+    ColorFgGhost   string `toml:"color_fg_ghost"`
+
+    ColorSession    string `toml:"color_session"`
+    ColorProcClaude string `toml:"color_proc_claude"`
+    ColorProcServer string `toml:"color_proc_server"`
+    ColorProcEditor string `toml:"color_proc_editor"`
+    ColorProcChild  string `toml:"color_proc_child"`
+
+    ColorGitDirty  string `toml:"color_git_dirty"`
+    ColorGitBehind string `toml:"color_git_behind"`
+    ColorGitAhead  string `toml:"color_git_ahead"`
+
+    ColorAlertInfo  string `toml:"color_alert_info"`
+    ColorAlertWarn  string `toml:"color_alert_warn"`
+    ColorAlertError string `toml:"color_alert_error"`
+
+    ColorPort    string `toml:"color_port"`
+    ColorPortBg  string `toml:"color_port_bg"`
+    ColorClean   string `toml:"color_clean"`
+    ColorCpuLow  string `toml:"color_cpu_low"`
+    ColorCpuMed  string `toml:"color_cpu_med"`
+    ColorCpuHigh string `toml:"color_cpu_high"`
+}
+
 type Config struct {
-    RefreshIntervalMs int      `toml:"refresh_interval_ms"`
-    IgnoredSessions   []string `toml:"ignored_sessions"`
-    DefaultFormat     string   `toml:"default_format"`
-    StatusBarFormat   string   `toml:"status_bar_format"`
-    SidebarWidth      int      `toml:"sidebar_width"`
-    Git               GitConfig `toml:"git"`
+    RefreshIntervalMs int         `toml:"refresh_interval_ms"`
+    IgnoredSessions   []string    `toml:"ignored_sessions"`
+    DefaultFormat     string      `toml:"default_format"`
+    StatusBarFormat   string      `toml:"status_bar_format"`
+    SidebarWidth      int         `toml:"sidebar_width"`
+    Git               GitConfig   `toml:"git"`
+    Theme             ThemeConfig `toml:"theme"`
 }
 
 func Default() Config {

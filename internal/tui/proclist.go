@@ -6,20 +6,12 @@ import (
     "strings"
     "time"
 
-    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
 )
 
-var (
-    procBorderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
-    procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
-    paneHeaderStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("33"))
-    procLine1Style     = lipgloss.NewStyle()
-    procLine2Style     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-)
 
 type ProcListNode struct {
     IsPaneHeader bool
@@ -136,11 +128,9 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
 
     if len(p.nodes) == 0 {
         hint := "Select a window with Enter"
-        inner := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render(hint)
+        inner := noSelectionStyle.Render(hint)
         return border.Width(width - 2).Height(height - 2).Render(inner)
     }
-
-    hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
     filter := strings.ToLower(p.filterText)
 
     // build the full rendered line list (respecting filter), tracking node index
@@ -237,7 +227,6 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
     return border.Width(width - 2).Height(height - 2).Render(inner)
 }
 
-var paneIdleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string {
     text := fmt.Sprintf("pane %d", node.Pane.PaneIndex)

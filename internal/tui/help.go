@@ -3,13 +3,8 @@ package tui
 import (
     "strings"
 
-    "github.com/charmbracelet/lipgloss"
 )
 
-var helpStyle = lipgloss.NewStyle().
-    Border(lipgloss.RoundedBorder()).
-    BorderForeground(lipgloss.Color("62")).
-    Padding(1, 2)
 
 type HelpModel struct{}
 

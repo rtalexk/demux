@@ -4,18 +4,12 @@ import (
     "fmt"
     "strings"
 
-    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
 )
 
-var (
-    detailBorder     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
-    detailLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(10)
-    detailValueStyle = lipgloss.NewStyle()
-)
 
 type DetailSelection int
 
@@ -99,7 +93,7 @@ func (d DetailModel) Render(width, height int) string {
         lines = d.renderProc(innerW)
     default:
         lines = []string{
-            lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render("No selection"),
+            noSelectionStyle.Render("No selection"),
         }
     }
     maxLines := height - 2

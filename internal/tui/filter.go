@@ -3,13 +3,8 @@ package tui
 import (
     "github.com/charmbracelet/bubbles/textinput"
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/charmbracelet/lipgloss"
 )
 
-var filterStyle = lipgloss.NewStyle().
-    Border(lipgloss.RoundedBorder()).
-    BorderForeground(lipgloss.Color("62")).
-    Padding(0, 1)
 
 type FilterModel struct {
     input textinput.Model
