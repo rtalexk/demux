@@ -246,7 +246,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     pr := node.Proc
     indent := "  " + strings.Repeat("  ", node.Depth) // 2-space base + depth indent
-    line1 := indent + pr.Name
+    line1 := indent + pr.FriendlyName()
     if pr.PID > 0 {
         line1 += fmt.Sprintf("  pid:%d", pr.PID)
     }

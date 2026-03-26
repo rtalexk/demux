@@ -168,7 +168,7 @@ func (d DetailModel) renderProc(innerWidth int) []string {
         cmd = string(cmdRunes)
     }
     lines := []string{
-        row("name", d.proc.Name),
+        row("name", d.proc.FriendlyName()),
         row("pid", fmt.Sprint(d.proc.PID)),
         row("cmd", cmd),
         row("uptime", formatProcDuration(d.proc.Uptime)),
