@@ -4,6 +4,7 @@ import (
     "fmt"
     "sort"
     "strings"
+    "time"
 
     "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
@@ -65,6 +66,20 @@ func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map
     }
 }
 
+// newestSessionAlert returns the most recent alert CreatedAt for a session
+// (checking both session-level and window-level targets), or zero time if none.
+func (s *SidebarModel) newestSessionAlert(session string) time.Time {
+    var newest time.Time
+    for target, a := range s.alerts {
+        if strings.HasPrefix(target, session+":") || target == session {
+            if a.CreatedAt.After(newest) {
+                newest = a.CreatedAt
+            }
+        }
+    }
+    return newest
+}
+
 func (s *SidebarModel) rebuildNodes() {
     // preserve expanded state
     expanded := map[string]bool{}
@@ -75,27 +90,38 @@ func (s *SidebarModel) rebuildNodes() {
     }
 
     s.nodes = nil
-    // sort sessions for stable ordering
+
+    // collect non-ignored sessions
     sessions := make([]string, 0, len(s.sessions))
     for name := range s.sessions {
-        sessions = append(sessions, name)
-    }
-    sort.Strings(sessions)
-
-    for _, name := range sessions {
-        if s.cfg.IgnoredSessions != nil {
-            ignored := false
-            for _, ig := range s.cfg.IgnoredSessions {
-                if ig == name {
-                    ignored = true
-                    break
-                }
-            }
-            if ignored {
-                continue
+        ignored := false
+        for _, ig := range s.cfg.IgnoredSessions {
+            if ig == name {
+                ignored = true
+                break
             }
         }
+        if !ignored {
+            sessions = append(sessions, name)
+        }
+    }
 
+    // sort: sessions with alerts first (newest alert desc), then alphabetical
+    sort.Slice(sessions, func(i, j int) bool {
+        ti := s.newestSessionAlert(sessions[i])
+        tj := s.newestSessionAlert(sessions[j])
+        hasI := !ti.IsZero()
+        hasJ := !tj.IsZero()
+        if hasI != hasJ {
+            return hasI
+        }
+        if hasI && hasJ && !ti.Equal(tj) {
+            return ti.After(tj)
+        }
+        return sessions[i] < sessions[j]
+    })
+
+    for _, name := range sessions {
         exp, ok := expanded[name]
         if !ok {
             exp = true // default expanded
@@ -107,7 +133,22 @@ func (s *SidebarModel) rebuildNodes() {
             for wi := range windows {
                 winIdxs = append(winIdxs, wi)
             }
-            sort.Ints(winIdxs)
+
+            // sort: windows with alerts first (newest alert desc), then by index
+            sort.Slice(winIdxs, func(i, j int) bool {
+                ki := fmt.Sprintf("%s:%d", name, winIdxs[i])
+                kj := fmt.Sprintf("%s:%d", name, winIdxs[j])
+                ai, hasi := s.alerts[ki]
+                aj, hasj := s.alerts[kj]
+                if hasi != hasj {
+                    return hasi
+                }
+                if hasi && hasj && !ai.CreatedAt.Equal(aj.CreatedAt) {
+                    return ai.CreatedAt.After(aj.CreatedAt)
+                }
+                return winIdxs[i] < winIdxs[j]
+            })
+
             for _, wi := range winIdxs {
                 s.nodes = append(s.nodes, SidebarNode{Session: name, WindowIndex: wi})
             }
