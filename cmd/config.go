@@ -57,6 +57,68 @@ error_display = "git err"
 [git.pr]
 # Enable pull-request info in the detail panel
 enabled = false
+
+# ---------------------------------------------------------------------------
+# Process type classification
+# Each list is appended to the built-in defaults; you only need to list names
+# you want to add, not replace the entire set.
+# ---------------------------------------------------------------------------
+[processes]
+# extra_editors = ["zed", "lapce"]
+# extra_agents  = ["copilot-language-server", "gemini"]
+# extra_servers = ["puma", "sidekiq", "celery", "fastify"]
+# extra_shells  = ["nushell"]
+
+# Built-in defaults (for reference — these are always active):
+#   editors : nvim, vim, vi, nano, emacs, hx, micro, helix
+#   agents  : claude, aider, cursor, copilot, continue, cody
+#   servers : railway, rails, node, deno, bun, python, python3, uvicorn,
+#             gunicorn, fastapi, django, flask, cargo, go, air, watchexec,
+#             vite, webpack, next, nuxt, caddy, nginx, httpd
+#   shells  : zsh, bash, sh, fish, dash, nu, pwsh
+
+# ---------------------------------------------------------------------------
+# Theme (Catppuccin Mocha defaults — uncomment and edit to override)
+# ---------------------------------------------------------------------------
+[theme]
+# Structure & chrome
+# color_bg       = "#0d0d14"
+# color_surface  = "#13131a"
+# color_raised   = "#1e1e2e"
+# color_selected = "#2a2a4a"
+# color_border   = "#313244"
+
+# Text hierarchy
+# color_fg_primary = "#cdd6f4"
+# color_fg_subtext = "#a6adc8"
+# color_fg_muted   = "#7f849c"
+# color_fg_dim     = "#45455a"
+# color_fg_ghost   = "#313244"
+
+# Process type colours
+# color_session     = "#89b4fa"
+# color_proc_claude = "#cba6f7"
+# color_proc_server = "#89dceb"
+# color_proc_editor = "#b4befe"
+# color_proc_child  = "#a6adc8"
+
+# Git status indicators
+# color_git_dirty  = "#f9e2af"
+# color_git_behind = "#74c7ec"
+# color_git_ahead  = "#a6e3a1"
+
+# Alert icons
+# color_alert_info  = "#89b4fa"
+# color_alert_warn  = "#f9e2af"
+# color_alert_error = "#f38ba8"
+
+# Semantic colours
+# color_port     = "#a6e3a1"
+# color_port_bg  = "#1a3a2a"
+# color_clean    = "#a6e3a1"
+# color_cpu_low  = "#7f849c"
+# color_cpu_med  = "#f9e2af"
+# color_cpu_high = "#f38ba8"
 `
 
 func init() {
