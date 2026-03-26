@@ -477,24 +477,22 @@ func (m Model) View() string {
 	// build breadcrumb from current sidebar selection
 	breadcrumb := m.breadcrumb()
 
-	dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	headerBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("244"))
 
-	leftHeader := lipgloss.NewStyle().
+	leftHeader := headerBox.
 		Bold(true).
-		Width(sidebarW - 1).
+		Width(sidebarW - 2).
 		Padding(0, 1).
 		Render("Sessions")
 
-	rightHeader := lipgloss.NewStyle().
-		Width(procW - 1).
+	rightHeader := headerBox.
+		Width(procW - 2).
 		Padding(0, 1).
 		Render(breadcrumb)
 
-	titlebar := lipgloss.JoinHorizontal(lipgloss.Top,
-		leftHeader,
-		dividerStyle.Render("│"),
-		rightHeader,
-	)
+	titlebar := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, rightHeader)
 
 	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, procList)
 	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, top, detail)
