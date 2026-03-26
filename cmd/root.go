@@ -8,6 +8,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/rtalex/demux/internal/config"
 	"github.com/rtalex/demux/internal/db"
+	"github.com/rtalex/demux/internal/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,9 +18,13 @@ var rootCmd = &cobra.Command{
 	Use:   "demux",
 	Short: "Monitor tmux sessions, processes, and alerts",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TUI launch — placeholder until Task 15
-		fmt.Println("TUI not yet implemented")
-		return nil
+		cfg := loadConfig()
+		database, err := db.Open(db.DefaultPath())
+		if err != nil {
+			return err
+		}
+		defer database.Close()
+		return tui.Run(cfg, database)
 	},
 }
 
