@@ -455,7 +455,10 @@ func (m Model) View() string {
 	if sidebarW <= 0 {
 		sidebarW = 30
 	}
-	procW := m.width - sidebarW - 2
+	procW := m.width - sidebarW
+	if procW < 10 {
+		procW = 10
+	}
 
 	detailH := 8
 	topH := m.height - detailH - 3 // titlebar + statusbar

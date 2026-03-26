@@ -15,7 +15,7 @@ import (
 
 var (
 	procBorderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
-	procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240"))
+	procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
 	paneHeaderStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("33"))
 	procLine1Style     = lipgloss.NewStyle().PaddingLeft(2)
 	procLine2Style     = lipgloss.NewStyle().PaddingLeft(4).Foreground(lipgloss.Color("240"))
@@ -93,6 +93,12 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
 	border := procBorderInactive
 	if focused {
 		border = procBorderActive
+	}
+
+	if len(p.nodes) == 0 {
+		hint := "Select a window with Enter"
+		inner := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render(hint)
+		return border.Width(width - 2).Height(height - 2).Render(inner)
 	}
 
 	filter := strings.ToLower(p.filterText)

@@ -14,7 +14,7 @@ import (
 
 var (
 	borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
-	borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240"))
+	borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
 	sessionStyle   = lipgloss.NewStyle().Bold(true)
 	windowIndent   = "  "
 	selectedBG     = lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230"))
@@ -126,7 +126,7 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
 
 	var lines []string
 	for i, node := range s.nodes {
-		line := s.renderNode(node, i == s.cursor)
+		line := s.renderNode(node, i == s.cursor, width)
 		lines = append(lines, line)
 	}
 
@@ -134,12 +134,12 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
 	return border.Width(width - 2).Height(height - 2).Render(inner)
 }
 
-func (s SidebarModel) renderNode(node SidebarNode, selected bool) string {
+func (s SidebarModel) renderNode(node SidebarNode, selected bool, width int) string {
 	var text string
 	if node.IsSession {
-		text = s.renderSession(node)
+		text = s.renderSession(node, width)
 	} else {
-		text = s.renderWindow(node)
+		text = s.renderWindow(node, width)
 	}
 	if selected {
 		return selectedBG.Render(text)
@@ -147,37 +147,49 @@ func (s SidebarModel) renderNode(node SidebarNode, selected bool) string {
 	return text
 }
 
-func (s SidebarModel) renderSession(node SidebarNode) string {
+func (s SidebarModel) renderSession(node SidebarNode, width int) string {
 	prefix := "▼ "
 	if !node.Expanded {
 		prefix = "▶ "
 	}
-	text := prefix + node.Session
 
+	// Build the indicator suffix first
+	indicatorSuffix := ""
 	if info, ok := s.gitInfo[node.Session]; ok {
 		if info.Loading {
-			text += "  …"
+			indicatorSuffix += "  …"
 		} else {
 			if ind := compactGitIndicators(info); ind != "" {
-				text += "  " + ind
+				indicatorSuffix += "  " + ind
 			}
 		}
 	} else if s.cfg.Git.Enabled {
-		text += "  …"
+		indicatorSuffix += "  …"
 	}
-
-	// alert indicator on session (any alert targeting this session)
 	for target, a := range s.alerts {
 		if strings.HasPrefix(target, node.Session+":") {
-			text += "  " + alertIcon(a.Level)
+			indicatorSuffix += "  " + alertIcon(a.Level)
 			break
 		}
 	}
 
+	// Truncate session name to fit available width, leaving room for indicators
+	maxW := width - 4
+	nameRunes := []rune(prefix + node.Session)
+	indRunes := len([]rune(stripANSI(indicatorSuffix)))
+	maxName := maxW - indRunes
+	if maxName < 4 {
+		maxName = 4
+	}
+	if len(nameRunes) > maxName {
+		nameRunes = append(nameRunes[:maxName-1], '…')
+	}
+	text := string(nameRunes) + indicatorSuffix
+
 	return sessionStyle.Render(text)
 }
 
-func (s SidebarModel) renderWindow(node SidebarNode) string {
+func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
 	windows := s.sessions[node.Session]
 	primaryCWD := primaryCWDForPanes(windows)
 	wPanes := windows[node.WindowIndex]
@@ -187,31 +199,41 @@ func (s SidebarModel) renderWindow(node SidebarNode) string {
 		name = fmt.Sprintf("%d: %s", node.WindowIndex, wPanes[0].WindowName)
 	}
 
-	text := windowIndent + name
-
-	// check if window is deviant
+	// Build the indicator suffix first
+	indicatorSuffix := ""
 	winCWD := windowCWDFromPanes(wPanes)
 	if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
 		gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
 		if info, ok := s.gitInfo[gitKey]; ok {
 			if info.Loading {
-				text += "  ↪ …"
+				indicatorSuffix += "  ↪ …"
 			} else {
-				text += "  ↪"
+				indicatorSuffix += "  ↪"
 				if ind := compactGitIndicators(info); ind != "" {
-					text += " " + ind
+					indicatorSuffix += " " + ind
 				}
 			}
 		} else {
-			text += "  ↪ …"
+			indicatorSuffix += "  ↪ …"
 		}
 	}
-
-	// alert indicator
 	target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
 	if a, ok := s.alerts[target]; ok {
-		text += "  " + alertIcon(a.Level)
+		indicatorSuffix += "  " + alertIcon(a.Level)
 	}
+
+	// Truncate name to fit available width, leaving room for indicators
+	maxW := width - 4
+	nameRunes := []rune(windowIndent + name)
+	indRunes := len([]rune(stripANSI(indicatorSuffix)))
+	maxName := maxW - indRunes
+	if maxName < 4 {
+		maxName = 4
+	}
+	if len(nameRunes) > maxName {
+		nameRunes = append(nameRunes[:maxName-1], '…')
+	}
+	text := string(nameRunes) + indicatorSuffix
 
 	return text
 }

@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	detailBorder     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("240"))
+	detailBorder     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
 	detailLabelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Width(10)
 	detailValueStyle = lipgloss.NewStyle()
 )
@@ -61,7 +61,9 @@ func (d DetailModel) Render(width, height int) string {
 	case DetailProc:
 		lines = d.renderProc()
 	default:
-		lines = []string{""}
+		lines = []string{
+			lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true).Render("No selection"),
+		}
 	}
 	inner := strings.Join(lines, "\n")
 	return detailBorder.Width(width - 2).Height(height - 2).Render(inner)
