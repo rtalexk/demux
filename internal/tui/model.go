@@ -632,8 +632,9 @@ func (m Model) breadcrumb() string {
     if node == nil {
         return ""
     }
+    sess := sessionStyle.Render(node.Session)
     if node.IsSession {
-        return node.Session
+        return sess
     }
     // window node: find window name from panes
     windows := m.sidebar.WindowsForSession(node.Session)
@@ -641,7 +642,7 @@ func (m Model) breadcrumb() string {
     if panes, ok := windows[node.WindowIndex]; ok && len(panes) > 0 {
         winName = panes[0].WindowName
     }
-    return node.Session + " / " + winName
+    return sess + " / " + winName
 }
 
 func primaryCWDForPanes(windows map[int][]tmux.Pane) string {
