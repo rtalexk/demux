@@ -69,6 +69,8 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
     globalSeen := make(map[int32]bool)
 
     p.nodes = nil
+    p.cursor = 0
+    p.offset = 0
     for _, pane := range sortPanes(wPanes) {
         paneCWD := pane.CWD
         gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
