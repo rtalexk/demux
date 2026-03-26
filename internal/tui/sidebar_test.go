@@ -171,7 +171,7 @@ func TestRenderSession_longNameTruncated(t *testing.T) {
         {Session: "a-very-long-session-name-that-exceeds-width", IsSession: true},
     })
     width := 20
-    text := s.renderSession(s.nodes[0], width)
+    text := s.renderSession(s.nodes[0], false, false, width)
     runes := []rune(stripANSI(text))
     if len(runes) > width-2 {
         t.Errorf("rendered length %d exceeds available width %d", len(runes), width-2)
@@ -185,7 +185,7 @@ func TestRenderSession_shortNameNotTruncated(t *testing.T) {
     s := sidebarWithNodes([]SidebarNode{
         {Session: "short", IsSession: true},
     })
-    text := s.renderSession(s.nodes[0], 40)
+    text := s.renderSession(s.nodes[0], false, false, 40)
     if strings.Contains(stripANSI(text), "…") {
         t.Error("unexpected ellipsis for short name")
     }

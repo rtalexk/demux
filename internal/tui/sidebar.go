@@ -17,14 +17,18 @@ var (
     borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
     sessionStyle   = lipgloss.NewStyle().Bold(true)
     windowIndent   = "  "
-    selectedBG       = lipgloss.NewStyle().Background(lipgloss.Color("62")).Foreground(lipgloss.Color("230"))
-    selectedInactive = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+    selectedBG       = lipgloss.NewStyle().Background(selectedBGColor).Foreground(lipgloss.Color("230"))
+    selectedInactive = lipgloss.NewStyle().Foreground(selectedBGColor)
 
     // git indicator colours (shared across sidebar and detail panel)
     gitAheadStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("76"))  // green
     gitBehindStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196")) // red
     gitDirtyStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("220")) // yellow
 )
+
+// selectedBGColor is the background colour used for focused-selected rows.
+// Kept as a named value so indicator styles can reuse it.
+const selectedBGColor = lipgloss.Color("62")
 
 type SidebarNode struct {
     Session     string
@@ -195,19 +199,10 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {
-    var text string
     if node.IsSession {
-        text = s.renderSession(node, width)
-    } else {
-        text = s.renderWindow(node, width)
+        return s.renderSession(node, selected, focused, width)
     }
-    if selected {
-        if focused {
-            return selectedBG.Render(text)
-        }
-        return selectedInactive.Render(text)
-    }
-    return text
+    return s.renderWindow(node, selected, focused, width)
 }
 
 // alignedRow builds a single sidebar line with the name on the left and
@@ -223,22 +218,33 @@ func alignedRow(name, indicators string, availWidth int) string {
     return name + strings.Repeat(" ", pad) + indicators
 }
 
-func (s SidebarModel) renderSession(node SidebarNode, width int) string {
+func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
     prefix := "▼ "
     if !node.Expanded {
         prefix = "▶ "
     }
 
-    // build indicators (no leading spaces — alignedRow handles padding)
+    // Build indicators; when focused-selected, bake in the BG colour so inner
+    // ANSI resets don't strip the row background mid-line.
     var indParts []string
     if info, ok := s.gitInfo[node.Session]; ok {
-        if ind := compactGitIndicators(info); ind != "" {
-            indParts = append(indParts, ind)
+        if selected && focused {
+            if ind := compactGitIndicatorsOnBG(info, selectedBGColor); ind != "" {
+                indParts = append(indParts, ind)
+            }
+        } else {
+            if ind := compactGitIndicators(info); ind != "" {
+                indParts = append(indParts, ind)
+            }
         }
     }
     for target, a := range s.alerts {
         if strings.HasPrefix(target, node.Session+":") {
-            indParts = append(indParts, alertIcon(a.Level))
+            if selected && focused {
+                indParts = append(indParts, alertIconOnBG(a.Level, selectedBGColor))
+            } else {
+                indParts = append(indParts, alertIcon(a.Level))
+            }
             break
         }
     }
@@ -246,7 +252,7 @@ func (s SidebarModel) renderSession(node SidebarNode, width int) string {
 
     availW := width - 4
     indW := len([]rune(stripANSI(indicators)))
-    maxName := availW - indW - 1 // -1 for the padding space
+    maxName := availW - indW - 1
     if maxName < 4 {
         maxName = 4
     }
@@ -254,12 +260,23 @@ func (s SidebarModel) renderSession(node SidebarNode, width int) string {
     if len(nameRunes) > maxName {
         nameRunes = append(nameRunes[:maxName-1], '…')
     }
+    nameStr := string(nameRunes)
 
-    text := alignedRow(string(nameRunes), indicators, availW)
+    if selected && focused {
+        pad := availW - len([]rune(nameStr)) - indW
+        if pad < 1 {
+            pad = 1
+        }
+        return selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+    }
+    text := alignedRow(nameStr, indicators, availW)
+    if selected {
+        return selectedInactive.Bold(true).Render(text)
+    }
     return sessionStyle.Render(text)
 }
 
-func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
+func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, width int) string {
     windows := s.sessions[node.Session]
     primaryCWD := primaryCWDForPanes(windows)
     wPanes := windows[node.WindowIndex]
@@ -276,15 +293,25 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
         gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
         devInd := "↪"
         if info, ok := s.gitInfo[gitKey]; ok {
-            if ind := compactGitIndicators(info); ind != "" {
-                devInd += " " + ind
+            if selected && focused {
+                if ind := compactGitIndicatorsOnBG(info, selectedBGColor); ind != "" {
+                    devInd += " " + ind
+                }
+            } else {
+                if ind := compactGitIndicators(info); ind != "" {
+                    devInd += " " + ind
+                }
             }
         }
         indParts = append(indParts, devInd)
     }
     target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
     if a, ok := s.alerts[target]; ok {
-        indParts = append(indParts, alertIcon(a.Level))
+        if selected && focused {
+            indParts = append(indParts, alertIconOnBG(a.Level, selectedBGColor))
+        } else {
+            indParts = append(indParts, alertIcon(a.Level))
+        }
     }
     indicators := strings.Join(indParts, " ")
 
@@ -298,8 +325,20 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
     if len(nameRunes) > maxName {
         nameRunes = append(nameRunes[:maxName-1], '…')
     }
+    nameStr := string(nameRunes)
 
-    return alignedRow(string(nameRunes), indicators, availW)
+    if selected && focused {
+        pad := availW - len([]rune(nameStr)) - indW
+        if pad < 1 {
+            pad = 1
+        }
+        return selectedBG.Render(nameStr+strings.Repeat(" ", pad)) + indicators
+    }
+    text := alignedRow(nameStr, indicators, availW)
+    if selected {
+        return selectedInactive.Render(text)
+    }
+    return text
 }
 
 func compactGitIndicators(info git.Info) string {
@@ -316,6 +355,23 @@ func compactGitIndicators(info git.Info) string {
     return strings.Join(parts, " ")
 }
 
+// compactGitIndicatorsOnBG renders git indicators with bg baked into each
+// piece so that inner ANSI resets don't strip a parent background colour.
+func compactGitIndicatorsOnBG(info git.Info, bg lipgloss.Color) string {
+    var parts []string
+    if info.Ahead > 0 {
+        parts = append(parts, gitAheadStyle.Background(bg).Render(fmt.Sprintf("↑%d", info.Ahead)))
+    }
+    if info.Behind > 0 {
+        parts = append(parts, gitBehindStyle.Background(bg).Render(fmt.Sprintf("↓%d", info.Behind)))
+    }
+    if info.Dirty {
+        parts = append(parts, gitDirtyStyle.Background(bg).Render("*"))
+    }
+    sep := lipgloss.NewStyle().Background(bg).Render(" ")
+    return strings.Join(parts, sep)
+}
+
 func alertIcon(level string) string {
     switch level {
     case "info":
@@ -324,6 +380,18 @@ func alertIcon(level string) string {
         return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render("")
     case "error":
         return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("")
+    }
+    return ""
+}
+
+func alertIconOnBG(level string, bg lipgloss.Color) string {
+    switch level {
+    case "info":
+        return lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Background(bg).Render("●")
+    case "warn":
+        return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Background(bg).Render("!")
+    case "error":
+        return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Background(bg).Render("✗")
     }
     return ""
 }
