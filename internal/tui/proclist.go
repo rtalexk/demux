@@ -249,25 +249,32 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     pr := node.Proc
     indent := "  " + strings.Repeat("  ", node.Depth) // 2-space base + depth indent
-    line1 := indent + pr.FriendlyName()
+
+    // line 1: name  pid:N  :port
+    name := indent + pr.FriendlyName()
+    var line1 string
+    if selected {
+        line1 = selectedBG.Render(name)
+    } else {
+        line1 = procLine1Style.Render(name)
+    }
     if pr.PID > 0 {
-        line1 += fmt.Sprintf("  pid:%d", pr.PID)
+        line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
     }
     if node.Port > 0 {
-        line1 += fmt.Sprintf("  :%d", node.Port)
+        line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
     }
-    line2 := fmt.Sprintf("cpu:%.1f%%  mem:%.1fMB  up:%s",
-        pr.CPU,
-        float64(pr.MemRSS)/1024/1024,
-        formatProcDuration(pr.Uptime),
-    )
 
-    l1 := procLine1Style.Render(line1)
-    l2 := procLine2Style.Render("    " + strings.Repeat("  ", node.Depth) + line2) // 4-space base + depth indent
-    if selected {
-        l1 = selectedBG.Render(line1)
-    }
-    return l1 + "\n" + l2
+    // line 2: cpu:V  mem:V  up:V  (labels dim, values muted)
+    statsIndent := "    " + strings.Repeat("  ", node.Depth)
+    l := statLabelStyle.Render
+    v := statValueStyle.Render
+    line2 := statsIndent +
+        l("cpu:") + v(fmt.Sprintf("%.1f%%", pr.CPU)) + "  " +
+        l("mem:") + v(fmt.Sprintf("%.1fMB", float64(pr.MemRSS)/1024/1024)) + "  " +
+        l("up:") + v(formatProcDuration(pr.Uptime))
+
+    return line1 + "\n" + line2
 }
 
 func formatProcDuration(d time.Duration) string {

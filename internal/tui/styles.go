@@ -36,6 +36,8 @@ var (
 	detailValueStyle lipgloss.Style
 	noSelectionStyle lipgloss.Style
 	spinnerStyle     lipgloss.Style
+	statLabelStyle   lipgloss.Style
+	statValueStyle   lipgloss.Style
 
 	// Selection
 	selectedBG       lipgloss.Style
@@ -74,6 +76,8 @@ func initStyles(t Theme) {
 	detailValueStyle = lipgloss.NewStyle().Foreground(t.ColorFgPrimary)
 	noSelectionStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Italic(true)
 	spinnerStyle     = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
+	statLabelStyle   = lipgloss.NewStyle().Foreground(t.ColorFgDim)
+	statValueStyle   = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 
 	selectedBG       = lipgloss.NewStyle().Background(t.ColorSelected).Foreground(t.ColorFgPrimary)
 	selectedInactive = lipgloss.NewStyle().Foreground(t.ColorSession)
