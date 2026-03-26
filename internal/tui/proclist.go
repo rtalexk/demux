@@ -142,7 +142,7 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
     }
     var allLines []renderedLine
     for i, node := range p.nodes {
-        selected := i == p.cursor
+        selected := focused && i == p.cursor
         var line string
         if node.IsPaneHeader {
             line = p.renderPaneHeader(node, selected)
