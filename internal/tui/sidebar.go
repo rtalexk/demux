@@ -312,12 +312,16 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     nameStr := string(nameRunes)
 
     if selected && focused {
-        pad := availW - len([]rune(nameStr)) - indW
+        accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
+        // nameStr starts with windowIndent ("   "); replace first rune with accent
+        nameRunes2 := []rune(nameStr)
+        bodyStr := string(nameRunes2[1:])
+        pad := availW - 1 - len(nameRunes2[1:]) - indW
         if pad < 0 {
             pad = 0
         }
         trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-        return selectedBG.Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+        return accent + selectedBG.Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
     if selected {

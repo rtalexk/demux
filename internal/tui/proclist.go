@@ -6,6 +6,7 @@ import (
     "strings"
     "time"
 
+    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
@@ -229,21 +230,58 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
 
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string {
-    text := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
+    label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
+    if selected {
+        text := label
+        if node.Pane.CWD != "" {
+            text += "  " + node.Pane.CWD
+        }
+        if node.GitDeviant {
+            if node.GitInfo.Loading {
+                text += "  ↪ …"
+            } else {
+                text += "  ↪ " + compactGitIndicators(node.GitInfo)
+            }
+        }
+        return selectedBG.Render(text)
+    }
+    out := paneHeaderStyle.Render(label)
     if node.Pane.CWD != "" {
-        text += "  " + node.Pane.CWD
+        out += "  " + panePathStyle.Render(node.Pane.CWD)
     }
     if node.GitDeviant {
         if node.GitInfo.Loading {
-            text += "  ↪ …"
+            out += "  " + panePathStyle.Render("↪ …")
         } else {
-            text += "  ↪ " + compactGitIndicators(node.GitInfo)
+            out += "  " + panePathStyle.Render("↪") + " " + compactGitIndicators(node.GitInfo)
         }
     }
-    if selected {
-        return selectedBG.Render(text)
+    return out
+}
+
+// procNameStyle returns the appropriate lipgloss style for a process name
+// based on its type and tree depth.
+func procNameStyle(pr proc.Process, depth int) lipgloss.Style {
+    if depth >= 2 {
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorProcChild)
     }
-    return paneHeaderStyle.Render(text)
+    name := strings.ToLower(pr.FriendlyName())
+    switch {
+    case name == "nvim" || name == "vim" || name == "vi" || name == "nano" || name == "emacs" || name == "hx":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorProcEditor)
+    case name == "claude" || strings.HasPrefix(name, "claude-"):
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorProcClaude)
+    case name == "railway" || name == "rails" || name == "node" || name == "deno" || name == "bun" ||
+        name == "python" || name == "python3" || name == "uvicorn" || name == "gunicorn" ||
+        name == "fastapi" || name == "django" || name == "flask" || name == "cargo" ||
+        name == "go" || name == "air" || name == "watchexec" || name == "vite" || name == "webpack" ||
+        name == "next" || name == "nuxt" || name == "caddy" || name == "nginx" || name == "httpd":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorProcServer)
+    case name == "zsh" || name == "bash" || name == "sh" || name == "fish" || name == "dash":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
+    default:
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorFgPrimary)
+    }
 }
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
@@ -256,7 +294,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     if selected {
         line1 = selectedBG.Render(name)
     } else {
-        line1 = procLine1Style.Render(name)
+        line1 = procNameStyle(pr, node.Depth).Render(name)
     }
     if pr.PID > 0 {
         line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
