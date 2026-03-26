@@ -145,14 +145,23 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         }
     }
 
-    maxLines := height - 2
-    if maxLines < 1 {
-        maxLines = 1
+    maxRows := height - 2
+    if maxRows < 1 {
+        maxRows = 1
     }
-    if len(lines) > maxLines {
-        lines = lines[:maxLines]
+    // each entry in lines may itself contain newlines (proc nodes render 2 rows),
+    // so count actual rows to know when to stop
+    var clipped []string
+    rowCount := 0
+    for _, l := range lines {
+        entryRows := strings.Count(l, "\n") + 1
+        if rowCount+entryRows > maxRows {
+            break
+        }
+        clipped = append(clipped, l)
+        rowCount += entryRows
     }
-    inner := strings.Join(lines, "\n")
+    inner := strings.Join(clipped, "\n")
     return border.Width(width - 2).Height(height - 2).Render(inner)
 }
 
