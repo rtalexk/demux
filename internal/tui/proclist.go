@@ -26,6 +26,7 @@ type ProcListNode struct {
     Pane         tmux.Pane
     GitDeviant   bool
     GitInfo      git.Info
+    Empty        bool // true for pane headers with no child processes
     Proc         proc.Process
     Port         int
     Depth        int // 0=pane header, 1=process, 2=subprocess
@@ -67,6 +68,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
         info := gitInfo[gitKey]
         deviant := p.primaryCWD != "" && !git.IsDescendant(paneCWD, p.primaryCWD) && paneCWD != p.primaryCWD
 
+        headerIdx := len(p.nodes)
         p.nodes = append(p.nodes, ProcListNode{
             IsPaneHeader: true,
             Pane:         pane,
@@ -102,6 +104,10 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
                     p.nodes = append(p.nodes, ProcListNode{Proc: grandchild, Depth: 2})
                 }
             }
+        }
+        if len(p.nodes) == headerIdx+1 {
+            // no children were added — mark pane as idle
+            p.nodes[headerIdx].Empty = true
         }
     }
 }
@@ -229,6 +235,8 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
     return border.Width(width - 2).Height(height - 2).Render(inner)
 }
 
+var paneIdleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Italic(true)
+
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string {
     text := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
     if node.Pane.CWD != "" {
@@ -241,9 +249,12 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
             text += "  ↪ " + compactGitIndicators(node.GitInfo)
         }
     }
-    line := paneHeaderStyle.Render(text)
     if selected {
         return selectedBG.Render(text)
+    }
+    line := paneHeaderStyle.Render(text)
+    if node.Empty {
+        line += "  " + paneIdleStyle.Render("idle")
     }
     return line
 }
