@@ -216,7 +216,7 @@ func (s SidebarModel) renderSession(node SidebarNode, width int) string {
 
     // build indicators (no leading spaces — alignedRow handles padding)
     var indParts []string
-    if info, ok := s.gitInfo[node.Session]; ok && !info.Loading {
+    if info, ok := s.gitInfo[node.Session]; ok {
         if ind := compactGitIndicators(info); ind != "" {
             indParts = append(indParts, ind)
         }
@@ -260,7 +260,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
     if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
         gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
         devInd := "↪"
-        if info, ok := s.gitInfo[gitKey]; ok && !info.Loading {
+        if info, ok := s.gitInfo[gitKey]; ok {
             if ind := compactGitIndicators(info); ind != "" {
                 devInd += " " + ind
             }
