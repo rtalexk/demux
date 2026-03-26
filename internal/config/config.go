@@ -103,9 +103,9 @@ func Default() Config {
 
             ColorFgPrimary: "#cdd6f4",
             ColorFgSubtext: "#a6adc8",
-            ColorFgMuted:   "#7f849c",
-            ColorFgDim:     "#45455a",
-            ColorFgGhost:   "#313244",
+            ColorFgMuted:   "#9399b2",
+            ColorFgDim:     "#6c7086",
+            ColorFgGhost:   "#45475a",
 
             ColorSession:    "#89b4fa",
             ColorProcClaude: "#cba6f7",

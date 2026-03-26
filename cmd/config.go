@@ -75,9 +75,9 @@ color_border   = "#313244"
 # Text hierarchy
 color_fg_primary = "#cdd6f4"
 color_fg_subtext = "#a6adc8"
-color_fg_muted   = "#7f849c"
-color_fg_dim     = "#45455a"
-color_fg_ghost   = "#313244"
+color_fg_muted   = "#9399b2"
+color_fg_dim     = "#6c7086"
+color_fg_ghost   = "#45475a"
 
 # Process type colours
 color_session     = "#89b4fa"
