@@ -7,6 +7,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/rtalex/demux/internal/format"
 	"github.com/rtalex/demux/internal/proc"
+	"github.com/rtalex/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -40,18 +41,42 @@ func runPorts(cmd *cobra.Command, _ []string) error {
 		pidToProc[p.PID] = p
 	}
 
+	allPanes, _ := tmux.ListPanes()
+	type paneRef struct{ session, window, pane string }
+	cwdToPane := map[string]paneRef{}
+	for _, p := range allPanes {
+		if _, exists := cwdToPane[p.CWD]; !exists {
+			cwdToPane[p.CWD] = paneRef{
+				session: p.Session,
+				window:  fmt.Sprint(p.WindowIndex),
+				pane:    fmt.Sprint(p.PaneIndex),
+			}
+		}
+	}
+
 	headers := []string{"PORT", "PID", "PROCESS", "SESSION", "WINDOW", "PANE", "UP"}
 	var rows []format.Row
 
 	for _, pi := range ports {
 		p := pidToProc[pi.PID]
+		session, window, pane := "—", "—", "—"
+
+		cwd, err := proc.CWD(pi.PID)
+		if err == nil && cwd != "" {
+			if ref, ok := cwdToPane[cwd]; ok {
+				session = ref.session
+				window = ref.window
+				pane = ref.pane
+			}
+		}
+
 		rows = append(rows, portRow{
 			port:    fmt.Sprintf(":%d", pi.Port),
 			pid:     fmt.Sprint(pi.PID),
 			process: p.Name,
-			session: "—",
-			window:  "—",
-			pane:    "—",
+			session: session,
+			window:  window,
+			pane:    pane,
 			up:      formatDuration(p.Uptime),
 		})
 	}
