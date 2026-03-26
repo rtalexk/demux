@@ -321,9 +321,9 @@ func alertIcon(level string) string {
     case "info":
         return lipgloss.NewStyle().Foreground(lipgloss.Color("33")).Render("●")
     case "warn":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render("")
+        return lipgloss.NewStyle().Foreground(lipgloss.Color("226")).Render("!")
     case "error":
-        return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("")
+        return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("✗")
     }
     return ""
 }
