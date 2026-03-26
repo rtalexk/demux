@@ -161,9 +161,19 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
         contentRows = 1
     }
 
+    // inner content width (border takes 2)
+    innerW := width - 2
+    centeredHint := func(text string) string {
+        pad := (innerW - len([]rune(text))) / 2
+        if pad < 0 {
+            pad = 0
+        }
+        return hintStyle.Render(strings.Repeat(" ", pad) + text)
+    }
+
     var lines []string
     if hasAbove {
-        lines = append(lines, hintStyle.Render("▲ more"))
+        lines = append(lines, centeredHint("▲ more"))
     }
     end := offset + contentRows
     if end > len(s.nodes) {
@@ -173,7 +183,7 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
         lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
     }
     if hasBelow {
-        lines = append(lines, hintStyle.Render("▼ more"))
+        lines = append(lines, centeredHint("▼ more"))
     }
 
     inner := strings.Join(lines, "\n")
