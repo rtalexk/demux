@@ -212,10 +212,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case alertsMsg:
         m.alerts = msg.alerts
         m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, m.cfg)
+        m.updateDetailFromSelection()
         return m, nil
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
         m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, m.cfg)
+        m.updateDetailFromSelection()
         return m, nil
     }
     return m, nil
@@ -227,8 +229,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         return m, tea.Quit
     case key.Matches(msg, keys.FocusSidebar):
         m.focus = panelSidebar
+        m.updateDetailFromSelection()
     case key.Matches(msg, keys.FocusProcList):
         m.focus = panelProcList
+        m.updateDetailFromSelection()
     case key.Matches(msg, keys.Help):
         m.showHelp = !m.showHelp
     case key.Matches(msg, keys.Yank):
