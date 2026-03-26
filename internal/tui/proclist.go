@@ -113,6 +113,11 @@ func sortPanes(panes []tmux.Pane) []tmux.Pane {
     return sorted
 }
 
+// CurrentWindow returns the session name and window index currently displayed.
+func (p ProcListModel) CurrentWindow() (string, int) {
+    return p.curSession, p.curWindow
+}
+
 func (p *ProcListModel) SetFilter(text string) {
     p.filterText = text
 }

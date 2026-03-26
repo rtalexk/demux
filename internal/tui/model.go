@@ -29,6 +29,7 @@ type alertsMsg struct{ alerts []db.Alert }
 type procDataMsg struct {
     procs  []proc.Process
     cwdMap map[int32]string
+    gen    int // generation counter — stale results are discarded
 }
 type gitResultMsg struct {
     key  string // session name, or "session:window" for deviants
@@ -63,6 +64,7 @@ type Model struct {
     statusMsg string
     statusExp time.Time
     ready     bool // true after first panesMsg — gates deferred fetches
+    procGen   int  // incremented on window change; discards in-flight proc fetches for old window
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -104,18 +106,37 @@ func (m Model) fetchAlerts() tea.Cmd {
     }
 }
 
-func fetchProcs() tea.Cmd {
+// scheduleProcFetch fires an immediate proc snapshot tagged with the current generation.
+// Stale results (gen mismatch) are discarded in the procDataMsg handler.
+func (m Model) scheduleProcFetch() tea.Cmd {
+    gen := m.procGen
     return func() tea.Msg {
         procs, err := proc.Snapshot()
         if err != nil {
-            return procDataMsg{}
+            return procDataMsg{gen: gen}
         }
         cwdMap, _ := proc.CWDAll()
         if cwdMap == nil {
             cwdMap = make(map[int32]string)
         }
-        return procDataMsg{procs: procs, cwdMap: cwdMap}
+        return procDataMsg{procs: procs, cwdMap: cwdMap, gen: gen}
     }
+}
+
+// scheduleDelayedProcFetch schedules a proc snapshot after 2s, tagged with the current generation.
+func (m Model) scheduleDelayedProcFetch() tea.Cmd {
+    gen := m.procGen
+    return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
+        procs, err := proc.Snapshot()
+        if err != nil {
+            return procDataMsg{gen: gen}
+        }
+        cwdMap, _ := proc.CWDAll()
+        if cwdMap == nil {
+            cwdMap = make(map[int32]string)
+        }
+        return procDataMsg{procs: procs, cwdMap: cwdMap, gen: gen}
+    })
 }
 
 func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
@@ -149,7 +170,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if time.Now().After(m.statusExp) {
             m.statusMsg = ""
         }
-        return m, tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts(), fetchProcs())
+        return m, tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts())
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
@@ -157,9 +178,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
-            // First load: sidebar is visible — now kick off the rest and start the tick
+            // First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
             m.ready = true
-            cmds = append(cmds, tick(), m.fetchAlerts(), fetchProcs())
+            cmds = append(cmds, tick(), m.fetchAlerts())
         }
         if m.cfg.Git.Enabled {
             for sessionName, windows := range grouped {
@@ -174,12 +195,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         }
         return m, tea.Batch(cmds...)
     case procDataMsg:
+        if msg.gen != m.procGen {
+            // Stale result from a previously selected window — discard.
+            return m, nil
+        }
         m.procs = msg.procs
         m.cwdMap = msg.cwdMap
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
             m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
         }
         m.updateDetailFromSelection()
+        // Self-schedule next poll in 2s for the selected window.
+        return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
         m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, m.cfg)
@@ -209,7 +236,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.showFilter = true
         m.filter = NewFilterModel()
     case key.Matches(msg, keys.Refresh):
-        return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), fetchProcs())
+        m.procGen++
+        return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
     default:
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)
@@ -248,11 +276,18 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.MoveToSessionLevel()
     }
     // auto-populate proc list whenever a window node is highlighted (no Enter needed)
+    // Trigger a fresh proc fetch when the highlighted window changes.
+    var cmd tea.Cmd
     if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+        prevSess, prevWin := m.procList.CurrentWindow()
         m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+        if node.Session != prevSess || node.WindowIndex != prevWin {
+            m.procGen++
+            cmd = m.scheduleProcFetch()
+        }
     }
     m.updateDetailFromSelection()
-    return m, nil
+    return m, cmd
 }
 
 func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
