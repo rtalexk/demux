@@ -311,23 +311,22 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     }
     nameStr := string(nameRunes)
 
-    if selected && focused {
-        accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
-        // nameStr starts with windowIndent ("   "); replace first rune with accent
+    if selected {
         nameRunes2 := []rune(nameStr)
         bodyStr := string(nameRunes2[1:])
         pad := availW - 1 - len(nameRunes2[1:]) - indW
         if pad < 0 {
             pad = 0
         }
-        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-        return accent + selectedBG.Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
+        if focused {
+            accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
+            trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
+            return accent + selectedBG.Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
+        }
+        accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
+        return accent + selectedInactive.Render(bodyStr+strings.Repeat(" ", pad)) + indicators
     }
-    text := alignedRow(nameStr, indicators, availW)
-    if selected {
-        return selectedInactive.Render(text)
-    }
-    return text
+    return alignedRow(nameStr, indicators, availW)
 }
 
 func compactGitIndicators(info git.Info) string {
