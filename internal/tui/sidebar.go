@@ -263,11 +263,14 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     nameStr := string(nameRunes)
 
     if selected && focused {
-        pad := availW - len([]rune(nameStr)) - indW
-        if pad < 1 {
-            pad = 1
+        // +1 left space, +1 trailing space = fills the full interior (availW+2 = width-2)
+        paddedName := " " + nameStr
+        pad := availW + 1 - len([]rune(paddedName)) - indW
+        if pad < 0 {
+            pad = 0
         }
-        return selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+        trail := lipgloss.NewStyle().Background(selectedBGColor).Render(" ")
+        return selectedBG.Bold(true).Render(paddedName+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
     if selected {
@@ -328,11 +331,13 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     nameStr := string(nameRunes)
 
     if selected && focused {
-        pad := availW - len([]rune(nameStr)) - indW
-        if pad < 1 {
-            pad = 1
+        paddedName := " " + nameStr
+        pad := availW + 1 - len([]rune(paddedName)) - indW
+        if pad < 0 {
+            pad = 0
         }
-        return selectedBG.Render(nameStr+strings.Repeat(" ", pad)) + indicators
+        trail := lipgloss.NewStyle().Background(selectedBGColor).Render(" ")
+        return selectedBG.Render(paddedName+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
     if selected {
