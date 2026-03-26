@@ -57,14 +57,25 @@ type ThemeConfig struct {
     ColorCpuHigh string `toml:"color_cpu_high"`
 }
 
+// ProcessesConfig lets users extend the built-in process-type lists.
+// Each field is appended to the default set; entries are matched
+// case-insensitively against the process's friendly name.
+type ProcessesConfig struct {
+    ExtraEditors []string `toml:"extra_editors"`
+    ExtraAgents  []string `toml:"extra_agents"`
+    ExtraServers []string `toml:"extra_servers"`
+    ExtraShells  []string `toml:"extra_shells"`
+}
+
 type Config struct {
-    RefreshIntervalMs int         `toml:"refresh_interval_ms"`
-    IgnoredSessions   []string    `toml:"ignored_sessions"`
-    DefaultFormat     string      `toml:"default_format"`
-    StatusBarFormat   string      `toml:"status_bar_format"`
-    SidebarWidth      int         `toml:"sidebar_width"`
-    Git               GitConfig   `toml:"git"`
-    Theme             ThemeConfig `toml:"theme"`
+    RefreshIntervalMs int             `toml:"refresh_interval_ms"`
+    IgnoredSessions   []string        `toml:"ignored_sessions"`
+    DefaultFormat     string          `toml:"default_format"`
+    StatusBarFormat   string          `toml:"status_bar_format"`
+    SidebarWidth      int             `toml:"sidebar_width"`
+    Git               GitConfig       `toml:"git"`
+    Theme             ThemeConfig     `toml:"theme"`
+    Processes         ProcessesConfig `toml:"processes"`
 }
 
 func Default() Config {

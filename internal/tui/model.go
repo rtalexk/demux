@@ -69,7 +69,7 @@ type Model struct {
 }
 
 func New(cfg config.Config, database *db.DB) Model {
-    initStyles(ThemeFromConfig(cfg.Theme))
+    initStyles(ThemeFromConfig(cfg.Theme), cfg.Processes)
     return Model{
         cfg:     cfg,
         db:      database,

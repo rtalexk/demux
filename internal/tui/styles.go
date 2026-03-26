@@ -1,9 +1,32 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/rtalex/demux/internal/config"
+)
 
 // activeTheme is set once at startup by initStyles.
 var activeTheme Theme
+
+// Process-type name lists. Populated by initStyles from built-in defaults
+// merged with any extra entries from the user's config.
+var (
+	activeProcEditors []string
+	activeProcAgents  []string
+	activeProcServers []string
+	activeProcShells  []string
+)
+
+var defaultProcEditors = []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"}
+var defaultProcAgents  = []string{"claude", "aider", "cursor", "copilot", "continue", "cody"}
+var defaultProcServers = []string{
+	"railway", "rails", "node", "deno", "bun",
+	"python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+	"cargo", "go", "air", "watchexec",
+	"vite", "webpack", "next", "nuxt",
+	"caddy", "nginx", "httpd",
+}
+var defaultProcShells = []string{"zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"}
 
 // All package-level lipgloss styles. Populated by initStyles.
 var (
@@ -26,6 +49,7 @@ var (
 
 	// Process list text
 	paneHeaderStyle lipgloss.Style
+	panePathStyle   lipgloss.Style
 	procLine1Style  lipgloss.Style
 	procLine2Style  lipgloss.Style
 	paneIdleStyle   lipgloss.Style
@@ -49,9 +73,15 @@ var (
 	gitDirtyStyle  lipgloss.Style
 )
 
-// initStyles rebuilds every style using the given theme. Call once from New().
-func initStyles(t Theme) {
+// initStyles rebuilds every style using the given theme and merges proc-type
+// name lists with any user-configured extras. Call once from New().
+func initStyles(t Theme, procs config.ProcessesConfig) {
 	activeTheme = t
+
+	activeProcEditors = append(defaultProcEditors, procs.ExtraEditors...)
+	activeProcAgents  = append(defaultProcAgents, procs.ExtraAgents...)
+	activeProcServers = append(defaultProcServers, procs.ExtraServers...)
+	activeProcShells  = append(defaultProcShells, procs.ExtraShells...)
 
 	borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
 	borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)
@@ -66,10 +96,11 @@ func initStyles(t Theme) {
 	yankStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 
 	sessionStyle    = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
-	paneHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
+	paneHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
+	panePathStyle   = lipgloss.NewStyle().Foreground(t.ColorSession)
 	procLine1Style  = lipgloss.NewStyle().Foreground(t.ColorFgPrimary)
 	procLine2Style  = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
-	paneIdleStyle   = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Italic(true)
+	paneIdleStyle   = lipgloss.NewStyle().Foreground(t.ColorFgDim).Italic(true)
 
 	hintStyle        = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 	detailLabelStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Width(10)
