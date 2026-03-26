@@ -267,8 +267,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             if node.IsSession {
                 m.sidebar.ToggleExpand()
             } else {
-                // select window, resolve non-sticky alert, move focus to proclist
-                m.resolveAlertForWindow(node.Session, node.WindowIndex)
+                // move focus to proclist
                 m.focus = panelProcList
                 m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
                 m.updateDetailFromSelection()
@@ -322,6 +321,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procList.JumpToNextPane()
     case key.Matches(msg, keys.Enter):
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+            m.resolveAlertForWindow(node.Session, node.WindowIndex)
             tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
         }
     case key.Matches(msg, keys.Esc):
