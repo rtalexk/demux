@@ -263,7 +263,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     nameStr := string(nameRunes)
 
     if selected && focused {
-        pad := availW + 2 - len([]rune(nameStr)) - indW
+        pad := availW + 1 - len([]rune(nameStr)) - indW
         if pad < 0 {
             pad = 0
         }
@@ -329,7 +329,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     nameStr := string(nameRunes)
 
     if selected && focused {
-        pad := availW + 2 - len([]rune(nameStr)) - indW
+        pad := availW + 1 - len([]rune(nameStr)) - indW
         if pad < 0 {
             pad = 0
         }
