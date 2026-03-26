@@ -62,6 +62,7 @@ type Model struct {
     pulse     bool
     statusMsg string
     statusExp time.Time
+    ready     bool // true after first panesMsg — gates deferred fetches
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -75,7 +76,9 @@ func New(cfg config.Config, database *db.DB) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-    return tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts(), fetchProcs())
+    // Only fetch panes on startup — sidebar renders immediately.
+    // fetchAlerts, fetchProcs, and the tick are deferred until panesMsg arrives.
+    return m.fetchPanes()
 }
 
 func tick() tea.Cmd {
@@ -153,6 +156,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
+        if !m.ready {
+            // First load: sidebar is visible — now kick off the rest and start the tick
+            m.ready = true
+            cmds = append(cmds, tick(), m.fetchAlerts(), fetchProcs())
+        }
         if m.cfg.Git.Enabled {
             for sessionName, windows := range grouped {
                 info := m.gitInfo[sessionName]
