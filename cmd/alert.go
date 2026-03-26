@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	alertTarget string
-	alertReason string
-	alertLevel  string
-	alertSticky bool
+	alertSetTarget    string
+	alertRemoveTarget string
+	alertReason       string
+	alertLevel        string
+	alertSticky       bool
 )
 
 type alertRow struct {
@@ -43,22 +44,16 @@ var alertSetCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Set (create or replace) an alert",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if alertTarget == "" {
-			return fmt.Errorf("--target is required")
-		}
-		if alertReason == "" {
-			return fmt.Errorf("--reason is required")
-		}
 		d, err := openDB()
 		if err != nil {
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer d.Close()
 
-		if err := d.AlertSet(alertTarget, alertReason, alertLevel, alertSticky); err != nil {
+		if err := d.AlertSet(alertSetTarget, alertReason, alertLevel, alertSticky); err != nil {
 			return fmt.Errorf("alert set: %w", err)
 		}
-		fmt.Printf("Alert set for %s\n", alertTarget)
+		fmt.Printf("Alert set for %s\n", alertSetTarget)
 		return nil
 	},
 }
@@ -68,19 +63,16 @@ var alertRemoveCmd = &cobra.Command{
 	Aliases: []string{"rm"},
 	Short:   "Remove an alert",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if alertTarget == "" {
-			return fmt.Errorf("--target is required")
-		}
 		d, err := openDB()
 		if err != nil {
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer d.Close()
 
-		if err := d.AlertRemove(alertTarget); err != nil {
+		if err := d.AlertRemove(alertRemoveTarget); err != nil {
 			return fmt.Errorf("alert remove: %w", err)
 		}
-		fmt.Printf("Alert removed for %s\n", alertTarget)
+		fmt.Printf("Alert removed for %s\n", alertRemoveTarget)
 		return nil
 	},
 }
@@ -120,13 +112,16 @@ func runAlertList(cmd *cobra.Command, args []string) error {
 
 func init() {
 	// alert set flags
-	alertSetCmd.Flags().StringVar(&alertTarget, "target", "", "Session:window target (required)")
+	alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Session:window target (required)")
 	alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text (required)")
 	alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error")
 	alertSetCmd.Flags().BoolVar(&alertSticky, "sticky", false, "Make alert sticky")
+	alertSetCmd.MarkFlagRequired("target")
+	alertSetCmd.MarkFlagRequired("reason")
 
 	// alert remove flags
-	alertRemoveCmd.Flags().StringVar(&alertTarget, "target", "", "Session:window target (required)")
+	alertRemoveCmd.Flags().StringVar(&alertRemoveTarget, "target", "", "Session:window target (required)")
+	alertRemoveCmd.MarkFlagRequired("target")
 
 	// wire subcommands
 	alertCmd.AddCommand(alertSetCmd, alertRemoveCmd, alertListCmd)
