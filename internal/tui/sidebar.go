@@ -189,45 +189,56 @@ func (s SidebarModel) renderNode(node SidebarNode, selected bool, width int) str
 	return text
 }
 
+// alignedRow builds a single sidebar line with the name on the left and
+// indicators right-aligned to availWidth. Both name and indicators are
+// measured by rune count after stripping ANSI codes.
+func alignedRow(name, indicators string, availWidth int) string {
+	nameW := len([]rune(stripANSI(name)))
+	indW := len([]rune(stripANSI(indicators)))
+	pad := availWidth - nameW - indW
+	if pad < 1 {
+		pad = 1
+	}
+	return name + strings.Repeat(" ", pad) + indicators
+}
+
 func (s SidebarModel) renderSession(node SidebarNode, width int) string {
 	prefix := "▼ "
 	if !node.Expanded {
 		prefix = "▶ "
 	}
 
-	// Build the indicator suffix first
-	indicatorSuffix := ""
+	// build indicators (no leading spaces — alignedRow handles padding)
+	var indParts []string
 	if info, ok := s.gitInfo[node.Session]; ok {
 		if info.Loading {
-			indicatorSuffix += "  …"
-		} else {
-			if ind := compactGitIndicators(info); ind != "" {
-				indicatorSuffix += "  " + ind
-			}
+			indParts = append(indParts, "…")
+		} else if ind := compactGitIndicators(info); ind != "" {
+			indParts = append(indParts, ind)
 		}
 	} else if s.cfg.Git.Enabled {
-		indicatorSuffix += "  …"
+		indParts = append(indParts, "…")
 	}
 	for target, a := range s.alerts {
 		if strings.HasPrefix(target, node.Session+":") {
-			indicatorSuffix += "  " + alertIcon(a.Level)
+			indParts = append(indParts, alertIcon(a.Level))
 			break
 		}
 	}
+	indicators := strings.Join(indParts, " ")
 
-	// Truncate session name to fit available width, leaving room for indicators
-	maxW := width - 4
-	nameRunes := []rune(prefix + node.Session)
-	indRunes := len([]rune(stripANSI(indicatorSuffix)))
-	maxName := maxW - indRunes
+	availW := width - 4
+	indW := len([]rune(stripANSI(indicators)))
+	maxName := availW - indW - 1 // -1 for the padding space
 	if maxName < 4 {
 		maxName = 4
 	}
+	nameRunes := []rune(prefix + node.Session)
 	if len(nameRunes) > maxName {
 		nameRunes = append(nameRunes[:maxName-1], '…')
 	}
-	text := string(nameRunes) + indicatorSuffix
 
+	text := alignedRow(string(nameRunes), indicators, availW)
 	return sessionStyle.Render(text)
 }
 
@@ -241,43 +252,43 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
 		name = fmt.Sprintf("%d: %s", node.WindowIndex, wPanes[0].WindowName)
 	}
 
-	// Build the indicator suffix first
-	indicatorSuffix := ""
+	// build indicators
+	var indParts []string
 	winCWD := windowCWDFromPanes(wPanes)
 	if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
 		gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
 		if info, ok := s.gitInfo[gitKey]; ok {
 			if info.Loading {
-				indicatorSuffix += "  ↪ …"
+				indParts = append(indParts, "↪ …")
 			} else {
-				indicatorSuffix += "  ↪"
+				devInd := "↪"
 				if ind := compactGitIndicators(info); ind != "" {
-					indicatorSuffix += " " + ind
+					devInd += " " + ind
 				}
+				indParts = append(indParts, devInd)
 			}
 		} else {
-			indicatorSuffix += "  ↪ …"
+			indParts = append(indParts, "↪ …")
 		}
 	}
 	target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
 	if a, ok := s.alerts[target]; ok {
-		indicatorSuffix += "  " + alertIcon(a.Level)
+		indParts = append(indParts, alertIcon(a.Level))
 	}
+	indicators := strings.Join(indParts, " ")
 
-	// Truncate name to fit available width, leaving room for indicators
-	maxW := width - 4
-	nameRunes := []rune(windowIndent + name)
-	indRunes := len([]rune(stripANSI(indicatorSuffix)))
-	maxName := maxW - indRunes
+	availW := width - 4
+	indW := len([]rune(stripANSI(indicators)))
+	maxName := availW - indW - 1
 	if maxName < 4 {
 		maxName = 4
 	}
+	nameRunes := []rune(windowIndent + name)
 	if len(nameRunes) > maxName {
 		nameRunes = append(nameRunes[:maxName-1], '…')
 	}
-	text := string(nameRunes) + indicatorSuffix
 
-	return text
+	return alignedRow(string(nameRunes), indicators, availW)
 }
 
 func compactGitIndicators(info git.Info) string {

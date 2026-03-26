@@ -190,3 +190,35 @@ func TestRenderSession_shortNameNotTruncated(t *testing.T) {
 		t.Error("unexpected ellipsis for short name")
 	}
 }
+
+// --- Right-alignment ---
+
+func TestAlignedRow_indicatorsAtRightEdge(t *testing.T) {
+	row := alignedRow("name", "* ↑2", 20)
+	plain := stripANSI(row)
+	runes := []rune(plain)
+	if len(runes) != 20 {
+		t.Errorf("expected total width 20, got %d: %q", len(runes), plain)
+	}
+	if !strings.HasSuffix(plain, "* ↑2") {
+		t.Errorf("indicators not at right edge: %q", plain)
+	}
+}
+
+func TestAlignedRow_noIndicators(t *testing.T) {
+	row := alignedRow("session-a", "", 20)
+	plain := stripANSI(row)
+	// with no indicators the row is just the name (no trailing spaces required)
+	if !strings.HasPrefix(plain, "session-a") {
+		t.Errorf("unexpected content: %q", plain)
+	}
+}
+
+func TestAlignedRow_minimumOnePadSpace(t *testing.T) {
+	// name + indicators exactly fill availWidth — must still have 1 pad space
+	row := alignedRow("name", "ind", 7) // "name"(4) + "ind"(3) = 7, no room
+	plain := stripANSI(row)
+	if !strings.Contains(plain, " ") {
+		t.Errorf("expected at least one space between name and indicators: %q", plain)
+	}
+}
