@@ -17,8 +17,8 @@ var (
     procBorderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
     procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
     paneHeaderStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("33"))
-    procLine1Style     = lipgloss.NewStyle().PaddingLeft(2)
-    procLine2Style     = lipgloss.NewStyle().PaddingLeft(4).Foreground(lipgloss.Color("240"))
+    procLine1Style     = lipgloss.NewStyle()
+    procLine2Style     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 )
 
 type ProcListNode struct {
@@ -255,7 +255,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     pr := node.Proc
-    indent := strings.Repeat("  ", node.Depth)
+    indent := "  " + strings.Repeat("  ", node.Depth) // 2-space base + depth indent
     line1 := indent + pr.Name
     if pr.PID > 0 {
         line1 += fmt.Sprintf("  pid:%d", pr.PID)
@@ -270,7 +270,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     )
 
     l1 := procLine1Style.Render(line1)
-    l2 := procLine2Style.Render(strings.Repeat("  ", node.Depth) + line2)
+    l2 := procLine2Style.Render("    " + strings.Repeat("  ", node.Depth) + line2) // 4-space base + depth indent
     if selected {
         l1 = selectedBG.Render(line1)
     }
