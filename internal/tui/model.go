@@ -468,7 +468,7 @@ func (m Model) View() string {
 	}
 
 	detailH := 8
-	topH := m.height - detailH - 4 // titlebar + separator + statusbar
+	topH := m.height - detailH - 3 // titlebar + statusbar
 
 	sidebar := m.sidebar.Render(sidebarW, topH, m.focus == panelSidebar)
 	procList := m.procList.Render(procW, topH, m.focus == panelProcList)
@@ -477,23 +477,27 @@ func (m Model) View() string {
 	// build breadcrumb from current sidebar selection
 	breadcrumb := m.breadcrumb()
 
+	dividerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+
 	leftHeader := lipgloss.NewStyle().
 		Bold(true).
-		Width(sidebarW).
+		Width(sidebarW - 1).
 		Padding(0, 1).
 		Render("Sessions")
 
 	rightHeader := lipgloss.NewStyle().
-		Width(procW).
+		Width(procW - 1).
 		Padding(0, 1).
 		Render(breadcrumb)
 
-	titlebar := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, rightHeader)
-
-	separator := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(strings.Repeat("─", m.width))
+	titlebar := lipgloss.JoinHorizontal(lipgloss.Top,
+		leftHeader,
+		dividerStyle.Render("│"),
+		rightHeader,
+	)
 
 	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, procList)
-	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, separator, top, detail)
+	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, top, detail)
 
 	statusBar := ""
 	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
