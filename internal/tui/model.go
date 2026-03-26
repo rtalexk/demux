@@ -60,11 +60,12 @@ type Model struct {
     showFilter bool
     showHelp   bool
 
-    pulse     bool
-    statusMsg string
-    statusExp time.Time
-    ready     bool // true after first panesMsg — gates deferred fetches
-    procGen   int  // incremented on window change; discards in-flight proc fetches for old window
+    pulse        bool
+    spinnerFrame int
+    statusMsg    string
+    statusExp    time.Time
+    ready        bool // true after first panesMsg — gates deferred fetches
+    procGen      int  // incremented on window change; discards in-flight proc fetches for old window
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -167,6 +168,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, nil
     case tickMsg:
         m.pulse = !m.pulse
+        m.spinnerFrame++
         if time.Now().After(m.statusExp) {
             m.statusMsg = ""
         }
@@ -556,11 +558,20 @@ func (m Model) View() string {
         Border(lipgloss.RoundedBorder()).
         BorderForeground(lipgloss.Color("244"))
 
+    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+    sessionsTitle := "Sessions"
+    for _, info := range m.gitInfo {
+        if info.Loading {
+            frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+            sessionsTitle += "  " + lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(frame)
+            break
+        }
+    }
     leftHeader := headerBox.
         Bold(true).
         Width(sidebarW - 2).
         Padding(0, 1).
-        Render("Sessions")
+        Render(sessionsTitle)
 
     rightHeader := headerBox.
         Width(procW - 2).

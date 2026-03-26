@@ -216,14 +216,10 @@ func (s SidebarModel) renderSession(node SidebarNode, width int) string {
 
     // build indicators (no leading spaces — alignedRow handles padding)
     var indParts []string
-    if info, ok := s.gitInfo[node.Session]; ok {
-        if info.Loading {
-            indParts = append(indParts, "…")
-        } else if ind := compactGitIndicators(info); ind != "" {
+    if info, ok := s.gitInfo[node.Session]; ok && !info.Loading {
+        if ind := compactGitIndicators(info); ind != "" {
             indParts = append(indParts, ind)
         }
-    } else if s.cfg.Git.Enabled {
-        indParts = append(indParts, "…")
     }
     for target, a := range s.alerts {
         if strings.HasPrefix(target, node.Session+":") {
@@ -263,19 +259,13 @@ func (s SidebarModel) renderWindow(node SidebarNode, width int) string {
     winCWD := windowCWDFromPanes(wPanes)
     if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
         gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
-        if info, ok := s.gitInfo[gitKey]; ok {
-            if info.Loading {
-                indParts = append(indParts, "↪ …")
-            } else {
-                devInd := "↪"
-                if ind := compactGitIndicators(info); ind != "" {
-                    devInd += " " + ind
-                }
-                indParts = append(indParts, devInd)
+        devInd := "↪"
+        if info, ok := s.gitInfo[gitKey]; ok && !info.Loading {
+            if ind := compactGitIndicators(info); ind != "" {
+                devInd += " " + ind
             }
-        } else {
-            indParts = append(indParts, "↪ …")
         }
+        indParts = append(indParts, devInd)
     }
     target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
     if a, ok := s.alerts[target]; ok {
