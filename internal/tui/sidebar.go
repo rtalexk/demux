@@ -64,7 +64,7 @@ func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map
 		}
 	}
 	if s.cursor >= len(s.nodes) {
-		s.cursor = maxInt(0, len(s.nodes)-1)
+		s.cursor = max(0, len(s.nodes)-1)
 	}
 }
 
@@ -287,9 +287,4 @@ func (s SidebarModel) Selected() *SidebarNode {
 	return &n
 }
 
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
+

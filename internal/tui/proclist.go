@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,14 +36,18 @@ type ProcListModel struct {
 	cursor     int
 	filterText string
 	primaryCWD string
-	gitInfo    map[string]git.Info
 }
 
-func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, gitInfo map[string]git.Info, cfg config.Config) {
+// SetWindowData rebuilds the node list from pre-fetched data.
+// procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched), and
+// gitInfo is keyed by "session:windowIndex:paneIndex" for deviant panes.
+func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, cfg config.Config) {
 	grouped := tmux.GroupBySessions(panes)
 	windows := grouped[session]
 	p.primaryCWD = primaryCWDForPanes(windows)
 	wPanes := windows[windowIndex]
+
+	tree := proc.BuildTree(procs)
 
 	p.nodes = nil
 	for _, pane := range sortPanes(wPanes) {
@@ -59,11 +64,9 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 		})
 
 		// find processes for this pane by CWD match, include subprocesses as grandchildren
-		allProcs, _ := proc.Snapshot()
-		tree := proc.BuildTree(allProcs)
-		for _, pr := range allProcs {
-			cwd, err := proc.CWD(pr.PID)
-			if err != nil || cwd != paneCWD {
+		for _, pr := range procs {
+			cwd, ok := cwdMap[pr.PID]
+			if !ok || cwd != paneCWD {
 				continue
 			}
 			p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
@@ -78,18 +81,8 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 func sortPanes(panes []tmux.Pane) []tmux.Pane {
 	sorted := make([]tmux.Pane, len(panes))
 	copy(sorted, panes)
-	for i := 0; i < len(sorted); i++ {
-		for j := i + 1; j < len(sorted); j++ {
-			if sorted[j].PaneIndex < sorted[i].PaneIndex {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].PaneIndex < sorted[j].PaneIndex })
 	return sorted
-}
-
-func (p *ProcListModel) SetGitInfo(gitInfo map[string]git.Info) {
-	p.gitInfo = gitInfo
 }
 
 func (p *ProcListModel) SetFilter(text string) {

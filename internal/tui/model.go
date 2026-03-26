@@ -26,6 +26,10 @@ const (
 type tickMsg time.Time
 type panesMsg struct{ panes []tmux.Pane }
 type alertsMsg struct{ alerts []db.Alert }
+type procDataMsg struct {
+	procs  []proc.Process
+	cwdMap map[int32]string
+}
 type gitResultMsg struct {
 	key  string // session name, or "session:window" for deviants
 	info git.Info
@@ -41,6 +45,8 @@ type Model struct {
 	panes   []tmux.Pane
 	alerts  []db.Alert
 	gitInfo map[string]git.Info // keyed by session name
+	procs   []proc.Process
+	cwdMap  map[int32]string // PID -> CWD, pre-fetched async
 
 	sidebar  SidebarModel
 	procList ProcListModel
@@ -69,7 +75,7 @@ func New(cfg config.Config, database *db.DB) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts())
+	return tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts(), fetchProcs())
 }
 
 func tick() tea.Cmd {
@@ -92,6 +98,22 @@ func (m Model) fetchAlerts() tea.Cmd {
 	return func() tea.Msg {
 		alerts, _ := m.db.AlertList()
 		return alertsMsg{alerts: alerts}
+	}
+}
+
+func fetchProcs() tea.Cmd {
+	return func() tea.Msg {
+		procs, err := proc.Snapshot()
+		if err != nil {
+			return procDataMsg{}
+		}
+		cwdMap := make(map[int32]string, len(procs))
+		for _, p := range procs {
+			if cwd, err := proc.CWD(p.PID); err == nil {
+				cwdMap[p.PID] = cwd
+			}
+		}
+		return procDataMsg{procs: procs, cwdMap: cwdMap}
 	}
 }
 
@@ -126,7 +148,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if time.Now().After(m.statusExp) {
 			m.statusMsg = ""
 		}
-		return m, tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts())
+		return m, tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts(), fetchProcs())
 	case panesMsg:
 		m.panes = msg.panes
 		grouped := tmux.GroupBySessions(msg.panes)
@@ -145,6 +167,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, tea.Batch(cmds...)
+	case procDataMsg:
+		m.procs = msg.procs
+		m.cwdMap = msg.cwdMap
+		m.updateDetailFromSelection()
 	case alertsMsg:
 		m.alerts = msg.alerts
 		m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, m.cfg)
@@ -174,7 +200,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showFilter = true
 		m.filter = NewFilterModel()
 	case key.Matches(msg, keys.Refresh):
-		return m, tea.Batch(m.fetchPanes(), m.fetchAlerts())
+		return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), fetchProcs())
 	default:
 		if m.focus == panelSidebar {
 			return m.handleSidebarKey(msg)
@@ -200,7 +226,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				// select window, resolve non-sticky alert, move focus to proclist
 				m.resolveAlertForWindow(node.Session, node.WindowIndex)
 				m.focus = panelProcList
-				m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.gitInfo, m.cfg)
+				m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 				m.updateDetailFromSelection()
 			}
 		}
@@ -283,7 +309,10 @@ func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
 	if err != nil || alert == nil || alert.Sticky {
 		return
 	}
-	m.db.AlertRemove(target)
+	if err := m.db.AlertRemove(target); err != nil {
+		m.statusMsg = "error removing alert: " + err.Error()
+		m.statusExp = time.Now().Add(2 * time.Second)
+	}
 }
 
 func (m *Model) updateDetailFromSelection() {
@@ -306,10 +335,9 @@ func (m *Model) updateDetailFromSelection() {
 			// count processes whose CWD is under the session's primary CWD
 			procCount := 0
 			if sessionCWD != "" {
-				allProcs, _ := proc.Snapshot()
-				for _, pr := range allProcs {
-					cwd, err := proc.CWD(pr.PID)
-					if err != nil {
+				for _, pr := range m.procs {
+					cwd := m.cwdMap[pr.PID]
+					if cwd == "" {
 						continue
 					}
 					if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
@@ -355,7 +383,7 @@ func (m *Model) updateDetailFromSelection() {
 			return
 		}
 		pr := selNode.Proc
-		cwd, _ := proc.CWD(pr.PID)
+		cwd := m.cwdMap[pr.PID]
 		portStr := ""
 		if selNode.Port > 0 {
 			portStr = fmt.Sprintf("%d", selNode.Port)
@@ -463,8 +491,7 @@ func (m Model) View() string {
 		return overlay
 	}
 	if m.showFilter {
-		filterView := m.filter.Render()
-		return lipgloss.JoinVertical(lipgloss.Left, body, filterView)
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.filter.Render())
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
