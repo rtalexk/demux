@@ -70,6 +70,7 @@ type ProcessesConfig struct {
 type Config struct {
     RefreshIntervalMs int         `toml:"refresh_interval_ms"`
     IgnoredSessions   []string    `toml:"ignored_sessions"`
+    IgnoredProcesses  []string    `toml:"ignored_processes"`
     DefaultFormat     string      `toml:"default_format"`
     StatusBarFormat   string      `toml:"status_bar_format"`
     SidebarWidth      int         `toml:"sidebar_width"`
@@ -81,6 +82,7 @@ func Default() Config {
     return Config{
         RefreshIntervalMs: 2000,
         IgnoredSessions:   []string{},
+        IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
         SidebarWidth:      30,

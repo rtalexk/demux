@@ -10,10 +10,11 @@ var activeTheme Theme
 
 // Process-type name lists. Populated by initStyles from config.
 var (
-	activeProcEditors []string
-	activeProcAgents  []string
-	activeProcServers []string
-	activeProcShells  []string
+	activeProcEditors  []string
+	activeProcAgents   []string
+	activeProcServers  []string
+	activeProcShells   []string
+	activeIgnoredProcs []string
 )
 
 // All package-level lipgloss styles. Populated by initStyles.
@@ -63,13 +64,14 @@ var (
 
 // initStyles rebuilds every style using the given theme and merges proc-type
 // name lists with any user-configured extras. Call once from New().
-func initStyles(t Theme, procs config.ProcessesConfig) {
+func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	activeTheme = t
 
-	activeProcEditors = procs.Editors
-	activeProcAgents  = procs.Agents
-	activeProcServers = procs.Servers
-	activeProcShells  = procs.Shells
+	activeProcEditors  = procs.Editors
+	activeProcAgents   = procs.Agents
+	activeProcServers  = procs.Servers
+	activeProcShells   = procs.Shells
+	activeIgnoredProcs = ignoredProcs
 
 	borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
 	borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)

@@ -29,6 +29,9 @@ refresh_interval_ms = 2000
 # Sessions to hide from the sidebar
 ignored_sessions = []
 
+# Processes to hide from the process list (children are promoted up)
+ignored_processes = ["zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"]
+
 # Default output format for CLI commands: text | table | json
 default_format = "text"
 

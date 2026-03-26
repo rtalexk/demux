@@ -91,7 +91,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
                 return
             }
             seen[pr.PID] = true
-            if containsStr(activeProcShells, strings.ToLower(pr.FriendlyName())) {
+            if containsStr(activeIgnoredProcs, strings.ToLower(pr.FriendlyName())) {
                 // skip shell — promote its children to the same depth
                 for _, child := range tree[pr.PID] {
                     addProc(child, depth)
