@@ -1,87 +1,87 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
+    "fmt"
+    "os"
 
-	"github.com/mattn/go-isatty"
-	"github.com/rtalex/demux/internal/format"
-	"github.com/rtalex/demux/internal/proc"
-	"github.com/rtalex/demux/internal/tmux"
-	"github.com/spf13/cobra"
+    "github.com/mattn/go-isatty"
+    "github.com/rtalex/demux/internal/format"
+    "github.com/rtalex/demux/internal/proc"
+    "github.com/rtalex/demux/internal/tmux"
+    "github.com/spf13/cobra"
 )
 
 var portsCmd = &cobra.Command{
-	Use:   "ports",
-	Short: "List all TCP listening ports",
-	RunE:  runPorts,
+    Use:   "ports",
+    Short: "List all TCP listening ports",
+    RunE:  runPorts,
 }
 
 func init() {
-	rootCmd.AddCommand(portsCmd)
+    rootCmd.AddCommand(portsCmd)
 }
 
 type portRow struct {
-	port, pid, process, session, window, pane, up string
+    port, pid, process, session, window, pane, up string
 }
 
 func (r portRow) Fields() []string {
-	return []string{r.port, r.pid, r.process, r.session, r.window, r.pane, r.up}
+    return []string{r.port, r.pid, r.process, r.session, r.window, r.pane, r.up}
 }
 
 func runPorts(cmd *cobra.Command, _ []string) error {
-	ports, err := proc.ListeningPorts()
-	if err != nil {
-		return err
-	}
+    ports, err := proc.ListeningPorts()
+    if err != nil {
+        return err
+    }
 
-	procs, _ := proc.Snapshot()
-	pidToProc := map[int32]proc.Process{}
-	for _, p := range procs {
-		pidToProc[p.PID] = p
-	}
+    procs, _ := proc.Snapshot()
+    pidToProc := map[int32]proc.Process{}
+    for _, p := range procs {
+        pidToProc[p.PID] = p
+    }
 
-	allPanes, _ := tmux.ListPanes()
-	type paneRef struct{ session, window, pane string }
-	cwdToPane := map[string]paneRef{}
-	for _, p := range allPanes {
-		if _, exists := cwdToPane[p.CWD]; !exists {
-			cwdToPane[p.CWD] = paneRef{
-				session: p.Session,
-				window:  fmt.Sprint(p.WindowIndex),
-				pane:    fmt.Sprint(p.PaneIndex),
-			}
-		}
-	}
+    allPanes, _ := tmux.ListPanes()
+    type paneRef struct{ session, window, pane string }
+    cwdToPane := map[string]paneRef{}
+    for _, p := range allPanes {
+        if _, exists := cwdToPane[p.CWD]; !exists {
+            cwdToPane[p.CWD] = paneRef{
+                session: p.Session,
+                window:  fmt.Sprint(p.WindowIndex),
+                pane:    fmt.Sprint(p.PaneIndex),
+            }
+        }
+    }
 
-	headers := []string{"PORT", "PID", "PROCESS", "SESSION", "WINDOW", "PANE", "UP"}
-	var rows []format.Row
+    headers := []string{"PORT", "PID", "PROCESS", "SESSION", "WINDOW", "PANE", "UP"}
+    var rows []format.Row
 
-	for _, pi := range ports {
-		p := pidToProc[pi.PID]
-		session, window, pane := "—", "—", "—"
+    for _, pi := range ports {
+        p := pidToProc[pi.PID]
+        session, window, pane := "—", "—", "—"
 
-		cwd, err := proc.CWD(pi.PID)
-		if err == nil && cwd != "" {
-			if ref, ok := cwdToPane[cwd]; ok {
-				session = ref.session
-				window = ref.window
-				pane = ref.pane
-			}
-		}
+        cwd, err := proc.CWD(pi.PID)
+        if err == nil && cwd != "" {
+            if ref, ok := cwdToPane[cwd]; ok {
+                session = ref.session
+                window = ref.window
+                pane = ref.pane
+            }
+        }
 
-		rows = append(rows, portRow{
-			port:    fmt.Sprintf(":%d", pi.Port),
-			pid:     fmt.Sprint(pi.PID),
-			process: p.Name,
-			session: session,
-			window:  window,
-			pane:    pane,
-			up:      formatDuration(p.Uptime),
-		})
-	}
+        rows = append(rows, portRow{
+            port:    fmt.Sprintf(":%d", pi.Port),
+            pid:     fmt.Sprint(pi.PID),
+            process: p.Name,
+            session: session,
+            window:  window,
+            pane:    pane,
+            up:      formatDuration(p.Uptime),
+        })
+    }
 
-	isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
-	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))
-	return nil
+    isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
+    fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))
+    return nil
 }
