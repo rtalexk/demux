@@ -211,9 +211,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	detailH := 11
-	topH := m.height - detailH - 4
-	sidebarVisibleRows := topH - 2
+	sidebarVisibleRows := m.height - 4 - 2 // contentH (height-4) minus border (2)
 	if sidebarVisibleRows < 1 {
 		sidebarVisibleRows = 1
 	}
@@ -468,11 +466,13 @@ func (m Model) View() string {
 	}
 
 	detailH := 11
-	topH := m.height - detailH - 4 // titlebar (3 rows: border+content+border) + statusbar
+	// sidebar spans full content height; proclist + detail stack on the right
+	contentH := m.height - 4 // 3 (header box) + 1 (status bar)
+	procH := contentH - detailH
 
-	sidebar := m.sidebar.Render(sidebarW, topH, m.focus == panelSidebar)
-	procList := m.procList.Render(procW, topH, m.focus == panelProcList)
-	detail := m.detail.Render(m.width-2, detailH)
+	sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar)
+	procList := m.procList.Render(procW, procH, m.focus == panelProcList)
+	detail := m.detail.Render(procW, detailH)
 
 	// build breadcrumb from current sidebar selection
 	breadcrumb := m.breadcrumb()
@@ -494,8 +494,9 @@ func (m Model) View() string {
 
 	titlebar := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, rightHeader)
 
-	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, procList)
-	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, top, detail)
+	right := lipgloss.JoinVertical(lipgloss.Left, procList, detail)
+	content := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, right)
+	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, content)
 
 	statusBar := ""
 	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
