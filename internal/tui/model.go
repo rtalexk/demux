@@ -11,6 +11,7 @@ import (
 	"github.com/rtalex/demux/internal/config"
 	"github.com/rtalex/demux/internal/db"
 	"github.com/rtalex/demux/internal/git"
+	"github.com/rtalex/demux/internal/proc"
 	"github.com/rtalex/demux/internal/tmux"
 )
 
@@ -167,6 +168,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Help):
 		m.showHelp = !m.showHelp
 	case key.Matches(msg, keys.Yank):
+		m.populateYankFields()
 		m.showYank = true
 	case key.Matches(msg, keys.Filter):
 		m.showFilter = true
@@ -199,6 +201,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.resolveAlertForWindow(node.Session, node.WindowIndex)
 				m.focus = panelProcList
 				m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.gitInfo, m.cfg)
+				m.updateDetailFromSelection()
 			}
 		}
 	case key.Matches(msg, keys.Esc):
@@ -237,6 +240,43 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *Model) populateYankFields() {
+	if m.focus == panelProcList {
+		selNode := m.procList.SelectedNode()
+		if selNode != nil && !selNode.IsPaneHeader {
+			pr := selNode.Proc
+			cwd, _ := proc.CWD(pr.PID)
+			portStr := ""
+			if selNode.Port > 0 {
+				portStr = fmt.Sprintf("%d", selNode.Port)
+			}
+			m.yank.SetFields([]YankField{
+				{Key: "p", Label: "PID", Value: fmt.Sprint(pr.PID)},
+				{Key: "n", Label: "name", Value: pr.Name},
+				{Key: "c", Label: "cmdline", Value: pr.Cmdline},
+				{Key: "d", Label: "CWD", Value: cwd},
+				{Key: "o", Label: "port", Value: portStr},
+			})
+			return
+		}
+	}
+	// session or window node from sidebar
+	node := m.sidebar.Selected()
+	if node != nil {
+		if node.IsSession {
+			m.yank.SetFields([]YankField{
+				{Key: "n", Label: "session", Value: node.Session},
+				{Key: "t", Label: "target", Value: node.Session},
+			})
+		} else {
+			m.yank.SetFields([]YankField{
+				{Key: "n", Label: "session", Value: node.Session},
+				{Key: "t", Label: "target", Value: fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)},
+			})
+		}
+	}
+}
+
 func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
 	target := fmt.Sprintf("%s:%d", session, windowIndex)
 	alert, err := m.db.AlertByTarget(target)
@@ -262,14 +302,70 @@ func (m *Model) updateDetailFromSelection() {
 					alertCount++
 				}
 			}
+			sessionCWD := primaryCWDForPanes(windows)
+			// count processes whose CWD is under the session's primary CWD
+			procCount := 0
+			if sessionCWD != "" {
+				allProcs, _ := proc.Snapshot()
+				for _, pr := range allProcs {
+					cwd, err := proc.CWD(pr.PID)
+					if err != nil {
+						continue
+					}
+					if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+						procCount++
+					}
+				}
+			}
 			m.detail = DetailModel{
 				selType:    DetailSession,
 				session:    node.Session,
-				sessionCWD: primaryCWDForPanes(windows),
+				sessionCWD: sessionCWD,
 				gitInfo:    m.gitInfo[node.Session],
 				winCount:   len(windows),
+				procCount:  procCount,
 				alertCount: alertCount,
 			}
+		} else {
+			// window node selected
+			grouped := tmux.GroupBySessions(m.panes)
+			windows := grouped[node.Session]
+			wPanes := windows[node.WindowIndex]
+			gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
+			var windowAlert *db.Alert
+			target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
+			if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
+				windowAlert = a
+			}
+			m.detail = DetailModel{
+				selType:     DetailWindow,
+				windowIndex: node.WindowIndex,
+				windowPanes: wPanes,
+				windowGit:   m.gitInfo[gitKey],
+				windowAlert: windowAlert,
+			}
+		}
+		return
+	}
+	// panelProcList focus
+	if m.focus == panelProcList {
+		selNode := m.procList.SelectedNode()
+		if selNode == nil || selNode.IsPaneHeader {
+			m.detail = DetailModel{}
+			return
+		}
+		pr := selNode.Proc
+		cwd, _ := proc.CWD(pr.PID)
+		portStr := ""
+		if selNode.Port > 0 {
+			portStr = fmt.Sprintf("%d", selNode.Port)
+		}
+		m.detail = DetailModel{
+			selType:  DetailProc,
+			proc:     pr,
+			procGit:  m.gitInfo[cwd],
+			procPort: portStr,
+			procCWD:  cwd,
 		}
 	}
 }
@@ -350,7 +446,10 @@ func (m Model) View() string {
 	top := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, procList)
 	body := lipgloss.JoinVertical(lipgloss.Left, titlebar, top, detail)
 
-	statusBar := m.statusMsg
+	statusBar := ""
+	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
+		statusBar = m.statusMsg
+	}
 	if statusBar == "" {
 		if m.focus == panelSidebar {
 			statusBar = "  1:sidebar  2:procs  j/k:nav  Enter:select  ?:help  q:quit"

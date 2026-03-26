@@ -45,8 +45,10 @@ type DetailModel struct {
 	windowAlert *db.Alert
 
 	// proc
-	proc    proc.Process
-	procGit git.Info
+	proc     proc.Process
+	procGit  git.Info
+	procPort string
+	procCWD  string
 }
 
 func (d DetailModel) Render(width, height int) string {
@@ -115,6 +117,12 @@ func (d DetailModel) renderProc() []string {
 		row("cmd", d.proc.Cmdline),
 		row("uptime", formatProcDuration(d.proc.Uptime)),
 		row("memory", fmt.Sprintf("%.1fMB", float64(d.proc.MemRSS)/1024/1024)),
+	}
+	if d.procPort != "" {
+		lines = append(lines, row("port", d.procPort))
+	}
+	if d.procCWD != "" {
+		lines = append(lines, row("cwd", d.procCWD))
 	}
 	if d.procGit.Branch != "" {
 		lines = append(lines, "")

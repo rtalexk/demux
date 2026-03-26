@@ -27,6 +27,7 @@ type ProcListNode struct {
 	GitInfo      git.Info
 	Proc         proc.Process
 	Port         int
+	Depth        int // 0=pane header, 1=process, 2=subprocess
 }
 
 type ProcListModel struct {
@@ -34,6 +35,7 @@ type ProcListModel struct {
 	cursor     int
 	filterText string
 	primaryCWD string
+	gitInfo    map[string]git.Info
 }
 
 func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, gitInfo map[string]git.Info, cfg config.Config) {
@@ -56,14 +58,19 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 			GitInfo:      info,
 		})
 
-		// find processes for this pane by CWD match
+		// find processes for this pane by CWD match, include subprocesses as grandchildren
 		allProcs, _ := proc.Snapshot()
+		tree := proc.BuildTree(allProcs)
 		for _, pr := range allProcs {
 			cwd, err := proc.CWD(pr.PID)
 			if err != nil || cwd != paneCWD {
 				continue
 			}
-			p.nodes = append(p.nodes, ProcListNode{Proc: pr})
+			p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
+			// add subprocesses (grandchildren)
+			for _, child := range tree[pr.PID] {
+				p.nodes = append(p.nodes, ProcListNode{Proc: child, Depth: 2})
+			}
 		}
 	}
 }
@@ -79,6 +86,10 @@ func sortPanes(panes []tmux.Pane) []tmux.Pane {
 		}
 	}
 	return sorted
+}
+
+func (p *ProcListModel) SetGitInfo(gitInfo map[string]git.Info) {
+	p.gitInfo = gitInfo
 }
 
 func (p *ProcListModel) SetFilter(text string) {
@@ -132,7 +143,8 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	pr := node.Proc
-	line1 := pr.Name
+	indent := strings.Repeat("  ", node.Depth)
+	line1 := indent + pr.Name
 	if pr.PID > 0 {
 		line1 += fmt.Sprintf("  pid:%d", pr.PID)
 	}
@@ -146,9 +158,9 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	)
 
 	l1 := procLine1Style.Render(line1)
-	l2 := procLine2Style.Render(line2)
+	l2 := procLine2Style.Render(strings.Repeat("  ", node.Depth) + line2)
 	if selected {
-		l1 = selectedBG.Render("  " + line1)
+		l1 = selectedBG.Render(line1)
 	}
 	return l1 + "\n" + l2
 }
