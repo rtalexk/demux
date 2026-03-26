@@ -218,7 +218,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Down):
 		m.procList.MoveDown()
 	case key.Matches(msg, keys.Tab):
-		m.procList.MoveDown()
+		m.procList.TabNext()
 	case key.Matches(msg, keys.JumpUp):
 		m.procList.JumpToPrevPane()
 	case key.Matches(msg, keys.JumpDown):

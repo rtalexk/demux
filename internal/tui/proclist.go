@@ -199,16 +199,157 @@ func stripANSI(s string) string {
 	return result.String()
 }
 
+// nodeDepth returns the logical depth of a node: 0 for pane headers, otherwise Depth.
+func nodeDepth(n ProcListNode) int {
+	if n.IsPaneHeader {
+		return 0
+	}
+	return n.Depth
+}
+
+// MoveUp moves the cursor to the previous sibling at the same depth level.
+// For depth 0 (pane headers): moves to previous pane header.
+// For depth 1/2: moves to previous node of the same depth without crossing a pane header.
 func (p *ProcListModel) MoveUp() {
-	if p.cursor > 0 {
-		p.cursor--
+	if len(p.nodes) == 0 {
+		return
+	}
+	depth := nodeDepth(p.nodes[p.cursor])
+	for i := p.cursor - 1; i >= 0; i-- {
+		d := nodeDepth(p.nodes[i])
+		if depth == 0 {
+			// only stop at other pane headers
+			if p.nodes[i].IsPaneHeader {
+				p.cursor = i
+				return
+			}
+		} else {
+			// stop at a pane header (don't cross into another pane's scope)
+			if p.nodes[i].IsPaneHeader {
+				return
+			}
+			// for depth 2, stop at a depth-1 node (don't cross parent boundary)
+			if depth == 2 && d == 1 {
+				return
+			}
+			if d == depth {
+				p.cursor = i
+				return
+			}
+		}
 	}
 }
 
+// MoveDown moves the cursor to the next sibling at the same depth level.
+// For depth 0 (pane headers): moves to next pane header.
+// For depth 1/2: moves to next node of the same depth without crossing a pane header.
 func (p *ProcListModel) MoveDown() {
-	if p.cursor < len(p.nodes)-1 {
-		p.cursor++
+	if len(p.nodes) == 0 {
+		return
 	}
+	depth := nodeDepth(p.nodes[p.cursor])
+	for i := p.cursor + 1; i < len(p.nodes); i++ {
+		d := nodeDepth(p.nodes[i])
+		if depth == 0 {
+			// only stop at other pane headers
+			if p.nodes[i].IsPaneHeader {
+				p.cursor = i
+				return
+			}
+		} else {
+			// stop at a pane header (don't cross into another pane's scope)
+			if p.nodes[i].IsPaneHeader {
+				return
+			}
+			// for depth 2, stop at a depth-1 node (don't cross parent boundary)
+			if depth == 2 && d == 1 {
+				return
+			}
+			if d == depth {
+				p.cursor = i
+				return
+			}
+		}
+	}
+}
+
+// TabNext moves to the next sibling at the same depth level, wrapping around
+// within the current depth's peer set.
+func (p *ProcListModel) TabNext() {
+	if len(p.nodes) == 0 {
+		return
+	}
+	depth := nodeDepth(p.nodes[p.cursor])
+
+	// collect all sibling indices at the same depth within the same scope
+	peers := p.peersAtDepth(p.cursor, depth)
+	if len(peers) == 0 {
+		return
+	}
+
+	// find current position among peers and advance (with wrap)
+	for i, idx := range peers {
+		if idx == p.cursor {
+			p.cursor = peers[(i+1)%len(peers)]
+			return
+		}
+	}
+}
+
+// peersAtDepth returns the indices of all nodes that are siblings of the node
+// at pos within the same scope (pane for depth 1; parent process block for depth 2;
+// all pane headers for depth 0).
+func (p *ProcListModel) peersAtDepth(pos, depth int) []int {
+	if depth == 0 {
+		var peers []int
+		for i, n := range p.nodes {
+			if n.IsPaneHeader {
+				peers = append(peers, i)
+			}
+		}
+		return peers
+	}
+
+	// find the scope boundaries for depth 1 or 2
+	scopeStart, scopeEnd := 0, len(p.nodes)-1
+
+	if depth == 1 {
+		// scope is within the enclosing pane header section
+		for i := pos - 1; i >= 0; i-- {
+			if p.nodes[i].IsPaneHeader {
+				scopeStart = i + 1
+				break
+			}
+		}
+		for i := pos + 1; i < len(p.nodes); i++ {
+			if p.nodes[i].IsPaneHeader {
+				scopeEnd = i - 1
+				break
+			}
+		}
+	} else {
+		// depth == 2: scope is within the enclosing depth-1 parent process block
+		for i := pos - 1; i >= 0; i-- {
+			if p.nodes[i].IsPaneHeader || nodeDepth(p.nodes[i]) == 1 {
+				scopeStart = i + 1
+				break
+			}
+		}
+		for i := pos + 1; i < len(p.nodes); i++ {
+			if p.nodes[i].IsPaneHeader || nodeDepth(p.nodes[i]) == 1 {
+				scopeEnd = i - 1
+				break
+			}
+		}
+	}
+
+	var peers []int
+	for i := scopeStart; i <= scopeEnd; i++ {
+		if nodeDepth(p.nodes[i]) == depth {
+			peers = append(peers, i)
+		}
+	}
+	return peers
 }
 
 func (p *ProcListModel) JumpToNextPane() {
