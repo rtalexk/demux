@@ -452,6 +452,14 @@ func (p *ProcListModel) JumpToPrevPane() {
     }
 }
 
+func (p *ProcListModel) Reset() {
+    p.nodes = nil
+    p.cursor = 0
+    p.offset = 0
+    p.curSession = ""
+    p.curWindow = -1
+}
+
 func (p ProcListModel) SelectedNode() *ProcListNode {
     if p.cursor < 0 || p.cursor >= len(p.nodes) {
         return nil

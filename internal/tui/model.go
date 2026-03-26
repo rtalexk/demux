@@ -282,13 +282,18 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     }
     // auto-populate proc list whenever a window node is highlighted (no Enter needed)
     // Trigger a fresh proc fetch when the highlighted window changes.
+    // Clear the proc list when a session node is highlighted.
     var cmd tea.Cmd
-    if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-        prevSess, prevWin := m.procList.CurrentWindow()
-        m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
-        if node.Session != prevSess || node.WindowIndex != prevWin {
-            m.procGen++
-            cmd = m.scheduleProcFetch()
+    if node := m.sidebar.Selected(); node != nil {
+        if !node.IsSession {
+            prevSess, prevWin := m.procList.CurrentWindow()
+            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            if node.Session != prevSess || node.WindowIndex != prevWin {
+                m.procGen++
+                cmd = m.scheduleProcFetch()
+            }
+        } else {
+            m.procList.Reset()
         }
     }
     m.updateDetailFromSelection()
