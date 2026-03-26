@@ -21,7 +21,7 @@ var configInitCmd = &cobra.Command{
 }
 
 const defaultConfigTOML = `# demux configuration
-# Default path: ~/.config/dmux/dmux.toml
+# Default path: ~/.config/demux/demux.toml
 
 # How often to refresh session/process data (milliseconds)
 refresh_interval_ms = 2000

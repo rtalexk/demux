@@ -59,8 +59,8 @@ func Load(path string) (Config, error) {
     return cfg, nil
 }
 
-// DefaultPath returns ~/.config/dmux/dmux.toml
+// DefaultPath returns ~/.config/demux/demux.toml
 func DefaultPath() string {
     home, _ := os.UserHomeDir()
-    return home + "/.config/dmux/dmux.toml"
+    return home + "/.config/demux/demux.toml"
 }
