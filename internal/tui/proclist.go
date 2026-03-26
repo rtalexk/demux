@@ -85,18 +85,26 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
                 children = append(children, pr)
             }
         }
-        for _, pr := range children {
+        var addProc func(pr proc.Process, depth int)
+        addProc = func(pr proc.Process, depth int) {
             if seen[pr.PID] {
-                continue
+                return
             }
             seen[pr.PID] = true
-            p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
-            for _, grandchild := range tree[pr.PID] {
-                if !seen[grandchild.PID] {
-                    seen[grandchild.PID] = true
-                    p.nodes = append(p.nodes, ProcListNode{Proc: grandchild, Depth: 2})
+            if containsStr(activeProcShells, strings.ToLower(pr.FriendlyName())) {
+                // skip shell — promote its children to the same depth
+                for _, child := range tree[pr.PID] {
+                    addProc(child, depth)
                 }
+                return
             }
+            p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: depth})
+            for _, child := range tree[pr.PID] {
+                addProc(child, depth+1)
+            }
+        }
+        for _, pr := range children {
+            addProc(pr, 1)
         }
         if len(p.nodes) == headerIdx+1 {
             // no children were added — insert an idle placeholder at process depth
@@ -273,8 +281,6 @@ func procNameStyle(pr proc.Process, depth int) lipgloss.Style {
         return lipgloss.NewStyle().Foreground(activeTheme.ColorProcClaude)
     case containsStr(activeProcServers, name):
         return lipgloss.NewStyle().Foreground(activeTheme.ColorProcServer)
-    case containsStr(activeProcShells, name):
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
     default:
         return lipgloss.NewStyle().Foreground(activeTheme.ColorFgPrimary)
     }
