@@ -14,12 +14,13 @@ type Pane struct {
     CWD         string
     PaneID      string // e.g. %12
     WindowName  string
+    PanePID     int32  // PID of the shell process running in this pane
 }
 
 // ListPanes runs tmux list-panes and returns all panes across all sessions.
 func ListPanes() ([]Pane, error) {
     out, err := exec.Command("tmux", "list-panes", "-a",
-        "-F", "#{session_name}\t#{window_index}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}",
+        "-F", "#{session_name}\t#{window_index}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}\t#{pane_pid}",
     ).Output()
     if err != nil {
         return nil, fmt.Errorf("tmux list-panes: %w", err)
@@ -51,6 +52,11 @@ func ParsePanes(raw string) ([]Pane, error) {
         }
         if len(parts) >= 6 {
             p.WindowName = parts[5]
+        }
+        if len(parts) >= 7 {
+            if pid, err := strconv.ParseInt(strings.TrimSpace(parts[6]), 10, 32); err == nil {
+                p.PanePID = int32(pid)
+            }
         }
         panes = append(panes, p)
     }

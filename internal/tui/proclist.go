@@ -52,24 +52,6 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 
     tree := proc.BuildTree(procs)
 
-    // build a set of all PIDs that match any pane in this window, so we can
-    // detect parent-child relationships within the match set
-    matchSet := make(map[int32]bool)
-    for _, pane := range wPanes {
-        for _, pr := range procs {
-            cwd, ok := cwdMap[pr.PID]
-            if !ok {
-                continue
-            }
-            if cwd == pane.CWD || git.IsDescendant(cwd, pane.CWD) {
-                matchSet[pr.PID] = true
-            }
-        }
-    }
-
-    // globalSeen prevents the same PID from appearing under multiple panes
-    globalSeen := make(map[int32]bool)
-
     windowChanged := session != p.curSession || windowIndex != p.curWindow
     p.curSession = session
     p.curWindow = windowIndex
@@ -78,6 +60,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
         p.cursor = 0
         p.offset = 0
     }
+
     for _, pane := range sortPanes(wPanes) {
         paneCWD := pane.CWD
         gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
@@ -91,25 +74,32 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
             GitInfo:      info,
         })
 
-        for _, pr := range procs {
-            if globalSeen[pr.PID] {
+        // collect depth-1 children of the pane's shell process
+        seen := make(map[int32]bool)
+        var children []proc.Process
+        if pane.PanePID != 0 {
+            // PID-based: direct children of the shell
+            children = tree[pane.PanePID]
+        } else {
+            // fallback: CWD-based match for panes without a known PID
+            for _, pr := range procs {
+                cwd, ok := cwdMap[pr.PID]
+                if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
+                    continue
+                }
+                children = append(children, pr)
+            }
+        }
+        for _, pr := range children {
+            if seen[pr.PID] {
                 continue
             }
-            cwd, ok := cwdMap[pr.PID]
-            if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
-                continue
-            }
-            // skip if this process's parent is also in the match set — it will
-            // appear as a depth-2 child under its parent instead
-            if matchSet[pr.PPID] {
-                continue
-            }
-            globalSeen[pr.PID] = true
+            seen[pr.PID] = true
             p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
-            for _, child := range tree[pr.PID] {
-                if !globalSeen[child.PID] {
-                    globalSeen[child.PID] = true
-                    p.nodes = append(p.nodes, ProcListNode{Proc: child, Depth: 2})
+            for _, grandchild := range tree[pr.PID] {
+                if !seen[grandchild.PID] {
+                    seen[grandchild.PID] = true
+                    p.nodes = append(p.nodes, ProcListNode{Proc: grandchild, Depth: 2})
                 }
             }
         }
