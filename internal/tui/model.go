@@ -517,6 +517,11 @@ func (m Model) View() string {
 		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.filter.Render())
 	}
 
+	statusBar = lipgloss.NewStyle().
+		Width(m.width).
+		MaxHeight(1).
+		Render(statusBar)
+
 	return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 }
 
