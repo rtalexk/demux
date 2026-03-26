@@ -49,6 +49,24 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 
     tree := proc.BuildTree(procs)
 
+    // build a set of all PIDs that match any pane in this window, so we can
+    // detect parent-child relationships within the match set
+    matchSet := make(map[int32]bool)
+    for _, pane := range wPanes {
+        for _, pr := range procs {
+            cwd, ok := cwdMap[pr.PID]
+            if !ok {
+                continue
+            }
+            if cwd == pane.CWD || git.IsDescendant(cwd, pane.CWD) {
+                matchSet[pr.PID] = true
+            }
+        }
+    }
+
+    // globalSeen prevents the same PID from appearing under multiple panes
+    globalSeen := make(map[int32]bool)
+
     p.nodes = nil
     for _, pane := range sortPanes(wPanes) {
         paneCWD := pane.CWD
@@ -63,16 +81,26 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
             GitInfo:      info,
         })
 
-        // find processes for this pane by CWD match (exact or descendant), include subprocesses as grandchildren
         for _, pr := range procs {
+            if globalSeen[pr.PID] {
+                continue
+            }
             cwd, ok := cwdMap[pr.PID]
             if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
                 continue
             }
+            // skip if this process's parent is also in the match set — it will
+            // appear as a depth-2 child under its parent instead
+            if matchSet[pr.PPID] {
+                continue
+            }
+            globalSeen[pr.PID] = true
             p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: 1})
-            // add subprocesses (grandchildren)
             for _, child := range tree[pr.PID] {
-                p.nodes = append(p.nodes, ProcListNode{Proc: child, Depth: 2})
+                if !globalSeen[child.PID] {
+                    globalSeen[child.PID] = true
+                    p.nodes = append(p.nodes, ProcListNode{Proc: child, Depth: 2})
+                }
             }
         }
     }
@@ -117,6 +145,13 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         }
     }
 
+    maxLines := height - 2
+    if maxLines < 1 {
+        maxLines = 1
+    }
+    if len(lines) > maxLines {
+        lines = lines[:maxLines]
+    }
     inner := strings.Join(lines, "\n")
     return border.Width(width - 2).Height(height - 2).Render(inner)
 }
