@@ -137,24 +137,35 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
 		offset = 0
 	}
 
-	// reserve 1 row for the "▼ more" hint when nodes extend below the viewport
-	hasMore := offset+visibleRows < len(s.nodes)
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	hasAbove := offset > 0
+	hasBelow := offset+visibleRows < len(s.nodes)
+
+	// each hint costs one row; shrink the content window accordingly
 	contentRows := visibleRows
-	if hasMore {
-		contentRows = visibleRows - 1
+	if hasAbove {
+		contentRows--
+	}
+	if hasBelow {
+		contentRows--
+	}
+	if contentRows < 1 {
+		contentRows = 1
 	}
 
 	var lines []string
+	if hasAbove {
+		lines = append(lines, hintStyle.Render("▲ more"))
+	}
 	end := offset + contentRows
 	if end > len(s.nodes) {
 		end = len(s.nodes)
 	}
 	for i := offset; i < end; i++ {
-		line := s.renderNode(s.nodes[i], i == s.cursor, width)
-		lines = append(lines, line)
+		lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, width))
 	}
-	if hasMore {
-		lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("▼ more"))
+	if hasBelow {
+		lines = append(lines, hintStyle.Render("▼ more"))
 	}
 
 	inner := strings.Join(lines, "\n")
