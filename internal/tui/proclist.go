@@ -32,11 +32,13 @@ type ProcListNode struct {
 }
 
 type ProcListModel struct {
-    nodes      []ProcListNode
-    cursor     int
-    offset     int // viewport scroll offset (by node index)
-    filterText string
-    primaryCWD string
+    nodes       []ProcListNode
+    cursor      int
+    offset      int // viewport scroll offset (by node index)
+    filterText  string
+    primaryCWD  string
+    curSession  string
+    curWindow   int
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
@@ -68,9 +70,14 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
     // globalSeen prevents the same PID from appearing under multiple panes
     globalSeen := make(map[int32]bool)
 
+    windowChanged := session != p.curSession || windowIndex != p.curWindow
+    p.curSession = session
+    p.curWindow = windowIndex
     p.nodes = nil
-    p.cursor = 0
-    p.offset = 0
+    if windowChanged {
+        p.cursor = 0
+        p.offset = 0
+    }
     for _, pane := range sortPanes(wPanes) {
         paneCWD := pane.CWD
         gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
