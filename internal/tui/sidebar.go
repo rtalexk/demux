@@ -16,7 +16,7 @@ var (
     borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("62"))
     borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("244"))
     sessionStyle   = lipgloss.NewStyle().Bold(true)
-    windowIndent   = "  "
+    windowIndent   = "   "
     selectedBG       = lipgloss.NewStyle().Background(selectedBGColor).Foreground(lipgloss.Color("230"))
     selectedInactive = lipgloss.NewStyle().Foreground(selectedBGColor)
 
@@ -219,9 +219,9 @@ func alignedRow(name, indicators string, availWidth int) string {
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
-    prefix := "▼ "
+    prefix := " ▼ "
     if !node.Expanded {
-        prefix = "▶ "
+        prefix = " ▶ "
     }
 
     // Build indicators; when focused-selected, bake in the BG colour so inner
@@ -263,14 +263,12 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     nameStr := string(nameRunes)
 
     if selected && focused {
-        // +1 left space, +1 trailing space = fills the full interior (availW+2 = width-2)
-        paddedName := " " + nameStr
-        pad := availW + 1 - len([]rune(paddedName)) - indW
+        pad := availW + 2 - len([]rune(nameStr)) - indW
         if pad < 0 {
             pad = 0
         }
         trail := lipgloss.NewStyle().Background(selectedBGColor).Render(" ")
-        return selectedBG.Bold(true).Render(paddedName+strings.Repeat(" ", pad)) + indicators + trail
+        return selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
     if selected {
@@ -331,13 +329,12 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
     nameStr := string(nameRunes)
 
     if selected && focused {
-        paddedName := " " + nameStr
-        pad := availW + 1 - len([]rune(paddedName)) - indW
+        pad := availW + 2 - len([]rune(nameStr)) - indW
         if pad < 0 {
             pad = 0
         }
         trail := lipgloss.NewStyle().Background(selectedBGColor).Render(" ")
-        return selectedBG.Render(paddedName+strings.Repeat(" ", pad)) + indicators + trail
+        return selectedBG.Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     text := alignedRow(nameStr, indicators, availW)
     if selected {
