@@ -655,3 +655,112 @@ func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
 		t.Errorf("no triangle expected for node without children, got: %s", plain)
 	}
 }
+
+// ---------- assignTreePrefixes ----------
+
+func TestAssignTreePrefixes_Depth0_Unchanged(t *testing.T) {
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+	}
+	assignTreePrefixes(nodes)
+	if nodes[0].TreePrefix != "" || nodes[0].StatPrefix != "" {
+		t.Error("pane header (depth 0) should have empty prefixes")
+	}
+}
+
+func TestAssignTreePrefixes_SingleDepth1_GetsLastConnector(t *testing.T) {
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 1}, Depth: 1},
+	}
+	assignTreePrefixes(nodes)
+	if nodes[1].TreePrefix != "  └─ " {
+		t.Errorf("single depth-1 should get └─, got %q", nodes[1].TreePrefix)
+	}
+	if nodes[1].StatPrefix != "     " {
+		t.Errorf("single depth-1 StatPrefix should be 5 spaces, got %q", nodes[1].StatPrefix)
+	}
+}
+
+func TestAssignTreePrefixes_TwoDepth1_CorrectConnectors(t *testing.T) {
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 1}, Depth: 1},
+		{Proc: proc.Process{PID: 2}, Depth: 1},
+	}
+	assignTreePrefixes(nodes)
+	if nodes[1].TreePrefix != "  ├─ " {
+		t.Errorf("first of two depth-1 should get ├─, got %q", nodes[1].TreePrefix)
+	}
+	if nodes[1].StatPrefix != "  │  " {
+		t.Errorf("first of two depth-1 StatPrefix should be '  │  ', got %q", nodes[1].StatPrefix)
+	}
+	if nodes[2].TreePrefix != "  └─ " {
+		t.Errorf("last depth-1 should get └─, got %q", nodes[2].TreePrefix)
+	}
+	if nodes[2].StatPrefix != "     " {
+		t.Errorf("last depth-1 StatPrefix should be 5 spaces, got %q", nodes[2].StatPrefix)
+	}
+}
+
+func TestAssignTreePrefixes_Depth2UnderNonLastParent(t *testing.T) {
+	// pane0, procA (non-last), procA-child (last under procA), procB (last)
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 1}, Depth: 1}, // non-last
+		{Proc: proc.Process{PID: 2}, Depth: 2}, // last under PID 1
+		{Proc: proc.Process{PID: 3}, Depth: 1}, // last
+	}
+	assignTreePrefixes(nodes)
+	// procA-child: parent (depth-1, PID 1) is non-last → ancestor cont = "│  "
+	// procA-child is the only child → isLast → "└─ "
+	if nodes[2].TreePrefix != "  │  └─ " {
+		t.Errorf("depth-2 under non-last parent should get '  │  └─ ', got %q", nodes[2].TreePrefix)
+	}
+	if nodes[2].StatPrefix != "  │     " {
+		t.Errorf("depth-2 StatPrefix under non-last parent should be '  │     ', got %q", nodes[2].StatPrefix)
+	}
+}
+
+func TestAssignTreePrefixes_Depth2UnderLastParent(t *testing.T) {
+	// pane0, procA (last), procA-child1 (non-last), procA-child2 (last)
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 1}, Depth: 1}, // last depth-1
+		{Proc: proc.Process{PID: 2}, Depth: 2}, // non-last
+		{Proc: proc.Process{PID: 3}, Depth: 2}, // last
+	}
+	assignTreePrefixes(nodes)
+	// parent (PID 1) is last → ancestor cont = "   " (3 spaces)
+	if nodes[2].TreePrefix != "     ├─ " {
+		t.Errorf("non-last depth-2 under last parent, got %q", nodes[2].TreePrefix)
+	}
+	if nodes[2].StatPrefix != "     │  " {
+		t.Errorf("non-last depth-2 StatPrefix under last parent, got %q", nodes[2].StatPrefix)
+	}
+	if nodes[3].TreePrefix != "     └─ " {
+		t.Errorf("last depth-2 under last parent, got %q", nodes[3].TreePrefix)
+	}
+	if nodes[3].StatPrefix != "        " {
+		t.Errorf("last depth-2 StatPrefix (8 spaces), got %q", nodes[3].StatPrefix)
+	}
+}
+
+func TestAssignTreePrefixes_CrossPaneBoundary_ResetsSiblingCount(t *testing.T) {
+	// depth-1 in pane 1 should be treated as last (only child in its pane)
+	nodes := []ProcListNode{
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 1}, Depth: 1},
+		{IsPaneHeader: true, Depth: 0},
+		{Proc: proc.Process{PID: 2}, Depth: 1},
+	}
+	assignTreePrefixes(nodes)
+	// PID 1 is last in pane 0 (next node at same depth is in another pane, separated by depth-0)
+	if nodes[1].TreePrefix != "  └─ " {
+		t.Errorf("depth-1 in pane 0 should get └─, got %q", nodes[1].TreePrefix)
+	}
+	// PID 2 is last in pane 1
+	if nodes[3].TreePrefix != "  └─ " {
+		t.Errorf("depth-1 in pane 1 should get └─, got %q", nodes[3].TreePrefix)
+	}
+}
