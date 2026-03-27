@@ -10,9 +10,14 @@ import (
 // aliases must be pre-sorted longest-prefix-first (guaranteed by config.Load).
 func ShortenPath(path string, aliases []config.PathAlias) string {
     for _, a := range aliases {
-        if strings.HasPrefix(path, a.Prefix) {
-            return a.Replace + path[len(a.Prefix):]
+        rest := strings.TrimPrefix(path, a.Prefix)
+        if rest == path {
+            continue // no prefix match
         }
+        if rest != "" && rest[0] != '/' {
+            continue // matched across a directory name boundary
+        }
+        return a.Replace + rest
     }
     return path
 }

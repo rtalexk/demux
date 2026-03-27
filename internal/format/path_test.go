@@ -68,3 +68,13 @@ func TestShortenPath_FirstAliasApplied(t *testing.T) {
         t.Errorf("expected ~/projects/foo, got %q", got)
     }
 }
+
+func TestShortenPath_NoFalsePartialMatch(t *testing.T) {
+    aliases := []config.PathAlias{
+        {Prefix: "/home/user", Replace: "~"},
+    }
+    got := format.ShortenPath("/home/userdata/foo", aliases)
+    if got != "/home/userdata/foo" {
+        t.Errorf("expected unchanged path, got %q", got)
+    }
+}
