@@ -139,3 +139,221 @@ func TestTabNext_SingleNode_StaysInPlace(t *testing.T) {
         t.Errorf("expected cursor to stay at 0 with single node, got %d", m.cursor)
     }
 }
+
+// buildIdleNodes creates a node list where pane 0 has an idle placeholder.
+//
+//    [0] pane header  (depth 0)
+//    [1] idle         (depth 1, IsIdle=true)
+//    [2] pane header  (depth 0)
+//    [3] proc B       (depth 1)
+func buildIdleNodes() []ProcListNode {
+    return []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}, Depth: 0},
+        {IsIdle: true, Depth: 1},
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 1}, Depth: 0},
+        {Proc: proc.Process{PID: 3, Name: "procB"}, Depth: 1},
+    }
+}
+
+// ---------- isSelectable ----------
+
+func TestIsSelectable_FalseForIdleNode(t *testing.T) {
+    if isSelectable(ProcListNode{IsIdle: true}) {
+        t.Error("idle node should not be selectable")
+    }
+}
+
+func TestIsSelectable_TrueForProcNode(t *testing.T) {
+    if !isSelectable(ProcListNode{Proc: proc.Process{PID: 1}}) {
+        t.Error("process node should be selectable")
+    }
+}
+
+func TestIsSelectable_TrueForPaneHeader(t *testing.T) {
+    if !isSelectable(ProcListNode{IsPaneHeader: true}) {
+        t.Error("pane header should be selectable")
+    }
+}
+
+// ---------- Idle node skipping in MoveUp/MoveDown ----------
+
+func TestMoveDown_SkipsIdleNode(t *testing.T) {
+    nodes := buildIdleNodes()
+    m := modelAt(nodes, 0) // cursor on first pane header
+    m.MoveDown()
+    // idle at [1] should be skipped; next selectable is pane header at [2]
+    if m.cursor != 2 {
+        t.Errorf("expected cursor=2 (skip idle), got %d", m.cursor)
+    }
+}
+
+func TestMoveUp_SkipsIdleNode(t *testing.T) {
+    nodes := buildIdleNodes()
+    m := modelAt(nodes, 2) // cursor on second pane header
+    m.MoveUp()
+    // going up from [2]: [1] is idle (skip), [0] is pane header (selectable)
+    if m.cursor != 0 {
+        t.Errorf("expected cursor=0 (skip idle), got %d", m.cursor)
+    }
+}
+
+func TestMoveDown_StopsAtLastSelectableNode(t *testing.T) {
+    // when last node is idle, MoveDown should not move past the last selectable
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        {Proc: proc.Process{PID: 1, Name: "procA"}, Depth: 1},
+        {IsIdle: true, Depth: 1},
+    }
+    m := modelAt(nodes, 1) // cursor on procA
+    m.MoveDown()
+    // idle at [2] is not selectable — cursor stays at [1]
+    if m.cursor != 1 {
+        t.Errorf("expected cursor=1 (no selectable node below), got %d", m.cursor)
+    }
+}
+
+// ---------- GotoTop / GotoBottom ----------
+
+func TestGotoTop_SetsCursorAndOffsetToZero(t *testing.T) {
+    m := modelAt(buildNodes(), 5)
+    m.offset = 3
+    m.GotoTop()
+    if m.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", m.cursor)
+    }
+    if m.offset != 0 {
+        t.Errorf("expected offset=0, got %d", m.offset)
+    }
+}
+
+func TestGotoBottom_MovesToLastSelectableNode(t *testing.T) {
+    nodes := buildNodes()
+    m := modelAt(nodes, 0)
+    m.GotoBottom()
+    if m.cursor != len(nodes)-1 {
+        t.Errorf("expected cursor=%d, got %d", len(nodes)-1, m.cursor)
+    }
+}
+
+func TestGotoBottom_SkipsTrailingIdleNode(t *testing.T) {
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        {Proc: proc.Process{PID: 1, Name: "procA"}, Depth: 1},
+        {IsIdle: true, Depth: 1},
+    }
+    m := modelAt(nodes, 0)
+    m.GotoBottom()
+    // procA at [1] is the last selectable; idle at [2] must be skipped
+    if m.cursor != 1 {
+        t.Errorf("expected cursor=1, got %d", m.cursor)
+    }
+}
+
+func TestGotoBottom_EmptyNodes_NoPanic(t *testing.T) {
+    m := ProcListModel{}
+    m.GotoBottom() // should not panic
+}
+
+// ---------- SelectedNode ----------
+
+func TestSelectedNode_ReturnsNilForIdleNode(t *testing.T) {
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        {IsIdle: true, Depth: 1},
+    }
+    m := modelAt(nodes, 1) // cursor on idle node
+    if m.SelectedNode() != nil {
+        t.Error("expected nil for idle node")
+    }
+}
+
+func TestSelectedNode_ReturnsProcNode(t *testing.T) {
+    nodes := buildNodes()
+    m := modelAt(nodes, 1) // cursor on procA
+    n := m.SelectedNode()
+    if n == nil {
+        t.Fatal("expected non-nil node")
+    }
+    if n.Proc.PID != 1 {
+        t.Errorf("expected PID=1, got %d", n.Proc.PID)
+    }
+}
+
+func TestSelectedNode_ReturnsNilForEmptyModel(t *testing.T) {
+    m := ProcListModel{}
+    if m.SelectedNode() != nil {
+        t.Error("expected nil for empty model")
+    }
+}
+
+// ---------- nodeRows ----------
+
+func TestNodeRows_PaneHeaderIsOneRow(t *testing.T) {
+    if nodeRows(ProcListNode{IsPaneHeader: true}) != 1 {
+        t.Error("expected 1 row for pane header")
+    }
+}
+
+func TestNodeRows_IdleIsOneRow(t *testing.T) {
+    if nodeRows(ProcListNode{IsIdle: true}) != 1 {
+        t.Error("expected 1 row for idle placeholder")
+    }
+}
+
+func TestNodeRows_ProcIsTwoRows(t *testing.T) {
+    if nodeRows(ProcListNode{Proc: proc.Process{PID: 1}}) != 2 {
+        t.Error("expected 2 rows for process node")
+    }
+}
+
+// ---------- clampOffset ----------
+
+func TestClampOffset_EmptyNodes(t *testing.T) {
+    m := ProcListModel{}
+    m.clampOffset(10) // must not panic
+    if m.offset != 0 {
+        t.Errorf("expected offset=0 for empty nodes, got %d", m.offset)
+    }
+}
+
+func TestClampOffset_CursorFitsInViewport_NoChange(t *testing.T) {
+    // cursor=1, only 2 nodes, large maxRows — offset should stay 0
+    nodes := buildNodes()
+    m := modelAt(nodes, 1)
+    m.offset = 0
+    m.clampOffset(20)
+    if m.offset != 0 {
+        t.Errorf("expected offset=0 when cursor fits, got %d", m.offset)
+    }
+}
+
+func TestClampOffset_AdvancesOffsetWhenCursorRowsExceedAvailable(t *testing.T) {
+    // nodes: pane header (1 row) + 4 processes (2 rows each) = 9 rows to last cursor
+    // maxRows=6 → available=4; cursor at last process (index 5) won't fit without scrolling
+    nodes := buildNodes()
+    m := modelAt(nodes, 5)
+    m.offset = 0
+    m.clampOffset(6)
+    if m.offset == 0 {
+        t.Error("expected offset to advance when cursor is far below viewport")
+    }
+    // verify cursor is within available rows from new offset
+    available := 6 - 2
+    rows := 0
+    for i := m.offset; i <= m.cursor; i++ {
+        rows += nodeRows(nodes[i])
+    }
+    if rows > available {
+        t.Errorf("cursor rows %d still exceed available %d after clamp", rows, available)
+    }
+}
+
+func TestClampOffset_CursorAboveOffset_ClampsUp(t *testing.T) {
+    nodes := buildNodes()
+    m := modelAt(nodes, 1)
+    m.offset = 3 // cursor is above viewport
+    m.clampOffset(10)
+    if m.offset != 1 {
+        t.Errorf("expected offset=cursor=1 when cursor above viewport, got %d", m.offset)
+    }
+}
