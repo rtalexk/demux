@@ -296,6 +296,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 m.resolveAlertForWindow(node.Session, node.WindowIndex)
                 tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
             }
+            if m.popupMode {
+                return m, tea.Quit
+            }
         }
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
@@ -367,11 +370,17 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
             m.resolveAlertForWindow(node.Session, node.WindowIndex)
             tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
+            if m.popupMode {
+                return m, tea.Quit
+            }
         }
     case key.Matches(msg, keys.Open):
         if pane := m.procList.SelectedPane(); pane != nil {
             m.resolveAlertForWindow(pane.Session, pane.WindowIndex)
             tmux.SwitchClient(fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex))
+            if m.popupMode {
+                return m, tea.Quit
+            }
         }
     case key.Matches(msg, keys.Esc):
         m.focus = panelSidebar
