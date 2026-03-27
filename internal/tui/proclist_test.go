@@ -575,266 +575,266 @@ func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
 // ---------- ToggleCollapse ----------
 
 func TestToggleCollapse_Depth1WithChildren_TogglesAndReturnsTrue(t *testing.T) {
-	m := ProcListModel{
-		collapsedPIDs: map[int32]bool{10: true},
-		nodes: []ProcListNode{
-			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
-			{Proc: proc.Process{PID: 10}, Depth: 1, HasChildren: true, Collapsed: true},
-		},
-		cursor: 1,
-	}
-	toggled := m.ToggleCollapse()
-	if !toggled {
-		t.Error("expected ToggleCollapse to return true")
-	}
-	if m.collapsedPIDs[10] != false {
-		t.Error("expected PID 10 to be expanded after toggle")
-	}
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10}, Depth: 1, HasChildren: true, Collapsed: true},
+        },
+        cursor: 1,
+    }
+    toggled := m.ToggleCollapse()
+    if !toggled {
+        t.Error("expected ToggleCollapse to return true")
+    }
+    if m.collapsedPIDs[10] != false {
+        t.Error("expected PID 10 to be expanded after toggle")
+    }
 }
 
 func TestToggleCollapse_Depth1NoChildren_ReturnsFalse(t *testing.T) {
-	m := ProcListModel{
-		collapsedPIDs: map[int32]bool{},
-		nodes: []ProcListNode{
-			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
-			{Proc: proc.Process{PID: 20}, Depth: 1, HasChildren: false},
-		},
-		cursor: 1,
-	}
-	toggled := m.ToggleCollapse()
-	if toggled {
-		t.Error("expected ToggleCollapse to return false for node without children")
-	}
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 20}, Depth: 1, HasChildren: false},
+        },
+        cursor: 1,
+    }
+    toggled := m.ToggleCollapse()
+    if toggled {
+        t.Error("expected ToggleCollapse to return false for node without children")
+    }
 }
 
 func TestToggleCollapse_PaneHeader_ReturnsFalse(t *testing.T) {
-	m := ProcListModel{
-		collapsedPIDs: map[int32]bool{},
-		nodes: []ProcListNode{
-			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
-		},
-		cursor: 0,
-	}
-	if m.ToggleCollapse() {
-		t.Error("expected false for pane header")
-	}
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        },
+        cursor: 0,
+    }
+    if m.ToggleCollapse() {
+        t.Error("expected false for pane header")
+    }
 }
 
 func TestToggleCollapse_ExpandedToCollapsed(t *testing.T) {
-	m := ProcListModel{
-		collapsedPIDs: map[int32]bool{30: false},
-		nodes: []ProcListNode{
-			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
-			{Proc: proc.Process{PID: 30}, Depth: 1, HasChildren: true, Collapsed: false},
-		},
-		cursor: 1,
-	}
-	m.ToggleCollapse()
-	if m.collapsedPIDs[30] != true {
-		t.Error("expected PID 30 to be collapsed after toggle")
-	}
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{30: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 30}, Depth: 1, HasChildren: true, Collapsed: false},
+        },
+        cursor: 1,
+    }
+    m.ToggleCollapse()
+    if m.collapsedPIDs[30] != true {
+        t.Error("expected PID 30 to be collapsed after toggle")
+    }
 }
 
 func TestToggleCollapse_EmptyNodes_ReturnsFalse(t *testing.T) {
-	m := ProcListModel{}
-	if m.ToggleCollapse() {
-		t.Error("expected false for empty model")
-	}
+    m := ProcListModel{}
+    if m.ToggleCollapse() {
+        t.Error("expected false for empty model")
+    }
 }
 
 func TestToggleCollapse_IdleNode_ReturnsFalse(t *testing.T) {
-	m := ProcListModel{
-		collapsedPIDs: map[int32]bool{},
-		nodes: []ProcListNode{
-			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
-			{IsIdle: true, Depth: 1},
-		},
-		cursor: 1,
-	}
-	if m.ToggleCollapse() {
-		t.Error("expected false for idle node")
-	}
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {IsIdle: true, Depth: 1},
+        },
+        cursor: 1,
+    }
+    if m.ToggleCollapse() {
+        t.Error("expected false for idle node")
+    }
 }
 
 // ---------- renderProc collapse rendering ----------
 
 func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testing.T) {
-	m := ProcListModel{}
-	node := ProcListNode{
-		Proc:        proc.Process{PID: 1, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
-		Depth:       1,
-		HasChildren: true,
-		Collapsed:   true,
-		AggCPU:      2.5,
-		AggMemRSS:   250 * 1024 * 1024,
-		TreePrefix:  "  └─ ",
-		StatPrefix:  "     ",
-	}
-	line := m.renderProc(node, false)
-	plain := stripANSI(line)
-	if !strings.Contains(plain, "▶") {
-		t.Errorf("expected ▶ prefix for collapsed node, got: %s", plain)
-	}
-	if !strings.Contains(plain, "(2.5%)") {
-		t.Errorf("expected aggregated cpu (2.5%%) in stats, got: %s", plain)
-	}
-	if !strings.Contains(plain, "(250.0MB)") {
-		t.Errorf("expected aggregated mem (250.0MB) in stats, got: %s", plain)
-	}
-	if !strings.Contains(plain, "└─") {
-		t.Errorf("expected tree connector └─ in output, got: %s", plain)
-	}
+    m := ProcListModel{}
+    node := ProcListNode{
+        Proc:        proc.Process{PID: 1, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
+        Depth:       1,
+        HasChildren: true,
+        Collapsed:   true,
+        AggCPU:      2.5,
+        AggMemRSS:   250 * 1024 * 1024,
+        TreePrefix:  "  └─ ",
+        StatPrefix:  "     ",
+    }
+    line := m.renderProc(node, false)
+    plain := stripANSI(line)
+    if !strings.Contains(plain, "▶") {
+        t.Errorf("expected ▶ prefix for collapsed node, got: %s", plain)
+    }
+    if !strings.Contains(plain, "(2.5%)") {
+        t.Errorf("expected aggregated cpu (2.5%%) in stats, got: %s", plain)
+    }
+    if !strings.Contains(plain, "(250.0MB)") {
+        t.Errorf("expected aggregated mem (250.0MB) in stats, got: %s", plain)
+    }
+    if !strings.Contains(plain, "└─") {
+        t.Errorf("expected tree connector └─ in output, got: %s", plain)
+    }
 }
 
 func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing.T) {
-	m := ProcListModel{}
-	node := ProcListNode{
-		Proc:        proc.Process{PID: 2, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
-		Depth:       1,
-		HasChildren: true,
-		Collapsed:   false,
-		AggCPU:      2.5,
-		AggMemRSS:   250 * 1024 * 1024,
-		TreePrefix:  "  └─ ",
-		StatPrefix:  "     ",
-	}
-	line := m.renderProc(node, false)
-	plain := stripANSI(line)
-	if !strings.Contains(plain, "▼") {
-		t.Errorf("expected ▼ prefix for expanded node with children, got: %s", plain)
-	}
-	if strings.Contains(plain, "(2.5%)") {
-		t.Errorf("expanded node should not show agg stats, got: %s", plain)
-	}
-	if !strings.Contains(plain, "└─") {
-		t.Errorf("expected tree connector └─ in output, got: %s", plain)
-	}
+    m := ProcListModel{}
+    node := ProcListNode{
+        Proc:        proc.Process{PID: 2, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
+        Depth:       1,
+        HasChildren: true,
+        Collapsed:   false,
+        AggCPU:      2.5,
+        AggMemRSS:   250 * 1024 * 1024,
+        TreePrefix:  "  └─ ",
+        StatPrefix:  "     ",
+    }
+    line := m.renderProc(node, false)
+    plain := stripANSI(line)
+    if !strings.Contains(plain, "▼") {
+        t.Errorf("expected ▼ prefix for expanded node with children, got: %s", plain)
+    }
+    if strings.Contains(plain, "(2.5%)") {
+        t.Errorf("expanded node should not show agg stats, got: %s", plain)
+    }
+    if !strings.Contains(plain, "└─") {
+        t.Errorf("expected tree connector └─ in output, got: %s", plain)
+    }
 }
 
 func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
-	m := ProcListModel{}
-	node := ProcListNode{
-		Proc:        proc.Process{PID: 3, Name: "nvim"},
-		Depth:       1,
-		HasChildren: false,
-		TreePrefix:  "  └─ ",
-		StatPrefix:  "     ",
-	}
-	line := m.renderProc(node, false)
-	plain := stripANSI(line)
-	if strings.Contains(plain, "▶") || strings.Contains(plain, "▼") {
-		t.Errorf("no triangle expected for node without children, got: %s", plain)
-	}
-	if !strings.Contains(plain, "└─") {
-		t.Errorf("expected tree connector └─ in output, got: %s", plain)
-	}
+    m := ProcListModel{}
+    node := ProcListNode{
+        Proc:        proc.Process{PID: 3, Name: "nvim"},
+        Depth:       1,
+        HasChildren: false,
+        TreePrefix:  "  └─ ",
+        StatPrefix:  "     ",
+    }
+    line := m.renderProc(node, false)
+    plain := stripANSI(line)
+    if strings.Contains(plain, "▶") || strings.Contains(plain, "▼") {
+        t.Errorf("no triangle expected for node without children, got: %s", plain)
+    }
+    if !strings.Contains(plain, "└─") {
+        t.Errorf("expected tree connector └─ in output, got: %s", plain)
+    }
 }
 
 // ---------- assignTreePrefixes ----------
 
 func TestAssignTreePrefixes_Depth0_Unchanged(t *testing.T) {
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-	}
-	assignTreePrefixes(nodes)
-	if nodes[0].TreePrefix != "" || nodes[0].StatPrefix != "" {
-		t.Error("pane header (depth 0) should have empty prefixes")
-	}
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+    }
+    assignTreePrefixes(nodes)
+    if nodes[0].TreePrefix != "" || nodes[0].StatPrefix != "" {
+        t.Error("pane header (depth 0) should have empty prefixes")
+    }
 }
 
 func TestAssignTreePrefixes_SingleDepth1_GetsLastConnector(t *testing.T) {
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 1}, Depth: 1},
-	}
-	assignTreePrefixes(nodes)
-	if nodes[1].TreePrefix != "  └─ " {
-		t.Errorf("single depth-1 should get └─, got %q", nodes[1].TreePrefix)
-	}
-	if nodes[1].StatPrefix != "     " {
-		t.Errorf("single depth-1 StatPrefix should be 5 spaces, got %q", nodes[1].StatPrefix)
-	}
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 1}, Depth: 1},
+    }
+    assignTreePrefixes(nodes)
+    if nodes[1].TreePrefix != "  └─ " {
+        t.Errorf("single depth-1 should get └─, got %q", nodes[1].TreePrefix)
+    }
+    if nodes[1].StatPrefix != "     " {
+        t.Errorf("single depth-1 StatPrefix should be 5 spaces, got %q", nodes[1].StatPrefix)
+    }
 }
 
 func TestAssignTreePrefixes_TwoDepth1_CorrectConnectors(t *testing.T) {
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 1}, Depth: 1},
-		{Proc: proc.Process{PID: 2}, Depth: 1},
-	}
-	assignTreePrefixes(nodes)
-	if nodes[1].TreePrefix != "  ├─ " {
-		t.Errorf("first of two depth-1 should get ├─, got %q", nodes[1].TreePrefix)
-	}
-	if nodes[1].StatPrefix != "  │  " {
-		t.Errorf("first of two depth-1 StatPrefix should be '  │  ', got %q", nodes[1].StatPrefix)
-	}
-	if nodes[2].TreePrefix != "  └─ " {
-		t.Errorf("last depth-1 should get └─, got %q", nodes[2].TreePrefix)
-	}
-	if nodes[2].StatPrefix != "     " {
-		t.Errorf("last depth-1 StatPrefix should be 5 spaces, got %q", nodes[2].StatPrefix)
-	}
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 1}, Depth: 1},
+        {Proc: proc.Process{PID: 2}, Depth: 1},
+    }
+    assignTreePrefixes(nodes)
+    if nodes[1].TreePrefix != "  ├─ " {
+        t.Errorf("first of two depth-1 should get ├─, got %q", nodes[1].TreePrefix)
+    }
+    if nodes[1].StatPrefix != "  │  " {
+        t.Errorf("first of two depth-1 StatPrefix should be '  │  ', got %q", nodes[1].StatPrefix)
+    }
+    if nodes[2].TreePrefix != "  └─ " {
+        t.Errorf("last depth-1 should get └─, got %q", nodes[2].TreePrefix)
+    }
+    if nodes[2].StatPrefix != "     " {
+        t.Errorf("last depth-1 StatPrefix should be 5 spaces, got %q", nodes[2].StatPrefix)
+    }
 }
 
 func TestAssignTreePrefixes_Depth2UnderNonLastParent(t *testing.T) {
-	// pane0, procA (non-last), procA-child (last under procA), procB (last)
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 1}, Depth: 1}, // non-last
-		{Proc: proc.Process{PID: 2}, Depth: 2}, // last under PID 1
-		{Proc: proc.Process{PID: 3}, Depth: 1}, // last
-	}
-	assignTreePrefixes(nodes)
-	// procA-child: parent (depth-1, PID 1) is non-last → ancestor cont = "│  "
-	// procA-child is the only child → isLast → "└─ "
-	if nodes[2].TreePrefix != "  │  └─ " {
-		t.Errorf("depth-2 under non-last parent should get '  │  └─ ', got %q", nodes[2].TreePrefix)
-	}
-	if nodes[2].StatPrefix != "  │     " {
-		t.Errorf("depth-2 StatPrefix under non-last parent should be '  │     ', got %q", nodes[2].StatPrefix)
-	}
+    // pane0, procA (non-last), procA-child (last under procA), procB (last)
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 1}, Depth: 1}, // non-last
+        {Proc: proc.Process{PID: 2}, Depth: 2}, // last under PID 1
+        {Proc: proc.Process{PID: 3}, Depth: 1}, // last
+    }
+    assignTreePrefixes(nodes)
+    // procA-child: parent (depth-1, PID 1) is non-last → ancestor cont = "│  "
+    // procA-child is the only child → isLast → "└─ "
+    if nodes[2].TreePrefix != "  │  └─ " {
+        t.Errorf("depth-2 under non-last parent should get '  │  └─ ', got %q", nodes[2].TreePrefix)
+    }
+    if nodes[2].StatPrefix != "  │     " {
+        t.Errorf("depth-2 StatPrefix under non-last parent should be '  │     ', got %q", nodes[2].StatPrefix)
+    }
 }
 
 func TestAssignTreePrefixes_Depth2UnderLastParent(t *testing.T) {
-	// pane0, procA (last), procA-child1 (non-last), procA-child2 (last)
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 1}, Depth: 1}, // last depth-1
-		{Proc: proc.Process{PID: 2}, Depth: 2}, // non-last
-		{Proc: proc.Process{PID: 3}, Depth: 2}, // last
-	}
-	assignTreePrefixes(nodes)
-	// parent (PID 1) is last → ancestor cont = "   " (3 spaces)
-	if nodes[2].TreePrefix != "     ├─ " {
-		t.Errorf("non-last depth-2 under last parent, got %q", nodes[2].TreePrefix)
-	}
-	if nodes[2].StatPrefix != "     │  " {
-		t.Errorf("non-last depth-2 StatPrefix under last parent, got %q", nodes[2].StatPrefix)
-	}
-	if nodes[3].TreePrefix != "     └─ " {
-		t.Errorf("last depth-2 under last parent, got %q", nodes[3].TreePrefix)
-	}
-	if nodes[3].StatPrefix != "        " {
-		t.Errorf("last depth-2 StatPrefix (8 spaces), got %q", nodes[3].StatPrefix)
-	}
+    // pane0, procA (last), procA-child1 (non-last), procA-child2 (last)
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 1}, Depth: 1}, // last depth-1
+        {Proc: proc.Process{PID: 2}, Depth: 2}, // non-last
+        {Proc: proc.Process{PID: 3}, Depth: 2}, // last
+    }
+    assignTreePrefixes(nodes)
+    // parent (PID 1) is last → ancestor cont = "   " (3 spaces)
+    if nodes[2].TreePrefix != "     ├─ " {
+        t.Errorf("non-last depth-2 under last parent, got %q", nodes[2].TreePrefix)
+    }
+    if nodes[2].StatPrefix != "     │  " {
+        t.Errorf("non-last depth-2 StatPrefix under last parent, got %q", nodes[2].StatPrefix)
+    }
+    if nodes[3].TreePrefix != "     └─ " {
+        t.Errorf("last depth-2 under last parent, got %q", nodes[3].TreePrefix)
+    }
+    if nodes[3].StatPrefix != "        " {
+        t.Errorf("last depth-2 StatPrefix (8 spaces), got %q", nodes[3].StatPrefix)
+    }
 }
 
 func TestAssignTreePrefixes_CrossPaneBoundary_ResetsSiblingCount(t *testing.T) {
-	// depth-1 in pane 1 should be treated as last (only child in its pane)
-	nodes := []ProcListNode{
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 1}, Depth: 1},
-		{IsPaneHeader: true, Depth: 0},
-		{Proc: proc.Process{PID: 2}, Depth: 1},
-	}
-	assignTreePrefixes(nodes)
-	// PID 1 is last in pane 0 (next node at same depth is in another pane, separated by depth-0)
-	if nodes[1].TreePrefix != "  └─ " {
-		t.Errorf("depth-1 in pane 0 should get └─, got %q", nodes[1].TreePrefix)
-	}
-	// PID 2 is last in pane 1
-	if nodes[3].TreePrefix != "  └─ " {
-		t.Errorf("depth-1 in pane 1 should get └─, got %q", nodes[3].TreePrefix)
-	}
+    // depth-1 in pane 1 should be treated as last (only child in its pane)
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 1}, Depth: 1},
+        {IsPaneHeader: true, Depth: 0},
+        {Proc: proc.Process{PID: 2}, Depth: 1},
+    }
+    assignTreePrefixes(nodes)
+    // PID 1 is last in pane 0 (next node at same depth is in another pane, separated by depth-0)
+    if nodes[1].TreePrefix != "  └─ " {
+        t.Errorf("depth-1 in pane 0 should get └─, got %q", nodes[1].TreePrefix)
+    }
+    // PID 2 is last in pane 1
+    if nodes[3].TreePrefix != "  └─ " {
+        t.Errorf("depth-1 in pane 1 should get └─, got %q", nodes[3].TreePrefix)
+    }
 }
