@@ -164,20 +164,38 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         allLines = append(allLines, renderedLine{nodeIdx: i, text: line})
     }
 
-    // clamp offset so cursor's line is visible
+    maxRows := height - 2
+    if maxRows < 1 {
+        maxRows = 1
+    }
+
+    // clamp offset so cursor's lines are visible (read-only; p.offset mutated by clampOffset)
     offset := p.offset
     if p.cursor < offset {
         offset = p.cursor
+    }
+    // scroll down: advance offset until cursor fits within maxRows
+    available := maxRows - 2
+    if available < 1 {
+        available = 1
+    }
+    for {
+        rows := 0
+        for i := offset; i < len(p.nodes); i++ {
+            rows += nodeRows(p.nodes[i])
+            if i == p.cursor {
+                break
+            }
+        }
+        if rows <= available || offset >= p.cursor {
+            break
+        }
+        offset++
     }
 
     // determine scroll hints based on node-level offset
     hasAbove := offset > 0
     hasBelow := false // determined after we know how many fit
-
-    maxRows := height - 2
-    if maxRows < 1 {
-        maxRows = 1
-    }
     contentRows := maxRows
     if hasAbove {
         contentRows--
@@ -371,19 +389,47 @@ func nodeDepth(n ProcListNode) int {
     return n.Depth
 }
 
-// clampOffset adjusts the viewport offset so the cursor is always visible.
-// visibleNodes is the number of node slots available (accounting for hint rows).
-func (p *ProcListModel) clampOffset(visibleNodes int) {
-    effective := visibleNodes - 2
-    if effective < 1 {
-        effective = 1
+// nodeRows returns how many terminal rows a node occupies when rendered.
+func nodeRows(n ProcListNode) int {
+    if n.IsPaneHeader || n.IsIdle {
+        return 1
     }
+    return 2 // process: name line + stats line
+}
+
+// clampOffset adjusts p.offset so the cursor node is always within the
+// visible row window. maxRows is the total inner height of the proc panel
+// (border already subtracted). Two rows are reserved for scroll hints.
+func (p *ProcListModel) clampOffset(maxRows int) {
+    if len(p.nodes) == 0 {
+        p.offset = 0
+        return
+    }
+    // scroll up: cursor moved above the viewport
     if p.cursor < p.offset {
         p.offset = p.cursor
     }
-    if p.cursor >= p.offset+effective {
-        p.offset = p.cursor - effective + 1
+
+    // scroll down: advance offset until the cursor fits within maxRows
+    // Reserve 2 rows for ▲/▼ hints (conservative — always safe).
+    available := maxRows - 2
+    if available < 1 {
+        available = 1
     }
+    for {
+        rows := 0
+        for i := p.offset; i < len(p.nodes); i++ {
+            rows += nodeRows(p.nodes[i])
+            if i == p.cursor {
+                break
+            }
+        }
+        if rows <= available || p.offset >= p.cursor {
+            break
+        }
+        p.offset++
+    }
+
     if p.offset < 0 {
         p.offset = 0
     }
