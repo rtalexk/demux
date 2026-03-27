@@ -85,13 +85,17 @@ func resolveAgent(name string) (agentDef, error) {
 
 var hooksNotifyCmd = &cobra.Command{
 	Use:   "notify",
-	Short: "Handle a Claude Code Notification hook event (reads event JSON from stdin)",
+	Short: "Handle a Notification hook event (reads event JSON from stdin)",
 	Long: `Reads the Notification hook event JSON from stdin, extracts the message,
 and sets a warn-level demux alert on the current tmux window.
 
-Intended to be called from ~/.claude/settings.json:
-  "command": "demux hooks notify"`,
+Use --agent to specify which AI agent is sending the notification.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		def, err := resolveAgent(hooksNotifyAgent)
+		if err != nil {
+			return err
+		}
+
 		if os.Getenv("TMUX") == "" {
 			return nil
 		}
@@ -103,7 +107,7 @@ Intended to be called from ~/.claude/settings.json:
 
 		reason := event.Message
 		if reason == "" {
-			reason = "Claude notification"
+			reason = def.notifyFallback
 		}
 
 		target, err := tmuxTarget()
@@ -239,6 +243,8 @@ func init() {
 	hooksInitCmd.MarkFlagRequired("agent")
 	hooksStopCmd.Flags().StringVar(&hooksStopAgent, "agent", "", "AI agent (required): claude")
 	hooksStopCmd.MarkFlagRequired("agent")
+	hooksNotifyCmd.Flags().StringVar(&hooksNotifyAgent, "agent", "", "AI agent (required): claude")
+	hooksNotifyCmd.MarkFlagRequired("agent")
 	hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
 	rootCmd.AddCommand(hooksCmd)
 }
