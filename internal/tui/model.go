@@ -365,6 +365,11 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             m.resolveAlertForWindow(node.Session, node.WindowIndex)
             tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
         }
+    case key.Matches(msg, keys.Open):
+        if pane := m.procList.SelectedPane(); pane != nil {
+            m.resolveAlertForWindow(pane.Session, pane.WindowIndex)
+            tmux.SwitchClient(fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex))
+        }
     case key.Matches(msg, keys.Esc):
         m.focus = panelSidebar
     case key.Matches(msg, keys.Kill):
