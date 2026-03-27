@@ -135,12 +135,13 @@ func TestLoadFromFile_IgnoredProcesses(t *testing.T) {
 
 func TestPathAliases_EnvExpansion(t *testing.T) {
     t.Setenv("MYPROJECTS", "/home/user/projects")
+    t.Setenv("PROJ_ALIAS", "proj")
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
     os.WriteFile(path, []byte(`
 [[path_aliases]]
 prefix = "$MYPROJECTS"
-replace = "proj"
+replace = "$PROJ_ALIAS"
 
 [[path_aliases]]
 prefix = "$MYPROJECTS/work"
@@ -161,9 +162,12 @@ replace = "work"
     if cfg.PathAliases[1].Prefix != "/home/user/projects" {
         t.Errorf("expected shorter prefix second, got %q", cfg.PathAliases[1].Prefix)
     }
-    // replace values are kept as-is (not env-expanded)
     if cfg.PathAliases[0].Replace != "work" {
-        t.Errorf("unexpected replace: %q", cfg.PathAliases[0].Replace)
+        t.Errorf("unexpected replace for index 0: %q", cfg.PathAliases[0].Replace)
+    }
+    // replace values are also env-expanded
+    if cfg.PathAliases[1].Replace != "proj" {
+        t.Errorf("expected Replace to be env-expanded to %q, got %q", "proj", cfg.PathAliases[1].Replace)
     }
 }
 
