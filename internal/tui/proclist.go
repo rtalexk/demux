@@ -531,10 +531,12 @@ func injectBorderTitle(rendered, title string) string {
     totalInner := len(runes) - 2
 
     titleRunes := []rune(title)
-    if len(titleRunes) > totalInner-1 {
+    titleVisible := []rune(stripANSI(title))
+    if len(titleVisible) > totalInner-1 {
         titleRunes = titleRunes[:totalInner-1]
+        titleVisible = titleVisible[:totalInner-1]
     }
-    fillCount := totalInner - len(titleRunes)
+    fillCount := totalInner - len(titleVisible)
 
     // Extract ANSI prefix (border color) and suffix (reset) from the original top line.
     cornerLeftIdx := strings.Index(topLine, cornerLeft)

@@ -611,11 +611,12 @@ func (m Model) View() string {
     // build sidebar border title: [1] Sessions (N) with optional spinner
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     sessionCount := m.sidebar.SessionCount()
-    sidebarTitle := fmt.Sprintf(" [1] Sessions (%d) ", sessionCount)
+    sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
+    sidebarTitle := fmt.Sprintf(" [1] Sessions %s ", sessionCountStr)
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            sidebarTitle = fmt.Sprintf(" [1] Sessions (%d) %s ", sessionCount, frame)
+            sidebarTitle = fmt.Sprintf(" [1] Sessions %s %s ", sessionCountStr, frame)
             break
         }
     }
