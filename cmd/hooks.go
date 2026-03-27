@@ -1,26 +1,26 @@
 package cmd
 
 import (
-    "encoding/json"
-    "fmt"
-    "io"
-    "os"
-    "os/exec"
-    "sort"
-    "strings"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"sort"
+	"strings"
 
-    "github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 )
 
 var hooksCmd = &cobra.Command{
-    Use:   "hooks",
-    Short: "Claude Code hook utilities",
+	Use:   "hooks",
+	Short: "Claude Code hook utilities",
 }
 
 var hooksInitCmd = &cobra.Command{
-    Use:   "init",
-    Short: "Print Claude Code hook configuration for demux",
-    Long: `Prints a JSON snippet to add to ~/.claude/settings.json.
+	Use:   "init",
+	Short: "Print Claude Code hook configuration for demux",
+	Long: `Prints a JSON snippet to add to ~/.claude/settings.json.
 
 Stop fires when a Claude Code session ends — demux shows an info badge on
 that tmux window.
@@ -28,23 +28,23 @@ that tmux window.
 Notification fires when Claude needs your attention: permission prompts,
 idle waiting for input, elicitation dialogs. demux shows a warn badge with
 the actual message from Claude so you know what it's asking.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        fmt.Print(claudeHooksSnippet)
-        return nil
-    },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Print(claudeHooksSnippet)
+		return nil
+	},
 }
 
 // notifyEvent mirrors the JSON that Claude Code sends to the Notification hook on stdin.
 type notifyEvent struct {
-    Message          string `json:"message"`
-    Title            string `json:"title"`
-    NotificationType string `json:"notification_type"`
+	Message          string `json:"message"`
+	Title            string `json:"title"`
+	NotificationType string `json:"notification_type"`
 }
 
 // stopEvent mirrors the JSON that Claude Code sends to the Stop hook on stdin.
 type stopEvent struct {
-    StopHookActive     bool   `json:"stop_hook_active"`
-    LastAssistantMessage string `json:"last_assistant_message"`
+	StopHookActive       bool   `json:"stop_hook_active"`
+	LastAssistantMessage string `json:"last_assistant_message"`
 }
 
 type agentDef struct {
@@ -74,87 +74,87 @@ func resolveAgent(name string) (agentDef, error) {
 }
 
 var hooksNotifyCmd = &cobra.Command{
-    Use:   "notify",
-    Short: "Handle a Claude Code Notification hook event (reads event JSON from stdin)",
-    Long: `Reads the Notification hook event JSON from stdin, extracts the message,
+	Use:   "notify",
+	Short: "Handle a Claude Code Notification hook event (reads event JSON from stdin)",
+	Long: `Reads the Notification hook event JSON from stdin, extracts the message,
 and sets a warn-level demux alert on the current tmux window.
 
 Intended to be called from ~/.claude/settings.json:
   "command": "demux hooks notify"`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        if os.Getenv("TMUX") == "" {
-            return nil
-        }
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if os.Getenv("TMUX") == "" {
+			return nil
+		}
 
-        var event notifyEvent
-        if data, err := io.ReadAll(os.Stdin); err == nil {
-            json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
-        }
+		var event notifyEvent
+		if data, err := io.ReadAll(os.Stdin); err == nil {
+			json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
+		}
 
-        reason := event.Message
-        if reason == "" {
-            reason = "Claude notification"
-        }
+		reason := event.Message
+		if reason == "" {
+			reason = "Claude notification"
+		}
 
-        target, err := tmuxTarget()
-        if err != nil {
-            return err
-        }
+		target, err := tmuxTarget()
+		if err != nil {
+			return err
+		}
 
-        d, err := openDB()
-        if err != nil {
-            return err
-        }
-        defer d.Close()
-        return d.AlertSet(target, reason, "warn", false)
-    },
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return d.AlertSet(target, reason, "warn", false)
+	},
 }
 
 var hooksStopCmd = &cobra.Command{
-    Use:   "stop",
-    Short: "Handle a Claude Code Stop hook event (reads event JSON from stdin)",
-    Long: `Reads the Stop hook event JSON from stdin and sets an info-level demux
+	Use:   "stop",
+	Short: "Handle a Claude Code Stop hook event (reads event JSON from stdin)",
+	Long: `Reads the Stop hook event JSON from stdin and sets an info-level demux
 alert on the current tmux window.
 
 Intended to be called from ~/.claude/settings.json:
   "command": "demux hooks stop"`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        if os.Getenv("TMUX") == "" {
-            return nil
-        }
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if os.Getenv("TMUX") == "" {
+			return nil
+		}
 
-        var event stopEvent
-        if data, err := io.ReadAll(os.Stdin); err == nil {
-            json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
-        }
+		var event stopEvent
+		if data, err := io.ReadAll(os.Stdin); err == nil {
+			json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
+		}
 
-        // stop_hook_active=true means this stop was triggered by a stop hook;
-        // skip to avoid creating stale alerts after the hook chain.
-        if event.StopHookActive {
-            return nil
-        }
+		// stop_hook_active=true means this stop was triggered by a stop hook;
+		// skip to avoid creating stale alerts after the hook chain.
+		if event.StopHookActive {
+			return nil
+		}
 
-        target, err := tmuxTarget()
-        if err != nil {
-            return err
-        }
+		target, err := tmuxTarget()
+		if err != nil {
+			return err
+		}
 
-        d, err := openDB()
-        if err != nil {
-            return err
-        }
-        defer d.Close()
-        return d.AlertSet(target, "Claude finished", "info", false)
-    },
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return d.AlertSet(target, "Claude finished", "info", false)
+	},
 }
 
 // tmuxTarget returns the current tmux target as "session:windowIndex".
 func tmuxTarget() (string, error) {
-    out, err := exec.Command("tmux", "display-message", "-p", "#S:#I").Output()
-    if err != nil {
-        return "", fmt.Errorf("get tmux target: %w", err)
-    }
-    return strings.TrimSpace(string(out)), nil
+	out, err := exec.Command("tmux", "display-message", "-p", "#S:#I").Output()
+	if err != nil {
+		return "", fmt.Errorf("get tmux target: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 const claudeHooksSnippet = `# Claude Code hooks for demux
@@ -221,6 +221,6 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 `
 
 func init() {
-    hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
-    rootCmd.AddCommand(hooksCmd)
+	hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
+	rootCmd.AddCommand(hooksCmd)
 }
