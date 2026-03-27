@@ -113,16 +113,18 @@ func row(label, value string) string {
 
 func (d DetailModel) renderSession() []string {
     lines := []string{
-        row("repo", d.sessionCWD),
+        row("path", d.sessionCWD),
     }
     if d.gitInfo.Worktree != "" {
         lines = append(lines, row("worktree", d.gitInfo.Worktree))
     }
-    branch := d.gitInfo.Branch
-    if ind := gitIndicatorsLong(d.gitInfo); ind != "" {
-        branch += "  " + ind
+    if d.gitInfo.Branch != "" {
+        branch := d.gitInfo.Branch
+        if ind := gitIndicatorsLong(d.gitInfo); ind != "" {
+            branch += "  " + ind
+        }
+        lines = append(lines, row("branch", branch))
     }
-    lines = append(lines, row("branch", branch))
     if d.prInfo != "" {
         lines = append(lines, row("pr", d.prInfo))
     }
