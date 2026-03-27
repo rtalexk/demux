@@ -608,6 +608,8 @@ func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testi
 		Collapsed:   true,
 		AggCPU:      2.5,
 		AggMemRSS:   250 * 1024 * 1024,
+		TreePrefix:  "  └─ ",
+		StatPrefix:  "     ",
 	}
 	line := m.renderProc(node, false)
 	plain := stripANSI(line)
@@ -620,6 +622,9 @@ func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testi
 	if !strings.Contains(plain, "(250.0MB)") {
 		t.Errorf("expected aggregated mem (250.0MB) in stats, got: %s", plain)
 	}
+	if !strings.Contains(plain, "└─") {
+		t.Errorf("expected tree connector └─ in output, got: %s", plain)
+	}
 }
 
 func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing.T) {
@@ -631,6 +636,8 @@ func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing
 		Collapsed:   false,
 		AggCPU:      2.5,
 		AggMemRSS:   250 * 1024 * 1024,
+		TreePrefix:  "  └─ ",
+		StatPrefix:  "     ",
 	}
 	line := m.renderProc(node, false)
 	plain := stripANSI(line)
@@ -640,6 +647,9 @@ func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing
 	if strings.Contains(plain, "(2.5%)") {
 		t.Errorf("expanded node should not show agg stats, got: %s", plain)
 	}
+	if !strings.Contains(plain, "└─") {
+		t.Errorf("expected tree connector └─ in output, got: %s", plain)
+	}
 }
 
 func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
@@ -648,11 +658,16 @@ func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
 		Proc:        proc.Process{PID: 3, Name: "nvim"},
 		Depth:       1,
 		HasChildren: false,
+		TreePrefix:  "  └─ ",
+		StatPrefix:  "     ",
 	}
 	line := m.renderProc(node, false)
 	plain := stripANSI(line)
 	if strings.Contains(plain, "▶") || strings.Contains(plain, "▼") {
 		t.Errorf("no triangle expected for node without children, got: %s", plain)
+	}
+	if !strings.Contains(plain, "└─") {
+		t.Errorf("expected tree connector └─ in output, got: %s", plain)
 	}
 }
 
