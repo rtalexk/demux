@@ -12,6 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var hooksInitAgent string
+var hooksStopAgent string
+var hooksNotifyAgent string
+
 var hooksCmd = &cobra.Command{
 	Use:   "hooks",
 	Short: "Claude Code hook utilities",
@@ -19,17 +23,23 @@ var hooksCmd = &cobra.Command{
 
 var hooksInitCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Print Claude Code hook configuration for demux",
-	Long: `Prints a JSON snippet to add to ~/.claude/settings.json.
+	Short: "Print hook configuration for an AI agent",
+	Long: `Prints a configuration snippet for the specified AI agent.
 
-Stop fires when a Claude Code session ends — demux shows an info badge on
-that tmux window.
+Supported agents: claude
 
-Notification fires when Claude needs your attention: permission prompts,
+For --agent claude, prints a JSON snippet to add to ~/.claude/settings.json.
+
+Stop fires when a session ends — demux shows an info badge on that tmux window.
+Notification fires when the agent needs your attention: permission prompts,
 idle waiting for input, elicitation dialogs. demux shows a warn badge with
-the actual message from Claude so you know what it's asking.`,
+the actual message so you know what it's asking.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Print(claudeHooksSnippet)
+		def, err := resolveAgent(hooksInitAgent)
+		if err != nil {
+			return err
+		}
+		fmt.Print(def.snippet)
 		return nil
 	},
 }
@@ -221,6 +231,8 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 `
 
 func init() {
+	hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude")
+	hooksInitCmd.MarkFlagRequired("agent")
 	hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
 	rootCmd.AddCommand(hooksCmd)
 }
