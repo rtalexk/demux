@@ -6,6 +6,7 @@ import (
 
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
+    "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
@@ -115,7 +116,7 @@ func row(label, value string) string {
 
 func (d DetailModel) renderSession() []string {
     lines := []string{
-        row("path", d.sessionCWD),
+        row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
     }
     if d.gitInfo.Worktree != "" {
         lines = append(lines, row("worktree", d.gitInfo.Worktree))
@@ -142,7 +143,7 @@ func (d DetailModel) renderSession() []string {
 func (d DetailModel) renderWindow() []string {
     var lines []string
     for _, p := range d.windowPanes {
-        lines = append(lines, fmt.Sprintf("  pane %d  %s", p.PaneIndex, p.CWD))
+        lines = append(lines, fmt.Sprintf("  pane %d  %s", p.PaneIndex, format.ShortenPath(p.CWD, d.cfg.PathAliases)))
     }
     if d.windowGit.Branch != "" {
         lines = append(lines, "")
@@ -184,7 +185,7 @@ func (d DetailModel) renderProc(innerWidth int) []string {
         lines = append(lines, row("port", d.procPort))
     }
     if d.procCWD != "" {
-        lines = append(lines, row("cwd", d.procCWD))
+        lines = append(lines, row("cwd", format.ShortenPath(d.procCWD, d.cfg.PathAliases)))
     }
     if d.procGit.Branch != "" {
         lines = append(lines, "")

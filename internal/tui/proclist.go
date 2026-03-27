@@ -8,6 +8,7 @@ import (
 
     "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
+    "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
@@ -41,12 +42,14 @@ type ProcListModel struct {
     curSession    string
     curWindow     int
     collapsedPIDs map[int32]bool // persists collapse state across SetWindowData calls
+    cfg           config.Config
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
 // procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched), and
 // gitInfo is keyed by "session:windowIndex:paneIndex" for deviant panes.
 func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, cfg config.Config) {
+    p.cfg = cfg
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
     p.primaryCWD = primaryCWDForPanes(windows)
@@ -378,7 +381,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
     }
     out := paneHeaderStyle.Render(label)
     if node.Pane.CWD != "" {
-        out += "  " + panePathStyle.Render(node.Pane.CWD)
+        out += "  " + panePathStyle.Render(format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases))
     }
     if node.GitDeviant {
         if node.GitInfo.Loading {
