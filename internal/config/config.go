@@ -79,8 +79,9 @@ type Config struct {
     IgnoredProcesses  []string    `toml:"ignored_processes"`
     DefaultFormat     string      `toml:"default_format"`
     StatusBarFormat   string      `toml:"status_bar_format"`
-    SidebarWidth      int         `toml:"sidebar_width"`
-    Git               GitConfig   `toml:"git"`
+    SidebarWidth         int         `toml:"sidebar_width"`
+    AlertFilterWindows   string      `toml:"alert_filter_windows"`
+    Git                  GitConfig   `toml:"git"`
     Theme             ThemeConfig `toml:"theme"`
     PathAliases       []PathAlias `toml:"path_aliases"`
 }
@@ -92,7 +93,8 @@ func Default() Config {
         IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
-        SidebarWidth:      30,
+        SidebarWidth:       30,
+        AlertFilterWindows: "all",
         Git: GitConfig{
             Enabled:         true,
             TimeoutMs:       500,

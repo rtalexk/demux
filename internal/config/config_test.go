@@ -197,6 +197,26 @@ replace = "rp"
     }
 }
 
+func TestDefaults_AlertFilterWindows(t *testing.T) {
+    cfg := config.Default()
+    if cfg.AlertFilterWindows != "all" {
+        t.Errorf("expected default AlertFilterWindows=\"all\", got %q", cfg.AlertFilterWindows)
+    }
+}
+
+func TestLoadFromFile_AlertFilterWindows(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`alert_filter_windows = "alerts_only"`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.AlertFilterWindows != "alerts_only" {
+        t.Errorf("expected \"alerts_only\", got %q", cfg.AlertFilterWindows)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
