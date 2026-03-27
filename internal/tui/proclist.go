@@ -164,6 +164,82 @@ func sortPanes(panes []tmux.Pane) []tmux.Pane {
 	return sorted
 }
 
+// assignTreePrefixes fills TreePrefix and StatPrefix on every non-header node.
+// It must be called after p.nodes is fully built by SetWindowData.
+//
+// Connectors used:
+//   "├─ " non-last sibling at this depth
+//   "└─ " last sibling at this depth
+//   "│  " ancestor continuation (non-last ancestor)
+//   "   " ancestor continuation (last ancestor)
+//
+// The base indent is 2 spaces (pane-level offset), matching the current
+// plain-indent scheme. Each connector/continuation segment is 3 visual columns.
+func assignTreePrefixes(nodes []ProcListNode) {
+	n := len(nodes)
+	for i := range nodes {
+		nd := &nodes[i]
+		if nd.Depth == 0 {
+			continue
+		}
+		depth := nd.Depth
+
+		// Determine if this node is the last sibling at its depth.
+		// Stop scanning at a pane header (depth 0) or a shallower depth.
+		isLast := true
+		for j := i + 1; j < n; j++ {
+			jd := nodes[j].Depth
+			if jd == 0 || jd < depth {
+				break
+			}
+			if jd == depth {
+				isLast = false
+				break
+			}
+		}
+
+		// Build the ancestor continuation chain for depths 1..depth-1.
+		// For each ancestor level, scan backward to find the nearest ancestor
+		// node at that depth and check whether it was itself last at that depth.
+		cont := "  " // base 2-space indent
+		for d := 1; d < depth; d++ {
+			ancestorIsLast := true
+			for j := i - 1; j >= 0; j-- {
+				if nodes[j].Depth == 0 {
+					break // crossed pane boundary
+				}
+				if nodes[j].Depth == d {
+					// Check whether this ancestor node is last at depth d.
+					for k := j + 1; k < n; k++ {
+						kd := nodes[k].Depth
+						if kd == 0 || kd < d {
+							break
+						}
+						if kd == d {
+							ancestorIsLast = false
+							break
+						}
+					}
+					break
+				}
+			}
+			if ancestorIsLast {
+				cont += "   "
+			} else {
+				cont += "│  "
+			}
+		}
+
+		if isLast {
+			nd.TreePrefix = cont + "└─ "
+			nd.StatPrefix = cont + "   "
+		} else {
+			nd.TreePrefix = cont + "├─ "
+			nd.StatPrefix = cont + "│  "
+		}
+	}
+}
+
 // CurrentWindow returns the session name and window index currently displayed.
 func (p ProcListModel) CurrentWindow() (string, int) {
 	return p.curSession, p.curWindow
