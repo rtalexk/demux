@@ -480,6 +480,16 @@ func (s *SidebarModel) ToggleExpand() {
     }
 }
 
+func (s *SidebarModel) GotoTop(visibleRows int) {
+    s.cursor = 0
+    s.clampViewport(visibleRows)
+}
+
+func (s *SidebarModel) GotoBottom(visibleRows int) {
+    s.cursor = max(0, len(s.nodes)-1)
+    s.clampViewport(visibleRows)
+}
+
 func (s *SidebarModel) MoveToSessionLevel() {
     for s.cursor > 0 && !s.nodes[s.cursor].IsSession {
         s.cursor--

@@ -506,6 +506,20 @@ func (p *ProcListModel) JumpToPrevPane() {
     }
 }
 
+func (p *ProcListModel) GotoTop() {
+    p.cursor = 0
+    p.offset = 0
+}
+
+func (p *ProcListModel) GotoBottom() {
+    for i := len(p.nodes) - 1; i >= 0; i-- {
+        if isSelectable(p.nodes[i]) {
+            p.cursor = i
+            return
+        }
+    }
+}
+
 func (p *ProcListModel) Reset() {
     p.nodes = nil
     p.cursor = 0
