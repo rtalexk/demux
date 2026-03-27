@@ -156,7 +156,9 @@ func (s *SidebarModel) rebuildNodes() {
             for _, wi := range winIdxs {
                 if s.filterAlerts && s.cfg.AlertFilterWindows == "alerts_only" {
                     target := fmt.Sprintf("%s:%d", name, wi)
-                    if _, hasAlert := s.alerts[target]; !hasAlert {
+                    _, hasWindowAlert := s.alerts[target]
+                    _, hasSessionAlert := s.alerts[name]
+                    if !hasWindowAlert && !hasSessionAlert {
                         continue
                     }
                 }
@@ -595,6 +597,9 @@ func (s SidebarModel) AlertFilterActive() bool {
 func (s *SidebarModel) ToggleAlertFilter() bool {
     s.filterAlerts = !s.filterAlerts
     s.rebuildNodes()
+    if s.cursor >= len(s.nodes) {
+        s.cursor = max(0, len(s.nodes)-1)
+    }
     return s.filterAlerts
 }
 
@@ -605,5 +610,3 @@ func (s SidebarModel) Selected() *SidebarNode {
     n := s.nodes[s.cursor]
     return &n
 }
-
-

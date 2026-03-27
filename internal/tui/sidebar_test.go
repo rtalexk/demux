@@ -586,3 +586,25 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
         t.Error("expected AlertFilterActive=true after toggle")
     }
 }
+
+func TestToggleAlertFilter_AlertsOnly_SessionLevelAlertShowsAllWindows(t *testing.T) {
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess": {Target: "sess", CreatedAt: time.Now()},
+        },
+        cfg: config.Config{AlertFilterWindows: "alerts_only"},
+    }
+    s.ToggleAlertFilter()
+    var winIdxs []int
+    for _, n := range s.nodes {
+        if !n.IsSession {
+            winIdxs = append(winIdxs, n.WindowIndex)
+        }
+    }
+    if len(winIdxs) != 2 {
+        t.Errorf("expected both windows visible when session has session-level alert, got %v", winIdxs)
+    }
+}
