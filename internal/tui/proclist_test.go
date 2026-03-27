@@ -450,8 +450,15 @@ func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
 
     pane := buildTestPane(300)
     var m ProcListModel
-    // pre-expand node (PID 301) before calling SetWindowData
-    m.collapsedPIDs = map[int32]bool{301: false}
+    // First call establishes the window and defaults PID 301 to collapsed.
+    m.SetWindowData(
+        []tmux.Pane{pane}, "test", 0,
+        procs, map[int32]string{},
+        map[string]git.Info{}, config.Config{},
+    )
+    // Simulate a toggle — expand PID 301.
+    m.collapsedPIDs[301] = false
+    // Second call for the same window (windowChanged=false) — map is preserved.
     m.SetWindowData(
         []tmux.Pane{pane}, "test", 0,
         procs, map[int32]string{},

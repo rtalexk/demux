@@ -62,6 +62,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 	if windowChanged {
 		p.cursor = 0
 		p.offset = 0
+		p.collapsedPIDs = make(map[int32]bool) // reset so new window's PIDs default to collapsed
 	}
 
 	for _, pane := range sortPanes(wPanes) {
