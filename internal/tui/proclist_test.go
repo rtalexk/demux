@@ -356,6 +356,70 @@ func TestClampOffset_CursorAboveOffset_ClampsUp(t *testing.T) {
     }
 }
 
+// ---------- procCursorVisible ----------
+
+// buildHeaderNodes returns n pane-header nodes (1 row each) for simple
+// viewport arithmetic in scroll tests.
+func buildHeaderNodes(n int) []ProcListNode {
+    nodes := make([]ProcListNode, n)
+    for i := range nodes {
+        nodes[i] = ProcListNode{IsPaneHeader: true}
+    }
+    return nodes
+}
+
+// TestProcCursorVisible_SecondToLastTriggersHasBelow is the regression test for
+// the bug where the first pass broke early at the cursor node and never checked
+// whether nodes after the cursor would cause a ▼ hint — making the cursor
+// appear visible when Render would actually hide it behind the hint row.
+func TestProcCursorVisible_SecondToLastTriggersHasBelow(t *testing.T) {
+    // 9 single-row nodes, viewport fits 8. cursor=7 (second to last).
+    // Node 8 overflows → ▼ hint → effective content = 7 → cursor=7 is NOT visible.
+    nodes := buildHeaderNodes(9)
+    if procCursorVisible(nodes, 7, 0, 8) {
+        t.Error("cursor=7 (second to last of 9) should NOT be visible: node 8 causes ▼ hint that cuts it off")
+    }
+}
+
+func TestProcCursorVisible_LastNodeNoHasBelow(t *testing.T) {
+    // cursor at the very last node — no ▼ hint, so it should be visible
+    // even though it fills the viewport exactly.
+    nodes := buildHeaderNodes(8)
+    if !procCursorVisible(nodes, 7, 0, 8) {
+        t.Error("cursor at last node should be visible when all nodes fit exactly")
+    }
+}
+
+func TestProcCursorVisible_AllFitNoScroll(t *testing.T) {
+    // Entire list fits in viewport with no hints needed.
+    nodes := buildHeaderNodes(5)
+    if !procCursorVisible(nodes, 4, 0, 10) {
+        t.Error("cursor should be visible when list easily fits in viewport")
+    }
+}
+
+// ---------- Render downward safety clamp ----------
+
+// TestRender_SafetyClampWhenViewportShrinks is the regression test for the bug
+// where moving the cursor to a process node caused the detail pane to expand,
+// shrinking procH. The stale p.offset (valid for the larger viewport) left the
+// cursor outside the visible area. Render must re-clamp read-only.
+func TestRender_SafetyClampWhenViewportShrinks(t *testing.T) {
+    nodes := buildNodes() // 6 nodes, 10 rows total
+    m := modelAt(nodes, 5)
+    // Simulate offset that was valid for a tall viewport but is now stale.
+    m.offset = 0
+
+    // height=6 → maxRows=4 (tiny viewport, cursor=5 can't fit at offset=0)
+    rendered := m.Render(40, 6, true, "")
+    plain := stripANSI(rendered)
+
+    // cursor is procB-child (PID 4); its name must appear in the rendered output
+    if !strings.Contains(plain, "procB-child") {
+        t.Errorf("cursor node 'procB-child' should be visible after read-only safety clamp; got:\n%s", plain)
+    }
+}
+
 // ---------- aggStats ----------
 
 func TestAggStats_LeafNode_ReturnsSelf(t *testing.T) {
