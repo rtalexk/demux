@@ -4,6 +4,7 @@ import (
     "fmt"
     "strings"
 
+    "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
@@ -22,6 +23,7 @@ const (
 
 type DetailModel struct {
     selType DetailSelection
+    cfg     config.Config
 
     // session
     session    string

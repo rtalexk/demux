@@ -450,6 +450,7 @@ func (m *Model) updateDetailFromSelection() {
                 }
             }
             m.detail = DetailModel{
+                cfg:        m.cfg,
                 selType:    DetailSession,
                 session:    node.Session,
                 sessionCWD: sessionCWD,
@@ -470,6 +471,7 @@ func (m *Model) updateDetailFromSelection() {
                 windowAlert = a
             }
             m.detail = DetailModel{
+                cfg:         m.cfg,
                 selType:     DetailWindow,
                 windowIndex: node.WindowIndex,
                 windowPanes: wPanes,
@@ -493,6 +495,7 @@ func (m *Model) updateDetailFromSelection() {
             portStr = fmt.Sprintf("%d", selNode.Port)
         }
         m.detail = DetailModel{
+            cfg:      m.cfg,
             selType:  DetailProc,
             proc:     pr,
             procGit:  m.gitInfo[cwd],
