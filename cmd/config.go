@@ -29,6 +29,13 @@ refresh_interval_ms = 2000
 # Sessions to hide from the sidebar
 ignored_sessions = []
 
+# Path prefix aliases — shorten verbose absolute paths in the TUI.
+# Both prefix and replace support environment variables.
+# Longest matching prefix wins. Example:
+# [[path_aliases]]
+# prefix = "$HOME"
+# replace = "~"
+
 # Processes to hide from the process list (children are promoted up)
 ignored_processes = ["zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"]
 
