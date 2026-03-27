@@ -331,8 +331,8 @@ func TestClampOffset_CursorFitsInViewport_NoChange(t *testing.T) {
 }
 
 func TestClampOffset_AdvancesOffsetWhenCursorRowsExceedAvailable(t *testing.T) {
-    // nodes: pane header (1 row) + 4 processes (2 rows each) = 9 rows to last cursor
-    // maxRows=6 → available=4; cursor at last process (index 5) won't fit without scrolling
+    // nodes: pane header (1 row) + 4 processes (2 rows each) = 10 rows total
+    // maxRows=6 → cursor at last process (index 5) won't fit without scrolling
     nodes := buildNodes()
     m := modelAt(nodes, 5)
     m.offset = 0
@@ -340,14 +340,9 @@ func TestClampOffset_AdvancesOffsetWhenCursorRowsExceedAvailable(t *testing.T) {
     if m.offset == 0 {
         t.Error("expected offset to advance when cursor is far below viewport")
     }
-    // verify cursor is within available rows from new offset
-    available := 6 - 2
-    rows := 0
-    for i := m.offset; i <= m.cursor; i++ {
-        rows += nodeRows(nodes[i])
-    }
-    if rows > available {
-        t.Errorf("cursor rows %d still exceed available %d after clamp", rows, available)
+    // verify cursor is visible according to the same hint logic used by Render
+    if !procCursorVisible(nodes, m.cursor, m.offset, 6) {
+        t.Errorf("cursor not visible after clamp: offset=%d cursor=%d", m.offset, m.cursor)
     }
 }
 

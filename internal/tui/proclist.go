@@ -587,40 +587,72 @@ func aggStats(pr proc.Process, tree map[int32][]proc.Process) (cpu float64, mem 
 
 // clampOffset adjusts p.offset so the cursor node is always within the
 // visible row window. maxRows is the total inner height of the proc panel
-// (border already subtracted). Two rows are reserved for scroll hints.
+// (border already subtracted).
 func (p *ProcListModel) clampOffset(maxRows int) {
 	if len(p.nodes) == 0 {
 		p.offset = 0
 		return
 	}
-	// scroll up: cursor moved above the viewport
 	if p.cursor < p.offset {
 		p.offset = p.cursor
 	}
-
-	// scroll down: advance offset until the cursor fits within maxRows
-	// Reserve 2 rows for ▲/▼ hints (conservative — always safe).
-	available := maxRows - 2
-	if available < 1 {
-		available = 1
-	}
-	for {
-		rows := 0
-		for i := p.offset; i < len(p.nodes); i++ {
-			rows += nodeRows(p.nodes[i])
-			if i == p.cursor {
-				break
-			}
-		}
-		if rows <= available || p.offset >= p.cursor {
+	for p.offset < p.cursor {
+		if procCursorVisible(p.nodes, p.cursor, p.offset, maxRows) {
 			break
 		}
 		p.offset++
 	}
-
 	if p.offset < 0 {
 		p.offset = 0
 	}
+}
+
+// procCursorVisible mirrors the Render hint logic to determine whether the
+// cursor node would be visible with the given offset and maxRows.
+//   - ▲ hint is shown when offset > 0 (costs 1 row)
+//   - ▼ hint is shown when content overflows after accounting for ▲ (costs 1 row)
+func procCursorVisible(nodes []ProcListNode, cursor, offset, maxRows int) bool {
+	hasAbove := offset > 0
+	contentRows := maxRows
+	if hasAbove {
+		contentRows--
+	}
+
+	// First pass: scan ALL nodes from offset (not stopping at cursor) so we
+	// can detect whether nodes after the cursor would cause ▼ to appear.
+	rows := 0
+	cursorRows := -1 // rows consumed up to and including the cursor node
+	hasBelow := false
+	for i := offset; i < len(nodes); i++ {
+		nr := nodeRows(nodes[i])
+		if rows+nr > contentRows {
+			hasBelow = true
+			break
+		}
+		rows += nr
+		if i == cursor {
+			cursorRows = rows
+		}
+	}
+	if cursorRows < 0 {
+		return false // cursor not reached within contentRows
+	}
+	if !hasBelow {
+		return true // no ▼ hint; cursor fits
+	}
+	// ▼ hint will be shown — re-check with one fewer row.
+	rows = 0
+	for i := offset; i < len(nodes); i++ {
+		nr := nodeRows(nodes[i])
+		if rows+nr > contentRows-1 {
+			return false
+		}
+		rows += nr
+		if i == cursor {
+			return true
+		}
+	}
+	return false
 }
 
 // MoveUp moves the cursor one item up, skipping idle placeholders.
