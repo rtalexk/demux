@@ -23,6 +23,7 @@ type keyMap struct {
     ShiftTab      key.Binding
     GotoTop       key.Binding
     GotoBottom    key.Binding
+    Open          key.Binding
 }
 
 var keys = keyMap{
@@ -46,4 +47,5 @@ var keys = keyMap{
     ShiftTab:      key.NewBinding(key.WithKeys("shift+tab")),
     GotoTop:       key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "top")),
     GotoBottom:    key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
+    Open:          key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open/attach")),
 }
