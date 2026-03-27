@@ -340,6 +340,15 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.GotoBottom):
         m.procList.GotoBottom()
     case key.Matches(msg, keys.Enter):
+        if m.procList.ToggleCollapse() {
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
             m.resolveAlertForWindow(node.Session, node.WindowIndex)
             tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
