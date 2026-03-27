@@ -3,9 +3,15 @@ package config
 import (
     "errors"
     "os"
+    "sort"
 
     "github.com/BurntSushi/toml"
 )
+
+type PathAlias struct {
+    Prefix  string `toml:"prefix"`
+    Replace string `toml:"replace"`
+}
 
 type GitPRConfig struct {
     Enabled bool `toml:"enabled"`
@@ -76,6 +82,7 @@ type Config struct {
     SidebarWidth      int         `toml:"sidebar_width"`
     Git               GitConfig   `toml:"git"`
     Theme             ThemeConfig `toml:"theme"`
+    PathAliases       []PathAlias `toml:"path_aliases"`
 }
 
 func Default() Config {
@@ -153,6 +160,19 @@ func Load(path string) (Config, error) {
         }
         return cfg, err
     }
+    // Expand env vars in path aliases, drop empty prefixes, sort longest-first.
+    filtered := cfg.PathAliases[:0]
+    for _, a := range cfg.PathAliases {
+        a.Prefix = os.ExpandEnv(a.Prefix)
+        a.Replace = os.ExpandEnv(a.Replace)
+        if a.Prefix != "" {
+            filtered = append(filtered, a)
+        }
+    }
+    cfg.PathAliases = filtered
+    sort.Slice(cfg.PathAliases, func(i, j int) bool {
+        return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
+    })
     return cfg, nil
 }
 

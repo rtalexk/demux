@@ -133,6 +133,66 @@ func TestLoadFromFile_IgnoredProcesses(t *testing.T) {
     }
 }
 
+func TestPathAliases_EnvExpansion(t *testing.T) {
+    t.Setenv("MYPROJECTS", "/home/user/projects")
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`
+[[path_aliases]]
+prefix = "$MYPROJECTS"
+replace = "proj"
+
+[[path_aliases]]
+prefix = "$MYPROJECTS/work"
+replace = "work"
+`), 0644)
+
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(cfg.PathAliases) != 2 {
+        t.Fatalf("expected 2 aliases, got %d", len(cfg.PathAliases))
+    }
+    // longest prefix ("/home/user/projects/work") must come first after sort
+    if cfg.PathAliases[0].Prefix != "/home/user/projects/work" {
+        t.Errorf("expected longest prefix first, got %q", cfg.PathAliases[0].Prefix)
+    }
+    if cfg.PathAliases[1].Prefix != "/home/user/projects" {
+        t.Errorf("expected shorter prefix second, got %q", cfg.PathAliases[1].Prefix)
+    }
+    // replace values are kept as-is (not env-expanded)
+    if cfg.PathAliases[0].Replace != "work" {
+        t.Errorf("unexpected replace: %q", cfg.PathAliases[0].Replace)
+    }
+}
+
+func TestPathAliases_EmptyPrefixDropped(t *testing.T) {
+    t.Setenv("UNSET_VAR", "")
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`
+[[path_aliases]]
+prefix = "$UNSET_VAR"
+replace = "x"
+
+[[path_aliases]]
+prefix = "/real/path"
+replace = "rp"
+`), 0644)
+
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(cfg.PathAliases) != 1 {
+        t.Fatalf("expected empty-prefix alias to be dropped, got %d aliases", len(cfg.PathAliases))
+    }
+    if cfg.PathAliases[0].Prefix != "/real/path" {
+        t.Errorf("unexpected alias: %+v", cfg.PathAliases[0])
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
