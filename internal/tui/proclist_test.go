@@ -3,6 +3,8 @@ package tui
 import (
     "testing"
 
+    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
 )
@@ -386,5 +388,113 @@ func TestAggStats_WithChildren_IncludesDescendants(t *testing.T) {
     }
     if mem != 200 {
         t.Errorf("expected mem=200, got %d", mem)
+    }
+}
+
+// ---------- SetWindowData collapse defaults ----------
+
+func buildTestPane(panePID int32) tmux.Pane {
+    return tmux.Pane{
+        Session:     "test",
+        WindowIndex: 0,
+        PaneIndex:   0,
+        PanePID:     panePID,
+    }
+}
+
+func TestSetWindowData_CollapseHidesChildren(t *testing.T) {
+    shell := proc.Process{PID: 200, PPID: 0, Name: "zsh"}
+    parent := proc.Process{PID: 201, PPID: 200, Name: "node"}
+    child := proc.Process{PID: 202, PPID: 201, Name: "esbuild"}
+    procs := []proc.Process{shell, parent, child}
+
+    pane := buildTestPane(200)
+    var m ProcListModel
+    m.SetWindowData(
+        []tmux.Pane{pane}, "test", 0,
+        procs, map[int32]string{},
+        map[string]git.Info{}, config.Config{},
+    )
+
+    // esbuild (depth-2 child of node) should NOT appear — parent collapsed by default
+    for _, n := range m.nodes {
+        if n.Proc.PID == 202 {
+            t.Error("esbuild (depth-2 child) should be hidden when parent is collapsed by default")
+        }
+    }
+
+    // node (PID 201) should have HasChildren=true and Collapsed=true
+    var nodeProc *ProcListNode
+    for i := range m.nodes {
+        if m.nodes[i].Proc.PID == 201 {
+            nodeProc = &m.nodes[i]
+        }
+    }
+    if nodeProc == nil {
+        t.Fatal("node proc (PID 201) not found in node list")
+    }
+    if !nodeProc.HasChildren {
+        t.Error("expected HasChildren=true for node with child esbuild")
+    }
+    if !nodeProc.Collapsed {
+        t.Error("expected Collapsed=true by default")
+    }
+}
+
+func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
+    shell := proc.Process{PID: 300, PPID: 0, Name: "zsh"}
+    parent := proc.Process{PID: 301, PPID: 300, Name: "node"}
+    child := proc.Process{PID: 302, PPID: 301, Name: "esbuild"}
+    procs := []proc.Process{shell, parent, child}
+
+    pane := buildTestPane(300)
+    var m ProcListModel
+    // pre-expand node (PID 301) before calling SetWindowData
+    m.collapsedPIDs = map[int32]bool{301: false}
+    m.SetWindowData(
+        []tmux.Pane{pane}, "test", 0,
+        procs, map[int32]string{},
+        map[string]git.Info{}, config.Config{},
+    )
+
+    found := false
+    for _, n := range m.nodes {
+        if n.Proc.PID == 302 {
+            found = true
+        }
+    }
+    if !found {
+        t.Error("esbuild (depth-2) should be visible when parent is expanded")
+    }
+}
+
+func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
+    shell := proc.Process{PID: 400, PPID: 0, Name: "zsh"}
+    parent := proc.Process{PID: 401, PPID: 400, Name: "node", CPU: 1.0, MemRSS: 100}
+    child := proc.Process{PID: 402, PPID: 401, Name: "esbuild", CPU: 0.5, MemRSS: 50}
+    procs := []proc.Process{shell, parent, child}
+
+    pane := buildTestPane(400)
+    var m ProcListModel
+    m.SetWindowData(
+        []tmux.Pane{pane}, "test", 0,
+        procs, map[int32]string{},
+        map[string]git.Info{}, config.Config{},
+    )
+
+    var nodeProc *ProcListNode
+    for i := range m.nodes {
+        if m.nodes[i].Proc.PID == 401 {
+            nodeProc = &m.nodes[i]
+        }
+    }
+    if nodeProc == nil {
+        t.Fatal("node proc (PID 401) not found")
+    }
+    if nodeProc.AggCPU != 1.5 {
+        t.Errorf("expected AggCPU=1.5, got %.2f", nodeProc.AggCPU)
+    }
+    if nodeProc.AggMemRSS != 150 {
+        t.Errorf("expected AggMemRSS=150, got %d", nodeProc.AggMemRSS)
     }
 }

@@ -51,6 +51,10 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 
 	tree := proc.BuildTree(procs)
 
+	if p.collapsedPIDs == nil {
+		p.collapsedPIDs = make(map[int32]bool)
+	}
+
 	windowChanged := session != p.curSession || windowIndex != p.curWindow
 	p.curSession = session
 	p.curWindow = windowIndex
@@ -103,7 +107,38 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 				}
 				return
 			}
-			p.nodes = append(p.nodes, ProcListNode{Proc: pr, Depth: depth})
+
+			// For depth-1 nodes: compute collapse metadata
+			var hasChildren bool
+			var aggCPU float64
+			var aggMem uint64
+			var collapsed bool
+			if depth == 1 {
+				for _, child := range tree[pr.PID] {
+					if !containsStr(activeIgnoredProcs, strings.ToLower(child.FriendlyName())) {
+						hasChildren = true
+						break
+					}
+				}
+				aggCPU, aggMem = aggStats(pr, tree)
+				if _, ok := p.collapsedPIDs[pr.PID]; !ok {
+					p.collapsedPIDs[pr.PID] = true
+				}
+				collapsed = p.collapsedPIDs[pr.PID]
+			}
+
+			p.nodes = append(p.nodes, ProcListNode{
+				Proc:        pr,
+				Depth:       depth,
+				HasChildren: hasChildren,
+				Collapsed:   collapsed,
+				AggCPU:      aggCPU,
+				AggMemRSS:   aggMem,
+			})
+
+			if depth == 1 && collapsed && hasChildren {
+				return
+			}
 			for _, child := range tree[pr.PID] {
 				addProc(child, depth+1)
 			}
