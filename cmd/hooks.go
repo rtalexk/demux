@@ -122,13 +122,17 @@ Intended to be called from ~/.claude/settings.json:
 
 var hooksStopCmd = &cobra.Command{
 	Use:   "stop",
-	Short: "Handle a Claude Code Stop hook event (reads event JSON from stdin)",
+	Short: "Handle a Stop hook event (reads event JSON from stdin)",
 	Long: `Reads the Stop hook event JSON from stdin and sets an info-level demux
 alert on the current tmux window.
 
-Intended to be called from ~/.claude/settings.json:
-  "command": "demux hooks stop"`,
+Use --agent to specify which AI agent's stop format to expect.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		def, err := resolveAgent(hooksStopAgent)
+		if err != nil {
+			return err
+		}
+
 		if os.Getenv("TMUX") == "" {
 			return nil
 		}
@@ -154,7 +158,7 @@ Intended to be called from ~/.claude/settings.json:
 			return err
 		}
 		defer d.Close()
-		return d.AlertSet(target, "Claude finished", "info", false)
+		return d.AlertSet(target, def.stopMsg, "info", false)
 	},
 }
 
@@ -233,6 +237,8 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 func init() {
 	hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude")
 	hooksInitCmd.MarkFlagRequired("agent")
+	hooksStopCmd.Flags().StringVar(&hooksStopAgent, "agent", "", "AI agent (required): claude")
+	hooksStopCmd.MarkFlagRequired("agent")
 	hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
 	rootCmd.AddCommand(hooksCmd)
 }
