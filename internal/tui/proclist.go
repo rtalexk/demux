@@ -368,7 +368,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string
     if selected {
         text := label
         if node.Pane.CWD != "" {
-            text += "  " + node.Pane.CWD
+            text += "  " + format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
         }
         if node.GitDeviant {
             if node.GitInfo.Loading {
