@@ -151,6 +151,26 @@ func TestRender_bothHintsWhenScrolledMid(t *testing.T) {
     }
 }
 
+// TestRender_belowHintWhenScrolledNearBottom is the regression test for the bug
+// where hasBelow was checked against offset+visibleRows instead of
+// offset+contentRows (after the ▲ hint row was already deducted). When scrolled
+// so that ▲ is showing, nodes just off the bottom were miscounted as fitting,
+// suppressing ▼ and leaving a blank row instead.
+func TestRender_belowHintWhenScrolledNearBottom(t *testing.T) {
+    // 10 nodes, visibleRows=4, offset=6 → ▲ costs 1 row → only 3 content rows fit
+    // (nodes 6,7,8). Node 9 is still below, so ▼ must appear.
+    s := sidebarWithNodes(makeNodes(10))
+    s.offset = 6
+    s.cursor = 6
+    out := renderInner(s, 4)
+    if !strings.Contains(out, "▼ more") {
+        t.Error("expected ▼ more: node 9 is out of view but hint was suppressed")
+    }
+    if !strings.Contains(out, "▲ more") {
+        t.Error("expected ▲ more when offset=6")
+    }
+}
+
 // hints must not add extra rows (total content <= visibleRows)
 func TestRender_hintsDoNotExceedVisibleRows(t *testing.T) {
     s := sidebarWithNodes(makeNodes(10))

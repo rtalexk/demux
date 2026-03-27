@@ -175,13 +175,14 @@ func (s SidebarModel) Render(width, height int, focused bool, title string) stri
     }
 
     hasAbove := offset > 0
-    hasBelow := offset+visibleRows < len(s.nodes)
 
-    // each hint costs one row; shrink the content window accordingly
+    // each hint costs one row; deduct ▲ first, then check ▼ against the
+    // reduced budget so hasBelow is accurate when scrolled down.
     contentRows := visibleRows
     if hasAbove {
         contentRows--
     }
+    hasBelow := offset+contentRows < len(s.nodes)
     if hasBelow {
         contentRows--
     }
