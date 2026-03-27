@@ -24,6 +24,7 @@ type keyMap struct {
     GotoTop       key.Binding
     GotoBottom    key.Binding
     Open          key.Binding
+    AlertFilter   key.Binding
 }
 
 var keys = keyMap{
@@ -48,4 +49,5 @@ var keys = keyMap{
     GotoTop:       key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "top")),
     GotoBottom:    key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
     Open:          key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open/attach")),
+    AlertFilter:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "alert filter")),
 }
