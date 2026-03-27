@@ -96,6 +96,41 @@ func TestMoveDown_doesNotExceedLastNode(t *testing.T) {
     }
 }
 
+// TestClampViewport_noBlankRowAtBottom is the regression test for the blank line
+// that appeared when scrolled to the end of the list. clampViewport used
+// effective=visibleRows-2, which left one slot vacant (no ▼ hint at bottom).
+// The fix slides offset back so the freed slot is filled with content.
+func TestClampViewport_noBlankRowAtBottom(t *testing.T) {
+    // 10 nodes, visibleRows=4: conservative effective=2 would set offset=8 for
+    // cursor=9, leaving only nodes 8,9 visible (2 rows) + ▲ = 3 rows and 1 blank.
+    // After fix: offset should be pulled to 7 so nodes 7,8,9 fill all 3 content rows.
+    s := sidebarWithNodes(makeNodes(10))
+    s.cursor = 9
+    s.offset = 0
+    s.clampViewport(4)
+    if s.offset != 7 {
+        t.Errorf("expected offset=7 (fills viewport without blank row), got %d", s.offset)
+    }
+}
+
+func TestRender_noBlankRowAtBottom(t *testing.T) {
+    // Scroll to the last node; the ▲ hint must appear (we're scrolled) and
+    // the last three nodes must all be visible — meaning no slot is wasted.
+    s := sidebarWithNodes(makeNodes(10))
+    s.cursor = 9
+    s.clampViewport(4) // must set offset=7 so nodes 7,8,9 fill contentRows=3
+    out := renderInner(s, 4)
+    if !strings.Contains(out, "▲ more") {
+        t.Error("expected ▲ more when scrolled to bottom")
+    }
+    // nodes[7..9] have names "ssssssss", "sssssssss", "ssssssssss"
+    for _, name := range []string{"ssssssss", "sssssssss", "ssssssssss"} {
+        if !strings.Contains(out, name) {
+            t.Errorf("expected node %q visible at bottom; got:\n%s", name, out)
+        }
+    }
+}
+
 // --- Render: scroll hints ---
 
 func renderInner(s SidebarModel, visibleRows int) string {

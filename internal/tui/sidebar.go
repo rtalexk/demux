@@ -451,6 +451,20 @@ func (s *SidebarModel) clampViewport(visibleRows int) {
     if s.cursor >= s.offset+effective {
         s.offset = s.cursor - effective + 1
     }
+    // At the bottom of the list ▼ is absent; reclaim the freed row so the
+    // viewport fills without a trailing blank line.
+    if s.offset > 0 {
+        contentRows := visibleRows - 1 // ▲ is present whenever offset > 0
+        if s.offset+contentRows >= len(s.nodes) {
+            newOffset := len(s.nodes) - contentRows
+            if newOffset < 0 {
+                newOffset = 0
+            }
+            if s.cursor >= newOffset {
+                s.offset = newOffset
+            }
+        }
+    }
     if s.offset < 0 {
         s.offset = 0
     }
