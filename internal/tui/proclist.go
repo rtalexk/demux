@@ -136,7 +136,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 				AggMemRSS:   aggMem,
 			})
 
-			if depth == 1 && collapsed && hasChildren {
+			if depth == 1 && collapsed {
 				return
 			}
 			for _, child := range tree[pr.PID] {

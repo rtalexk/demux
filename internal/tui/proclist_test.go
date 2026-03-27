@@ -491,6 +491,12 @@ func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
     if nodeProc == nil {
         t.Fatal("node proc (PID 401) not found")
     }
+    if !nodeProc.HasChildren {
+        t.Error("expected HasChildren=true for node with child esbuild")
+    }
+    if !nodeProc.Collapsed {
+        t.Error("expected Collapsed=true by default")
+    }
     if nodeProc.AggCPU != 1.5 {
         t.Errorf("expected AggCPU=1.5, got %.2f", nodeProc.AggCPU)
     }
