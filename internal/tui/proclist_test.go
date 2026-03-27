@@ -504,3 +504,73 @@ func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
         t.Errorf("expected AggMemRSS=150, got %d", nodeProc.AggMemRSS)
     }
 }
+
+// ---------- ToggleCollapse ----------
+
+func TestToggleCollapse_Depth1WithChildren_TogglesAndReturnsTrue(t *testing.T) {
+	m := ProcListModel{
+		collapsedPIDs: map[int32]bool{10: true},
+		nodes: []ProcListNode{
+			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+			{Proc: proc.Process{PID: 10}, Depth: 1, HasChildren: true, Collapsed: true},
+		},
+		cursor: 1,
+	}
+	toggled := m.ToggleCollapse()
+	if !toggled {
+		t.Error("expected ToggleCollapse to return true")
+	}
+	if m.collapsedPIDs[10] != false {
+		t.Error("expected PID 10 to be expanded after toggle")
+	}
+}
+
+func TestToggleCollapse_Depth1NoChildren_ReturnsFalse(t *testing.T) {
+	m := ProcListModel{
+		collapsedPIDs: map[int32]bool{},
+		nodes: []ProcListNode{
+			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+			{Proc: proc.Process{PID: 20}, Depth: 1, HasChildren: false},
+		},
+		cursor: 1,
+	}
+	toggled := m.ToggleCollapse()
+	if toggled {
+		t.Error("expected ToggleCollapse to return false for node without children")
+	}
+}
+
+func TestToggleCollapse_PaneHeader_ReturnsFalse(t *testing.T) {
+	m := ProcListModel{
+		collapsedPIDs: map[int32]bool{},
+		nodes: []ProcListNode{
+			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+		},
+		cursor: 0,
+	}
+	if m.ToggleCollapse() {
+		t.Error("expected false for pane header")
+	}
+}
+
+func TestToggleCollapse_ExpandedToCollapsed(t *testing.T) {
+	m := ProcListModel{
+		collapsedPIDs: map[int32]bool{30: false},
+		nodes: []ProcListNode{
+			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+			{Proc: proc.Process{PID: 30}, Depth: 1, HasChildren: true, Collapsed: false},
+		},
+		cursor: 1,
+	}
+	m.ToggleCollapse()
+	if m.collapsedPIDs[30] != true {
+		t.Error("expected PID 30 to be collapsed after toggle")
+	}
+}
+
+func TestToggleCollapse_EmptyNodes_ReturnsFalse(t *testing.T) {
+	m := ProcListModel{}
+	if m.ToggleCollapse() {
+		t.Error("expected false for empty model")
+	}
+}

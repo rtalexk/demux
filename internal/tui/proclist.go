@@ -618,3 +618,21 @@ func (p ProcListModel) SelectedNode() *ProcListNode {
 	}
 	return &n
 }
+
+// ToggleCollapse flips the collapsed state of the cursor node if it is a
+// depth-1 process with children. Returns true if a toggle occurred.
+// The caller must re-call SetWindowData to rebuild nodes after a toggle.
+func (p *ProcListModel) ToggleCollapse() bool {
+	if p.cursor < 0 || p.cursor >= len(p.nodes) {
+		return false
+	}
+	n := p.nodes[p.cursor]
+	if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {
+		return false
+	}
+	if p.collapsedPIDs == nil {
+		p.collapsedPIDs = make(map[int32]bool)
+	}
+	p.collapsedPIDs[n.Proc.PID] = !p.collapsedPIDs[n.Proc.PID]
+	return true
+}
