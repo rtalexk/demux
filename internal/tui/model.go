@@ -285,6 +285,15 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 m.updateDetailFromSelection()
             }
         }
+    case key.Matches(msg, keys.Open):
+        if node := m.sidebar.Selected(); node != nil {
+            if node.IsSession {
+                tmux.SwitchClient(node.Session)
+            } else {
+                m.resolveAlertForWindow(node.Session, node.WindowIndex)
+                tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
+            }
+        }
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
     }
