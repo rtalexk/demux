@@ -3,6 +3,10 @@ package tui
 import (
     "strings"
     "testing"
+    "time"
+
+    "github.com/rtalex/demux/internal/db"
+    "github.com/rtalex/demux/internal/tmux"
 )
 
 // makeNodes builds a flat slice of session-only SidebarNodes for viewport tests.
@@ -220,5 +224,192 @@ func TestAlignedRow_minimumOnePadSpace(t *testing.T) {
     plain := stripANSI(row)
     if !strings.Contains(plain, " ") {
         t.Errorf("expected at least one space between name and indicators: %q", plain)
+    }
+}
+
+// --- GotoTop / GotoBottom ---
+
+func TestGotoTop_SetsToFirstAndClampsViewport(t *testing.T) {
+    s := sidebarWithNodes(makeNodes(10))
+    s.cursor = 8
+    s.offset = 5
+    s.GotoTop(10)
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", s.cursor)
+    }
+    if s.offset != 0 {
+        t.Errorf("expected offset=0, got %d", s.offset)
+    }
+}
+
+func TestGotoBottom_SetsToLastNode(t *testing.T) {
+    s := sidebarWithNodes(makeNodes(5))
+    s.cursor = 0
+    s.GotoBottom(10)
+    if s.cursor != 4 {
+        t.Errorf("expected cursor=4, got %d", s.cursor)
+    }
+}
+
+func TestSidebarGotoBottom_EmptyNodes_NoPanic(t *testing.T) {
+    s := SidebarModel{}
+    s.GotoBottom(10) // must not panic, cursor stays at 0
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", s.cursor)
+    }
+}
+
+// --- SessionCount ---
+
+func TestSessionCount_CountsOnlySessionNodes(t *testing.T) {
+    nodes := []SidebarNode{
+        {Session: "a", IsSession: true},
+        {Session: "a", WindowIndex: 0},
+        {Session: "a", WindowIndex: 1},
+        {Session: "b", IsSession: true},
+        {Session: "b", WindowIndex: 0},
+    }
+    s := sidebarWithNodes(nodes)
+    if s.SessionCount() != 2 {
+        t.Errorf("expected 2, got %d", s.SessionCount())
+    }
+}
+
+func TestSessionCount_Empty(t *testing.T) {
+    s := SidebarModel{}
+    if s.SessionCount() != 0 {
+        t.Errorf("expected 0, got %d", s.SessionCount())
+    }
+}
+
+// --- newestSessionAlert ---
+
+func TestNewestSessionAlert_NoAlerts(t *testing.T) {
+    s := SidebarModel{alerts: map[string]db.Alert{}}
+    if !s.newestSessionAlert("sess").IsZero() {
+        t.Error("expected zero time when no alerts for session")
+    }
+}
+
+func TestNewestSessionAlert_IgnoresDifferentSession(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        alerts: map[string]db.Alert{
+            "other:0": {Target: "other:0", CreatedAt: t1},
+        },
+    }
+    if !s.newestSessionAlert("sess").IsZero() {
+        t.Error("expected zero time — alert belongs to a different session")
+    }
+}
+
+func TestNewestSessionAlert_ReturnsNewestAmongWindows(t *testing.T) {
+    t1 := time.Now().Add(-10 * time.Second)
+    t2 := time.Now()
+    s := SidebarModel{
+        alerts: map[string]db.Alert{
+            "sess:0": {Target: "sess:0", CreatedAt: t1},
+            "sess:1": {Target: "sess:1", CreatedAt: t2},
+        },
+    }
+    got := s.newestSessionAlert("sess")
+    if !got.Equal(t2) {
+        t.Errorf("expected newest alert time %v, got %v", t2, got)
+    }
+}
+
+func TestNewestSessionAlert_MatchesSessionLevelTarget(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        alerts: map[string]db.Alert{
+            "sess": {Target: "sess", CreatedAt: t1},
+        },
+    }
+    got := s.newestSessionAlert("sess")
+    if !got.Equal(t1) {
+        t.Errorf("expected %v, got %v", t1, got)
+    }
+}
+
+// --- rebuildNodes sorting ---
+
+// makeSessions builds the sessions map used by SidebarModel from a list of names.
+// Each session gets a single window at index 0 with no panes (sufficient for sort tests).
+func makeSessions(names ...string) map[string]map[int][]tmux.Pane {
+    m := make(map[string]map[int][]tmux.Pane, len(names))
+    for _, n := range names {
+        m[n] = map[int][]tmux.Pane{0: nil}
+    }
+    return m
+}
+
+func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("charlie", "alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    var got []string
+    for _, n := range s.nodes {
+        if n.IsSession {
+            got = append(got, n.Session)
+        }
+    }
+    want := []string{"alpha", "beta", "charlie"}
+    if strings.Join(got, ",") != strings.Join(want, ",") {
+        t.Errorf("expected %v, got %v", want, got)
+    }
+}
+
+func TestRebuildNodes_SessionWithAlertSortsFirst(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "beta:0": {Target: "beta:0", CreatedAt: t1},
+        },
+    }
+    s.rebuildNodes()
+    if len(s.nodes) == 0 || s.nodes[0].Session != "beta" {
+        t.Errorf("expected beta (has alert) first, got %v", s.nodes[0].Session)
+    }
+}
+
+func TestRebuildNodes_NewestAlertSessionSortsFirst(t *testing.T) {
+    t1 := time.Now().Add(-time.Minute)
+    t2 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "alpha:0": {Target: "alpha:0", CreatedAt: t1},
+            "beta:0":  {Target: "beta:0", CreatedAt: t2},
+        },
+    }
+    s.rebuildNodes()
+    if len(s.nodes) == 0 || s.nodes[0].Session != "beta" {
+        t.Errorf("expected beta (newer alert) first, got %v", s.nodes[0].Session)
+    }
+}
+
+func TestRebuildNodes_WindowWithAlertSortsFirst(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil, 2: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess:2": {Target: "sess:2", CreatedAt: t1},
+        },
+    }
+    s.rebuildNodes()
+    // Find window nodes for "sess"
+    var winIdxs []int
+    for _, n := range s.nodes {
+        if !n.IsSession && n.Session == "sess" {
+            winIdxs = append(winIdxs, n.WindowIndex)
+        }
+    }
+    if len(winIdxs) == 0 || winIdxs[0] != 2 {
+        t.Errorf("expected window 2 (has alert) first, got %v", winIdxs)
     }
 }
