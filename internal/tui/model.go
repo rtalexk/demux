@@ -249,6 +249,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Refresh):
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
+    case key.Matches(msg, keys.AlertFilter):
+        m.sidebar.ToggleAlertFilter()
     default:
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)
@@ -612,11 +614,15 @@ func (m Model) View() string {
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
-    sidebarTitle := fmt.Sprintf(" [1] Sessions %s ", sessionCountStr)
+    alertFilterMark := ""
+    if m.sidebar.AlertFilterActive() {
+        alertFilterMark = " [!]"
+    }
+    sidebarTitle := fmt.Sprintf(" [1] Sessions %s%s ", sessionCountStr, alertFilterMark)
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            sidebarTitle = fmt.Sprintf(" [1] Sessions %s %s ", sessionCountStr, frame)
+            sidebarTitle = fmt.Sprintf(" [1] Sessions %s%s %s ", sessionCountStr, alertFilterMark, frame)
             break
         }
     }
@@ -643,7 +649,7 @@ func (m Model) View() string {
     }
     if statusBar == "" {
         if m.focus == panelSidebar {
-            statusBar = "  Tab:cycle  j/k:nav  Enter:select  ?:help  q:quit"
+            statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:alerts  ?:help  q:quit"
         } else {
             statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
         }
