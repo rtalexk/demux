@@ -663,11 +663,11 @@ func (m Model) plainBreadcrumb() string {
         return node.Session
     }
     windows := m.sidebar.WindowsForSession(node.Session)
-    winName := fmt.Sprintf("%d", node.WindowIndex)
+    winLabel := fmt.Sprintf("%d", node.WindowIndex)
     if panes, ok := windows[node.WindowIndex]; ok && len(panes) > 0 {
-        winName = panes[0].WindowName
+        winLabel = fmt.Sprintf("%d: %s", node.WindowIndex, panes[0].WindowName)
     }
-    return node.Session + " / " + winName
+    return node.Session + " / " + winLabel
 }
 
 
