@@ -18,7 +18,7 @@ var hooksNotifyAgent string
 
 var hooksCmd = &cobra.Command{
 	Use:   "hooks",
-	Short: "Claude Code hook utilities",
+	Short: "AI agent hook utilities",
 }
 
 var hooksInitCmd = &cobra.Command{
