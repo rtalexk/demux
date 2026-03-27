@@ -289,11 +289,14 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 		maxRows = 1
 	}
 
-	// Safety upward clamp (read-only): handles resize where cursor drifted above viewport.
-	// Downward clamping is owned by clampOffset (pointer receiver).
+	// Safety clamps (read-only): handle cases where the viewport shrank since
+	// the last clampOffset call (e.g. detail pane expanding after selection change).
 	offset := p.offset
 	if p.cursor < offset {
 		offset = p.cursor
+	}
+	for offset < p.cursor && !procCursorVisible(p.nodes, p.cursor, offset, maxRows) {
+		offset++
 	}
 
 	// determine scroll hints based on node-level offset
