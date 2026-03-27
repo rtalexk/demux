@@ -362,7 +362,7 @@ func TestClampOffset_CursorAboveOffset_ClampsUp(t *testing.T) {
 
 func TestAggStats_LeafNode_ReturnsSelf(t *testing.T) {
     tree := map[int32][]proc.Process{}
-    cpu, mem := aggStats(1, proc.Process{PID: 1, CPU: 2.5, MemRSS: 1024}, tree)
+    cpu, mem := aggStats(proc.Process{PID: 1, CPU: 2.5, MemRSS: 1024}, tree)
     if cpu != 2.5 {
         t.Errorf("expected cpu=2.5, got %.2f", cpu)
     }
@@ -380,7 +380,7 @@ func TestAggStats_WithChildren_IncludesDescendants(t *testing.T) {
         10: {child1, child2},
         11: {grandchild},
     }
-    cpu, mem := aggStats(10, parent, tree)
+    cpu, mem := aggStats(parent, tree)
     if cpu != 2.0 {
         t.Errorf("expected cpu=2.0, got %.2f", cpu)
     }
