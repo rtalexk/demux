@@ -23,13 +23,14 @@ type SidebarNode struct {
 }
 
 type SidebarModel struct {
-    nodes    []SidebarNode
-    cursor   int
-    offset   int // viewport scroll offset
-    sessions map[string]map[int][]tmux.Pane
-    alerts   map[string]db.Alert
-    gitInfo  map[string]git.Info
-    cfg      config.Config
+    nodes        []SidebarNode
+    cursor       int
+    offset       int // viewport scroll offset
+    sessions     map[string]map[int][]tmux.Pane
+    alerts       map[string]db.Alert
+    gitInfo      map[string]git.Info
+    cfg          config.Config
+    filterAlerts bool
 }
 
 func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map[string]git.Info, cfg config.Config) {
@@ -122,6 +123,9 @@ func (s *SidebarModel) rebuildNodes() {
     })
 
     for _, name := range sessions {
+        if s.filterAlerts && s.newestSessionAlert(name).IsZero() {
+            continue
+        }
         exp, ok := expanded[name]
         if !ok {
             exp = true // default expanded
@@ -150,6 +154,12 @@ func (s *SidebarModel) rebuildNodes() {
             })
 
             for _, wi := range winIdxs {
+                if s.filterAlerts && s.cfg.AlertFilterWindows == "alerts_only" {
+                    target := fmt.Sprintf("%s:%d", name, wi)
+                    if _, hasAlert := s.alerts[target]; !hasAlert {
+                        continue
+                    }
+                }
                 s.nodes = append(s.nodes, SidebarNode{Session: name, WindowIndex: wi})
             }
         }
@@ -574,6 +584,18 @@ func (s SidebarModel) SessionCount() int {
         }
     }
     return count
+}
+
+// AlertFilterActive reports whether the alert filter is currently on.
+func (s SidebarModel) AlertFilterActive() bool {
+    return s.filterAlerts
+}
+
+// ToggleAlertFilter flips the alert filter flag, rebuilds nodes, and returns the new state.
+func (s *SidebarModel) ToggleAlertFilter() bool {
+    s.filterAlerts = !s.filterAlerts
+    s.rebuildNodes()
+    return s.filterAlerts
 }
 
 func (s SidebarModel) Selected() *SidebarNode {

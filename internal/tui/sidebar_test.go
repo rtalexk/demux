@@ -5,6 +5,7 @@ import (
     "testing"
     "time"
 
+    "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/tmux"
 )
@@ -466,5 +467,122 @@ func TestRebuildNodes_WindowWithAlertSortsFirst(t *testing.T) {
     }
     if len(winIdxs) == 0 || winIdxs[0] != 2 {
         t.Errorf("expected window 2 (has alert) first, got %v", winIdxs)
+    }
+}
+
+// --- Alert filter ---
+
+func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "beta:0": {Target: "beta:0", CreatedAt: t1},
+        },
+        cfg: config.Config{AlertFilterWindows: "all"},
+    }
+    active := s.ToggleAlertFilter()
+    if !active {
+        t.Error("expected ToggleAlertFilter to return true (filter now active)")
+    }
+    for _, n := range s.nodes {
+        if n.IsSession && n.Session == "alpha" {
+            t.Error("alpha (no alerts) should be hidden when filter is active")
+        }
+    }
+    hasBeta := false
+    for _, n := range s.nodes {
+        if n.IsSession && n.Session == "beta" {
+            hasBeta = true
+        }
+    }
+    if !hasBeta {
+        t.Error("beta (has alerts) should be visible when filter is active")
+    }
+}
+
+func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess:1": {Target: "sess:1", CreatedAt: t1},
+        },
+        cfg: config.Config{AlertFilterWindows: "all"},
+    }
+    s.ToggleAlertFilter()
+    var winIdxs []int
+    for _, n := range s.nodes {
+        if !n.IsSession {
+            winIdxs = append(winIdxs, n.WindowIndex)
+        }
+    }
+    if len(winIdxs) != 2 {
+        t.Errorf("expected both windows visible with AlertFilterWindows=all, got %v", winIdxs)
+    }
+}
+
+func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess:1": {Target: "sess:1", CreatedAt: t1},
+        },
+        cfg: config.Config{AlertFilterWindows: "alerts_only"},
+    }
+    s.ToggleAlertFilter()
+    var winIdxs []int
+    for _, n := range s.nodes {
+        if !n.IsSession {
+            winIdxs = append(winIdxs, n.WindowIndex)
+        }
+    }
+    if len(winIdxs) != 1 || winIdxs[0] != 1 {
+        t.Errorf("expected only window 1 (has alert) visible with AlertFilterWindows=alerts_only, got %v", winIdxs)
+    }
+}
+
+func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "beta:0": {Target: "beta:0", CreatedAt: t1},
+        },
+        cfg: config.Config{AlertFilterWindows: "all"},
+    }
+    s.ToggleAlertFilter() // on
+    active := s.ToggleAlertFilter() // off
+    if active {
+        t.Error("expected ToggleAlertFilter to return false (filter now inactive)")
+    }
+    var sessions []string
+    for _, n := range s.nodes {
+        if n.IsSession {
+            sessions = append(sessions, n.Session)
+        }
+    }
+    if len(sessions) != 2 {
+        t.Errorf("expected both sessions after toggle off, got %v", sessions)
+    }
+}
+
+func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("a"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{AlertFilterWindows: "all"},
+    }
+    if s.AlertFilterActive() {
+        t.Error("expected AlertFilterActive=false before toggle")
+    }
+    s.ToggleAlertFilter()
+    if !s.AlertFilterActive() {
+        t.Error("expected AlertFilterActive=true after toggle")
     }
 }
