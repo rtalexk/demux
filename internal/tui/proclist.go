@@ -817,10 +817,15 @@ func (p ProcListModel) SelectedNode() *ProcListNode {
 // backwards to find the nearest enclosing pane header.
 // Returns nil if the node list is empty or no pane header is found.
 func (p ProcListModel) SelectedPane() *tmux.Pane {
-    if len(p.nodes) == 0 {
+    n := len(p.nodes)
+    if n == 0 {
         return nil
     }
-    for i := p.cursor; i >= 0; i-- {
+    start := p.cursor
+    if start >= n {
+        start = n - 1
+    }
+    for i := start; i >= 0; i-- {
         if p.nodes[i].IsPaneHeader {
             pane := p.nodes[i].Pane
             return &pane

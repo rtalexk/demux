@@ -53,11 +53,30 @@ func TestSelectedPane_OnProcessNode(t *testing.T) {
     if got == nil {
         t.Fatal("expected non-nil pane for depth-2 node")
     }
+    if got.PaneIndex != 2 {
+        t.Errorf("PaneIndex: got %d, want 2", got.PaneIndex)
+    }
 }
 
 func TestSelectedPane_EmptyList(t *testing.T) {
     m := makeTestProcListWithNodes(nil)
     if m.SelectedPane() != nil {
         t.Error("expected nil for empty node list")
+    }
+}
+
+func TestSelectedPane_StaleCursor(t *testing.T) {
+    pane := tmux.Pane{Session: "main", WindowIndex: 0, PaneIndex: 1}
+    nodes := []ProcListNode{
+        {IsPaneHeader: true, Pane: pane},
+    }
+    m := makeTestProcListWithNodes(nodes)
+    m.cursor = 5 // stale: beyond slice bounds
+    got := m.SelectedPane()
+    if got == nil {
+        t.Fatal("expected non-nil pane when cursor is stale but pane header exists")
+    }
+    if got.PaneIndex != 1 {
+        t.Errorf("PaneIndex: got %d, want 1", got.PaneIndex)
     }
 }
