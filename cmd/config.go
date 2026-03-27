@@ -41,6 +41,9 @@ status_bar_format = "tmux"
 # Sidebar width in columns
 sidebar_width = 30
 
+# When the ! alert filter is active, which windows to show: all | alerts_only
+alert_filter_windows = "all"
+
 # Path prefix aliases — shorten verbose absolute paths in the TUI.
 # Both prefix and replace support environment variables.
 # Longest matching prefix wins. Example:
