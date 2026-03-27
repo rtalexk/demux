@@ -156,7 +156,7 @@ func (s *SidebarModel) rebuildNodes() {
     }
 }
 
-func (s SidebarModel) Render(width, height int, focused bool) string {
+func (s SidebarModel) Render(width, height int, focused bool, title string) string {
     visibleRows := height - 2
     if visibleRows < 1 {
         visibleRows = 1
@@ -219,7 +219,7 @@ func (s SidebarModel) Render(width, height int, focused bool) string {
     if focused {
         style = borderActive
     }
-    return style.Width(width - 2).Height(height - 2).Render(inner)
+    return injectBorderTitle(style.Width(width-2).Height(height-2).Render(inner), title)
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {

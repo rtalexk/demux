@@ -23,7 +23,6 @@ var (
     borderActive   lipgloss.Style
     borderInactive lipgloss.Style
     detailBorder   lipgloss.Style
-    headerBoxStyle lipgloss.Style
 
     procBorderActive   lipgloss.Style
     procBorderInactive lipgloss.Style
@@ -79,7 +78,6 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
     borderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
     borderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)
     detailBorder   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)
-    headerBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)
 
     procBorderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
     procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)

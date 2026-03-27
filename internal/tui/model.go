@@ -8,6 +8,7 @@ import (
     "github.com/charmbracelet/bubbles/key"
     tea "github.com/charmbracelet/bubbletea"
     "github.com/charmbracelet/lipgloss"
+    runewidth "github.com/mattn/go-runewidth"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
@@ -564,7 +565,7 @@ func (m Model) View() string {
     }
 
     // sidebar spans full content height; proclist + detail stack on the right
-    contentH := m.height - 4 // 3 (header box) + 1 (status bar)
+    contentH := m.height - 1 // 1 (status bar)
     innerW := procW - 2
     detailContent := m.detail.ContentLines(innerW)
     detailH := detailContent + 2 // +2 for border
@@ -578,48 +579,33 @@ func (m Model) View() string {
     }
     procH := contentH - detailH
 
-    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar)
-    procList := m.procList.Render(procW, procH, m.focus == panelProcList)
-    detail := m.detail.Render(procW, detailH)
-
-    // build breadcrumb from current sidebar selection
-    breadcrumb := m.breadcrumb()
-
+    // build sidebar border title: [1] Sessions (N) with optional spinner
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     sessionCount := m.sidebar.SessionCount()
-    sessionCountStr := hintStyle.Render(fmt.Sprintf("(%d)", sessionCount))
-    sessionsTitle := "Sessions " + sessionCountStr
-    titlePlainLen := len([]rune(fmt.Sprintf("Sessions (%d)", sessionCount)))
+    sidebarTitle := fmt.Sprintf(" [1] Sessions (%d) ", sessionCount)
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            spinner := spinnerStyle.Render(frame)
-            // innerW = sidebarW - 2 (border) - 2 (padding); spinner is 1 rune wide
-            innerW := sidebarW - 4
-            pad := innerW - titlePlainLen - 1
-            if pad < 1 {
-                pad = 1
-            }
-            sessionsTitle = "Sessions " + sessionCountStr + strings.Repeat(" ", pad) + spinner
+            sidebarTitle = fmt.Sprintf(" [1] Sessions (%d) %s ", sessionCount, frame)
             break
         }
     }
-    leftHeader := headerBoxStyle.
-        Bold(true).
-        Width(sidebarW - 2).
-        Padding(0, 1).
-        Render(sessionsTitle)
 
-    rightHeader := headerBoxStyle.
-        Width(procW - 2).
-        Padding(0, 1).
-        Render(breadcrumb)
+    // build proc list border title: [2] <session> / <window>
+    bc := m.plainBreadcrumb()
+    procTitleSuffix := " "
+    if runes := []rune(bc); len(runes) > 0 && isIconRune(runes[len(runes)-1]) {
+        procTitleSuffix = "  "
+    }
+    procTitle := " [2] " + bc + procTitleSuffix
 
-    titlebar := lipgloss.JoinHorizontal(lipgloss.Top, leftHeader, rightHeader)
+    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle)
+    procList := m.procList.Render(procW, procH, m.focus == panelProcList, procTitle)
+    detail := m.detail.Render(procW, detailH)
 
     right := lipgloss.JoinVertical(lipgloss.Left, procList, detail)
     content := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, right)
-    body := lipgloss.JoinVertical(lipgloss.Left, titlebar, content)
+    body := content
 
     statusBar := ""
     if m.statusMsg != "" && time.Now().Before(m.statusExp) {
@@ -649,23 +635,41 @@ func (m Model) View() string {
     return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 }
 
-func (m Model) breadcrumb() string {
+// isIconRune reports whether r is likely a terminal icon that renders as 2
+// columns: emoji (runewidth > 1), Nerd Font / Private Use Area glyphs
+// (U+E000–U+F8FF, U+F0000+), and common symbol blocks that many terminals
+// render wide.
+func isIconRune(r rune) bool {
+    if runewidth.RuneWidth(r) > 1 {
+        return true
+    }
+    // Private Use Area — Nerd Font icons live here and render as 2-wide
+    // in terminals even though Unicode assigns them width 1.
+    if r >= 0xE000 && r <= 0xF8FF {
+        return true
+    }
+    if r >= 0xF0000 {
+        return true
+    }
+    return false
+}
+
+func (m Model) plainBreadcrumb() string {
     node := m.sidebar.Selected()
     if node == nil {
         return ""
     }
-    sess := sessionStyle.Render(node.Session)
     if node.IsSession {
-        return sess
+        return node.Session
     }
-    // window node: find window name from panes
     windows := m.sidebar.WindowsForSession(node.Session)
     winName := fmt.Sprintf("%d", node.WindowIndex)
     if panes, ok := windows[node.WindowIndex]; ok && len(panes) > 0 {
         winName = panes[0].WindowName
     }
-    return sess + " / " + winName
+    return node.Session + " / " + winName
 }
+
 
 func primaryCWDForPanes(windows map[int][]tmux.Pane) string {
     panes, ok := windows[0]

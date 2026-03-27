@@ -250,16 +250,15 @@ func (p *ProcListModel) SetFilter(text string) {
 	p.filterText = text
 }
 
-func (p ProcListModel) Render(width, height int, focused bool) string {
+func (p ProcListModel) Render(width, height int, focused bool, title string) string {
 	border := procBorderInactive
 	if focused {
 		border = procBorderActive
 	}
-
 	if len(p.nodes) == 0 {
 		hint := "Select a window with Enter"
 		inner := noSelectionStyle.Render(hint)
-		return border.Width(width - 2).Height(height - 2).Render(inner)
+		return injectBorderTitle(border.Width(width-2).Height(height-2).Render(inner), title)
 	}
 	filter := strings.ToLower(p.filterText)
 
@@ -355,7 +354,7 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
 	}
 
 	inner := strings.Join(resultLines, "\n")
-	return border.Width(width - 2).Height(height - 2).Render(inner)
+	return injectBorderTitle(border.Width(width-2).Height(height-2).Render(inner), title)
 }
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string {
@@ -496,6 +495,63 @@ func stripANSI(s string) string {
 		i++
 	}
 	return result.String()
+}
+
+// injectBorderTitle splices title into the top border line of a lipgloss-rendered
+// box. The title is placed immediately after the top-left corner, with the
+// remaining width filled by the border's horizontal fill character.
+// ANSI color codes wrapping the original top line are preserved.
+func injectBorderTitle(rendered, title string) string {
+	if title == "" {
+		return rendered
+	}
+	nl := strings.IndexByte(rendered, '\n')
+	if nl < 0 {
+		return rendered
+	}
+	topLine := rendered[:nl]
+	rest := rendered[nl:] // includes the leading \n
+
+	plain := stripANSI(topLine)
+	runes := []rune(plain)
+	if len(runes) < 4 {
+		return rendered
+	}
+
+	// runes[0]=╭, runes[1..len-2]=─ fill, runes[len-1]=╮
+	cornerLeft := string(runes[0])
+	cornerRight := string(runes[len(runes)-1])
+	fill := string(runes[1])
+	totalInner := len(runes) - 2
+
+	titleRunes := []rune(title)
+	if len(titleRunes) > totalInner-1 {
+		titleRunes = titleRunes[:totalInner-1]
+	}
+	fillCount := totalInner - len(titleRunes)
+
+	// Extract ANSI prefix (border color) and suffix (reset) from the original top line.
+	cornerLeftIdx := strings.Index(topLine, cornerLeft)
+	cornerRightIdx := strings.LastIndex(topLine, cornerRight)
+	ansiPrefix := ""
+	ansiSuffix := ""
+	if cornerLeftIdx > 0 {
+		ansiPrefix = topLine[:cornerLeftIdx]
+	}
+	if cornerRightIdx >= 0 {
+		after := cornerRightIdx + len(cornerRight)
+		if after <= len(topLine) {
+			ansiSuffix = topLine[after:]
+		}
+	}
+
+	// Color the border chars but not the title text, so the title uses the
+	// terminal's default foreground rather than the border color.
+	newTop := ansiPrefix + cornerLeft + ansiSuffix +
+		title +
+		ansiPrefix + strings.Repeat(fill, fillCount) + cornerRight + ansiSuffix
+
+	return newTop + rest
 }
 
 // isSelectable reports whether the cursor may land on n.

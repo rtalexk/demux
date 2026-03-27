@@ -100,7 +100,7 @@ func TestMoveDown_doesNotExceedLastNode(t *testing.T) {
 
 func renderInner(s SidebarModel, visibleRows int) string {
     // height = visibleRows + 2 (border), width = 40
-    rendered := s.Render(40, visibleRows+2, false)
+    rendered := s.Render(40, visibleRows+2, false, "")
     // strip ANSI so we can search plain text
     return stripANSI(rendered)
 }
@@ -157,7 +157,7 @@ func TestRender_hintsDoNotExceedVisibleRows(t *testing.T) {
     s.offset = 3
     s.cursor = 3
     visibleRows := 4
-    rendered := s.Render(40, visibleRows+2, false)
+    rendered := s.Render(40, visibleRows+2, false, "")
     // count newlines in the inner content (strip border lines)
     inner := stripANSI(rendered)
     lines := strings.Split(strings.TrimRight(inner, "\n"), "\n")
