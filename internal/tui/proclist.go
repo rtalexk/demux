@@ -418,7 +418,7 @@ func containsStr(list []string, s string) bool {
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	pr := node.Proc
-	indent := "  " + strings.Repeat("  ", node.Depth)
+	indent := node.TreePrefix
 
 	// collapse indicator prefix for depth-1 nodes with children
 	collapsePrefix := ""
@@ -446,7 +446,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	}
 
 	// line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children
-	statsIndent := "    " + strings.Repeat("  ", node.Depth)
+	statsIndent := node.StatPrefix + "  "
 	l := statLabelStyle.Render
 	v := statValueStyle.Render
 
