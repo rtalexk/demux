@@ -256,7 +256,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-    sidebarVisibleRows := m.height - 4 - 2 // contentH (height-4) minus border (2)
+    sidebarVisibleRows := m.height - 1 - 2 // contentH (height-1) minus border (2)
     if sidebarVisibleRows < 1 {
         sidebarVisibleRows = 1
     }
@@ -309,7 +309,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-    contentH := m.height - 4
+    contentH := m.height - 1
     innerW := m.width - m.cfg.SidebarWidth - 2
     if innerW < 1 {
         innerW = 1
