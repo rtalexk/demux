@@ -353,7 +353,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Log):
         // TODO: tmux popup with scrollback
     }
-    m.procList.clampOffset(procH)
+    m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
     m.updateDetailFromSelection()
     return m, nil
 }

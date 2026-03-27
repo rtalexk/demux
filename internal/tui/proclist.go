@@ -169,28 +169,11 @@ func (p ProcListModel) Render(width, height int, focused bool) string {
         maxRows = 1
     }
 
-    // clamp offset so cursor's lines are visible (read-only; p.offset mutated by clampOffset)
+    // Safety upward clamp (read-only): handles resize where cursor drifted above viewport.
+    // Downward clamping is owned by clampOffset (pointer receiver).
     offset := p.offset
     if p.cursor < offset {
         offset = p.cursor
-    }
-    // scroll down: advance offset until cursor fits within maxRows
-    available := maxRows - 2
-    if available < 1 {
-        available = 1
-    }
-    for {
-        rows := 0
-        for i := offset; i < len(p.nodes); i++ {
-            rows += nodeRows(p.nodes[i])
-            if i == p.cursor {
-                break
-            }
-        }
-        if rows <= available || offset >= p.cursor {
-            break
-        }
-        offset++
     }
 
     // determine scroll hints based on node-level offset
