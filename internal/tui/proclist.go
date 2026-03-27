@@ -23,6 +23,11 @@ type ProcListNode struct {
     Proc         proc.Process
     Port         int
     Depth        int // 0=pane header, 1=process, 2=subprocess
+    // collapse support (depth-1 nodes only)
+    HasChildren bool    // true if this depth-1 node has at least one non-ignored child
+    Collapsed   bool    // true when children are hidden
+    AggCPU      float64 // CPU% summed across parent + all descendants
+    AggMemRSS   uint64  // MemRSS summed across parent + all descendants
 }
 
 type ProcListModel struct {
@@ -32,7 +37,8 @@ type ProcListModel struct {
     filterText  string
     primaryCWD  string
     curSession  string
-    curWindow   int
+    curWindow     int
+    collapsedPIDs map[int32]bool // persists collapse state across SetWindowData calls
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
