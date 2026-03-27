@@ -155,6 +155,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 			p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
 		}
 	}
+	assignTreePrefixes(p.nodes)
 }
 
 func sortPanes(panes []tmux.Pane) []tmux.Pane {
