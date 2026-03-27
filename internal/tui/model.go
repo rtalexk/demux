@@ -642,9 +642,9 @@ func (m Model) View() string {
     }
     if statusBar == "" {
         if m.focus == panelSidebar {
-            statusBar = "  1:sidebar  2:procs  j/k:nav  Enter:select  ?:help  q:quit"
+            statusBar = "  Tab:cycle  j/k:nav  Enter:select  ?:help  q:quit"
         } else {
-            statusBar = "  1:sidebar  2:procs  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
+            statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
         }
     }
 
