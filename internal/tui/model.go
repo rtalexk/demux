@@ -250,7 +250,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
     case key.Matches(msg, keys.AlertFilter):
-        m.sidebar.ToggleAlertFilter()
+        sidebarVisibleRows := m.height - 1 - 2
+        if sidebarVisibleRows < 1 {
+            sidebarVisibleRows = 1
+        }
+        m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
     default:
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)

@@ -594,7 +594,7 @@ func (s SidebarModel) AlertFilterActive() bool {
 }
 
 // ToggleAlertFilter flips the alert filter flag, rebuilds nodes, and returns the new state.
-func (s *SidebarModel) ToggleAlertFilter() bool {
+func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     s.filterAlerts = !s.filterAlerts
     s.rebuildNodes()
     if s.filterAlerts {
@@ -604,16 +604,19 @@ func (s *SidebarModel) ToggleAlertFilter() bool {
                 continue
             }
             target := fmt.Sprintf("%s:%d", n.Session, n.WindowIndex)
-            if _, ok := s.alerts[target]; ok {
+            _, hasWindowAlert := s.alerts[target]
+            _, hasSessionAlert := s.alerts[n.Session]
+            if hasWindowAlert || hasSessionAlert {
                 s.cursor = i
-                return s.filterAlerts
+                break
             }
         }
     }
-    // Filter off, or no alerted window found: clamp cursor to valid range.
+    // Clamp cursor to valid range before calling clampViewport.
     if s.cursor >= len(s.nodes) {
         s.cursor = max(0, len(s.nodes)-1)
     }
+    s.clampViewport(visibleRows)
     return s.filterAlerts
 }
 

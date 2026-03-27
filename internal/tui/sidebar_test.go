@@ -481,7 +481,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
-    active := s.ToggleAlertFilter()
+    active := s.ToggleAlertFilter(10)
     if !active {
         t.Error("expected ToggleAlertFilter to return true (filter now active)")
     }
@@ -512,7 +512,7 @@ func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
-    s.ToggleAlertFilter()
+    s.ToggleAlertFilter(10)
     var winIdxs []int
     for _, n := range s.nodes {
         if !n.IsSession {
@@ -535,7 +535,7 @@ func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
         },
         cfg: config.Config{AlertFilterWindows: "alerts_only"},
     }
-    s.ToggleAlertFilter()
+    s.ToggleAlertFilter(10)
     var winIdxs []int
     for _, n := range s.nodes {
         if !n.IsSession {
@@ -556,8 +556,8 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
-    s.ToggleAlertFilter() // on
-    active := s.ToggleAlertFilter() // off
+    s.ToggleAlertFilter(10) // on
+    active := s.ToggleAlertFilter(10) // off
     if active {
         t.Error("expected ToggleAlertFilter to return false (filter now inactive)")
     }
@@ -581,7 +581,7 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     if s.AlertFilterActive() {
         t.Error("expected AlertFilterActive=false before toggle")
     }
-    s.ToggleAlertFilter()
+    s.ToggleAlertFilter(10)
     if !s.AlertFilterActive() {
         t.Error("expected AlertFilterActive=true after toggle")
     }
@@ -597,7 +597,7 @@ func TestToggleAlertFilter_AlertsOnly_SessionLevelAlertShowsAllWindows(t *testin
         },
         cfg: config.Config{AlertFilterWindows: "alerts_only"},
     }
-    s.ToggleAlertFilter()
+    s.ToggleAlertFilter(10)
     var winIdxs []int
     for _, n := range s.nodes {
         if !n.IsSession {
@@ -622,7 +622,7 @@ func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
-    s.ToggleAlertFilter()
+    s.ToggleAlertFilter(10)
     if s.cursor != 1 {
         t.Errorf("expected cursor=1 (first alerted window), got %d", s.cursor)
     }
@@ -632,5 +632,20 @@ func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
     }
     if node.Session != "beta" || node.WindowIndex != 0 {
         t.Errorf("expected cursor on beta:0, got session=%q window=%d", node.Session, node.WindowIndex)
+    }
+}
+
+func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
+    // Filter on with no window-level alerts: cursor should clamp to last valid node.
+    s := SidebarModel{
+        sessions: makeSessions("sess"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{AlertFilterWindows: "all"},
+    }
+    // With no alerts, filter on hides all sessions → nodes is empty.
+    s.cursor = 5 // out of range
+    s.ToggleAlertFilter(10)
+    if s.cursor != 0 {
+        t.Errorf("expected cursor clamped to 0 on empty node list, got %d", s.cursor)
     }
 }
