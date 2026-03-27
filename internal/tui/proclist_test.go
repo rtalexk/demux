@@ -1,6 +1,7 @@
 package tui
 
 import (
+    "strings"
     "testing"
 
     "github.com/rtalex/demux/internal/config"
@@ -586,5 +587,64 @@ func TestToggleCollapse_IdleNode_ReturnsFalse(t *testing.T) {
 	}
 	if m.ToggleCollapse() {
 		t.Error("expected false for idle node")
+	}
+}
+
+// ---------- renderProc collapse rendering ----------
+
+func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testing.T) {
+	m := ProcListModel{}
+	node := ProcListNode{
+		Proc:        proc.Process{PID: 1, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
+		Depth:       1,
+		HasChildren: true,
+		Collapsed:   true,
+		AggCPU:      2.5,
+		AggMemRSS:   250 * 1024 * 1024,
+	}
+	line := m.renderProc(node, false)
+	plain := stripANSI(line)
+	if !strings.Contains(plain, "▶") {
+		t.Errorf("expected ▶ prefix for collapsed node, got: %s", plain)
+	}
+	if !strings.Contains(plain, "(2.5%)") {
+		t.Errorf("expected aggregated cpu (2.5%%) in stats, got: %s", plain)
+	}
+	if !strings.Contains(plain, "(250.0MB)") {
+		t.Errorf("expected aggregated mem (250.0MB) in stats, got: %s", plain)
+	}
+}
+
+func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing.T) {
+	m := ProcListModel{}
+	node := ProcListNode{
+		Proc:        proc.Process{PID: 2, Name: "node", CPU: 1.0, MemRSS: 100 * 1024 * 1024},
+		Depth:       1,
+		HasChildren: true,
+		Collapsed:   false,
+		AggCPU:      2.5,
+		AggMemRSS:   250 * 1024 * 1024,
+	}
+	line := m.renderProc(node, false)
+	plain := stripANSI(line)
+	if !strings.Contains(plain, "▼") {
+		t.Errorf("expected ▼ prefix for expanded node with children, got: %s", plain)
+	}
+	if strings.Contains(plain, "(2.5%)") {
+		t.Errorf("expanded node should not show agg stats, got: %s", plain)
+	}
+}
+
+func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
+	m := ProcListModel{}
+	node := ProcListNode{
+		Proc:        proc.Process{PID: 3, Name: "nvim"},
+		Depth:       1,
+		HasChildren: false,
+	}
+	line := m.renderProc(node, false)
+	plain := stripANSI(line)
+	if strings.Contains(plain, "▶") || strings.Contains(plain, "▼") {
+		t.Errorf("no triangle expected for node without children, got: %s", plain)
 	}
 }

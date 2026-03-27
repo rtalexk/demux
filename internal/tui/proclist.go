@@ -337,10 +337,20 @@ func containsStr(list []string, s string) bool {
 
 func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	pr := node.Proc
-	indent := "  " + strings.Repeat("  ", node.Depth) // 2-space base + depth indent
+	indent := "  " + strings.Repeat("  ", node.Depth)
 
-	// line 1: name  pid:N  :port
-	name := indent + pr.FriendlyName()
+	// collapse indicator prefix for depth-1 nodes with children
+	collapsePrefix := ""
+	if node.Depth == 1 && node.HasChildren {
+		if node.Collapsed {
+			collapsePrefix = "▶ "
+		} else {
+			collapsePrefix = "▼ "
+		}
+	}
+
+	// line 1: [indicator]name  pid:N  :port
+	name := indent + collapsePrefix + pr.FriendlyName()
 	var line1 string
 	if selected {
 		line1 = selectedBG.Render(name)
@@ -354,13 +364,21 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 		line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
 	}
 
-	// line 2: cpu:V  mem:V  up:V  (labels dim, values muted)
+	// line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children
 	statsIndent := "    " + strings.Repeat("  ", node.Depth)
 	l := statLabelStyle.Render
 	v := statValueStyle.Render
+
+	cpuStr := v(fmt.Sprintf("%.1f%%", pr.CPU))
+	memStr := v(fmt.Sprintf("%.1fMB", float64(pr.MemRSS)/1024/1024))
+	if node.Depth == 1 && node.HasChildren && node.Collapsed {
+		cpuStr += v(fmt.Sprintf(" (%.1f%%)", node.AggCPU))
+		memStr += v(fmt.Sprintf(" (%.1fMB)", float64(node.AggMemRSS)/1024/1024))
+	}
+
 	line2 := statsIndent +
-		l("cpu:") + v(fmt.Sprintf("%.1f%%", pr.CPU)) + "  " +
-		l("mem:") + v(fmt.Sprintf("%.1fMB", float64(pr.MemRSS)/1024/1024)) + "  " +
+		l("cpu:") + cpuStr + "  " +
+		l("mem:") + memStr + "  " +
 		l("up:") + v(formatProcDuration(pr.Uptime))
 
 	return line1 + "\n" + line2
