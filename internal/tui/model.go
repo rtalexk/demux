@@ -2,6 +2,7 @@ package tui
 
 import (
     "fmt"
+    "os"
     "strings"
     "time"
 
@@ -67,16 +68,18 @@ type Model struct {
     statusExp    time.Time
     ready        bool // true after first panesMsg — gates deferred fetches
     procGen      int  // incremented on window change; discards in-flight proc fetches for old window
+    popupMode    bool // true when launched with DEMUX_POPUP=1; quits after attach
 }
 
 func New(cfg config.Config, database *db.DB) Model {
     initStyles(ThemeFromConfig(cfg.Theme), cfg.Theme.Processes, cfg.IgnoredProcesses)
     return Model{
-        cfg:     cfg,
-        db:      database,
-        focus:   panelSidebar,
-        gitInfo: make(map[string]git.Info),
-        filter:  NewFilterModel(),
+        cfg:       cfg,
+        db:        database,
+        focus:     panelSidebar,
+        gitInfo:   make(map[string]git.Info),
+        filter:    NewFilterModel(),
+        popupMode: os.Getenv("DEMUX_POPUP") == "1",
     }
 }
 
