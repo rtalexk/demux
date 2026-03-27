@@ -380,6 +380,18 @@ func nodeRows(n ProcListNode) int {
     return 2 // process: name line + stats line
 }
 
+// aggStats returns the total CPU% and MemRSS for pr and all its descendants.
+func aggStats(pid int32, pr proc.Process, tree map[int32][]proc.Process) (cpu float64, mem uint64) {
+	cpu = pr.CPU
+	mem = pr.MemRSS
+	for _, child := range tree[pid] {
+		c, m := aggStats(child.PID, child, tree)
+		cpu += c
+		mem += m
+	}
+	return
+}
+
 // clampOffset adjusts p.offset so the cursor node is always within the
 // visible row window. maxRows is the total inner height of the proc panel
 // (border already subtracted). Two rows are reserved for scroll hints.

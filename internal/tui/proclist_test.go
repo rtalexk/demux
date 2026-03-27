@@ -357,3 +357,34 @@ func TestClampOffset_CursorAboveOffset_ClampsUp(t *testing.T) {
         t.Errorf("expected offset=cursor=1 when cursor above viewport, got %d", m.offset)
     }
 }
+
+// ---------- aggStats ----------
+
+func TestAggStats_LeafNode_ReturnsSelf(t *testing.T) {
+    tree := map[int32][]proc.Process{}
+    cpu, mem := aggStats(1, proc.Process{PID: 1, CPU: 2.5, MemRSS: 1024}, tree)
+    if cpu != 2.5 {
+        t.Errorf("expected cpu=2.5, got %.2f", cpu)
+    }
+    if mem != 1024 {
+        t.Errorf("expected mem=1024, got %d", mem)
+    }
+}
+
+func TestAggStats_WithChildren_IncludesDescendants(t *testing.T) {
+    parent := proc.Process{PID: 10, CPU: 1.0, MemRSS: 100}
+    child1 := proc.Process{PID: 11, CPU: 0.5, MemRSS: 50}
+    child2 := proc.Process{PID: 12, CPU: 0.3, MemRSS: 30}
+    grandchild := proc.Process{PID: 13, CPU: 0.2, MemRSS: 20}
+    tree := map[int32][]proc.Process{
+        10: {child1, child2},
+        11: {grandchild},
+    }
+    cpu, mem := aggStats(10, parent, tree)
+    if cpu != 2.0 {
+        t.Errorf("expected cpu=2.0, got %.2f", cpu)
+    }
+    if mem != 200 {
+        t.Errorf("expected mem=200, got %d", mem)
+    }
+}
