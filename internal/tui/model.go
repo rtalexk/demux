@@ -341,6 +341,8 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procList.GotoBottom()
     case key.Matches(msg, keys.Enter):
         if m.procList.ToggleCollapse() {
+            // Rebuild immediately with current data. The nil guard is defensive: if the
+            // sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
             if node := m.sidebar.Selected(); node != nil && !node.IsSession {
                 m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
             }
