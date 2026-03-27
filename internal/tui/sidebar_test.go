@@ -608,3 +608,29 @@ func TestToggleAlertFilter_AlertsOnly_SessionLevelAlertShowsAllWindows(t *testin
         t.Errorf("expected both windows visible when session has session-level alert, got %v", winIdxs)
     }
 }
+
+func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
+    t1 := time.Now()
+    // "alpha" has no alert; "beta" has an alert on window 0.
+    // After rebuild with filter on, nodes will be:
+    //   [0] session "beta" (IsSession=true)
+    //   [1] window "beta":0  <- first alerted window
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "beta:0": {Target: "beta:0", CreatedAt: t1},
+        },
+        cfg: config.Config{AlertFilterWindows: "all"},
+    }
+    s.ToggleAlertFilter()
+    if s.cursor != 1 {
+        t.Errorf("expected cursor=1 (first alerted window), got %d", s.cursor)
+    }
+    node := s.nodes[s.cursor]
+    if node.IsSession {
+        t.Error("expected cursor to be on a window node, not a session node")
+    }
+    if node.Session != "beta" || node.WindowIndex != 0 {
+        t.Errorf("expected cursor on beta:0, got session=%q window=%d", node.Session, node.WindowIndex)
+    }
+}

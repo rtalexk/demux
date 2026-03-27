@@ -597,6 +597,20 @@ func (s SidebarModel) AlertFilterActive() bool {
 func (s *SidebarModel) ToggleAlertFilter() bool {
     s.filterAlerts = !s.filterAlerts
     s.rebuildNodes()
+    if s.filterAlerts {
+        // Move cursor to first window node with an alert.
+        for i, n := range s.nodes {
+            if n.IsSession {
+                continue
+            }
+            target := fmt.Sprintf("%s:%d", n.Session, n.WindowIndex)
+            if _, ok := s.alerts[target]; ok {
+                s.cursor = i
+                return s.filterAlerts
+            }
+        }
+    }
+    // Filter off, or no alerted window found: clamp cursor to valid range.
     if s.cursor >= len(s.nodes) {
         s.cursor = max(0, len(s.nodes)-1)
     }
