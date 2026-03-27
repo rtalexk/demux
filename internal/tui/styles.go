@@ -56,6 +56,9 @@ var (
     selectedBG       lipgloss.Style
     selectedInactive lipgloss.Style
 
+    // Tree connectors
+    treeConnectorStyle lipgloss.Style
+
     // Git indicators
     gitAheadStyle  lipgloss.Style
     gitBehindStyle lipgloss.Style
@@ -102,6 +105,8 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 
     selectedBG       = lipgloss.NewStyle().Background(t.ColorSelected).Foreground(t.ColorFgPrimary)
     selectedInactive = lipgloss.NewStyle().Foreground(t.ColorSession)
+
+    treeConnectorStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 
     gitAheadStyle  = lipgloss.NewStyle().Foreground(t.ColorGitAhead)
     gitBehindStyle = lipgloss.NewStyle().Foreground(t.ColorGitBehind)

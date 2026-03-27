@@ -431,12 +431,11 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	}
 
 	// line 1: [indicator]name  pid:N  :port
-	name := indent + collapsePrefix + pr.FriendlyName()
 	var line1 string
 	if selected {
-		line1 = selectedBG.Render(name)
+		line1 = selectedBG.Render(indent + collapsePrefix + pr.FriendlyName())
 	} else {
-		line1 = procNameStyle(pr, node.Depth).Render(name)
+		line1 = treeConnectorStyle.Render(indent) + procNameStyle(pr, node.Depth).Render(collapsePrefix+pr.FriendlyName())
 	}
 	if pr.PID > 0 {
 		line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
@@ -446,7 +445,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
 	}
 
 	// line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children
-	statsIndent := node.StatPrefix + "  "
+	statsIndent := treeConnectorStyle.Render(node.StatPrefix) + "  "
 	l := statLabelStyle.Render
 	v := statValueStyle.Render
 
