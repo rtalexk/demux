@@ -8,6 +8,15 @@ import (
     "github.com/rtalex/demux/internal/config"
 )
 
+func containsStr(s []string, v string) bool {
+    for _, x := range s {
+        if x == v {
+            return true
+        }
+    }
+    return false
+}
+
 func TestDefaults(t *testing.T) {
     cfg := config.Default()
     if cfg.RefreshIntervalMs != 2000 {
@@ -21,6 +30,48 @@ func TestDefaults(t *testing.T) {
     }
     if cfg.Git.OnTimeout != "cached" {
         t.Errorf("expected cached, got %s", cfg.Git.OnTimeout)
+    }
+}
+
+func TestDefaults_IgnoredProcesses(t *testing.T) {
+    cfg := config.Default()
+    expected := []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"}
+    if len(cfg.IgnoredProcesses) != len(expected) {
+        t.Fatalf("expected %d ignored processes, got %d: %v", len(expected), len(cfg.IgnoredProcesses), cfg.IgnoredProcesses)
+    }
+    for i, v := range expected {
+        if cfg.IgnoredProcesses[i] != v {
+            t.Errorf("IgnoredProcesses[%d]: expected %q, got %q", i, v, cfg.IgnoredProcesses[i])
+        }
+    }
+}
+
+func TestDefaults_ProcessesConfig(t *testing.T) {
+    procs := config.Default().Theme.Processes
+    if len(procs.Editors) == 0 {
+        t.Error("expected non-empty default editors list")
+    }
+    if len(procs.Agents) == 0 {
+        t.Error("expected non-empty default agents list")
+    }
+    if len(procs.Servers) == 0 {
+        t.Error("expected non-empty default servers list")
+    }
+    if len(procs.Shells) == 0 {
+        t.Error("expected non-empty default shells list")
+    }
+    // spot-check key entries
+    if !containsStr(procs.Editors, "nvim") {
+        t.Error("expected nvim in default editors")
+    }
+    if !containsStr(procs.Agents, "claude") {
+        t.Error("expected claude in default agents")
+    }
+    if !containsStr(procs.Servers, "node") {
+        t.Error("expected node in default servers")
+    }
+    if !containsStr(procs.Shells, "zsh") {
+        t.Error("expected zsh in default shells")
     }
 }
 
@@ -62,5 +113,52 @@ func TestMissingFile(t *testing.T) {
     }
     if cfg.RefreshIntervalMs != 2000 {
         t.Errorf("expected defaults, got %d", cfg.RefreshIntervalMs)
+    }
+}
+
+func TestLoadFromFile_IgnoredProcesses(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`ignored_processes = ["bash", "zsh"]`), 0644)
+
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(cfg.IgnoredProcesses) != 2 {
+        t.Fatalf("expected 2 ignored processes, got %d: %v", len(cfg.IgnoredProcesses), cfg.IgnoredProcesses)
+    }
+    if cfg.IgnoredProcesses[0] != "bash" || cfg.IgnoredProcesses[1] != "zsh" {
+        t.Errorf("unexpected ignored processes: %v", cfg.IgnoredProcesses)
+    }
+}
+
+func TestLoadFromFile_ProcessesConfig(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`
+[theme.processes]
+editors = ["hx"]
+agents  = ["aider"]
+servers = ["bun"]
+shells  = ["fish"]
+`), 0644)
+
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    procs := cfg.Theme.Processes
+    if len(procs.Editors) != 1 || procs.Editors[0] != "hx" {
+        t.Errorf("unexpected editors: %v", procs.Editors)
+    }
+    if len(procs.Agents) != 1 || procs.Agents[0] != "aider" {
+        t.Errorf("unexpected agents: %v", procs.Agents)
+    }
+    if len(procs.Servers) != 1 || procs.Servers[0] != "bun" {
+        t.Errorf("unexpected servers: %v", procs.Servers)
+    }
+    if len(procs.Shells) != 1 || procs.Shells[0] != "fish" {
+        t.Errorf("unexpected shells: %v", procs.Shells)
     }
 }
