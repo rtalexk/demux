@@ -811,6 +811,24 @@ func (p ProcListModel) SelectedNode() *ProcListNode {
     return &n
 }
 
+// SelectedPane returns the tmux.Pane containing the cursor node.
+// If the cursor is on a pane header, that pane is returned directly.
+// If the cursor is on a process or subprocess node, the method walks
+// backwards to find the nearest enclosing pane header.
+// Returns nil if the node list is empty or no pane header is found.
+func (p ProcListModel) SelectedPane() *tmux.Pane {
+    if len(p.nodes) == 0 {
+        return nil
+    }
+    for i := p.cursor; i >= 0; i-- {
+        if p.nodes[i].IsPaneHeader {
+            pane := p.nodes[i].Pane
+            return &pane
+        }
+    }
+    return nil
+}
+
 // ToggleCollapse flips the collapsed state of the cursor node if it is a
 // depth-1 process with children. Returns true if a toggle occurred.
 // The caller must re-call SetWindowData to rebuild nodes after a toggle.
