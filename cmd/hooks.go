@@ -201,7 +201,7 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
         "hooks": [
           {
             "type": "command",
-            "command": "demux hooks stop"
+            "command": "demux hooks stop --agent claude"
           }
         ]
       }
@@ -212,7 +212,7 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
         "hooks": [
           {
             "type": "command",
-            "command": "demux hooks notify"
+            "command": "demux hooks notify --agent claude"
           }
         ]
       }
@@ -225,10 +225,10 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 #   {
 #     "hooks": {
 #       "Stop": [
-#         { "matcher": "", "hooks": [{ "type": "command", "command": "demux hooks stop" }] }
+#         { "matcher": "", "hooks": [{ "type": "command", "command": "demux hooks stop --agent claude" }] }
 #       ],
 #       "Notification": [
-#         { "matcher": "", "hooks": [{ "type": "command", "command": "demux hooks notify" }] }
+#         { "matcher": "", "hooks": [{ "type": "command", "command": "demux hooks notify --agent claude" }] }
 #       ]
 #     }
 #   }
