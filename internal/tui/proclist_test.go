@@ -574,3 +574,17 @@ func TestToggleCollapse_EmptyNodes_ReturnsFalse(t *testing.T) {
 		t.Error("expected false for empty model")
 	}
 }
+
+func TestToggleCollapse_IdleNode_ReturnsFalse(t *testing.T) {
+	m := ProcListModel{
+		collapsedPIDs: map[int32]bool{},
+		nodes: []ProcListNode{
+			{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+			{IsIdle: true, Depth: 1},
+		},
+		cursor: 1,
+	}
+	if m.ToggleCollapse() {
+		t.Error("expected false for idle node")
+	}
+}
