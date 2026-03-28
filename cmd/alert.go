@@ -112,7 +112,7 @@ func runAlertList(cmd *cobra.Command, args []string) error {
 
 func init() {
     // alert set flags
-    alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Session:window target (required)")
+    alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Target: session:window or session:window.pane (required)")
     alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text (required)")
     alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error")
     alertSetCmd.Flags().BoolVar(&alertSticky, "sticky", false, "Make alert sticky")
@@ -120,7 +120,7 @@ func init() {
     alertSetCmd.MarkFlagRequired("reason")
 
     // alert remove flags
-    alertRemoveCmd.Flags().StringVar(&alertRemoveTarget, "target", "", "Session:window target (required)")
+    alertRemoveCmd.Flags().StringVar(&alertRemoveTarget, "target", "", "Target: session:window or session:window.pane (required)")
     alertRemoveCmd.MarkFlagRequired("target")
 
     // wire subcommands

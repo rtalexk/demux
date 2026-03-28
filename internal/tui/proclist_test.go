@@ -473,7 +473,7 @@ func TestSetWindowData_CollapseHidesChildren(t *testing.T) {
     m.SetWindowData(
         []tmux.Pane{pane}, "test", 0,
         procs, map[int32]string{},
-        map[string]git.Info{}, config.Config{},
+        map[string]git.Info{}, nil, config.Config{},
     )
 
     // esbuild (depth-2 child of node) should NOT appear — parent collapsed by default
@@ -513,7 +513,7 @@ func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
     m.SetWindowData(
         []tmux.Pane{pane}, "test", 0,
         procs, map[int32]string{},
-        map[string]git.Info{}, config.Config{},
+        map[string]git.Info{}, nil, config.Config{},
     )
     // Simulate a toggle — expand PID 301.
     m.collapsedPIDs[301] = false
@@ -521,7 +521,7 @@ func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
     m.SetWindowData(
         []tmux.Pane{pane}, "test", 0,
         procs, map[int32]string{},
-        map[string]git.Info{}, config.Config{},
+        map[string]git.Info{}, nil, config.Config{},
     )
 
     found := false
@@ -546,7 +546,7 @@ func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
     m.SetWindowData(
         []tmux.Pane{pane}, "test", 0,
         procs, map[int32]string{},
-        map[string]git.Info{}, config.Config{},
+        map[string]git.Info{}, nil, config.Config{},
     )
 
     var nodeProc *ProcListNode

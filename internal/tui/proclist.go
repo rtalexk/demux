@@ -8,6 +8,7 @@ import (
 
     "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
+    "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
@@ -20,6 +21,7 @@ type ProcListNode struct {
     Pane         tmux.Pane
     GitDeviant   bool
     GitInfo      git.Info
+    Alert        *db.Alert
     Proc         proc.Process
     Port         int
     Depth        int // 0=pane header, 1=process, 2=subprocess
@@ -46,9 +48,10 @@ type ProcListModel struct {
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
-// procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched), and
-// gitInfo is keyed by "session:windowIndex:paneIndex" for deviant panes.
-func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, cfg config.Config) {
+// procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched),
+// gitInfo is keyed by "session:windowIndex:paneIndex" for deviant panes, and
+// alertMap is keyed by "session:windowIndex.paneIndex" for pane-level alerts.
+func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
     p.cfg = cfg
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
@@ -78,11 +81,19 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
         deviant := p.primaryCWD != "" && !git.IsDescendant(paneCWD, p.primaryCWD) && paneCWD != p.primaryCWD
 
         headerIdx := len(p.nodes)
+        var paneAlert *db.Alert
+        if alertMap != nil {
+            paneKey := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+            if a, ok := alertMap[paneKey]; ok {
+                paneAlert = &a
+            }
+        }
         p.nodes = append(p.nodes, ProcListNode{
             IsPaneHeader: true,
             Pane:         pane,
             GitDeviant:   deviant,
             GitInfo:      info,
+            Alert:        paneAlert,
         })
 
         // collect depth-1 children of the pane's shell process
@@ -367,6 +378,11 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int) string {
     label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
 
+    alertSuffix := ""
+    if node.Alert != nil {
+        alertSuffix = "  " + alertIcon(node.Alert.Level) + " " + node.Alert.Reason
+    }
+
     pathStr := ""
     if node.Pane.CWD != "" {
         pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
@@ -381,26 +397,26 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     }
 
     if selected {
-        text := label
+        text := label + stripANSI(alertSuffix)
         if pathStr != "" {
             if p.cfg.PanePathRightAlign && innerW > 0 {
-                labelW := len([]rune(label))
+                labelW := len([]rune(label + stripANSI(alertSuffix)))
                 rightPart := pathStr + gitSuffix
                 rightW := len([]rune(rightPart))
                 fillCount := innerW - labelW - 2 - 2 - rightW
                 if fillCount < 1 {
                     fillCount = 1
                 }
-                text = label + "  " + strings.Repeat("─", fillCount) + "  " + rightPart
+                text = label + stripANSI(alertSuffix) + "  " + strings.Repeat("─", fillCount) + "  " + rightPart
             } else {
-                text = label + "  " + pathStr + gitSuffix
+                text = label + stripANSI(alertSuffix) + "  " + pathStr + gitSuffix
             }
         }
         return selectedBG.Render(text)
     }
 
     if node.Pane.CWD == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
-        out := paneHeaderStyle.Render(label)
+        out := paneHeaderStyle.Render(label) + alertSuffix
         if node.Pane.CWD != "" {
             out += "  " + panePathStyle.Render(pathStr)
         }
@@ -414,7 +430,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
         return out
     }
 
-    labelW := len([]rune(label))
+    labelW := len([]rune(label + stripANSI(alertSuffix)))
     rightPart := pathStr + gitSuffix
     rightW := len([]rune(rightPart))
     fillCount := innerW - labelW - 2 - 2 - rightW
@@ -422,6 +438,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
         fillCount = 1
     }
     out := paneHeaderStyle.Render(label) +
+        alertSuffix +
         "  " +
         paneSepStyle.Render(strings.Repeat("─", fillCount)) +
         "  " +

@@ -110,7 +110,7 @@ Use --agent to specify which AI agent is sending the notification.`,
 			reason = def.notifyFallback
 		}
 
-		target, err := tmuxTarget()
+		target, err := tmuxPaneTarget()
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ Use --agent to specify which AI agent's stop format to expect.`,
 			return nil
 		}
 
-		target, err := tmuxTarget()
+		target, err := tmuxPaneTarget()
 		if err != nil {
 			return err
 		}
@@ -171,6 +171,15 @@ func tmuxTarget() (string, error) {
 	out, err := exec.Command("tmux", "display-message", "-p", "#S:#I").Output()
 	if err != nil {
 		return "", fmt.Errorf("get tmux target: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
+func tmuxPaneTarget() (string, error) {
+	out, err := exec.Command("tmux", "display-message", "-p", "#S:#I.#P").Output()
+	if err != nil {
+		return "", fmt.Errorf("get tmux pane target: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
@@ -234,7 +243,7 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 #   }
 #
 # To clear an alert after you've seen it:
-#   demux alert remove --target SESSION:WINDOW
+#   demux alert remove --target SESSION:WINDOW.PANE
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
