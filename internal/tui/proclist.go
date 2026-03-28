@@ -258,6 +258,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     if focused {
         border = procBorderActive
     }
+    innerW := width - 2
     if len(p.nodes) == 0 {
         hint := "Select a window with Enter"
         inner := noSelectionStyle.Render(hint)
@@ -275,7 +276,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         selected := focused && i == p.cursor
         var line string
         if node.IsPaneHeader {
-            line = p.renderPaneHeader(node, selected)
+            line = p.renderPaneHeader(node, selected, innerW)
         } else if node.IsIdle {
             line = paneIdleStyle.Render("    idle")
         } else {
@@ -363,26 +364,68 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     return injectBorderTitle(border.Width(width-2).Height(height-2).Render(inner), title)
 }
 
-func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool) string {
+func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int) string {
     label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
+
+    pathStr := ""
+    if node.Pane.CWD != "" {
+        pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
+    }
+    gitSuffix := ""
+    if node.GitDeviant {
+        if node.GitInfo.Loading {
+            gitSuffix = "  ↪ …"
+        } else {
+            gitSuffix = "  ↪ " + stripANSI(compactGitIndicators(node.GitInfo))
+        }
+    }
+
     if selected {
         text := label
-        if node.Pane.CWD != "" {
-            text += "  " + format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
-        }
-        if node.GitDeviant {
-            if node.GitInfo.Loading {
-                text += "  ↪ …"
+        if pathStr != "" {
+            if p.cfg.PanePathRightAlign && innerW > 0 {
+                labelW := len([]rune(label))
+                rightPart := pathStr + gitSuffix
+                rightW := len([]rune(rightPart))
+                fillCount := innerW - labelW - 2 - 2 - rightW
+                if fillCount < 1 {
+                    fillCount = 1
+                }
+                text = label + "  " + strings.Repeat("─", fillCount) + "  " + rightPart
             } else {
-                text += "  ↪ " + compactGitIndicators(node.GitInfo)
+                text = label + "  " + pathStr + gitSuffix
             }
         }
         return selectedBG.Render(text)
     }
-    out := paneHeaderStyle.Render(label)
-    if node.Pane.CWD != "" {
-        out += "  " + panePathStyle.Render(format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases))
+
+    if node.Pane.CWD == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
+        out := paneHeaderStyle.Render(label)
+        if node.Pane.CWD != "" {
+            out += "  " + panePathStyle.Render(pathStr)
+        }
+        if node.GitDeviant {
+            if node.GitInfo.Loading {
+                out += "  " + panePathStyle.Render("↪ …")
+            } else {
+                out += "  " + panePathStyle.Render("↪") + " " + compactGitIndicators(node.GitInfo)
+            }
+        }
+        return out
     }
+
+    labelW := len([]rune(label))
+    rightPart := pathStr + gitSuffix
+    rightW := len([]rune(rightPart))
+    fillCount := innerW - labelW - 2 - 2 - rightW
+    if fillCount < 1 {
+        fillCount = 1
+    }
+    out := paneHeaderStyle.Render(label) +
+        "  " +
+        paneSepStyle.Render(strings.Repeat("─", fillCount)) +
+        "  " +
+        panePathStyle.Render(pathStr)
     if node.GitDeviant {
         if node.GitInfo.Loading {
             out += "  " + panePathStyle.Render("↪ …")
@@ -558,6 +601,61 @@ func injectBorderTitle(rendered, title string) string {
     newTop := ansiPrefix + cornerLeft + ansiSuffix +
         title +
         ansiPrefix + strings.Repeat(fill, fillCount) + cornerRight + ansiSuffix
+
+    return newTop + rest
+}
+
+// injectBorderTitles is like injectBorderTitle but also places rightTitle
+// flush against the right corner of the top border line.
+func injectBorderTitles(rendered, leftTitle, rightTitle string) string {
+    if rightTitle == "" {
+        return injectBorderTitle(rendered, leftTitle)
+    }
+    nl := strings.IndexByte(rendered, '\n')
+    if nl < 0 {
+        return rendered
+    }
+    topLine := rendered[:nl]
+    rest := rendered[nl:]
+
+    plain := stripANSI(topLine)
+    runes := []rune(plain)
+    if len(runes) < 4 {
+        return rendered
+    }
+
+    cornerLeft := string(runes[0])
+    cornerRight := string(runes[len(runes)-1])
+    fill := string(runes[1])
+    totalInner := len(runes) - 2
+
+    leftVisible := []rune(stripANSI(leftTitle))
+    rightVisible := []rune(stripANSI(rightTitle))
+    totalUsed := len(leftVisible) + len(rightVisible)
+    if totalUsed >= totalInner {
+        return injectBorderTitle(rendered, leftTitle)
+    }
+    fillCount := totalInner - totalUsed
+
+    cornerLeftIdx := strings.Index(topLine, cornerLeft)
+    cornerRightIdx := strings.LastIndex(topLine, cornerRight)
+    ansiPrefix := ""
+    ansiSuffix := ""
+    if cornerLeftIdx > 0 {
+        ansiPrefix = topLine[:cornerLeftIdx]
+    }
+    if cornerRightIdx >= 0 {
+        after := cornerRightIdx + len(cornerRight)
+        if after <= len(topLine) {
+            ansiSuffix = topLine[after:]
+        }
+    }
+
+    newTop := ansiPrefix + cornerLeft + ansiSuffix +
+        leftTitle +
+        ansiPrefix + strings.Repeat(fill, fillCount) + ansiSuffix +
+        rightTitle +
+        ansiPrefix + cornerRight + ansiSuffix
 
     return newTop + rest
 }
