@@ -67,3 +67,65 @@ func TestParsePanesEmpty(t *testing.T) {
         t.Errorf("expected 0 panes, got %d", len(panes))
     }
 }
+
+func TestParsePanes_WithSessionActivity(t *testing.T) {
+    // 8 fields: session, window_index, pane_index, cwd, pane_id, window_name, pane_pid, session_activity
+    raw := "mysession\t0\t0\t/home/dev\t%1\teditor\t1234\t1711652000\n"
+    panes, err := tmux.ParsePanes(raw)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(panes) != 1 {
+        t.Fatalf("expected 1 pane, got %d", len(panes))
+    }
+    if panes[0].SessionActivity != 1711652000 {
+        t.Errorf("expected SessionActivity=1711652000, got %d", panes[0].SessionActivity)
+    }
+}
+
+func TestParsePanes_WithoutSessionActivity_BackwardCompat(t *testing.T) {
+    // Old 7-field format (no session_activity) should still parse with SessionActivity=0
+    raw := "mysession\t0\t0\t/home/dev\t%1\teditor\t1234\n"
+    panes, err := tmux.ParsePanes(raw)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(panes) != 1 {
+        t.Fatalf("expected 1 pane, got %d", len(panes))
+    }
+    if panes[0].SessionActivity != 0 {
+        t.Errorf("expected SessionActivity=0 for old format, got %d", panes[0].SessionActivity)
+    }
+}
+
+func TestSessionActivityMap_MaxPerSession(t *testing.T) {
+    panes := []tmux.Pane{
+        {Session: "s1", SessionActivity: 1000},
+        {Session: "s1", SessionActivity: 3000}, // max for s1
+        {Session: "s2", SessionActivity: 2000},
+    }
+    m := tmux.SessionActivityMap(panes)
+    if m["s1"].Unix() != 3000 {
+        t.Errorf("expected s1=3000, got %d", m["s1"].Unix())
+    }
+    if m["s2"].Unix() != 2000 {
+        t.Errorf("expected s2=2000, got %d", m["s2"].Unix())
+    }
+}
+
+func TestSessionActivityMap_Empty(t *testing.T) {
+    m := tmux.SessionActivityMap(nil)
+    if len(m) != 0 {
+        t.Errorf("expected empty map, got %v", m)
+    }
+}
+
+func TestSessionActivityMap_ZeroTimestampSkipped(t *testing.T) {
+    panes := []tmux.Pane{
+        {Session: "s1", SessionActivity: 0},
+    }
+    m := tmux.SessionActivityMap(panes)
+    if _, ok := m["s1"]; ok {
+        t.Error("expected s1 to be absent (zero timestamp skipped)")
+    }
+}
