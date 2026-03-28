@@ -364,8 +364,8 @@ func TestNewestSessionAlert_ReturnsNewestAmongWindows(t *testing.T) {
     t2 := time.Now()
     s := SidebarModel{
         alerts: map[string]db.Alert{
-            "sess:0": {Target: "sess:0", CreatedAt: t1},
-            "sess:1": {Target: "sess:1", CreatedAt: t2},
+            "sess:0.0": {Target: "sess:0.0", CreatedAt: t1},
+            "sess:1.0": {Target: "sess:1.0", CreatedAt: t2},
         },
     }
     got := s.newestSessionAlert("sess")
@@ -422,7 +422,7 @@ func TestRebuildNodes_SessionWithAlertSortsFirst(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts: map[string]db.Alert{
-            "beta:0": {Target: "beta:0", CreatedAt: t1},
+            "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
     }
     s.rebuildNodes()
@@ -437,8 +437,8 @@ func TestRebuildNodes_NewestAlertSessionSortsFirst(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts: map[string]db.Alert{
-            "alpha:0": {Target: "alpha:0", CreatedAt: t1},
-            "beta:0":  {Target: "beta:0", CreatedAt: t2},
+            "alpha:0.0": {Target: "alpha:0.0", CreatedAt: t1},
+            "beta:0.0":  {Target: "beta:0.0", CreatedAt: t2},
         },
     }
     s.rebuildNodes()
@@ -454,7 +454,7 @@ func TestRebuildNodes_WindowWithAlertSortsFirst(t *testing.T) {
             "sess": {0: nil, 1: nil, 2: nil},
         },
         alerts: map[string]db.Alert{
-            "sess:2": {Target: "sess:2", CreatedAt: t1},
+            "sess:2.0": {Target: "sess:2.0", CreatedAt: t1},
         },
     }
     s.rebuildNodes()
@@ -532,7 +532,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts: map[string]db.Alert{
-            "beta:0": {Target: "beta:0", CreatedAt: t1},
+            "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
@@ -563,7 +563,7 @@ func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing
             "sess": {0: nil, 1: nil},
         },
         alerts: map[string]db.Alert{
-            "sess:1": {Target: "sess:1", CreatedAt: t1},
+            "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
@@ -586,7 +586,7 @@ func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
             "sess": {0: nil, 1: nil},
         },
         alerts: map[string]db.Alert{
-            "sess:1": {Target: "sess:1", CreatedAt: t1},
+            "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
         },
         cfg: config.Config{AlertFilterWindows: "alerts_only"},
     }
@@ -607,7 +607,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts: map[string]db.Alert{
-            "beta:0": {Target: "beta:0", CreatedAt: t1},
+            "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }
@@ -642,13 +642,15 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     }
 }
 
-func TestToggleAlertFilter_AlertsOnly_SessionLevelAlertShowsAllWindows(t *testing.T) {
+func TestToggleAlertFilter_AlertsOnly_BothWindowsWithPaneAlertsVisible(t *testing.T) {
+    now := time.Now()
     s := SidebarModel{
         sessions: map[string]map[int][]tmux.Pane{
             "sess": {0: nil, 1: nil},
         },
         alerts: map[string]db.Alert{
-            "sess": {Target: "sess", CreatedAt: time.Now()},
+            "sess:0.0": {Target: "sess:0.0", CreatedAt: now},
+            "sess:1.0": {Target: "sess:1.0", CreatedAt: now},
         },
         cfg: config.Config{AlertFilterWindows: "alerts_only"},
     }
@@ -660,20 +662,20 @@ func TestToggleAlertFilter_AlertsOnly_SessionLevelAlertShowsAllWindows(t *testin
         }
     }
     if len(winIdxs) != 2 {
-        t.Errorf("expected both windows visible when session has session-level alert, got %v", winIdxs)
+        t.Errorf("expected both windows visible when both have pane alerts, got %v", winIdxs)
     }
 }
 
 func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
     t1 := time.Now()
-    // "alpha" has no alert; "beta" has an alert on window 0.
+    // "alpha" has no alert; "beta" has a pane alert on window 0, pane 0.
     // After rebuild with filter on, nodes will be:
     //   [0] session "beta" (IsSession=true)
     //   [1] window "beta":0  <- first alerted window
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts: map[string]db.Alert{
-            "beta:0": {Target: "beta:0", CreatedAt: t1},
+            "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
         cfg: config.Config{AlertFilterWindows: "all"},
     }

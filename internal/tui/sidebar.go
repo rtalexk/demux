@@ -69,8 +69,38 @@ func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map
     }
 }
 
+// alertSeverity maps alert level to a numeric priority (higher = more severe).
+func alertSeverity(level string) int {
+    switch level {
+    case "error":
+        return 2
+    case "warn":
+        return 1
+    default:
+        return 0
+    }
+}
+
+// windowAlert returns the highest-severity pane-level alert for a window
+// (target format "session:windowIndex.paneIndex"), or nil if none exist.
+func (s *SidebarModel) windowAlert(session string, windowIndex int) *db.Alert {
+    prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
+    var best *db.Alert
+    for target, a := range s.alerts {
+        if !strings.HasPrefix(target, prefix) {
+            continue
+        }
+        a := a
+        if best == nil || alertSeverity(a.Level) > alertSeverity(best.Level) ||
+            (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
+            best = &a
+        }
+    }
+    return best
+}
+
 // newestSessionAlert returns the most recent alert CreatedAt for a session
-// (checking both session-level and window-level targets), or zero time if none.
+// (checking pane-level targets "session:window.pane"), or zero time if none.
 func (s *SidebarModel) newestSessionAlert(session string) time.Time {
     var newest time.Time
     for target, a := range s.alerts {
@@ -157,12 +187,12 @@ func (s *SidebarModel) rebuildNodes() {
                 winIdxs = append(winIdxs, wi)
             }
 
-            // sort: windows with alerts first (newest alert desc), then by index
+            // sort: windows with alerts first (highest severity, then newest), then by index
             sort.Slice(winIdxs, func(i, j int) bool {
-                ki := fmt.Sprintf("%s:%d", name, winIdxs[i])
-                kj := fmt.Sprintf("%s:%d", name, winIdxs[j])
-                ai, hasi := s.alerts[ki]
-                aj, hasj := s.alerts[kj]
+                ai := s.windowAlert(name, winIdxs[i])
+                aj := s.windowAlert(name, winIdxs[j])
+                hasi := ai != nil
+                hasj := aj != nil
                 if hasi != hasj {
                     return hasi
                 }
@@ -174,10 +204,7 @@ func (s *SidebarModel) rebuildNodes() {
 
             for _, wi := range winIdxs {
                 if s.filterAlerts && s.cfg.AlertFilterWindows == "alerts_only" {
-                    target := fmt.Sprintf("%s:%d", name, wi)
-                    _, hasWindowAlert := s.alerts[target]
-                    _, hasSessionAlert := s.alerts[name]
-                    if !hasWindowAlert && !hasSessionAlert {
+                    if s.windowAlert(name, wi) == nil {
                         continue
                     }
                 }
@@ -366,8 +393,7 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
         }
         indParts = append(indParts, devInd)
     }
-    target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
-    if a, ok := s.alerts[target]; ok {
+    if a := s.windowAlert(node.Session, node.WindowIndex); a != nil {
         if selected && focused {
             indParts = append(indParts, alertIconOnBG(a.Level, activeTheme.ColorSelected))
         } else {
@@ -626,10 +652,7 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
             if n.IsSession {
                 continue
             }
-            target := fmt.Sprintf("%s:%d", n.Session, n.WindowIndex)
-            _, hasWindowAlert := s.alerts[target]
-            _, hasSessionAlert := s.alerts[n.Session]
-            if hasWindowAlert || hasSessionAlert {
+            if s.windowAlert(n.Session, n.WindowIndex) != nil {
                 s.cursor = i
                 break
             }

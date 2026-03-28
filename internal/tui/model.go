@@ -452,14 +452,15 @@ func (m *Model) populateYankFields() {
 }
 
 func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
-    target := fmt.Sprintf("%s:%d", session, windowIndex)
-    alert, err := m.db.AlertByTarget(target)
-    if err != nil || alert == nil || alert.Sticky {
-        return
-    }
-    if err := m.db.AlertRemove(target); err != nil {
-        m.statusMsg = "error removing alert: " + err.Error()
-        m.statusExp = time.Now().Add(2 * time.Second)
+    prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
+    for _, a := range m.alerts {
+        if !strings.HasPrefix(a.Target, prefix) || a.Sticky {
+            continue
+        }
+        if err := m.db.AlertRemove(a.Target); err != nil {
+            m.statusMsg = "error removing alert: " + err.Error()
+            m.statusExp = time.Now().Add(2 * time.Second)
+        }
     }
 }
 
