@@ -28,18 +28,20 @@ type SidebarModel struct {
     offset       int // viewport scroll offset
     sessions     map[string]map[int][]tmux.Pane
     alerts       map[string]db.Alert
-    gitInfo      map[string]git.Info
-    cfg          config.Config
-    filterAlerts bool
+    gitInfo         map[string]git.Info
+    sessionActivity map[string]time.Time
+    cfg             config.Config
+    filterAlerts    bool
 }
 
-func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map[string]git.Info, cfg config.Config) {
+func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map[string]git.Info, sessionActivity map[string]time.Time, cfg config.Config) {
     s.sessions = tmux.GroupBySessions(panes)
     s.alerts = make(map[string]db.Alert, len(alerts))
     for _, a := range alerts {
         s.alerts[a.Target] = a
     }
     s.gitInfo = gitInfo
+    s.sessionActivity = sessionActivity
     s.cfg = cfg
 
     // preserve cursor position, rebuild nodes
@@ -107,19 +109,36 @@ func (s *SidebarModel) rebuildNodes() {
         }
     }
 
-    // sort: sessions with alerts first (newest alert desc), then alphabetical
+    sortKeys := s.cfg.SessionSort
+    if len(sortKeys) == 0 {
+        sortKeys = []string{"priority", "last_seen", "alphabetical"}
+    }
     sort.Slice(sessions, func(i, j int) bool {
-        ti := s.newestSessionAlert(sessions[i])
-        tj := s.newestSessionAlert(sessions[j])
-        hasI := !ti.IsZero()
-        hasJ := !tj.IsZero()
-        if hasI != hasJ {
-            return hasI
+        si, sj := sessions[i], sessions[j]
+        for _, key := range sortKeys {
+            switch key {
+            case "priority":
+                ti := s.newestSessionAlert(si)
+                tj := s.newestSessionAlert(sj)
+                hasI := !ti.IsZero()
+                hasJ := !tj.IsZero()
+                if hasI != hasJ {
+                    return hasI
+                }
+                if hasI && hasJ && !ti.Equal(tj) {
+                    return ti.After(tj)
+                }
+            case "last_seen":
+                ai := s.sessionActivity[si]
+                aj := s.sessionActivity[sj]
+                if !ai.Equal(aj) {
+                    return ai.After(aj)
+                }
+            case "alphabetical":
+                return si < sj
+            }
         }
-        if hasI && hasJ && !ti.Equal(tj) {
-            return ti.After(tj)
-        }
-        return sessions[i] < sessions[j]
+        return false
     })
 
     for _, name := range sessions {
@@ -168,7 +187,7 @@ func (s *SidebarModel) rebuildNodes() {
     }
 }
 
-func (s SidebarModel) Render(width, height int, focused bool, title string) string {
+func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle string) string {
     visibleRows := height - 2
     if visibleRows < 1 {
         visibleRows = 1
@@ -236,7 +255,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title string) stri
     if focused {
         style = borderActive
     }
-    return injectBorderTitle(style.Width(width-2).Height(height-2).Render(inner), title)
+    return injectBorderTitles(style.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {

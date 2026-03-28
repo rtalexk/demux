@@ -472,6 +472,61 @@ func TestRebuildNodes_WindowWithAlertSortsFirst(t *testing.T) {
 
 // --- Alert filter ---
 
+func TestRebuildNodes_LastSeenSort(t *testing.T) {
+    now := time.Now()
+    older := now.Add(-10 * time.Minute)
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        sessionActivity: map[string]time.Time{
+            "alpha": older,
+            "beta":  now,
+        },
+        cfg: config.Config{
+            SessionSort: []string{"last_seen", "priority", "alphabetical"},
+        },
+    }
+    s.rebuildNodes()
+    var got []string
+    for _, n := range s.nodes {
+        if n.IsSession {
+            got = append(got, n.Session)
+        }
+    }
+    // beta is more recent → should appear first
+    if len(got) < 2 || got[0] != "beta" {
+        t.Errorf("expected beta (more recent) first, got %v", got)
+    }
+}
+
+func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
+    now := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("charlie", "alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        // all same activity time → falls through to alpha
+        sessionActivity: map[string]time.Time{
+            "charlie": now,
+            "alpha":   now,
+            "beta":    now,
+        },
+        cfg: config.Config{
+            SessionSort: []string{"last_seen", "priority", "alphabetical"},
+        },
+    }
+    s.rebuildNodes()
+    var got []string
+    for _, n := range s.nodes {
+        if n.IsSession {
+            got = append(got, n.Session)
+        }
+    }
+    want := []string{"alpha", "beta", "charlie"}
+    if strings.Join(got, ",") != strings.Join(want, ",") {
+        t.Errorf("expected %v (alpha tiebreak), got %v", want, got)
+    }
+}
+
 func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
     t1 := time.Now()
     s := SidebarModel{

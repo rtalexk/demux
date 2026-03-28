@@ -181,7 +181,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
-        m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, m.cfg)
+        m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(msg.panes), m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -216,12 +216,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, m.cfg)
+        m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
         m.updateDetailFromSelection()
         return m, nil
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
-        m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, m.cfg)
+        m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
         m.updateDetailFromSelection()
         return m, nil
     }
