@@ -838,3 +838,87 @@ func TestAssignTreePrefixes_CrossPaneBoundary_ResetsSiblingCount(t *testing.T) {
         t.Errorf("depth-1 in pane 1 should get └─, got %q", nodes[3].TreePrefix)
     }
 }
+
+// ---------- renderPaneHeader right-align tests ----------
+
+func paneNode(paneIndex int, cwd string) ProcListNode {
+    return ProcListNode{
+        IsPaneHeader: true,
+        Pane:         tmux.Pane{PaneIndex: paneIndex, CWD: cwd},
+    }
+}
+
+func TestRenderPaneHeader_RightAlign_PathAppearsAtRight(t *testing.T) {
+    p := ProcListModel{
+        cfg: config.Config{PanePathRightAlign: true},
+    }
+    node := paneNode(0, "/home/user/project")
+    innerW := 40
+    line := p.renderPaneHeader(node, false, innerW)
+    plain := stripANSI(line)
+    runes := []rune(plain)
+    if len(runes) != innerW {
+        t.Errorf("expected line width %d, got %d: %q", innerW, len(runes), plain)
+    }
+    if !strings.HasSuffix(strings.TrimRight(plain, " "), "/home/user/project") {
+        t.Errorf("expected path at right edge, got: %q", plain)
+    }
+}
+
+func TestRenderPaneHeader_RightAlign_FillCharsPresent(t *testing.T) {
+    p := ProcListModel{
+        cfg: config.Config{PanePathRightAlign: true},
+    }
+    node := paneNode(1, "/tmp")
+    innerW := 40
+    line := p.renderPaneHeader(node, false, innerW)
+    plain := stripANSI(line)
+    if !strings.Contains(plain, "─") {
+        t.Errorf("expected fill chars (─) in right-aligned line, got: %q", plain)
+    }
+}
+
+func TestRenderPaneHeader_LeftAlign_NoFillChars(t *testing.T) {
+    p := ProcListModel{
+        cfg: config.Config{PanePathRightAlign: false},
+    }
+    node := paneNode(0, "/tmp")
+    innerW := 40
+    line := p.renderPaneHeader(node, false, innerW)
+    plain := stripANSI(line)
+    if strings.Contains(plain, "─") {
+        t.Errorf("expected no fill chars in left-aligned line, got: %q", plain)
+    }
+}
+
+func TestRenderPaneHeader_RightAlign_NoCWD_NoFill(t *testing.T) {
+    p := ProcListModel{
+        cfg: config.Config{PanePathRightAlign: true},
+    }
+    node := paneNode(0, "")
+    innerW := 40
+    line := p.renderPaneHeader(node, false, innerW)
+    plain := stripANSI(line)
+    if strings.Contains(plain, "─") {
+        t.Errorf("expected no fill when CWD is empty, got: %q", plain)
+    }
+}
+
+func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T) {
+    p := ProcListModel{
+        cfg: config.Config{PanePathRightAlign: true},
+    }
+    node := paneNode(0, "/home/user/project")
+    innerW := 40
+    line := p.renderPaneHeader(node, true, innerW)
+    plain := stripANSI(line)
+    if !strings.Contains(plain, "pane 0") {
+        t.Errorf("expected label in selected right-align line, got: %q", plain)
+    }
+    if !strings.Contains(plain, "/home/user/project") {
+        t.Errorf("expected path in selected right-align line, got: %q", plain)
+    }
+    if !strings.Contains(plain, "─") {
+        t.Errorf("expected fill chars in selected right-align line, got: %q", plain)
+    }
+}
