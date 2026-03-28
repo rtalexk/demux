@@ -32,6 +32,7 @@ type DetailModel struct {
     gitInfo    git.Info
     prInfo     string
     winCount   int
+    paneCount  int
     procCount  int
     alertCount int
 
@@ -114,6 +115,10 @@ func row(label, value string) string {
     return detailLabelStyle.Render(label) + detailValueStyle.Render(value)
 }
 
+func inlineStat(label, value string) string {
+    return detailLabelStyle.Width(0).Render(label+":") + " " + detailValueStyle.Render(value)
+}
+
 func (d DetailModel) renderSession() []string {
     lines := []string{
         row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
@@ -133,33 +138,37 @@ func (d DetailModel) renderSession() []string {
     }
     lines = append(lines,
         "",
-        row("windows", fmt.Sprint(d.winCount)),
-        row("procs", fmt.Sprint(d.procCount)),
-        row("alerts", fmt.Sprint(d.alertCount)),
+        inlineStat("windows", fmt.Sprint(d.winCount))+"   "+
+            inlineStat("panes", fmt.Sprint(d.paneCount))+"   "+
+            inlineStat("procs", fmt.Sprint(d.procCount))+"   "+
+            inlineStat("alerts", fmt.Sprint(d.alertCount)),
     )
     return lines
 }
 
 func (d DetailModel) renderWindow() []string {
-    var lines []string
-    for _, p := range d.windowPanes {
-        lines = append(lines, fmt.Sprintf("  pane %d  %s", p.PaneIndex, format.ShortenPath(p.CWD, d.cfg.PathAliases)))
+    lines := []string{
+        row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
     }
-    if d.windowGit.Branch != "" {
-        lines = append(lines, "")
-        if d.windowGit.Worktree != "" {
-            lines = append(lines, row("worktree", d.windowGit.Worktree))
-        }
-        branch := d.windowGit.Branch
-        if ind := gitIndicatorsLong(d.windowGit); ind != "" {
+    if d.gitInfo.Worktree != "" {
+        lines = append(lines, row("worktree", d.gitInfo.Worktree))
+    }
+    if d.gitInfo.Branch != "" {
+        branch := d.gitInfo.Branch
+        if ind := gitIndicatorsLong(d.gitInfo); ind != "" {
             branch += "  " + ind
         }
         lines = append(lines, row("branch", branch))
     }
-    if d.windowAlert != nil {
-        lines = append(lines, "")
-        lines = append(lines, row("alert", d.windowAlert.Level+": "+d.windowAlert.Reason))
+    if d.prInfo != "" {
+        lines = append(lines, row("pr", d.prInfo))
     }
+    lines = append(lines,
+        "",
+        inlineStat("panes", fmt.Sprint(len(d.windowPanes)))+"   "+
+            inlineStat("procs", fmt.Sprint(d.procCount))+"   "+
+            inlineStat("alerts", fmt.Sprint(d.alertCount)),
+    )
     return lines
 }
 

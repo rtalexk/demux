@@ -481,6 +481,10 @@ func (m *Model) updateDetailFromSelection() {
                     }
                 }
             }
+            paneCount := 0
+            for _, wp := range windows {
+                paneCount += len(wp)
+            }
             m.detail = DetailModel{
                 cfg:        m.cfg,
                 selType:    DetailSession,
@@ -488,6 +492,7 @@ func (m *Model) updateDetailFromSelection() {
                 sessionCWD: sessionCWD,
                 gitInfo:    m.gitInfo[node.Session],
                 winCount:   len(windows),
+                paneCount:  paneCount,
                 procCount:  procCount,
                 alertCount: alertCount,
             }
@@ -502,9 +507,34 @@ func (m *Model) updateDetailFromSelection() {
             if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
                 windowAlert = a
             }
+            sessionCWD := primaryCWDForPanes(windows)
+            alertCount := 0
+            for _, a := range m.alerts {
+                if strings.HasPrefix(a.Target, node.Session+":") {
+                    alertCount++
+                }
+            }
+            procCount := 0
+            if sessionCWD != "" {
+                for _, pr := range m.procs {
+                    cwd := m.cwdMap[pr.PID]
+                    if cwd == "" {
+                        continue
+                    }
+                    if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+                        procCount++
+                    }
+                }
+            }
             m.detail = DetailModel{
                 cfg:         m.cfg,
                 selType:     DetailWindow,
+                session:     node.Session,
+                sessionCWD:  sessionCWD,
+                gitInfo:     m.gitInfo[node.Session],
+                winCount:    len(windows),
+                procCount:   procCount,
+                alertCount:  alertCount,
                 windowIndex: node.WindowIndex,
                 windowPanes: wPanes,
                 windowGit:   m.gitInfo[gitKey],
