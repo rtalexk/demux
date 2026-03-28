@@ -673,10 +673,11 @@ func (m Model) View() string {
         alertFilterMark = " [!]"
     }
     sidebarTitle := fmt.Sprintf(" [1] Sessions %s%s ", sessionCountStr, alertFilterMark)
+    sidebarRightTitle := ""
     for _, info := range m.gitInfo {
         if info.Loading {
             frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            sidebarTitle = fmt.Sprintf(" [1] Sessions %s%s %s ", sessionCountStr, alertFilterMark, frame)
+            sidebarRightTitle = fmt.Sprintf(" %s ", spinnerStyle.Render(frame))
             break
         }
     }
@@ -689,7 +690,7 @@ func (m Model) View() string {
     }
     procTitle := " [2] " + bc + procTitleSuffix
 
-    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle)
+    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle, sidebarRightTitle)
     procList := m.procList.Render(procW, procH, m.focus == panelProcList, procTitle)
     detail := m.detail.Render(procW, detailH)
 
