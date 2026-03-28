@@ -209,7 +209,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.procs = msg.procs
         m.cwdMap = msg.cwdMap
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
         }
         m.updateDetailFromSelection()
         // Self-schedule next poll in 2s for the selected window.
@@ -257,7 +257,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
         if node := m.sidebar.Selected(); node != nil && !node.IsSession {
             prevSess, prevWin := m.procList.CurrentWindow()
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
             if node.Session != prevSess || node.WindowIndex != prevWin {
                 m.procGen++
@@ -302,7 +302,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             } else {
                 // move focus to proclist
                 m.focus = panelProcList
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
                 m.updateDetailFromSelection()
             }
         }
@@ -328,7 +328,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     if node := m.sidebar.Selected(); node != nil {
         if !node.IsSession {
             prevSess, prevWin := m.procList.CurrentWindow()
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             if node.Session != prevSess || node.WindowIndex != prevWin {
                 m.procGen++
                 cmd = m.scheduleProcFetch()
@@ -378,7 +378,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             // Rebuild immediately with current data. The nil guard is defensive: if the
             // sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
             if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
@@ -461,6 +461,14 @@ func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
         m.statusMsg = "error removing alert: " + err.Error()
         m.statusExp = time.Now().Add(2 * time.Second)
     }
+}
+
+func (m *Model) alertMap() map[string]db.Alert {
+    am := make(map[string]db.Alert, len(m.alerts))
+    for _, a := range m.alerts {
+        am[a.Target] = a
+    }
+    return am
 }
 
 func (m *Model) updateDetailFromSelection() {
