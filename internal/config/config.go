@@ -80,8 +80,9 @@ type Config struct {
     DefaultFormat      string      `toml:"default_format"`
     StatusBarFormat    string      `toml:"status_bar_format"`
     SidebarWidth       int         `toml:"sidebar_width"`
-    AlertFilterWindows string      `toml:"alert_filter_windows"` // "all" or "alerts_only"
-    Git                GitConfig   `toml:"git"`
+    AlertFilterWindows  string      `toml:"alert_filter_windows"` // "all" or "alerts_only"
+    PanePathRightAlign  bool        `toml:"pane_path_right_align"`
+    Git                 GitConfig   `toml:"git"`
     Theme              ThemeConfig `toml:"theme"`
     PathAliases        []PathAlias `toml:"path_aliases"`
 }
