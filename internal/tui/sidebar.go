@@ -213,18 +213,22 @@ func (s SidebarModel) Render(width, height int, focused bool, title string) stri
     }
 
     var lines []string
-    if hasAbove {
-        lines = append(lines, centeredHint("▲ more"))
-    }
-    end := offset + contentRows
-    if end > len(s.nodes) {
-        end = len(s.nodes)
-    }
-    for i := offset; i < end; i++ {
-        lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
-    }
-    if hasBelow {
-        lines = append(lines, centeredHint("▼ more"))
+    if len(s.nodes) == 0 && s.filterAlerts {
+        lines = append(lines, centeredHint("no alerts"))
+    } else {
+        if hasAbove {
+            lines = append(lines, centeredHint("▲ more"))
+        }
+        end := offset + contentRows
+        if end > len(s.nodes) {
+            end = len(s.nodes)
+        }
+        for i := offset; i < end; i++ {
+            lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
+        }
+        if hasBelow {
+            lines = append(lines, centeredHint("▼ more"))
+        }
     }
 
     inner := strings.Join(lines, "\n")
