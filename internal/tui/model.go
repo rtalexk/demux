@@ -255,6 +255,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             sidebarVisibleRows = 1
         }
         m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
+        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+            prevSess, prevWin := m.procList.CurrentWindow()
+            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.cfg)
+            m.updateDetailFromSelection()
+            if node.Session != prevSess || node.WindowIndex != prevWin {
+                m.procGen++
+                return m, m.scheduleProcFetch()
+            }
+        } else {
+            m.procList.Reset()
+            m.updateDetailFromSelection()
+        }
     default:
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)
