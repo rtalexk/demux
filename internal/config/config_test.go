@@ -217,6 +217,19 @@ func TestLoadFromFile_AlertFilterWindows(t *testing.T) {
     }
 }
 
+func TestDefaults_SessionSort(t *testing.T) {
+    cfg := config.Default()
+    want := []string{"priority", "last_seen", "alphabetical"}
+    if len(cfg.SessionSort) != len(want) {
+        t.Fatalf("expected SessionSort=%v, got %v", want, cfg.SessionSort)
+    }
+    for i, v := range want {
+        if cfg.SessionSort[i] != v {
+            t.Errorf("SessionSort[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        }
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")

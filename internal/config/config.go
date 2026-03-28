@@ -82,6 +82,7 @@ type Config struct {
     SidebarWidth       int         `toml:"sidebar_width"`
     AlertFilterWindows  string      `toml:"alert_filter_windows"` // "all" or "alerts_only"
     PanePathRightAlign  bool        `toml:"pane_path_right_align"`
+    SessionSort         []string    `toml:"session_sort"`
     Git                 GitConfig   `toml:"git"`
     Theme              ThemeConfig `toml:"theme"`
     PathAliases        []PathAlias `toml:"path_aliases"`
@@ -96,6 +97,7 @@ func Default() Config {
         StatusBarFormat:   "tmux",
         SidebarWidth:       30,
         AlertFilterWindows: "all",
+        SessionSort:        []string{"priority", "last_seen", "alphabetical"},
         Git: GitConfig{
             Enabled:         true,
             TimeoutMs:       500,
