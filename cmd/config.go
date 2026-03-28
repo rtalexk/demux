@@ -44,6 +44,9 @@ sidebar_width = 30
 # When the ! alert filter is active, which windows to show: all | alerts_only
 alert_filter_windows = "all"
 
+# Right-align pane CWD paths in the process list, with a fill separator
+pane_path_right_align = false
+
 # Path prefix aliases — shorten verbose absolute paths in the TUI.
 # Both prefix and replace support environment variables.
 # Longest matching prefix wins. Example:
