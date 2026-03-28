@@ -230,6 +230,74 @@ func TestDefaults_SessionSort(t *testing.T) {
     }
 }
 
+func TestLoadFromFile_SessionSort_SingleKey(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`session_sort = ["last_seen"]`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    want := []string{"last_seen", "priority", "alphabetical"}
+    if len(cfg.SessionSort) != len(want) {
+        t.Fatalf("expected %v, got %v", want, cfg.SessionSort)
+    }
+    for i, v := range want {
+        if cfg.SessionSort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        }
+    }
+}
+
+func TestLoadFromFile_SessionSort_PartialCustom(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`session_sort = ["alphabetical", "priority"]`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    want := []string{"alphabetical", "priority", "last_seen"}
+    for i, v := range want {
+        if cfg.SessionSort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        }
+    }
+}
+
+func TestLoadFromFile_SessionSort_InvalidDropped(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`session_sort = ["bogus", "last_seen"]`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    // "bogus" dropped; "last_seen" first; "priority", "alphabetical" filled in
+    want := []string{"last_seen", "priority", "alphabetical"}
+    for i, v := range want {
+        if cfg.SessionSort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        }
+    }
+}
+
+func TestLoadFromFile_SessionSort_Empty(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`session_sort = []`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    want := []string{"priority", "last_seen", "alphabetical"}
+    for i, v := range want {
+        if cfg.SessionSort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        }
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")

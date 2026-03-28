@@ -8,6 +8,26 @@ import (
     "github.com/BurntSushi/toml"
 )
 
+var defaultSessionSortOrder = []string{"priority", "last_seen", "alphabetical"}
+
+func normalizeSortKeys(user []string) []string {
+    valid := map[string]bool{"priority": true, "last_seen": true, "alphabetical": true}
+    seen := map[string]bool{}
+    result := make([]string, 0, len(defaultSessionSortOrder))
+    for _, k := range user {
+        if valid[k] && !seen[k] {
+            result = append(result, k)
+            seen[k] = true
+        }
+    }
+    for _, k := range defaultSessionSortOrder {
+        if !seen[k] {
+            result = append(result, k)
+        }
+    }
+    return result
+}
+
 type PathAlias struct {
     Prefix  string `toml:"prefix"`
     Replace string `toml:"replace"`
@@ -178,6 +198,7 @@ func Load(path string) (Config, error) {
     sort.Slice(cfg.PathAliases, func(i, j int) bool {
         return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
     })
+    cfg.SessionSort = normalizeSortKeys(cfg.SessionSort)
     return cfg, nil
 }
 
