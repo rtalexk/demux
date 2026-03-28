@@ -44,6 +44,10 @@ sidebar_width = 30
 # When the ! alert filter is active, which windows to show: all | alerts_only
 alert_filter_windows = "all"
 
+# Session sort order — first key wins, missing keys filled from default order
+# Valid keys: priority | last_seen | alphabetical
+session_sort = ["priority", "last_seen", "alphabetical"]
+
 # Right-align pane CWD paths in the process list, with a fill separator
 pane_path_right_align = false
 
