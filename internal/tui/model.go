@@ -28,7 +28,7 @@ const (
 type tickMsg time.Time
 type panesMsg struct {
     panes          []tmux.Pane
-    currentSession string
+    currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
     currentWindow  int
 }
 type alertsMsg struct{ alerts []db.Alert }

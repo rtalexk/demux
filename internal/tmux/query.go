@@ -99,6 +99,8 @@ func SessionActivityMap(panes []Pane) map[string]time.Time {
 }
 
 // ParseCurrentTarget parses the output of `tmux display-message -p "#{session_name}\t#{window_index}"`.
+// Empty input is treated as an error because a real tmux invocation only produces empty output
+// in degenerate states; the caller (CurrentTarget) surfaces the exec error before this is reached.
 func ParseCurrentTarget(raw string) (string, int, error) {
     raw = strings.TrimSpace(raw)
     if raw == "" {

@@ -149,3 +149,10 @@ func TestParseCurrentTarget_Empty(t *testing.T) {
         t.Error("expected error for empty input")
     }
 }
+
+func TestParseCurrentTarget_NoTab(t *testing.T) {
+    _, _, err := tmux.ParseCurrentTarget("myproject")
+    if err == nil {
+        t.Error("expected error for input with no tab")
+    }
+}
