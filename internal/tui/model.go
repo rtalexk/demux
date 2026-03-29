@@ -198,12 +198,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             m.currentSession = msg.currentSession
             m.currentWindow = msg.currentWindow
             switch m.cfg.FocusOnOpen {
-            case "current_window":
+            case "current_window", "current_session", "first_window", "first_session":
                 visibleRows := max(1, m.height-1-2)
-                m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows)
-            case "current_session":
-                visibleRows := max(1, m.height-1-2)
-                m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
+                m.applyNonAlertFocusMode(m.cfg.FocusOnOpen, visibleRows)
             }
             m.ready = true
             cmds = append(cmds, tick(), m.fetchAlerts())
@@ -241,9 +238,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             visibleRows := max(1, m.height-1-2)
             switch m.cfg.FocusOnOpen {
             case "alert_window":
-                m.sidebar.FocusFirstAlertWindow(visibleRows)
+                if !m.sidebar.FocusFirstAlertWindow(visibleRows) && m.cfg.FocusOnOpenFallback != "" {
+                    m.applyNonAlertFocusMode(m.cfg.FocusOnOpenFallback, visibleRows)
+                }
             case "alert_session":
-                m.sidebar.FocusFirstAlertSession(visibleRows)
+                if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.FocusOnOpenFallback != "" {
+                    m.applyNonAlertFocusMode(m.cfg.FocusOnOpenFallback, visibleRows)
+                }
             }
         }
         m.updateDetailFromSelection()
@@ -491,6 +492,22 @@ func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
             m.statusMsg = "error removing alert: " + err.Error()
             m.statusExp = time.Now().Add(2 * time.Second)
         }
+    }
+}
+
+// applyNonAlertFocusMode applies a non-alert focus mode to the sidebar.
+// Valid modes: current_window, current_session, first_window, first_session.
+// No-ops on empty or unrecognised mode.
+func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
+    switch mode {
+    case "current_window":
+        m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows)
+    case "current_session":
+        m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
+    case "first_window":
+        m.sidebar.FocusFirstWindow(visibleRows)
+    case "first_session":
+        // cursor is already 0, which is always a session node — no-op
     }
 }
 

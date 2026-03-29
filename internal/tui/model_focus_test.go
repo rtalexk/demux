@@ -83,6 +83,7 @@ func TestFocusOnOpen_AlertSession(t *testing.T) {
 
 func TestFocusOnOpen_AlertWindow_NoAlerts_StaysAt0(t *testing.T) {
     m := focusTestModel("alert_window")
+    m.cfg.FocusOnOpenFallback = "" // no fallback — cursor must not move
     m.height = 40
     m, _ = applyPanesMsg(m, "alpha", 0)
     m, _ = applyAlertsMsg(m, nil)
@@ -93,6 +94,62 @@ func TestFocusOnOpen_AlertWindow_NoAlerts_StaysAt0(t *testing.T) {
     // cursor should be at 0 — whatever that node is
     if m.sidebar.cursor != 0 {
         t.Errorf("expected cursor=0, got %d", m.sidebar.cursor)
+    }
+}
+
+func TestFocusOnOpen_FirstWindow(t *testing.T) {
+    m := focusTestModel("first_window")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "alpha", 0)
+    node := m.sidebar.Selected()
+    if node == nil || node.IsSession {
+        t.Errorf("expected a window node, got %+v", node)
+    }
+}
+
+func TestFocusOnOpen_FirstSession(t *testing.T) {
+    m := focusTestModel("first_session")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "alpha", 0)
+    node := m.sidebar.Selected()
+    if node == nil || !node.IsSession {
+        t.Errorf("expected a session node, got %+v", node)
+    }
+}
+
+func TestFocusOnOpen_AlertWindow_FallsBackToCurrentWindow_WhenNoAlerts(t *testing.T) {
+    m := focusTestModel("alert_window")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    // No alerts — should fall back to current_window (beta:0)
+    m, _ = applyAlertsMsg(m, nil)
+    node := m.sidebar.Selected()
+    if node == nil || node.IsSession || node.Session != "beta" || node.WindowIndex != 0 {
+        t.Errorf("expected fallback to beta:0 (current_window), got %+v", node)
+    }
+}
+
+func TestFocusOnOpen_AlertSession_FallsBackToCurrentWindow_WhenNoAlerts(t *testing.T) {
+    m := focusTestModel("alert_session")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    // No alerts — should fall back to current_window (beta:0)
+    m, _ = applyAlertsMsg(m, nil)
+    node := m.sidebar.Selected()
+    if node == nil || node.IsSession || node.Session != "beta" || node.WindowIndex != 0 {
+        t.Errorf("expected fallback to beta:0 (current_window), got %+v", node)
+    }
+}
+
+func TestFocusOnOpen_AlertWindow_NoFallback_WhenFallbackEmpty(t *testing.T) {
+    m := focusTestModel("alert_window")
+    m.cfg.FocusOnOpenFallback = ""
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    // No alerts, no fallback — cursor stays at 0
+    m, _ = applyAlertsMsg(m, nil)
+    if m.sidebar.cursor != 0 {
+        t.Errorf("expected cursor=0 with no fallback, got %d", m.sidebar.cursor)
     }
 }
 
