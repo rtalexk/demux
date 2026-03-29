@@ -73,6 +73,10 @@ type Model struct {
     ready        bool // true after first panesMsg — gates deferred fetches
     procGen      int  // incremented on window change; discards in-flight proc fetches for old window
     popupMode    bool // true when launched with DEMUX_POPUP=1; quits after attach
+
+    currentSession   string
+    currentWindow    int
+    startupFocusDone bool
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -191,6 +195,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         var cmds []tea.Cmd
         if !m.ready {
             // First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
+            m.currentSession = msg.currentSession
+            m.currentWindow = msg.currentWindow
+            switch m.cfg.FocusOnOpen {
+            case "current_window":
+                visibleRows := max(1, m.height-1-2)
+                m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows)
+            case "current_session":
+                visibleRows := max(1, m.height-1-2)
+                m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
+            }
             m.ready = true
             cmds = append(cmds, tick(), m.fetchAlerts())
         }
@@ -221,7 +235,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
+        savedCursor := m.sidebar.cursor
         m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
+        if !m.startupFocusDone {
+            m.startupFocusDone = true
+            visibleRows := max(1, m.height-1-2)
+            switch m.cfg.FocusOnOpen {
+            case "alert_window":
+                m.sidebar.FocusFirstAlertWindow(visibleRows)
+            case "alert_session":
+                m.sidebar.FocusFirstAlertSession(visibleRows)
+            }
+        } else {
+            m.sidebar.cursor = savedCursor
+        }
         m.updateDetailFromSelection()
         return m, nil
     case gitResultMsg:
