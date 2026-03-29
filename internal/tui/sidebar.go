@@ -667,16 +667,17 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     return s.filterAlerts
 }
 
-func (s *SidebarModel) focusFirstAlertWindow() {
+func (s *SidebarModel) focusFirstAlertWindow() bool {
     for i, n := range s.nodes {
         if n.IsSession {
             continue
         }
         if s.windowAlert(n.Session, n.WindowIndex) != nil {
             s.cursor = i
-            return
+            return true
         }
     }
+    return false
 }
 
 // FocusNode positions the cursor on the node matching session+windowIndex.
@@ -701,8 +702,8 @@ func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel
 }
 
 // FocusFirstAlertSession positions the cursor on the first session node that has any alert.
-// No-ops if no alerted session exists.
-func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) {
+// Returns true if a matching node was found, false otherwise.
+func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
     for i, n := range s.nodes {
         if !n.IsSession {
             continue
@@ -710,16 +711,31 @@ func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) {
         if !s.newestSessionAlert(n.Session).IsZero() {
             s.cursor = i
             s.clampViewport(visibleRows)
-            return
+            return true
         }
     }
+    return false
 }
 
 // FocusFirstAlertWindow positions the cursor on the first window node that has any alert.
-// No-ops if no alerted window exists.
-func (s *SidebarModel) FocusFirstAlertWindow(visibleRows int) {
-    s.focusFirstAlertWindow()
+// Returns true if a matching node was found, false otherwise.
+func (s *SidebarModel) FocusFirstAlertWindow(visibleRows int) bool {
+    found := s.focusFirstAlertWindow()
     s.clampViewport(visibleRows)
+    return found
+}
+
+// FocusFirstWindow positions the cursor on the first window node in the list.
+// Returns true if a window node was found, false if the list contains only session nodes.
+func (s *SidebarModel) FocusFirstWindow(visibleRows int) bool {
+    for i, n := range s.nodes {
+        if !n.IsSession {
+            s.cursor = i
+            s.clampViewport(visibleRows)
+            return true
+        }
+    }
+    return false
 }
 
 func (s SidebarModel) Selected() *SidebarNode {

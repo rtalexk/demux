@@ -817,3 +817,99 @@ func TestFocusFirstAlertWindow_NoAlerts_LeavesCursorAt0(t *testing.T) {
         t.Errorf("expected cursor=0, got %d", s.cursor)
     }
 }
+
+// --- FocusFirstWindow ---
+
+func TestFocusFirstWindow_MovesToFirstWindowNode(t *testing.T) {
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{},
+        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstWindow(20)
+    if !found {
+        t.Fatal("expected found=true")
+    }
+    node := s.Selected()
+    if node == nil || node.IsSession {
+        t.Errorf("expected a window node, got %+v", node)
+    }
+}
+
+func TestFocusFirstWindow_NoWindows_ReturnsFalse(t *testing.T) {
+    // A session with no windows produces only a session node
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{},
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstWindow(20)
+    if found {
+        t.Error("expected found=false when no window nodes exist")
+    }
+}
+
+// --- FocusFirstAlertWindow returns bool ---
+
+func TestFocusFirstAlertWindow_ReturnsTrue_WhenFound(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess:1.0": {Target: "sess:1.0", Level: "warn", CreatedAt: t1},
+        },
+        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstAlertWindow(20)
+    if !found {
+        t.Error("expected found=true")
+    }
+}
+
+func TestFocusFirstAlertWindow_ReturnsFalse_WhenNotFound(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstAlertWindow(20)
+    if found {
+        t.Error("expected found=false when no alerted windows")
+    }
+}
+
+// --- FocusFirstAlertSession returns bool ---
+
+func TestFocusFirstAlertSession_ReturnsTrue_WhenFound(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts: map[string]db.Alert{
+            "alpha:0.0": {Target: "alpha:0.0", Level: "warn", CreatedAt: t1},
+        },
+        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstAlertSession(20)
+    if !found {
+        t.Error("expected found=true")
+    }
+}
+
+func TestFocusFirstAlertSession_ReturnsFalse_WhenNotFound(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    found := s.FocusFirstAlertSession(20)
+    if found {
+        t.Error("expected found=false when no alerted sessions")
+    }
+}
