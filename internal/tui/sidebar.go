@@ -657,16 +657,7 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     s.filterAlerts = !s.filterAlerts
     s.rebuildNodes()
     if s.filterAlerts {
-        // Move cursor to first window node with an alert.
-        for i, n := range s.nodes {
-            if n.IsSession {
-                continue
-            }
-            if s.windowAlert(n.Session, n.WindowIndex) != nil {
-                s.cursor = i
-                break
-            }
-        }
+        s.focusFirstAlertWindow()
     }
     // Clamp cursor to valid range before calling clampViewport.
     if s.cursor >= len(s.nodes) {
@@ -674,6 +665,61 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     }
     s.clampViewport(visibleRows)
     return s.filterAlerts
+}
+
+func (s *SidebarModel) focusFirstAlertWindow() {
+    for i, n := range s.nodes {
+        if n.IsSession {
+            continue
+        }
+        if s.windowAlert(n.Session, n.WindowIndex) != nil {
+            s.cursor = i
+            return
+        }
+    }
+}
+
+// FocusNode positions the cursor on the node matching session+windowIndex.
+// If isSessionLevel is true, targets the session node; otherwise targets the window node.
+// No-ops if no matching node is found, leaving cursor at its current position.
+func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel bool, visibleRows int) {
+    for i, n := range s.nodes {
+        if n.Session != session {
+            continue
+        }
+        if isSessionLevel && n.IsSession {
+            s.cursor = i
+            s.clampViewport(visibleRows)
+            return
+        }
+        if !isSessionLevel && !n.IsSession && n.WindowIndex == windowIndex {
+            s.cursor = i
+            s.clampViewport(visibleRows)
+            return
+        }
+    }
+}
+
+// FocusFirstAlertSession positions the cursor on the first session node that has any alert.
+// No-ops if no alerted session exists.
+func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) {
+    for i, n := range s.nodes {
+        if !n.IsSession {
+            continue
+        }
+        if !s.newestSessionAlert(n.Session).IsZero() {
+            s.cursor = i
+            s.clampViewport(visibleRows)
+            return
+        }
+    }
+}
+
+// FocusFirstAlertWindow positions the cursor on the first window node that has any alert.
+// No-ops if no alerted window exists.
+func (s *SidebarModel) FocusFirstAlertWindow(visibleRows int) {
+    s.focusFirstAlertWindow()
+    s.clampViewport(visibleRows)
 }
 
 func (s SidebarModel) Selected() *SidebarNode {

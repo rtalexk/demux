@@ -706,3 +706,85 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
         t.Errorf("expected cursor clamped to 0 on empty node list, got %d", s.cursor)
     }
 }
+
+// --- FocusNode ---
+
+func TestFocusNode_SessionLevel(t *testing.T) {
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "alpha": {0: nil},
+            "beta":  {0: nil, 1: nil},
+        },
+        alerts: map[string]db.Alert{},
+        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    s.FocusNode("beta", 0, true, 20)
+    node := s.Selected()
+    if node == nil || !node.IsSession || node.Session != "beta" {
+        t.Errorf("expected session node beta, got %+v", node)
+    }
+}
+
+func TestFocusNode_WindowLevel(t *testing.T) {
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 2: nil},
+        },
+        alerts: map[string]db.Alert{},
+        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    s.FocusNode("sess", 2, false, 20)
+    node := s.Selected()
+    if node == nil || node.IsSession || node.Session != "sess" || node.WindowIndex != 2 {
+        t.Errorf("expected window node sess:2, got %+v", node)
+    }
+}
+
+func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    s.FocusNode("nonexistent", 0, true, 20)
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", s.cursor)
+    }
+}
+
+// --- FocusFirstAlertSession ---
+
+func TestFocusFirstAlertSession_MovesToAlertedSession(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts: map[string]db.Alert{
+            "beta:0.0": {Target: "beta:0.0", Level: "warn", CreatedAt: t1},
+        },
+        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    // alphabetical: alpha first, beta second; but beta has alert so it sorts first
+    // force alphabetical order so beta is NOT first by sort, to test the method itself
+    s.cfg.SessionSort = []string{"alphabetical"}
+    s.rebuildNodes()
+    s.FocusFirstAlertSession(20)
+    node := s.Selected()
+    if node == nil || !node.IsSession || node.Session != "beta" {
+        t.Errorf("expected session node beta, got %+v", node)
+    }
+}
+
+func TestFocusFirstAlertSession_NoAlerts_LeavesCursorAt0(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    s.FocusFirstAlertSession(20)
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", s.cursor)
+    }
+}
