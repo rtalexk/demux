@@ -197,10 +197,10 @@ const tmuxHooksSnippet = `# demux tmux hooks
 # How it works:
 #   after-select-pane   — fires when you move focus between panes within a window.
 #   after-select-window — fires when you switch to a different window.
-#                         Both are needed: switching windows does not trigger
-#                         after-select-pane, so without this hook window-level
-#                         alerts would not clear on window switch.
-#   Both hooks target the now-active pane and clear any alerts on it and its
+#   after-switch-client — fires when you switch to a different session.
+#   All three are needed: each navigation action fires a different hook.
+#   Together they cover every way a pane can receive focus.
+#   Each hook targets the now-active pane and clears any alerts on it and its
 #   parent window.
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -209,6 +209,9 @@ set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{se
 
 # Clears alerts when switching windows (after-select-pane does not fire for window switches).
 set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+
+# Clears alerts when switching sessions (after-select-window does not fire for session switches).
+set-hook -g after-switch-client "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
 
 # ──────────────────────────────────────────────────────────────────────────────
 `
