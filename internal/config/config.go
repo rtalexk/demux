@@ -102,7 +102,7 @@ type Config struct {
     StatusBarFormat    string      `toml:"status_bar_format"`
     SidebarWidth       int         `toml:"sidebar_width"`
     AlertFilterWindows  string      `toml:"alert_filter_windows"` // "all" or "alerts_only"
-    FocusOnOpen        string      `toml:"focus_on_open"`
+    FocusOnOpen         string      `toml:"focus_on_open"`
     PanePathRightAlign  bool        `toml:"pane_path_right_align"`
     SessionSort         []string    `toml:"session_sort"`
     Git                 GitConfig   `toml:"git"`
@@ -119,7 +119,7 @@ func Default() Config {
         StatusBarFormat:   "tmux",
         SidebarWidth:       30,
         AlertFilterWindows: "all",
-        FocusOnOpen: "current_window",
+        FocusOnOpen:        "current_window",
         SessionSort:        []string{"priority", "last_seen", "alphabetical"},
         Git: GitConfig{
             Enabled:         true,
