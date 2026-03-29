@@ -16,6 +16,10 @@ func init() {
     rootCmd.AddCommand(statusCmd)
 }
 
+func tmuxCounter(style, icon string, count int) string {
+    return fmt.Sprintf("%s%s %d", style, icon, count)
+}
+
 func runStatus(cmd *cobra.Command, _ []string) error {
     database, err := openDB()
     if err != nil {
@@ -28,9 +32,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
         return err
     }
 
-    var warns, errors int
+    var infos, warns, errors int
     for _, a := range alerts {
         switch a.Level {
+        case "info":
+            infos++
         case "warn":
             warns++
         case "error":
@@ -46,20 +52,30 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
     switch fmtName {
     case "tmux":
-        if warns == 0 && errors == 0 {
-            fmt.Print("#[fg=green]●#[default]")
-        } else if errors > 0 {
-            fmt.Printf("#[fg=yellow]● %d#[default]  #[fg=red,bold]● %d#[default]", warns, errors)
+        if infos == 0 && warns == 0 && errors == 0 {
+            fmt.Print("#[fg=green]#[default]")
         } else {
-            fmt.Printf("#[fg=yellow]● %d#[default]", warns)
+            sep := ""
+            if infos > 0 {
+                fmt.Print(tmuxCounter("#[fg=cyan]", "", infos))
+                sep = " "
+            }
+            if warns > 0 {
+                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=yellow]", "", warns))
+                sep = " "
+            }
+            if errors > 0 {
+                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=red,bold]", "", errors))
+            }
+            fmt.Print("#[default]")
         }
     case "json":
-        fmt.Printf(`{"warns":%d,"errors":%d}`+"\n", warns, errors)
+        fmt.Printf(`{"infos":%d,"warns":%d,"errors":%d}`+"\n", infos, warns, errors)
     default:
-        if warns == 0 && errors == 0 {
+        if infos == 0 && warns == 0 && errors == 0 {
             fmt.Println("ok")
         } else {
-            fmt.Printf("warns=%d errors=%d\n", warns, errors)
+            fmt.Printf("infos=%d warns=%d errors=%d\n", infos, warns, errors)
         }
     }
     return nil
