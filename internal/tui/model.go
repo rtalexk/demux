@@ -453,8 +453,9 @@ func (m *Model) populateYankFields() {
 
 func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
     prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
+    exact := fmt.Sprintf("%s:%d", session, windowIndex)
     for _, a := range m.alerts {
-        if !strings.HasPrefix(a.Target, prefix) || a.Sticky {
+        if (a.Target != exact && !strings.HasPrefix(a.Target, prefix)) || a.Sticky {
             continue
         }
         if err := m.db.AlertRemove(a.Target); err != nil {

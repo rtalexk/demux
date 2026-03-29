@@ -81,13 +81,15 @@ func alertSeverity(level string) int {
     }
 }
 
-// windowAlert returns the highest-severity pane-level alert for a window
-// (target format "session:windowIndex.paneIndex"), or nil if none exist.
+// windowAlert returns the highest-severity alert for a window, checking both
+// window-level targets ("session:windowIndex") and pane-level targets
+// ("session:windowIndex.paneIndex"), or nil if none exist.
 func (s *SidebarModel) windowAlert(session string, windowIndex int) *db.Alert {
     prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
+    exact := fmt.Sprintf("%s:%d", session, windowIndex)
     var best *db.Alert
     for target, a := range s.alerts {
-        if !strings.HasPrefix(target, prefix) {
+        if target != exact && !strings.HasPrefix(target, prefix) {
             continue
         }
         a := a
@@ -325,14 +327,22 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
             }
         }
     }
+    var bestSessionAlert *db.Alert
     for target, a := range s.alerts {
-        if strings.HasPrefix(target, node.Session+":") {
-            if selected && focused {
-                indParts = append(indParts, alertIconOnBG(a.Level, activeTheme.ColorSelected))
-            } else {
-                indParts = append(indParts, alertIcon(a.Level))
-            }
-            break
+        if !strings.HasPrefix(target, node.Session+":") && target != node.Session {
+            continue
+        }
+        a := a
+        if bestSessionAlert == nil || alertSeverity(a.Level) > alertSeverity(bestSessionAlert.Level) ||
+            (alertSeverity(a.Level) == alertSeverity(bestSessionAlert.Level) && a.CreatedAt.After(bestSessionAlert.CreatedAt)) {
+            bestSessionAlert = &a
+        }
+    }
+    if bestSessionAlert != nil {
+        if selected && focused {
+            indParts = append(indParts, alertIconOnBG(bestSessionAlert.Level, activeTheme.ColorSelected))
+        } else {
+            indParts = append(indParts, alertIcon(bestSessionAlert.Level))
         }
     }
     indicators := strings.Join(indParts, " ")
