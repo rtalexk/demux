@@ -44,6 +44,9 @@ sidebar_width = 30
 # When the ! alert filter is active, which windows to show: all | alerts_only
 alert_filter_windows = "all"
 
+# Where to position the sidebar cursor on open: current_window | current_session | alert_window | alert_session
+focus_on_open = "current_window"
+
 # Session sort order — first key wins, missing keys filled from default order
 # Valid keys: priority | last_seen | alphabetical
 session_sort = ["priority", "last_seen", "alphabetical"]
