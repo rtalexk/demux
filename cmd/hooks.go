@@ -191,15 +191,24 @@ func tmuxPaneTarget() (string, error) {
 
 const tmuxHooksSnippet = `# demux tmux hooks
 # ──────────────────────────────────────────────────────────────────────────────
-# Paste the line below into ~/.tmux.conf, then reload with:
+# Paste the lines below into ~/.tmux.conf, then reload with:
 #   tmux source ~/.tmux.conf
 #
 # How it works:
-#   after-select-pane — fires whenever a pane receives focus.
-#                       demux clears any alerts on that pane and its parent window.
+#   after-select-pane   — fires when you move focus between panes within a window.
+#   after-select-window — fires when you switch to a different window.
+#                         Both are needed: switching windows does not trigger
+#                         after-select-pane, so without this hook window-level
+#                         alerts would not clear on window switch.
+#   Both hooks target the now-active pane and clear any alerts on it and its
+#   parent window.
 # ──────────────────────────────────────────────────────────────────────────────
 
-set-hook -g after-select-pane "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+# Clears alerts when switching between panes within the same window.
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+
+# Clears alerts when switching windows (after-select-pane does not fire for window switches).
+set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
 
 # ──────────────────────────────────────────────────────────────────────────────
 `
