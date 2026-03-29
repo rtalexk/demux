@@ -129,3 +129,23 @@ func TestSessionActivityMap_ZeroTimestampSkipped(t *testing.T) {
         t.Error("expected s1 to be absent (zero timestamp skipped)")
     }
 }
+
+func TestParseCurrentTarget(t *testing.T) {
+    session, window, err := tmux.ParseCurrentTarget("myproject\t3\n")
+    if err != nil {
+        t.Fatal(err)
+    }
+    if session != "myproject" {
+        t.Errorf("expected session \"myproject\", got %q", session)
+    }
+    if window != 3 {
+        t.Errorf("expected window 3, got %d", window)
+    }
+}
+
+func TestParseCurrentTarget_Empty(t *testing.T) {
+    _, _, err := tmux.ParseCurrentTarget("")
+    if err == nil {
+        t.Error("expected error for empty input")
+    }
+}

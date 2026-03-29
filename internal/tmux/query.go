@@ -98,6 +98,33 @@ func SessionActivityMap(panes []Pane) map[string]time.Time {
     return m
 }
 
+// ParseCurrentTarget parses the output of `tmux display-message -p "#{session_name}\t#{window_index}"`.
+func ParseCurrentTarget(raw string) (string, int, error) {
+    raw = strings.TrimSpace(raw)
+    if raw == "" {
+        return "", 0, fmt.Errorf("empty output")
+    }
+    parts := strings.SplitN(raw, "\t", 2)
+    if len(parts) < 2 {
+        return "", 0, fmt.Errorf("unexpected format: %q", raw)
+    }
+    wi, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+    if err != nil {
+        return "", 0, fmt.Errorf("invalid window index: %w", err)
+    }
+    return parts[0], wi, nil
+}
+
+// CurrentTarget returns the session name and window index of the tmux client
+// that launched this process. Returns an error if tmux is unavailable.
+func CurrentTarget() (string, int, error) {
+    out, err := exec.Command("tmux", "display-message", "-p", "#{session_name}\t#{window_index}").Output()
+    if err != nil {
+        return "", 0, fmt.Errorf("tmux display-message: %w", err)
+    }
+    return ParseCurrentTarget(string(out))
+}
+
 // SwitchClient runs tmux switch-client -t target.
 func SwitchClient(target string) error {
     return exec.Command("tmux", "switch-client", "-t", target).Run()

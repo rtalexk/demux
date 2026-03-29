@@ -26,7 +26,11 @@ const (
 
 // Message types
 type tickMsg time.Time
-type panesMsg struct{ panes []tmux.Pane }
+type panesMsg struct {
+    panes          []tmux.Pane
+    currentSession string
+    currentWindow  int
+}
 type alertsMsg struct{ alerts []db.Alert }
 type procDataMsg struct {
     procs  []proc.Process
@@ -101,7 +105,8 @@ func (m Model) fetchPanes() tea.Cmd {
         if err != nil {
             return panesMsg{}
         }
-        return panesMsg{panes: panes}
+        session, window, _ := tmux.CurrentTarget()
+        return panesMsg{panes: panes, currentSession: session, currentWindow: window}
     }
 }
 
