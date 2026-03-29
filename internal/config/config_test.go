@@ -320,6 +320,26 @@ replace = "mydir"
     }
 }
 
+func TestDefaults_FocusOnOpen(t *testing.T) {
+    cfg := config.Default()
+    if cfg.FocusOnOpen != "current_window" {
+        t.Errorf("expected default FocusOnOpen=\"current_window\", got %q", cfg.FocusOnOpen)
+    }
+}
+
+func TestLoadFromFile_FocusOnOpen(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`focus_on_open = "alert_window"`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.FocusOnOpen != "alert_window" {
+        t.Errorf("expected \"alert_window\", got %q", cfg.FocusOnOpen)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
