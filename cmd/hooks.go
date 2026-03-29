@@ -181,8 +181,14 @@ func tmuxTarget() (string, error) {
 }
 
 // tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
+// It uses $TMUX_PANE (set by tmux at process start) so the result always refers
+// to the pane where the agent was launched, not the currently focused pane.
 func tmuxPaneTarget() (string, error) {
-    out, err := exec.Command("tmux", "display-message", "-p", "#S:#I.#P").Output()
+    args := []string{"display-message", "-p", "#S:#I.#P"}
+    if pane := os.Getenv("TMUX_PANE"); pane != "" {
+        args = []string{"display-message", "-t", pane, "-p", "#S:#I.#P"}
+    }
+    out, err := exec.Command("tmux", args...).Output()
     if err != nil {
         return "", fmt.Errorf("get tmux pane target: %w", err)
     }
