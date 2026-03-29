@@ -1,15 +1,15 @@
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"sort"
-	"strings"
+    "encoding/json"
+    "fmt"
+    "io"
+    "os"
+    "os/exec"
+    "sort"
+    "strings"
 
-	"github.com/spf13/cobra"
+    "github.com/spf13/cobra"
 )
 
 var hooksInitAgent string
@@ -17,16 +17,16 @@ var hooksStopAgent string
 var hooksNotifyAgent string
 
 var hooksCmd = &cobra.Command{
-	Use:   "hooks",
-	Short: "AI agent hook utilities",
+    Use:   "hooks",
+    Short: "AI agent hook utilities",
 }
 
 var hooksInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Print hook configuration for an AI agent",
-	Long: `Prints a configuration snippet for the specified AI agent.
+    Use:   "init",
+    Short: "Print hook configuration for an AI agent",
+    Long: `Prints a configuration snippet for the specified AI agent.
 
-Supported agents: claude
+Supported agents: claude, tmux
 
 For --agent claude, prints a JSON snippet to add to ~/.claude/settings.json.
 
@@ -34,155 +34,175 @@ Stop fires when a session ends — demux shows an info badge on that tmux window
 Notification fires when the agent needs your attention: permission prompts,
 idle waiting for input, elicitation dialogs. demux shows a warn badge with
 the actual message so you know what it's asking.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		def, err := resolveAgent(hooksInitAgent)
-		if err != nil {
-			return err
-		}
-		fmt.Print(def.snippet)
-		return nil
-	},
+    RunE: func(cmd *cobra.Command, args []string) error {
+        def, err := resolveAgent(hooksInitAgent)
+        if err != nil {
+            return err
+        }
+        fmt.Print(def.snippet)
+        return nil
+    },
 }
 
 // notifyEvent mirrors the JSON that Claude Code sends to the Notification hook on stdin.
 type notifyEvent struct {
-	Message          string `json:"message"`
-	Title            string `json:"title"`
-	NotificationType string `json:"notification_type"`
+    Message          string `json:"message"`
+    Title            string `json:"title"`
+    NotificationType string `json:"notification_type"`
 }
 
 // stopEvent mirrors the JSON that Claude Code sends to the Stop hook on stdin.
 type stopEvent struct {
-	StopHookActive       bool   `json:"stop_hook_active"`
-	LastAssistantMessage string `json:"last_assistant_message"`
+    StopHookActive       bool   `json:"stop_hook_active"`
+    LastAssistantMessage string `json:"last_assistant_message"`
 }
 
 type agentDef struct {
-	stopMsg        string
-	notifyFallback string
-	snippet        string
+    stopMsg        string
+    notifyFallback string
+    snippet        string
 }
 
 var agentDefs = map[string]agentDef{
-	"claude": {
-		stopMsg:        "Claude finished",
-		notifyFallback: "Claude notification",
-		snippet:        claudeHooksSnippet,
-	},
+    "tmux": {
+        stopMsg:        "",
+        notifyFallback: "",
+        snippet:        tmuxHooksSnippet,
+    },
+    "claude": {
+        stopMsg:        "Claude finished",
+        notifyFallback: "Claude notification",
+        snippet:        claudeHooksSnippet,
+    },
 }
 
 func resolveAgent(name string) (agentDef, error) {
-	if def, ok := agentDefs[name]; ok {
-		return def, nil
-	}
-	supported := make([]string, 0, len(agentDefs))
-	for k := range agentDefs {
-		supported = append(supported, k)
-	}
-	sort.Strings(supported)
-	return agentDef{}, fmt.Errorf("unknown agent %q: supported agents: %s", name, strings.Join(supported, ", "))
+    if def, ok := agentDefs[name]; ok {
+        return def, nil
+    }
+    supported := make([]string, 0, len(agentDefs))
+    for k := range agentDefs {
+        supported = append(supported, k)
+    }
+    sort.Strings(supported)
+    return agentDef{}, fmt.Errorf("unknown agent %q: supported agents: %s", name, strings.Join(supported, ", "))
 }
 
 var hooksNotifyCmd = &cobra.Command{
-	Use:   "notify",
-	Short: "Handle a Notification hook event (reads event JSON from stdin)",
-	Long: `Reads the Notification hook event JSON from stdin, extracts the message,
+    Use:   "notify",
+    Short: "Handle a Notification hook event (reads event JSON from stdin)",
+    Long: `Reads the Notification hook event JSON from stdin, extracts the message,
 and sets a warn-level demux alert on the current tmux window.
 
 Use --agent to specify which AI agent is sending the notification.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		def, err := resolveAgent(hooksNotifyAgent)
-		if err != nil {
-			return err
-		}
+    RunE: func(cmd *cobra.Command, args []string) error {
+        def, err := resolveAgent(hooksNotifyAgent)
+        if err != nil {
+            return err
+        }
 
-		if os.Getenv("TMUX") == "" {
-			return nil
-		}
+        if os.Getenv("TMUX") == "" {
+            return nil
+        }
 
-		var event notifyEvent
-		if data, err := io.ReadAll(os.Stdin); err == nil {
-			json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
-		}
+        var event notifyEvent
+        if data, err := io.ReadAll(os.Stdin); err == nil {
+            json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
+        }
 
-		reason := event.Message
-		if reason == "" {
-			reason = def.notifyFallback
-		}
+        reason := event.Message
+        if reason == "" {
+            reason = def.notifyFallback
+        }
 
-		target, err := tmuxPaneTarget()
-		if err != nil {
-			return err
-		}
+        target, err := tmuxPaneTarget()
+        if err != nil {
+            return err
+        }
 
-		d, err := openDB()
-		if err != nil {
-			return err
-		}
-		defer d.Close()
-		return d.AlertSet(target, reason, "warn", false)
-	},
+        d, err := openDB()
+        if err != nil {
+            return err
+        }
+        defer d.Close()
+        return d.AlertSet(target, reason, "warn", false)
+    },
 }
 
 var hooksStopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Handle a Stop hook event (reads event JSON from stdin)",
-	Long: `Reads the Stop hook event JSON from stdin and sets an info-level demux
+    Use:   "stop",
+    Short: "Handle a Stop hook event (reads event JSON from stdin)",
+    Long: `Reads the Stop hook event JSON from stdin and sets an info-level demux
 alert on the current tmux window.
 
 Use --agent to specify which AI agent's stop format to expect.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		def, err := resolveAgent(hooksStopAgent)
-		if err != nil {
-			return err
-		}
+    RunE: func(cmd *cobra.Command, args []string) error {
+        def, err := resolveAgent(hooksStopAgent)
+        if err != nil {
+            return err
+        }
 
-		if os.Getenv("TMUX") == "" {
-			return nil
-		}
+        if os.Getenv("TMUX") == "" {
+            return nil
+        }
 
-		var event stopEvent
-		if data, err := io.ReadAll(os.Stdin); err == nil {
-			json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
-		}
+        var event stopEvent
+        if data, err := io.ReadAll(os.Stdin); err == nil {
+            json.Unmarshal(data, &event) //nolint:errcheck — fallback handles failure
+        }
 
-		// stop_hook_active=true means this stop was triggered by a stop hook;
-		// skip to avoid creating stale alerts after the hook chain.
-		if event.StopHookActive {
-			return nil
-		}
+        // stop_hook_active=true means this stop was triggered by a stop hook;
+        // skip to avoid creating stale alerts after the hook chain.
+        if event.StopHookActive {
+            return nil
+        }
 
-		target, err := tmuxPaneTarget()
-		if err != nil {
-			return err
-		}
+        target, err := tmuxPaneTarget()
+        if err != nil {
+            return err
+        }
 
-		d, err := openDB()
-		if err != nil {
-			return err
-		}
-		defer d.Close()
-		return d.AlertSet(target, def.stopMsg, "info", false)
-	},
+        d, err := openDB()
+        if err != nil {
+            return err
+        }
+        defer d.Close()
+        return d.AlertSet(target, def.stopMsg, "info", false)
+    },
 }
 
 // tmuxTarget returns the current tmux target as "session:windowIndex".
 func tmuxTarget() (string, error) {
-	out, err := exec.Command("tmux", "display-message", "-p", "#S:#I").Output()
-	if err != nil {
-		return "", fmt.Errorf("get tmux target: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
+    out, err := exec.Command("tmux", "display-message", "-p", "#S:#I").Output()
+    if err != nil {
+        return "", fmt.Errorf("get tmux target: %w", err)
+    }
+    return strings.TrimSpace(string(out)), nil
 }
 
 // tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
 func tmuxPaneTarget() (string, error) {
-	out, err := exec.Command("tmux", "display-message", "-p", "#S:#I.#P").Output()
-	if err != nil {
-		return "", fmt.Errorf("get tmux pane target: %w", err)
-	}
-	return strings.TrimSpace(string(out)), nil
+    out, err := exec.Command("tmux", "display-message", "-p", "#S:#I.#P").Output()
+    if err != nil {
+        return "", fmt.Errorf("get tmux pane target: %w", err)
+    }
+    return strings.TrimSpace(string(out)), nil
 }
+
+const tmuxHooksSnippet = `# demux tmux hooks
+# ──────────────────────────────────────────────────────────────────────────────
+# Paste the line below into ~/.tmux.conf, then reload with:
+#   tmux source ~/.tmux.conf
+#
+# How it works:
+#   after-select-pane — fires whenever a pane receives focus.
+#                       demux clears any alerts on that pane and its parent window.
+# ──────────────────────────────────────────────────────────────────────────────
+
+set-hook -g after-select-pane "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+
+# ──────────────────────────────────────────────────────────────────────────────
+`
 
 const claudeHooksSnippet = `# Claude Code hooks for demux
 # ──────────────────────────────────────────────────────────────────────────────
@@ -248,12 +268,12 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 `
 
 func init() {
-	hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude")
-	hooksInitCmd.MarkFlagRequired("agent")
-	hooksStopCmd.Flags().StringVar(&hooksStopAgent, "agent", "", "AI agent (required): claude")
-	hooksStopCmd.MarkFlagRequired("agent")
-	hooksNotifyCmd.Flags().StringVar(&hooksNotifyAgent, "agent", "", "AI agent (required): claude")
-	hooksNotifyCmd.MarkFlagRequired("agent")
-	hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
-	rootCmd.AddCommand(hooksCmd)
+    hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude")
+    hooksInitCmd.MarkFlagRequired("agent")
+    hooksStopCmd.Flags().StringVar(&hooksStopAgent, "agent", "", "AI agent (required): claude")
+    hooksStopCmd.MarkFlagRequired("agent")
+    hooksNotifyCmd.Flags().StringVar(&hooksNotifyAgent, "agent", "", "AI agent (required): claude")
+    hooksNotifyCmd.MarkFlagRequired("agent")
+    hooksCmd.AddCommand(hooksInitCmd, hooksNotifyCmd, hooksStopCmd)
+    rootCmd.AddCommand(hooksCmd)
 }
