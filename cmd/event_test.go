@@ -22,6 +22,15 @@ func TestWindowTargetFromPane_NoDot(t *testing.T) {
     }
 }
 
+func TestWindowTargetFromPane_NamedWindowWithDots(t *testing.T) {
+    // session name contains a dot; LastIndex correctly strips only the pane suffix
+    got := windowTargetFromPane("a.b:c.0")
+    want := "a.b:c"
+    if got != want {
+        t.Errorf("windowTargetFromPane(%q) = %q, want %q", "a.b:c.0", got, want)
+    }
+}
+
 func TestPaneFocusClearsAlertsIncludingSticky(t *testing.T) {
     d, err := db.Open(":memory:")
     if err != nil {

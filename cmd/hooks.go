@@ -268,7 +268,7 @@ const claudeHooksSnippet = `# Claude Code hooks for demux
 `
 
 func init() {
-    hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude")
+    hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude, tmux")
     hooksInitCmd.MarkFlagRequired("agent")
     hooksStopCmd.Flags().StringVar(&hooksStopAgent, "agent", "", "AI agent (required): claude")
     hooksStopCmd.MarkFlagRequired("agent")
