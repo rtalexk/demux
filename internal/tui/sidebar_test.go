@@ -766,10 +766,6 @@ func TestFocusFirstAlertSession_MovesToAlertedSession(t *testing.T) {
         cfg: config.Config{SessionSort: []string{"alphabetical"}},
     }
     s.rebuildNodes()
-    // alphabetical: alpha first, beta second; but beta has alert so it sorts first
-    // force alphabetical order so beta is NOT first by sort, to test the method itself
-    s.cfg.SessionSort = []string{"alphabetical"}
-    s.rebuildNodes()
     s.FocusFirstAlertSession(20)
     node := s.Selected()
     if node == nil || !node.IsSession || node.Session != "beta" {
@@ -784,6 +780,39 @@ func TestFocusFirstAlertSession_NoAlerts_LeavesCursorAt0(t *testing.T) {
     }
     s.rebuildNodes()
     s.FocusFirstAlertSession(20)
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0, got %d", s.cursor)
+    }
+}
+
+// --- FocusFirstAlertWindow ---
+
+func TestFocusFirstAlertWindow_MovesToAlertedWindow(t *testing.T) {
+    t1 := time.Now()
+    s := SidebarModel{
+        sessions: map[string]map[int][]tmux.Pane{
+            "sess": {0: nil, 1: nil, 2: nil},
+        },
+        alerts: map[string]db.Alert{
+            "sess:2.0": {Target: "sess:2.0", Level: "warn", CreatedAt: t1},
+        },
+        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes()
+    s.FocusFirstAlertWindow(20)
+    node := s.Selected()
+    if node == nil || node.IsSession || node.Session != "sess" || node.WindowIndex != 2 {
+        t.Errorf("expected window node sess:2, got %+v", node)
+    }
+}
+
+func TestFocusFirstAlertWindow_NoAlerts_LeavesCursorAt0(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+    }
+    s.rebuildNodes()
+    s.FocusFirstAlertWindow(20)
     if s.cursor != 0 {
         t.Errorf("expected cursor=0, got %d", s.cursor)
     }
