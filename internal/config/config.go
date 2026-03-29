@@ -4,6 +4,7 @@ import (
     "errors"
     "os"
     "sort"
+    "strings"
 
     "github.com/BurntSushi/toml"
 )
@@ -188,8 +189,8 @@ func Load(path string) (Config, error) {
     // Expand env vars in path aliases, drop empty prefixes, sort longest-first.
     filtered := cfg.PathAliases[:0]
     for _, a := range cfg.PathAliases {
-        a.Prefix = os.ExpandEnv(a.Prefix)
-        a.Replace = os.ExpandEnv(a.Replace)
+        a.Prefix = strings.ReplaceAll(os.ExpandEnv(a.Prefix), `\ `, " ")
+        a.Replace = strings.ReplaceAll(os.ExpandEnv(a.Replace), `\ `, " ")
         if a.Prefix != "" {
             filtered = append(filtered, a)
         }

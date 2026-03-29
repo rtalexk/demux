@@ -298,6 +298,28 @@ func TestLoadFromFile_SessionSort_Empty(t *testing.T) {
     }
 }
 
+func TestPathAliases_BackslashEscapedSpace(t *testing.T) {
+    t.Setenv("MY_DIR", `/home/user/some\ dir`)
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`
+[[path_aliases]]
+prefix = "$MY_DIR"
+replace = "mydir"
+`), 0644)
+
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(cfg.PathAliases) != 1 {
+        t.Fatalf("expected 1 alias, got %d", len(cfg.PathAliases))
+    }
+    if cfg.PathAliases[0].Prefix != "/home/user/some dir" {
+        t.Errorf("unexpected prefix: %q", cfg.PathAliases[0].Prefix)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
