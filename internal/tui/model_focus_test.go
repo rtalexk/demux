@@ -100,17 +100,21 @@ func TestFocusOnOpen_SubsequentAlerts_DoNotRefocus(t *testing.T) {
     m := focusTestModel("alert_window")
     m.height = 40
     m, _ = applyPanesMsg(m, "alpha", 0)
-    alerts := []db.Alert{
+    // First alertsMsg: beta:0 has a warn alert — startup focus lands on beta:0
+    alerts1 := []db.Alert{
         {Target: "beta:0", Level: "warn", CreatedAt: time.Now()},
     }
-    m, _ = applyAlertsMsg(m, alerts)
-    firstCursor := m.sidebar.cursor
-    // Simulate a second alerts tick with a different alert
+    m, _ = applyAlertsMsg(m, alerts1)
+    // Second alertsMsg: alpha:1 now has an error alert (higher severity, newer) — this changes
+    // sort order so alpha sorts before beta, shifting node indices.
+    // The cursor should still point to beta:0 by identity, not by the original index.
     alerts2 := []db.Alert{
+        {Target: "beta:0", Level: "warn", CreatedAt: time.Now().Add(-time.Second)},
         {Target: "alpha:1", Level: "error", CreatedAt: time.Now()},
     }
     m, _ = applyAlertsMsg(m, alerts2)
-    if m.sidebar.cursor != firstCursor {
-        t.Errorf("expected cursor to stay at %d after second alertsMsg, got %d", firstCursor, m.sidebar.cursor)
+    node := m.sidebar.Selected()
+    if node == nil || node.IsSession || node.Session != "beta" || node.WindowIndex != 0 {
+        t.Errorf("expected cursor to remain on beta:0 after sort-order-changing alertsMsg, got %+v", node)
     }
 }

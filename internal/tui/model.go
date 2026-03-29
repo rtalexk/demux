@@ -235,7 +235,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        savedCursor := m.sidebar.cursor
         m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
@@ -246,8 +245,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             case "alert_session":
                 m.sidebar.FocusFirstAlertSession(visibleRows)
             }
-        } else {
-            m.sidebar.cursor = savedCursor
         }
         m.updateDetailFromSelection()
         return m, nil
