@@ -340,6 +340,26 @@ func TestLoadFromFile_FocusOnOpen(t *testing.T) {
     }
 }
 
+func TestDefaults_FocusOnOpenFallback(t *testing.T) {
+    cfg := config.Default()
+    if cfg.FocusOnOpenFallback != "current_window" {
+        t.Errorf("expected default FocusOnOpenFallback=\"current_window\", got %q", cfg.FocusOnOpenFallback)
+    }
+}
+
+func TestLoadFromFile_FocusOnOpenFallback(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`focus_on_open_fallback = "first_window"`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.FocusOnOpenFallback != "first_window" {
+        t.Errorf("expected \"first_window\", got %q", cfg.FocusOnOpenFallback)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
