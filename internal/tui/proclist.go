@@ -460,7 +460,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                     highlighted := highlightMatchPos(node.Pane.WindowName, pos)
                     line = strings.Replace(line, node.Pane.WindowName, highlighted, 1)
                 } else {
-                    line = dimStyle.Render(line)
+                    line = dimStyle.Render(stripANSI(line))
                 }
             }
         } else if node.IsPaneHeader {
@@ -506,7 +506,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                     highlighted := highlightMatchPos(node.Proc.FriendlyName(), pos)
                     line = strings.Replace(line, node.Proc.FriendlyName(), highlighted, 1)
                 } else {
-                    line = dimStyle.Render(line)
+                    line = dimStyle.Render(stripANSI(line))
                 }
             }
         }
