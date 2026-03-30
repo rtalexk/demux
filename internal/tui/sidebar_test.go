@@ -1158,3 +1158,97 @@ func TestCollapseAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
         t.Errorf("expected cursor on beta session node after CollapseAll, got %+v", n)
     }
 }
+
+func makeSidebarWithAlerts(alerts []db.Alert) SidebarModel {
+    s := SidebarModel{}
+    s.alerts = make(map[string]db.Alert, len(alerts))
+    for _, a := range alerts {
+        s.alerts[a.Target] = a
+    }
+    return s
+}
+
+func TestBestAlertTargetInSession_NoAlerts(t *testing.T) {
+    s := makeSidebarWithAlerts(nil)
+    if got := s.BestAlertTargetInSession("work", "severity"); got != "" {
+        t.Errorf("expected empty, got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_SingleAlert(t *testing.T) {
+    now := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelWarn, CreatedAt: now},
+    })
+    if got := s.BestAlertTargetInSession("work", "severity"); got != "work:1.0" {
+        t.Errorf("expected \"work:1.0\", got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_SeverityPriority(t *testing.T) {
+    now := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelWarn,  CreatedAt: now.Add(-time.Minute)},
+        {Target: "work:2.0", Level: db.LevelError, CreatedAt: now.Add(-2 * time.Minute)},
+        {Target: "work:3.0", Level: db.LevelInfo,  CreatedAt: now},
+    })
+    if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
+        t.Errorf("expected \"work:2.0\" (highest severity), got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_SeverityTiebreaker(t *testing.T) {
+    base := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelError, CreatedAt: base.Add(-time.Minute)},
+        {Target: "work:2.0", Level: db.LevelError, CreatedAt: base},
+    })
+    // equal severity — newest wins
+    if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
+        t.Errorf("expected \"work:2.0\" (newer tiebreaker), got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_NewestPriority(t *testing.T) {
+    base := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelError, CreatedAt: base.Add(-time.Minute)},
+        {Target: "work:2.0", Level: db.LevelInfo,  CreatedAt: base},
+    })
+    if got := s.BestAlertTargetInSession("work", "newest"); got != "work:2.0" {
+        t.Errorf("expected \"work:2.0\" (newest), got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_OldestPriority(t *testing.T) {
+    base := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelInfo,  CreatedAt: base.Add(-time.Minute)},
+        {Target: "work:2.0", Level: db.LevelError, CreatedAt: base},
+    })
+    if got := s.BestAlertTargetInSession("work", "oldest"); got != "work:1.0" {
+        t.Errorf("expected \"work:1.0\" (oldest), got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_OtherSessionIgnored(t *testing.T) {
+    now := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "other:1.0", Level: db.LevelError, CreatedAt: now},
+        {Target: "work:2.0",  Level: db.LevelInfo,  CreatedAt: now.Add(-time.Minute)},
+    })
+    if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
+        t.Errorf("expected only work session alert, got %q", got)
+    }
+}
+
+func TestBestAlertTargetInSession_UnknownPriorityFallsBackToSeverity(t *testing.T) {
+    base := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelWarn,  CreatedAt: base.Add(-time.Minute)},
+        {Target: "work:2.0", Level: db.LevelError, CreatedAt: base.Add(-2 * time.Minute)},
+    })
+    if got := s.BestAlertTargetInSession("work", "bogus"); got != "work:2.0" {
+        t.Errorf("expected severity fallback to return \"work:2.0\", got %q", got)
+    }
+}

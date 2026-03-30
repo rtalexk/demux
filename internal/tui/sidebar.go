@@ -78,6 +78,43 @@ func (s *SidebarModel) windowAlert(session string, windowIndex int) *db.Alert {
     return best
 }
 
+// BestAlertTargetInSession returns the tmux target string of the best alert
+// in the given session according to priority ("severity", "newest", "oldest").
+// Returns "" if the session has no alerts. Unknown priority values fall back to "severity".
+func (s *SidebarModel) BestAlertTargetInSession(session, priority string) string {
+    prefix := session + ":"
+    var best *db.Alert
+    for target, a := range s.alerts {
+        if target != session && !strings.HasPrefix(target, prefix) {
+            continue
+        }
+        a := a
+        if best == nil {
+            best = &a
+            continue
+        }
+        switch priority {
+        case "newest":
+            if a.CreatedAt.After(best.CreatedAt) {
+                best = &a
+            }
+        case "oldest":
+            if a.CreatedAt.Before(best.CreatedAt) {
+                best = &a
+            }
+        default: // "severity" and unknown values
+            if alertSeverity(a.Level) > alertSeverity(best.Level) ||
+                (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
+                best = &a
+            }
+        }
+    }
+    if best == nil {
+        return ""
+    }
+    return best.Target
+}
+
 // newestSessionAlert returns the most recent alert CreatedAt for a session
 // (checking pane-level targets "session:window.pane"), or zero time if none.
 func (s *SidebarModel) newestSessionAlert(session string) time.Time {
@@ -752,8 +789,8 @@ func (s *SidebarModel) focusFirstAlertWindow() bool {
 
 // FocusNode positions the cursor on the node matching session+windowIndex.
 // If isSessionLevel is true, targets the session node; otherwise targets the window node.
-// No-ops if no matching node is found, leaving cursor at its current position.
-func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel bool, visibleRows int) {
+// Returns true if a matching node was found; false if not (e.g. sessions are collapsed).
+func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel bool, visibleRows int) bool {
     for i, n := range s.nodes {
         if n.Session != session {
             continue
@@ -761,14 +798,15 @@ func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel
         if isSessionLevel && n.IsSession {
             s.cursor = i
             s.clampViewport(visibleRows)
-            return
+            return true
         }
         if !isSessionLevel && !n.IsSession && n.WindowIndex == windowIndex {
             s.cursor = i
             s.clampViewport(visibleRows)
-            return
+            return true
         }
     }
+    return false
 }
 
 // FocusFirstAlertSession positions the cursor on the first session node that has any alert.
