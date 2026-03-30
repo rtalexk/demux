@@ -359,6 +359,14 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 return m, tea.Quit
             }
         }
+    case key.Matches(msg, keys.Expand):
+        m.sidebar.Expand()
+    case key.Matches(msg, keys.Collapse):
+        m.sidebar.Collapse()
+    case key.Matches(msg, keys.ExpandAll):
+        m.sidebar.ExpandAll()
+    case key.Matches(msg, keys.CollapseAll):
+        m.sidebar.CollapseAll()
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
     }
@@ -440,6 +448,46 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             if m.popupMode {
                 return m, tea.Quit
             }
+        }
+    case key.Matches(msg, keys.Expand):
+        if m.procList.Expand() {
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.Collapse):
+        if m.procList.Collapse() {
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.ExpandAll):
+        if m.procList.ExpandAll() {
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.CollapseAll):
+        if m.procList.CollapseAll() {
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
         }
     case key.Matches(msg, keys.Esc):
         m.focus = panelSidebar

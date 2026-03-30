@@ -566,6 +566,64 @@ func (s *SidebarModel) ToggleExpand() {
     }
 }
 
+func (s *SidebarModel) Expand() {
+    if s.cursor < len(s.nodes) && s.nodes[s.cursor].IsSession && !s.nodes[s.cursor].Expanded {
+        s.nodes[s.cursor].Expanded = true
+        s.rebuildNodes()
+    }
+}
+
+func (s *SidebarModel) Collapse() {
+    if s.cursor >= len(s.nodes) {
+        return
+    }
+    n := s.nodes[s.cursor]
+    if n.IsSession {
+        if n.Expanded {
+            s.nodes[s.cursor].Expanded = false
+            s.rebuildNodes()
+        }
+        return
+    }
+    // Window node: find parent session and collapse it, moving cursor there.
+    for i := s.cursor - 1; i >= 0; i-- {
+        if s.nodes[i].IsSession {
+            if s.nodes[i].Expanded {
+                s.cursor = i
+                s.nodes[i].Expanded = false
+                s.rebuildNodes()
+            }
+            return
+        }
+    }
+}
+
+func (s *SidebarModel) ExpandAll() {
+    changed := false
+    for i := range s.nodes {
+        if s.nodes[i].IsSession && !s.nodes[i].Expanded {
+            s.nodes[i].Expanded = true
+            changed = true
+        }
+    }
+    if changed {
+        s.rebuildNodes()
+    }
+}
+
+func (s *SidebarModel) CollapseAll() {
+    changed := false
+    for i := range s.nodes {
+        if s.nodes[i].IsSession && s.nodes[i].Expanded {
+            s.nodes[i].Expanded = false
+            changed = true
+        }
+    }
+    if changed {
+        s.rebuildNodes()
+    }
+}
+
 func (s *SidebarModel) GotoTop(visibleRows int) {
     s.cursor = 0
     s.clampViewport(visibleRows)

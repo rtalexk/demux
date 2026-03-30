@@ -913,3 +913,195 @@ func TestFocusFirstAlertSession_ReturnsFalse_WhenNotFound(t *testing.T) {
         t.Error("expected found=false when no alerted sessions")
     }
 }
+
+// --- Expand ---
+
+func TestExpand_CollapsedSession_AddsWindowNodes(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    // Seed nodes with alpha collapsed so Expand has something to do
+    s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
+    s.cursor = 0
+    s.Expand()
+    // rebuildNodes ran: alpha is now expanded; window node must appear
+    if len(s.nodes) < 2 {
+        t.Fatalf("expected session + window node after Expand(), got %d nodes", len(s.nodes))
+    }
+    if !s.nodes[0].Expanded {
+        t.Error("expected alpha to be expanded")
+    }
+    if s.nodes[1].IsSession {
+        t.Error("expected second node to be a window node")
+    }
+}
+
+func TestExpand_AlreadyExpanded_NoChange(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // alpha expanded by default
+    before := len(s.nodes)
+    s.cursor = 0
+    s.Expand()
+    if len(s.nodes) != before {
+        t.Errorf("expected no change when already expanded, got %d nodes (was %d)", len(s.nodes), before)
+    }
+}
+
+func TestExpand_WindowNode_NoOp(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // nodes = [alpha, alpha-win0]
+    before := len(s.nodes)
+    s.cursor = 1 // window node
+    s.Expand()
+    if len(s.nodes) != before {
+        t.Errorf("expected no change when cursor is on a window node, got %d nodes (was %d)", len(s.nodes), before)
+    }
+}
+
+// --- Collapse ---
+
+func TestCollapse_ExpandedSession_RemovesWindowNodes(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // alpha expanded; nodes = [alpha, alpha-win0]
+    s.cursor = 0
+    s.Collapse()
+    if len(s.nodes) != 1 {
+        t.Errorf("expected 1 node (session only) after Collapse(), got %d", len(s.nodes))
+    }
+    if s.nodes[0].Expanded {
+        t.Error("expected alpha to be collapsed")
+    }
+}
+
+func TestCollapse_AlreadyCollapsed_NoChange(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
+    s.cursor = 0
+    s.Collapse()
+    if len(s.nodes) != 1 {
+        t.Errorf("expected 1 node unchanged, got %d", len(s.nodes))
+    }
+}
+
+func TestCollapse_WindowNode_CollapsesParentSession(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // nodes = [alpha, alpha-win0]
+    s.cursor = 1     // window node
+    s.Collapse()
+    // parent session should be collapsed; cursor should move to it
+    if len(s.nodes) != 1 {
+        t.Errorf("expected 1 node (session only) after Collapse() on window, got %d", len(s.nodes))
+    }
+    if s.nodes[0].Expanded {
+        t.Error("expected parent session to be collapsed")
+    }
+    if s.cursor != 0 {
+        t.Errorf("expected cursor to move to parent session (0), got %d", s.cursor)
+    }
+}
+
+// --- ExpandAll ---
+
+func TestExpandAll_CollapsedSessions_ExpandsAll(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    // Start with both collapsed
+    s.nodes = []SidebarNode{
+        {Session: "alpha", IsSession: true, Expanded: false},
+        {Session: "beta", IsSession: true, Expanded: false},
+    }
+    s.ExpandAll()
+    sessionCount, windowCount := 0, 0
+    for _, n := range s.nodes {
+        if n.IsSession {
+            sessionCount++
+            if !n.Expanded {
+                t.Errorf("expected session %q to be expanded after ExpandAll()", n.Session)
+            }
+        } else {
+            windowCount++
+        }
+    }
+    if sessionCount != 2 {
+        t.Errorf("expected 2 session nodes, got %d", sessionCount)
+    }
+    if windowCount != 2 {
+        t.Errorf("expected 2 window nodes after ExpandAll(), got %d", windowCount)
+    }
+}
+
+func TestExpandAll_AllAlreadyExpanded_NoChange(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // both expanded by default
+    before := len(s.nodes)
+    s.ExpandAll()
+    if len(s.nodes) != before {
+        t.Errorf("expected no change when all already expanded, got %d nodes (was %d)", len(s.nodes), before)
+    }
+}
+
+// --- CollapseAll ---
+
+func TestCollapseAll_ExpandedSessions_CollapsesAll(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // both expanded; nodes = [alpha, alpha-win0, beta, beta-win0]
+    s.CollapseAll()
+    if len(s.nodes) != 2 {
+        t.Errorf("expected 2 session nodes after CollapseAll(), got %d", len(s.nodes))
+    }
+    for _, n := range s.nodes {
+        if n.Expanded {
+            t.Errorf("expected session %q to be collapsed after CollapseAll()", n.Session)
+        }
+    }
+}
+
+func TestCollapseAll_AllAlreadyCollapsed_NoChange(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.nodes = []SidebarNode{
+        {Session: "alpha", IsSession: true, Expanded: false},
+        {Session: "beta", IsSession: true, Expanded: false},
+    }
+    before := len(s.nodes)
+    s.CollapseAll()
+    if len(s.nodes) != before {
+        t.Errorf("expected no change when all already collapsed, got %d nodes (was %d)", len(s.nodes), before)
+    }
+}

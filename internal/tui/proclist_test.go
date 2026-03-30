@@ -656,6 +656,223 @@ func TestToggleCollapse_IdleNode_ReturnsFalse(t *testing.T) {
     }
 }
 
+// ---------- Expand ----------
+
+func TestExpand_CollapsedNode_ExpandsAndReturnsTrue(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "proc"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 1,
+    }
+    if !m.Expand() {
+        t.Error("expected Expand to return true for collapsed node")
+    }
+    if m.collapsedPIDs[10] {
+        t.Error("expected PID 10 to be expanded after Expand()")
+    }
+}
+
+func TestExpand_AlreadyExpanded_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "proc"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 1,
+    }
+    if m.Expand() {
+        t.Error("expected Expand to return false when node is already expanded")
+    }
+}
+
+func TestExpand_PaneHeader_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes:         []ProcListNode{{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}}},
+        cursor:        0,
+    }
+    if m.Expand() {
+        t.Error("expected false for pane header")
+    }
+}
+
+func TestExpand_NoChildren_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes: []ProcListNode{
+            {Proc: proc.Process{PID: 5, Name: "proc"}, Depth: 1, HasChildren: false},
+        },
+        cursor: 0,
+    }
+    if m.Expand() {
+        t.Error("expected false for node without children")
+    }
+}
+
+// ---------- Collapse ----------
+
+func TestCollapse_ExpandedNode_CollapsesAndReturnsTrue(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 20, Name: "proc"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 1,
+    }
+    if !m.Collapse() {
+        t.Error("expected Collapse to return true for expanded node")
+    }
+    if !m.collapsedPIDs[20] {
+        t.Error("expected PID 20 to be collapsed after Collapse()")
+    }
+}
+
+func TestCollapse_AlreadyCollapsed_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{20: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 20, Name: "proc"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 1,
+    }
+    if m.Collapse() {
+        t.Error("expected Collapse to return false when node is already collapsed")
+    }
+}
+
+func TestCollapse_PaneHeader_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes:         []ProcListNode{{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}}},
+        cursor:        0,
+    }
+    if m.Collapse() {
+        t.Error("expected false for pane header")
+    }
+}
+
+func TestCollapse_Depth2Node_CollapsesParentAndMovesCursor(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 20, Name: "parent"}, Depth: 1, HasChildren: true},
+            {Proc: proc.Process{PID: 21, Name: "child"}, Depth: 2},
+        },
+        cursor: 2, // depth-2 child
+    }
+    if !m.Collapse() {
+        t.Error("expected Collapse to return true for depth-2 node")
+    }
+    if !m.collapsedPIDs[20] {
+        t.Error("expected parent PID 20 to be collapsed")
+    }
+    if m.cursor != 1 {
+        t.Errorf("expected cursor to move to parent (1), got %d", m.cursor)
+    }
+}
+
+func TestCollapse_Depth2Node_ParentAlreadyCollapsed_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{20: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 20, Name: "parent"}, Depth: 1, HasChildren: true},
+            {Proc: proc.Process{PID: 21, Name: "child"}, Depth: 2},
+        },
+        cursor: 2,
+    }
+    if m.Collapse() {
+        t.Error("expected false when parent is already collapsed")
+    }
+}
+
+// ---------- ExpandAll ----------
+
+func TestExpandAll_CollapsedNodes_ExpandsAndReturnsTrue(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: true, 20: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 1}},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+    }
+    if !m.ExpandAll() {
+        t.Error("expected ExpandAll to return true when nodes are collapsed")
+    }
+    if m.collapsedPIDs[10] || m.collapsedPIDs[20] {
+        t.Error("expected all nodes to be expanded after ExpandAll()")
+    }
+}
+
+func TestExpandAll_AllAlreadyExpanded_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false, 20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 1}},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+    }
+    if m.ExpandAll() {
+        t.Error("expected ExpandAll to return false when all are already expanded")
+    }
+}
+
+func TestExpandAll_NoCollapsibleNodes_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{},
+        nodes:         []ProcListNode{{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}}},
+    }
+    if m.ExpandAll() {
+        t.Error("expected ExpandAll to return false with no collapsible nodes")
+    }
+}
+
+// ---------- CollapseAll ----------
+
+func TestCollapseAll_ExpandedNodes_CollapsesAndReturnsTrue(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false, 20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 1}},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+    }
+    if !m.CollapseAll() {
+        t.Error("expected CollapseAll to return true when nodes are expanded")
+    }
+    if !m.collapsedPIDs[10] || !m.collapsedPIDs[20] {
+        t.Error("expected all nodes to be collapsed after CollapseAll()")
+    }
+}
+
+func TestCollapseAll_AllAlreadyCollapsed_ReturnsFalse(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: true, 20: true},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 1}},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+    }
+    if m.CollapseAll() {
+        t.Error("expected CollapseAll to return false when all are already collapsed")
+    }
+}
+
 // ---------- renderProc collapse rendering ----------
 
 func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testing.T) {

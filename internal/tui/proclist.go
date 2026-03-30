@@ -968,3 +968,103 @@ func (p *ProcListModel) ToggleCollapse() bool {
     p.collapsedPIDs[n.Proc.PID] = !p.collapsedPIDs[n.Proc.PID]
     return true
 }
+
+// Expand expands the focused depth-1 process node if it has children and is collapsed.
+// Returns true if a change occurred; the caller must re-call SetWindowData.
+func (p *ProcListModel) Expand() bool {
+    if p.cursor < 0 || p.cursor >= len(p.nodes) {
+        return false
+    }
+    n := p.nodes[p.cursor]
+    if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {
+        return false
+    }
+    if p.collapsedPIDs == nil {
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+    if !p.collapsedPIDs[n.Proc.PID] {
+        return false
+    }
+    p.collapsedPIDs[n.Proc.PID] = false
+    return true
+}
+
+// Collapse collapses the focused node. For depth-1 nodes with children it collapses
+// directly; for depth-2 nodes it walks up to the parent depth-1 node, moves the cursor
+// there, and collapses it. Returns true if a change occurred; the caller must re-call SetWindowData.
+func (p *ProcListModel) Collapse() bool {
+    if p.cursor < 0 || p.cursor >= len(p.nodes) {
+        return false
+    }
+    n := p.nodes[p.cursor]
+    if n.IsPaneHeader || n.IsIdle {
+        return false
+    }
+    if p.collapsedPIDs == nil {
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+    if n.Depth == 2 {
+        // Walk up to the parent depth-1 node.
+        for i := p.cursor - 1; i >= 0; i-- {
+            if p.nodes[i].IsPaneHeader {
+                break
+            }
+            if p.nodes[i].Depth == 1 {
+                parent := p.nodes[i]
+                if !parent.HasChildren || p.collapsedPIDs[parent.Proc.PID] {
+                    return false
+                }
+                p.cursor = i
+                p.collapsedPIDs[parent.Proc.PID] = true
+                return true
+            }
+        }
+        return false
+    }
+    if n.Depth != 1 || !n.HasChildren {
+        return false
+    }
+    if p.collapsedPIDs[n.Proc.PID] {
+        return false
+    }
+    p.collapsedPIDs[n.Proc.PID] = true
+    return true
+}
+
+// ExpandAll expands all depth-1 process nodes that have children.
+// Returns true if any change occurred; the caller must re-call SetWindowData.
+func (p *ProcListModel) ExpandAll() bool {
+    if p.collapsedPIDs == nil {
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+    changed := false
+    for _, n := range p.nodes {
+        if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {
+            continue
+        }
+        if p.collapsedPIDs[n.Proc.PID] {
+            p.collapsedPIDs[n.Proc.PID] = false
+            changed = true
+        }
+    }
+    return changed
+}
+
+// CollapseAll collapses all depth-1 process nodes that have children.
+// Returns true if any change occurred; the caller must re-call SetWindowData.
+func (p *ProcListModel) CollapseAll() bool {
+    if p.collapsedPIDs == nil {
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+    changed := false
+    for _, n := range p.nodes {
+        if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {
+            continue
+        }
+        if !p.collapsedPIDs[n.Proc.PID] {
+            p.collapsedPIDs[n.Proc.PID] = true
+            changed = true
+        }
+    }
+    return changed
+}
