@@ -203,7 +203,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             m.currentSession = msg.currentSession
             switch m.cfg.Sidebar.FocusOnOpen {
             case "current_session", "first_session":
-                visibleRows := max(1, m.height-1-2)
+                visibleRows := max(1, m.height-1-2-3) // searchBoxH = 3
                 m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
             }
             m.ready = true
@@ -244,7 +244,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
-            visibleRows := max(1, m.height-1-2)
+            visibleRows := max(1, m.height-1-2-3) // searchBoxH = 3
             if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
                 m.sidebar.FocusFirstAlertSession(visibleRows)
             }
@@ -288,7 +288,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     if m.searchInput.IsInsert() {
-        sidebarVisibleRows := m.height - 1 - 2
+        sidebarVisibleRows := m.height - 1 - 2 - 3 // searchBoxH = 3
         if sidebarVisibleRows < 1 {
             sidebarVisibleRows = 1
         }
@@ -342,7 +342,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
     case key.Matches(msg, keys.AlertFilter):
-        sidebarVisibleRows := m.height - 1 - 2
+        sidebarVisibleRows := m.height - 1 - 2 - 3 // searchBoxH = 3
         if sidebarVisibleRows < 1 {
             sidebarVisibleRows = 1
         }
@@ -365,7 +365,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-    sidebarVisibleRows := m.height - 1 - 2 // contentH (height-1) minus border (2)
+    sidebarVisibleRows := m.height - 1 - 2 - 3 // contentH (height-1) minus border (2) minus searchBoxH (3)
     if sidebarVisibleRows < 1 {
         sidebarVisibleRows = 1
     }
@@ -770,12 +770,16 @@ func (m Model) View() string {
     }
     procTitle := " [l] " + bc + procTitleSuffix
 
-    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle, "")
+    const searchBoxH = 3
+    sidebarContent := m.sidebar.Render(sidebarW, contentH-searchBoxH, m.focus == panelSidebar, sidebarTitle, "")
+    searchBox := m.searchInput.View(sidebarW)
+    leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
+
     procList := m.procList.Render(procW, procH, m.focus == panelProcList, procTitle)
     detail := m.detail.Render(procW, detailH)
 
     right := lipgloss.JoinVertical(lipgloss.Left, procList, detail)
-    content := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, right)
+    content := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, right)
     body := content
 
     statusBar := ""
