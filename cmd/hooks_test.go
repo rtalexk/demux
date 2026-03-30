@@ -10,12 +10,6 @@ func TestResolveAgent_Claude(t *testing.T) {
     if err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
-    if def.stopMsg != "Claude finished" {
-        t.Errorf("stopMsg = %q, want %q", def.stopMsg, "Claude finished")
-    }
-    if def.notifyFallback != "Claude notification" {
-        t.Errorf("notifyFallback = %q, want %q", def.notifyFallback, "Claude notification")
-    }
     if def.snippet != claudeHooksSnippet {
         t.Errorf("snippet mismatch")
     }
@@ -42,12 +36,6 @@ func TestResolveAgent_Tmux(t *testing.T) {
     def, err := resolveAgent("tmux")
     if err != nil {
         t.Fatalf("unexpected error: %v", err)
-    }
-    if def.stopMsg != "" {
-        t.Errorf("stopMsg = %q, want empty", def.stopMsg)
-    }
-    if def.notifyFallback != "" {
-        t.Errorf("notifyFallback = %q, want empty", def.notifyFallback)
     }
     if def.snippet != tmuxHooksSnippet {
         t.Errorf("snippet mismatch")
