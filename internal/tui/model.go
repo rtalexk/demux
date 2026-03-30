@@ -398,6 +398,46 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             m.updateDetailFromSelection()
             return m, m.scheduleDelayedProcFetch()
         }
+    case key.Matches(msg, keys.Expand):
+        if m.procList.Expand() {
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.Collapse):
+        if m.procList.Collapse() {
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.ExpandAll):
+        if m.procList.ExpandAll() {
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
+    case key.Matches(msg, keys.CollapseAll):
+        if m.procList.CollapseAll() {
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
+            m.procGen++
+            m.procList.clampOffset(procH - 2)
+            m.updateDetailFromSelection()
+            return m, m.scheduleDelayedProcFetch()
+        }
     case key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
             target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
