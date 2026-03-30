@@ -48,6 +48,8 @@ type ProcListModel struct {
     pendingSeekKey  string         // node identity to restore cursor after next rebuild
     inSessionMode   bool           // true when displaying all windows of a session
     cfg             config.Config
+    searchQuery     query.ParsedQuery
+    queryResult     query.Result
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
@@ -440,12 +442,24 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         nodeIdx int
         text    string
     }
+
+    searchActive := p.searchQuery.Term != "" &&
+        p.searchQuery.Scope != query.ScopeSession &&
+        len(p.queryResult.Sessions) > 0
+    dimStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgDim)
+
     var allLines []renderedLine
     for i, node := range p.nodes {
         selected := focused && i == p.cursor
         var line string
         if node.IsWindowHeader {
             line = p.renderWindowHeader(node, selected, innerW)
+            if searchActive && !selected {
+                pos := p.windowMatchPos(p.curSession, node.Pane.WindowIndex)
+                if pos == nil {
+                    line = dimStyle.Render(line)
+                }
+            }
         } else if node.IsPaneHeader {
             paneInnerW := innerW
             if p.inSessionMode {
@@ -483,6 +497,15 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                 }
             }
             line = rendered
+            if searchActive && !selected {
+                pos := p.procMatchPos(p.curSession, node.Proc.PID)
+                if pos != nil {
+                    highlighted := highlightMatchPos(node.Proc.FriendlyName(), pos)
+                    line = strings.Replace(line, node.Proc.FriendlyName(), highlighted, 1)
+                } else {
+                    line = dimStyle.Render(line)
+                }
+            }
         }
         allLines = append(allLines, renderedLine{nodeIdx: i, text: line})
     }
@@ -1433,5 +1456,63 @@ func (p *ProcListModel) CollapseAll() bool {
     return changed
 }
 
-// SetSearchQuery is a stub for Task 9 — will dim/highlight proc list based on query results.
-func (p *ProcListModel) SetSearchQuery(pq query.ParsedQuery, r query.Result) {}
+// SetSearchQuery stores the current search query and its results so that
+// Render can dim non-matching nodes and highlight matching characters.
+func (p *ProcListModel) SetSearchQuery(pq query.ParsedQuery, r query.Result) {
+    p.searchQuery = pq
+    p.queryResult = r
+}
+
+// windowMatchPos returns the match positions for a window in the current query
+// result, or nil if the window is not a match.
+func (p *ProcListModel) windowMatchPos(sessionName string, windowIdx int) []int {
+    for _, sm := range p.queryResult.Sessions {
+        if sm.Name != sessionName {
+            continue
+        }
+        for _, wm := range sm.Windows {
+            if wm.Index == windowIdx {
+                return wm.MatchPos
+            }
+        }
+    }
+    return nil
+}
+
+// procMatchPos returns the match positions for a process in the current query
+// result, or nil if the process is not a match.
+func (p *ProcListModel) procMatchPos(sessionName string, pid int32) []int {
+    for _, sm := range p.queryResult.Sessions {
+        if sm.Name != sessionName {
+            continue
+        }
+        for _, pm := range sm.Procs {
+            if pm.PID == pid {
+                return pm.MatchPos
+            }
+        }
+    }
+    return nil
+}
+
+// highlightMatchPos returns the name with matched character positions rendered
+// in the accent color. If pos is empty the name is returned unchanged.
+func highlightMatchPos(name string, pos []int) string {
+    if len(pos) == 0 {
+        return name
+    }
+    posSet := make(map[int]bool, len(pos))
+    for _, p := range pos {
+        posSet[p] = true
+    }
+    accentStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorSession)
+    var b strings.Builder
+    for i, ch := range name {
+        if posSet[i] {
+            b.WriteString(accentStyle.Render(string(ch)))
+        } else {
+            b.WriteRune(ch)
+        }
+    }
+    return b.String()
+}
