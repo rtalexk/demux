@@ -248,7 +248,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             switch m.cfg.FocusOnOpen {
             case "alert_window":
                 if !m.sidebar.FocusFirstAlertWindow(visibleRows) {
-                    // sessions collapsed: no window nodes visible — try alert session instead
+                    // window node not found (sessions collapsed or no alert on any window) — try alert session before falling back
                     if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.FocusOnOpenFallback != "" {
                         m.applyNonAlertFocusMode(m.cfg.FocusOnOpenFallback, visibleRows)
                     }
