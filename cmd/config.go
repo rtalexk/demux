@@ -49,24 +49,17 @@ status_bar_format = "tmux"
 # Sidebar width in columns
 width = 35
 
-# Start with all sessions collapsed in the sidebar (windows hidden until expanded)
-collapsed = true
+# Where to position the sidebar cursor on open: current_session | alert_session | first_session
+focus_on_open = "alert_session"
 
-# Where to position the sidebar cursor on open: current_window | current_session | alert_window | alert_session | first_window | first_session
-# When sessions are collapsed, *_window values automatically fall back to their *_session equivalent
-focus_on_open = "alert_window"
-
-# When alert_window or alert_session finds no alerts, fall back to this mode (any non-alert focus_on_open value)
-focus_on_open_fallback = "current_window"
-
-# When the ! alert filter is active, which windows to show: all | alerts_only
+# When the ! alert filter is active, which sessions to show: all | alerts_only
 alert_filter = "all"
 
 # Session sort order — first key wins, missing keys filled from default order
 # Valid keys: priority | last_seen | alphabetical
 sort = ["priority", "last_seen", "alphabetical"]
 
-# Which window to focus when switching to a session: default | severity | newest | oldest
+# Which target to focus when switching to a session: default | severity | newest | oldest
 #   default  — let tmux use its last-focused window
 #   severity — navigate to highest-severity alerted window; newest tiebreaker
 #   newest   — navigate to most recently alerted window

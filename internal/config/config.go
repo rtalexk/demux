@@ -101,13 +101,11 @@ type ProcessesConfig struct {
 }
 
 type SidebarConfig struct {
-    AlertFilter         string   `toml:"alert_filter"`
-    Collapsed           bool     `toml:"collapsed"`
-    FocusOnOpen         string   `toml:"focus_on_open"`
-    FocusOnOpenFallback string   `toml:"focus_on_open_fallback"`
-    Sort                []string `toml:"sort"`
-    SwitchFocus         string   `toml:"switch_focus"`
-    Width               int      `toml:"width"`
+    AlertFilter string   `toml:"alert_filter"`
+    FocusOnOpen string   `toml:"focus_on_open"`
+    Sort        []string `toml:"sort"`
+    SwitchFocus string   `toml:"switch_focus"`
+    Width       int      `toml:"width"`
 }
 
 type ProcessListConfig struct {
@@ -135,13 +133,11 @@ func Default() Config {
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
         Sidebar: SidebarConfig{
-            AlertFilter:         "all",
-            Collapsed:           true,
-            FocusOnOpen:         "alert_window",
-            FocusOnOpenFallback: "current_window",
-            Sort:                []string{"priority", "last_seen", "alphabetical"},
-            SwitchFocus:         "severity",
-            Width:               35,
+            AlertFilter: "all",
+            FocusOnOpen: "alert_session",
+            Sort:        []string{"priority", "last_seen", "alphabetical"},
+            SwitchFocus: "severity",
+            Width:       35,
         },
         Git: GitConfig{
             Enabled:         true,

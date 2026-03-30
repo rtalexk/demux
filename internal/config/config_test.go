@@ -330,8 +330,8 @@ replace = "mydir"
 
 func TestDefaults_FocusOnOpen(t *testing.T) {
     cfg := config.Default()
-    if cfg.Sidebar.FocusOnOpen != "alert_window" {
-        t.Errorf("expected default Sidebar.FocusOnOpen=\"alert_window\", got %q", cfg.Sidebar.FocusOnOpen)
+    if cfg.Sidebar.FocusOnOpen != "alert_session" {
+        t.Errorf("expected default Sidebar.FocusOnOpen=\"alert_session\", got %q", cfg.Sidebar.FocusOnOpen)
     }
 }
 
@@ -346,27 +346,6 @@ focus_on_open = "alert_window"`), 0644)
     }
     if cfg.Sidebar.FocusOnOpen != "alert_window" {
         t.Errorf("expected \"alert_window\", got %q", cfg.Sidebar.FocusOnOpen)
-    }
-}
-
-func TestDefaults_FocusOnOpenFallback(t *testing.T) {
-    cfg := config.Default()
-    if cfg.Sidebar.FocusOnOpenFallback != "current_window" {
-        t.Errorf("expected default Sidebar.FocusOnOpenFallback=\"current_window\", got %q", cfg.Sidebar.FocusOnOpenFallback)
-    }
-}
-
-func TestLoadFromFile_FocusOnOpenFallback(t *testing.T) {
-    dir := t.TempDir()
-    path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`[sidebar]
-focus_on_open_fallback = "first_window"`), 0644)
-    cfg, err := config.Load(path)
-    if err != nil {
-        t.Fatal(err)
-    }
-    if cfg.Sidebar.FocusOnOpenFallback != "first_window" {
-        t.Errorf("expected \"first_window\", got %q", cfg.Sidebar.FocusOnOpenFallback)
     }
 }
 
