@@ -900,11 +900,13 @@ func (m Model) View() string {
 
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     spinnerStr := ""
-    for _, info := range m.gitInfo {
-        if info.Loading {
-            frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            spinnerStr = " " + spinnerStyle.Render(frame) + " "
-            break
+    if m.cfg.Git.ShowSpinner {
+        for _, info := range m.gitInfo {
+            if info.Loading {
+                frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+                spinnerStr = " " + spinnerStyle.Render(frame) + " "
+                break
+            }
         }
     }
     if spinnerStr != "" {

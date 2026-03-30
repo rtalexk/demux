@@ -79,6 +79,9 @@ sessions_collapsed = false
 # Enable git status indicators in the sidebar
 enabled = true
 
+# Show a loading spinner in the status bar while git data is being fetched
+show_spinner = true
+
 # Timeout for git operations (milliseconds)
 timeout_ms = 500
 

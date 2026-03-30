@@ -42,6 +42,7 @@ type GitPRConfig struct {
 
 type GitConfig struct {
     Enabled         bool        `toml:"enabled"`
+    ShowSpinner     bool        `toml:"show_spinner"`
     TimeoutMs       int         `toml:"timeout_ms"`
     OnTimeout       string      `toml:"on_timeout"`
     FallbackDisplay string      `toml:"fallback_display"`
@@ -133,6 +134,7 @@ func Default() Config {
         SessionSort:        []string{"priority", "last_seen", "alphabetical"},
         Git: GitConfig{
             Enabled:         true,
+            ShowSpinner:     true,
             TimeoutMs:       500,
             OnTimeout:       "cached",
             FallbackDisplay: "—",
