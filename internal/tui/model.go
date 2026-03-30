@@ -697,8 +697,55 @@ func (m *Model) updateDetailFromSelection() {
     // panelProcList focus
     if m.focus == panelProcList {
         selNode := m.procList.SelectedNode()
-        if selNode == nil || selNode.IsPaneHeader || selNode.IsWindowHeader {
+        if selNode == nil || selNode.IsPaneHeader {
             m.detail = DetailModel{}
+            return
+        }
+        if selNode.IsWindowHeader {
+            sess := selNode.Pane.Session
+            winIdx := selNode.Pane.WindowIndex
+            grouped := tmux.GroupBySessions(m.panes)
+            windows := grouped[sess]
+            wPanes := windows[winIdx]
+            gitKey := fmt.Sprintf("%s:%d", sess, winIdx)
+            var windowAlert *db.Alert
+            target := fmt.Sprintf("%s:%d", sess, winIdx)
+            if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
+                windowAlert = a
+            }
+            sessionCWD := primaryCWDForPanes(windows)
+            alertCount := 0
+            for _, a := range m.alerts {
+                if strings.HasPrefix(a.Target, sess+":") {
+                    alertCount++
+                }
+            }
+            procCount := 0
+            if sessionCWD != "" {
+                for _, pr := range m.procs {
+                    cwd := m.cwdMap[pr.PID]
+                    if cwd == "" {
+                        continue
+                    }
+                    if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+                        procCount++
+                    }
+                }
+            }
+            m.detail = DetailModel{
+                cfg:         m.cfg,
+                selType:     DetailWindow,
+                session:     sess,
+                sessionCWD:  sessionCWD,
+                gitInfo:     m.gitInfo[sess],
+                winCount:    len(windows),
+                procCount:   procCount,
+                alertCount:  alertCount,
+                windowIndex: winIdx,
+                windowPanes: wPanes,
+                windowGit:   m.gitInfo[gitKey],
+                windowAlert: windowAlert,
+            }
             return
         }
         pr := selNode.Proc
