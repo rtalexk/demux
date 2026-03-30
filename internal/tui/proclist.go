@@ -448,9 +448,10 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         len(p.queryResult.Sessions) > 0
     dimStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgDim)
 
-    // Pre-compute which pane IDs have at least one matching process so that
-    // pane header rows (parents) are not dimmed when a child process matches.
+    // Pre-compute which panes and windows have at least one matching process so
+    // that ancestor header rows are not dimmed when a descendant matches.
     paneHasMatch := map[string]bool{}
+    windowHasMatch := map[int]bool{}
     if searchActive {
         for _, node := range p.nodes {
             if node.IsPaneHeader || node.IsWindowHeader || node.IsIdle {
@@ -458,6 +459,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
             }
             if p.procMatchPos(p.curSession, node.Proc.PID) != nil {
                 paneHasMatch[node.Pane.PaneID] = true
+                windowHasMatch[node.Pane.WindowIndex] = true
             }
         }
     }
@@ -473,7 +475,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                 if pos != nil {
                     highlighted := highlightMatchPos(node.Pane.WindowName, pos)
                     line = strings.Replace(line, node.Pane.WindowName, highlighted, 1)
-                } else {
+                } else if !windowHasMatch[node.Pane.WindowIndex] {
                     line = dimStyle.Render(stripANSI(line))
                 }
             }
