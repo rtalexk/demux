@@ -58,6 +58,28 @@ func TestSelectedPane_OnProcessNode(t *testing.T) {
     }
 }
 
+func TestSelectedPane_OnWindowHeader(t *testing.T) {
+    win0Pane := tmux.Pane{Session: "s", WindowIndex: 0, PaneIndex: 0}
+    win1Pane := tmux.Pane{Session: "s", WindowIndex: 1, PaneIndex: 0}
+    nodes := []ProcListNode{
+        {IsWindowHeader: true, Pane: win0Pane},
+        {IsPaneHeader: true, Pane: win0Pane},
+        {IsWindowHeader: true, Pane: win1Pane},
+        {IsPaneHeader: true, Pane: win1Pane},
+    }
+    m := makeTestProcListWithNodes(nodes)
+
+    // cursor on Win 1 header — must return Win 1, not Win 0
+    m.cursor = 2
+    got := m.SelectedPane()
+    if got == nil {
+        t.Fatal("expected non-nil pane for window header node")
+    }
+    if got.WindowIndex != 1 {
+        t.Errorf("WindowIndex: got %d, want 1", got.WindowIndex)
+    }
+}
+
 func TestSelectedPane_EmptyList(t *testing.T) {
     m := makeTestProcListWithNodes(nil)
     if m.SelectedPane() != nil {

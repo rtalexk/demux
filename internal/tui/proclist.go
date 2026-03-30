@@ -1317,7 +1317,7 @@ func (p ProcListModel) SelectedPane() *tmux.Pane {
         start = n - 1
     }
     for i := start; i >= 0; i-- {
-        if p.nodes[i].IsPaneHeader {
+        if p.nodes[i].IsPaneHeader || p.nodes[i].IsWindowHeader {
             pane := p.nodes[i].Pane
             return &pane
         }
