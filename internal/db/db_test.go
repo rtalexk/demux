@@ -1,6 +1,8 @@
 package db_test
 
 import (
+    "os"
+    "path/filepath"
     "testing"
     "time"
 
@@ -81,6 +83,23 @@ func TestAlertCreatedAt(t *testing.T) {
     alerts, _ := d.AlertList()
     if alerts[0].CreatedAt.Before(before) {
         t.Error("created_at is before insert time")
+    }
+}
+
+func TestOpen_DirPermissions(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "subdir", "state.db")
+    d, err := db.Open(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    d.Close()
+    info, err := os.Stat(filepath.Dir(path))
+    if err != nil {
+        t.Fatal(err)
+    }
+    if got := info.Mode().Perm(); got != 0700 {
+        t.Errorf("dir perm = %04o, want 0700", got)
     }
 }
 

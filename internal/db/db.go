@@ -15,7 +15,7 @@ type DB struct {
 
 func Open(path string) (*DB, error) {
     if path != ":memory:" {
-        if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+        if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
             return nil, fmt.Errorf("db dir: %w", err)
         }
     }
