@@ -197,10 +197,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             // First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
             m.currentSession = msg.currentSession
             m.currentWindow = msg.currentWindow
-            switch m.cfg.FocusOnOpen {
+            switch m.cfg.Sidebar.FocusOnOpen {
             case "current_window", "current_session", "first_window", "first_session":
                 visibleRows := max(1, m.height-1-2)
-                m.applyNonAlertFocusMode(m.cfg.FocusOnOpen, visibleRows)
+                m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
             }
             m.ready = true
             cmds = append(cmds, tick(), m.fetchAlerts())
@@ -245,17 +245,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if !m.startupFocusDone {
             m.startupFocusDone = true
             visibleRows := max(1, m.height-1-2)
-            switch m.cfg.FocusOnOpen {
+            switch m.cfg.Sidebar.FocusOnOpen {
             case "alert_window":
                 if !m.sidebar.FocusFirstAlertWindow(visibleRows) {
                     // window node not found (sessions collapsed or no alert on any window) — try alert session before falling back
-                    if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.FocusOnOpenFallback != "" {
-                        m.applyNonAlertFocusMode(m.cfg.FocusOnOpenFallback, visibleRows)
+                    if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.Sidebar.FocusOnOpenFallback != "" {
+                        m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpenFallback, visibleRows)
                     }
                 }
             case "alert_session":
-                if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.FocusOnOpenFallback != "" {
-                    m.applyNonAlertFocusMode(m.cfg.FocusOnOpenFallback, visibleRows)
+                if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.Sidebar.FocusOnOpenFallback != "" {
+                    m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpenFallback, visibleRows)
                 }
             }
         }
@@ -357,7 +357,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
             if node.IsSession {
-                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.SessionSwitchFocus)
+                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
                 if target == "" {
                     target = node.Session
                 }
@@ -403,7 +403,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     contentH := m.height - 1
-    innerW := m.width - m.cfg.SidebarWidth - 2
+    innerW := m.width - m.cfg.Sidebar.Width - 2
     if innerW < 1 {
         innerW = 1
     }
@@ -829,7 +829,7 @@ func (m Model) View() string {
         return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.help.Render())
     }
 
-    sidebarW := m.cfg.SidebarWidth
+    sidebarW := m.cfg.Sidebar.Width
     if sidebarW <= 0 {
         sidebarW = 30
     }

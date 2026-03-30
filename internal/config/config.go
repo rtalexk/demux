@@ -100,38 +100,49 @@ type ProcessesConfig struct {
     Shells  []string `toml:"shells"`
 }
 
+type SidebarConfig struct {
+    AlertFilter         string   `toml:"alert_filter"`
+    Collapsed           bool     `toml:"collapsed"`
+    FocusOnOpen         string   `toml:"focus_on_open"`
+    FocusOnOpenFallback string   `toml:"focus_on_open_fallback"`
+    Sort                []string `toml:"sort"`
+    SwitchFocus         string   `toml:"switch_focus"`
+    Width               int      `toml:"width"`
+}
+
+type ProcessListConfig struct {
+    PathRightAlign bool `toml:"path_right_align"`
+}
+
 type Config struct {
-    RefreshIntervalMs  int         `toml:"refresh_interval_ms"`
-    IgnoredSessions    []string    `toml:"ignored_sessions"`
-    IgnoredProcesses   []string    `toml:"ignored_processes"`
-    DefaultFormat      string      `toml:"default_format"`
-    StatusBarFormat    string      `toml:"status_bar_format"`
-    SidebarWidth       int         `toml:"sidebar_width"`
-    AlertFilterWindows  string      `toml:"alert_filter_windows"` // "all" or "alerts_only"
-    FocusOnOpen         string      `toml:"focus_on_open"`
-    FocusOnOpenFallback string      `toml:"focus_on_open_fallback"`
-    PanePathRightAlign  bool        `toml:"pane_path_right_align"`
-    SessionsCollapsed   bool        `toml:"sessions_collapsed"`
-    SessionSwitchFocus  string      `toml:"session_switch_focus"`
-    SessionSort         []string    `toml:"session_sort"`
-    Git                 GitConfig   `toml:"git"`
-    Theme              ThemeConfig `toml:"theme"`
-    PathAliases        []PathAlias `toml:"path_aliases"`
+    RefreshIntervalMs int               `toml:"refresh_interval_ms"`
+    IgnoredSessions   []string          `toml:"ignored_sessions"`
+    IgnoredProcesses  []string          `toml:"ignored_processes"`
+    DefaultFormat     string            `toml:"default_format"`
+    StatusBarFormat   string            `toml:"status_bar_format"`
+    Sidebar           SidebarConfig     `toml:"sidebar"`
+    ProcessList       ProcessListConfig `toml:"process_list"`
+    Git               GitConfig         `toml:"git"`
+    Theme             ThemeConfig       `toml:"theme"`
+    PathAliases       []PathAlias       `toml:"path_aliases"`
 }
 
 func Default() Config {
     return Config{
-        RefreshIntervalMs: 2000,
+        RefreshIntervalMs: 3000,
         IgnoredSessions:   []string{},
         IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
-        SidebarWidth:       30,
-        AlertFilterWindows:  "all",
-        FocusOnOpen:         "current_window",
-        FocusOnOpenFallback: "current_window",
-        SessionSwitchFocus:  "severity",
-        SessionSort:        []string{"priority", "last_seen", "alphabetical"},
+        Sidebar: SidebarConfig{
+            AlertFilter:         "all",
+            Collapsed:           true,
+            FocusOnOpen:         "alert_window",
+            FocusOnOpenFallback: "current_window",
+            Sort:                []string{"priority", "last_seen", "alphabetical"},
+            SwitchFocus:         "severity",
+            Width:               35,
+        },
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,
@@ -216,7 +227,7 @@ func Load(path string) (Config, error) {
     sort.Slice(cfg.PathAliases, func(i, j int) bool {
         return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
     })
-    cfg.SessionSort = normalizeSortKeys(cfg.SessionSort)
+    cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
     return cfg, nil
 }
 

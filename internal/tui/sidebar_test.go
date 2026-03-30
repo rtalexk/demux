@@ -482,9 +482,7 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
             "alpha": older,
             "beta":  now,
         },
-        cfg: config.Config{
-            SessionSort: []string{"last_seen", "priority", "alphabetical"},
-        },
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
     var got []string
@@ -510,9 +508,7 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
             "alpha":   now,
             "beta":    now,
         },
-        cfg: config.Config{
-            SessionSort: []string{"last_seen", "priority", "alphabetical"},
-        },
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
     var got []string
@@ -534,7 +530,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{AlertFilterWindows: "all"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     active := s.ToggleAlertFilter(10)
     if !active {
@@ -565,7 +561,7 @@ func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing
         alerts: map[string]db.Alert{
             "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
         },
-        cfg: config.Config{AlertFilterWindows: "all"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     s.ToggleAlertFilter(10)
     var winIdxs []int
@@ -575,7 +571,7 @@ func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing
         }
     }
     if len(winIdxs) != 2 {
-        t.Errorf("expected both windows visible with AlertFilterWindows=all, got %v", winIdxs)
+        t.Errorf("expected both windows visible with alert_filter=all, got %v", winIdxs)
     }
 }
 
@@ -588,7 +584,7 @@ func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
         alerts: map[string]db.Alert{
             "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
         },
-        cfg: config.Config{AlertFilterWindows: "alerts_only"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "alerts_only"}},
     }
     s.ToggleAlertFilter(10)
     var winIdxs []int
@@ -598,7 +594,7 @@ func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
         }
     }
     if len(winIdxs) != 1 || winIdxs[0] != 1 {
-        t.Errorf("expected only window 1 (has alert) visible with AlertFilterWindows=alerts_only, got %v", winIdxs)
+        t.Errorf("expected only window 1 (has alert) visible with alert_filter=alerts_only, got %v", winIdxs)
     }
 }
 
@@ -609,7 +605,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{AlertFilterWindows: "all"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     s.ToggleAlertFilter(10) // on
     active := s.ToggleAlertFilter(10) // off
@@ -631,7 +627,7 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("a"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{AlertFilterWindows: "all"},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     if s.AlertFilterActive() {
         t.Error("expected AlertFilterActive=false before toggle")
@@ -652,7 +648,7 @@ func TestToggleAlertFilter_AlertsOnly_BothWindowsWithPaneAlertsVisible(t *testin
             "sess:0.0": {Target: "sess:0.0", CreatedAt: now},
             "sess:1.0": {Target: "sess:1.0", CreatedAt: now},
         },
-        cfg: config.Config{AlertFilterWindows: "alerts_only"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "alerts_only"}},
     }
     s.ToggleAlertFilter(10)
     var winIdxs []int
@@ -677,7 +673,7 @@ func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{AlertFilterWindows: "all"},
+        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     s.ToggleAlertFilter(10)
     if s.cursor != 1 {
@@ -697,7 +693,7 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("sess"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{AlertFilterWindows: "all"},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
     }
     // With no alerts, filter on hides all sessions → nodes is empty.
     s.cursor = 5 // out of range
@@ -716,7 +712,7 @@ func TestFocusNode_SessionLevel(t *testing.T) {
             "beta":  {0: nil, 1: nil},
         },
         alerts: map[string]db.Alert{},
-        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     s.FocusNode("beta", 0, true, 20)
@@ -732,7 +728,7 @@ func TestFocusNode_WindowLevel(t *testing.T) {
             "sess": {0: nil, 2: nil},
         },
         alerts: map[string]db.Alert{},
-        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     s.FocusNode("sess", 2, false, 20)
@@ -763,7 +759,7 @@ func TestFocusFirstAlertSession_MovesToAlertedSession(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", Level: "warn", CreatedAt: t1},
         },
-        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     s.FocusFirstAlertSession(20)
@@ -796,7 +792,7 @@ func TestFocusFirstAlertWindow_MovesToAlertedWindow(t *testing.T) {
         alerts: map[string]db.Alert{
             "sess:2.0": {Target: "sess:2.0", Level: "warn", CreatedAt: t1},
         },
-        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     s.FocusFirstAlertWindow(20)
@@ -826,7 +822,7 @@ func TestFocusFirstWindow_MovesToFirstWindowNode(t *testing.T) {
             "sess": {0: nil, 1: nil},
         },
         alerts: map[string]db.Alert{},
-        cfg:    config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     found := s.FocusFirstWindow(20)
@@ -863,7 +859,7 @@ func TestFocusFirstAlertWindow_ReturnsTrue_WhenFound(t *testing.T) {
         alerts: map[string]db.Alert{
             "sess:1.0": {Target: "sess:1.0", Level: "warn", CreatedAt: t1},
         },
-        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     found := s.FocusFirstAlertWindow(20)
@@ -893,7 +889,7 @@ func TestFocusFirstAlertSession_ReturnsTrue_WhenFound(t *testing.T) {
         alerts: map[string]db.Alert{
             "alpha:0.0": {Target: "alpha:0.0", Level: "warn", CreatedAt: t1},
         },
-        cfg: config.Config{SessionSort: []string{"alphabetical"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
     found := s.FocusFirstAlertSession(20)
@@ -920,7 +916,7 @@ func TestExpand_CollapsedSession_AddsWindowNodes(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     // Seed nodes with alpha collapsed so Expand has something to do
     s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
@@ -942,7 +938,7 @@ func TestExpand_AlreadyExpanded_NoChange(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // alpha expanded by default
     before := len(s.nodes)
@@ -957,7 +953,7 @@ func TestExpand_WindowNode_NoOp(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // nodes = [alpha, alpha-win0]
     before := len(s.nodes)
@@ -974,7 +970,7 @@ func TestCollapse_ExpandedSession_RemovesWindowNodes(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // alpha expanded; nodes = [alpha, alpha-win0]
     s.cursor = 0
@@ -991,7 +987,7 @@ func TestCollapse_AlreadyCollapsed_NoChange(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
     s.cursor = 0
@@ -1005,7 +1001,7 @@ func TestCollapse_WindowNode_CollapsesParentSession(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // nodes = [alpha, alpha-win0]
     s.cursor = 1     // window node
@@ -1028,7 +1024,7 @@ func TestExpandAll_CollapsedSessions_ExpandsAll(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     // Start with both collapsed
     s.nodes = []SidebarNode{
@@ -1059,7 +1055,7 @@ func TestExpandAll_AllAlreadyExpanded_NoChange(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // both expanded by default
     before := len(s.nodes)
@@ -1075,7 +1071,7 @@ func TestCollapseAll_ExpandedSessions_CollapsesAll(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // both expanded; nodes = [alpha, alpha-win0, beta, beta-win0]
     s.CollapseAll()
@@ -1093,7 +1089,7 @@ func TestCollapseAll_AllAlreadyCollapsed_NoChange(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.nodes = []SidebarNode{
         {Session: "alpha", IsSession: true, Expanded: false},
@@ -1112,7 +1108,7 @@ func TestCollapseAll_CursorOnWindowNode_FallsBackToParentSession(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
     // Focus alpha's window node (index 1).
@@ -1131,7 +1127,7 @@ func TestExpandAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}, SessionsCollapsed: true},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}, Collapsed: true}},
     }
     s.rebuildNodes() // both collapsed: [alpha(session), beta(session)]
     // Focus beta session (index 1); after ExpandAll alpha gains a window node
@@ -1147,7 +1143,7 @@ func TestCollapseAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("alpha", "beta"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
     // Focus beta session (index 2).

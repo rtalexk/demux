@@ -24,7 +24,7 @@ const defaultConfigTOML = `# demux configuration
 # Default path: ~/.config/demux/demux.toml
 
 # How often to refresh session/process data (milliseconds)
-refresh_interval_ms = 2000
+refresh_interval_ms = 3000
 
 # Sessions to hide from the sidebar
 ignored_sessions = []
@@ -38,36 +38,6 @@ default_format = "text"
 # Status bar format string (tmux #(...) syntax)
 status_bar_format = "tmux"
 
-# Sidebar width in columns
-sidebar_width = 30
-
-# When the ! alert filter is active, which windows to show: all | alerts_only
-alert_filter_windows = "all"
-
-# Where to position the sidebar cursor on open: current_window | current_session | alert_window | alert_session | first_window | first_session
-# When sessions are collapsed, *_window values automatically fall back to their *_session equivalent
-focus_on_open = "current_window"
-
-# When alert_window or alert_session finds no alerts, fall back to this mode (any non-alert focus_on_open value)
-focus_on_open_fallback = "current_window"
-
-# Which window to focus when switching to a session: default | severity | newest | oldest
-#   default  — let tmux use its last-focused window
-#   severity — navigate to highest-severity alerted window; newest tiebreaker
-#   newest   — navigate to most recently alerted window
-#   oldest   — navigate to oldest alerted window
-session_switch_focus = "severity"
-
-# Session sort order — first key wins, missing keys filled from default order
-# Valid keys: priority | last_seen | alphabetical
-session_sort = ["priority", "last_seen", "alphabetical"]
-
-# Right-align pane CWD paths in the process list, with a fill separator
-pane_path_right_align = false
-
-# Start with all sessions collapsed in the sidebar (windows hidden until expanded)
-sessions_collapsed = false
-
 # Path prefix aliases — shorten verbose absolute paths in the TUI.
 # Both prefix and replace support environment variables.
 # Longest matching prefix wins. Example:
@@ -75,12 +45,44 @@ sessions_collapsed = false
 # prefix = "$HOME"
 # replace = "~"
 
+[sidebar]
+# Sidebar width in columns
+width = 35
+
+# Start with all sessions collapsed in the sidebar (windows hidden until expanded)
+collapsed = true
+
+# Where to position the sidebar cursor on open: current_window | current_session | alert_window | alert_session | first_window | first_session
+# When sessions are collapsed, *_window values automatically fall back to their *_session equivalent
+focus_on_open = "alert_window"
+
+# When alert_window or alert_session finds no alerts, fall back to this mode (any non-alert focus_on_open value)
+focus_on_open_fallback = "current_window"
+
+# When the ! alert filter is active, which windows to show: all | alerts_only
+alert_filter = "all"
+
+# Session sort order — first key wins, missing keys filled from default order
+# Valid keys: priority | last_seen | alphabetical
+sort = ["priority", "last_seen", "alphabetical"]
+
+# Which window to focus when switching to a session: default | severity | newest | oldest
+#   default  — let tmux use its last-focused window
+#   severity — navigate to highest-severity alerted window; newest tiebreaker
+#   newest   — navigate to most recently alerted window
+#   oldest   — navigate to oldest alerted window
+switch_focus = "severity"
+
+[process_list]
+# Right-align pane CWD paths in the process list, with a fill separator
+path_right_align = false
+
 [git]
 # Enable git status indicators in the sidebar
 enabled = true
 
 # Show a loading spinner in the status bar while git data is being fetched
-show_spinner = true
+show_spinner = false
 
 # Timeout for git operations (milliseconds)
 timeout_ms = 500

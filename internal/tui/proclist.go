@@ -595,7 +595,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     if selected {
         left := label + stripANSI(alertSuffix)
         rightPart := pathStr + gitSuffix
-        if rightPart != "" && p.cfg.PanePathRightAlign && innerW > 0 {
+        if rightPart != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
             rightW := len([]rune(rightPart))
             padCount := innerW - len([]rune(left)) - rightW
             if padCount < 1 {
@@ -619,7 +619,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     }
 
     rightPart := pathStr + gitSuffix
-    if rightPart == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
+    if rightPart == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
         out := paneHeaderStyle.Render(label) + alertSuffix
         if pathStr != "" {
             out += "  " + panePathStyle.Render(pathStr)
@@ -674,7 +674,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
     if selected {
         left := label + stripANSI(alertSuffix)
-        if pathStr != "" && p.cfg.PanePathRightAlign && innerW > 0 {
+        if pathStr != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
             rightW := len([]rune(pathStr))
             padCount := innerW - len([]rune(left)) - rightW
             if padCount < 1 {
@@ -697,7 +697,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
         return selectedBG.Render(left + strings.Repeat(" ", padCount))
     }
 
-    if pathStr == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
+    if pathStr == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
         out := windowHeaderStyle.Render(label) + alertSuffix
         if pathStr != "" {
             out += "  " + panePathStyle.Render(pathStr)

@@ -1209,7 +1209,7 @@ func paneNode(paneIndex int, cwd string) ProcListNode {
 
 func TestRenderPaneHeader_RightAlign_PathAppearsAtRight(t *testing.T) {
     p := ProcListModel{
-        cfg: config.Config{PanePathRightAlign: true},
+        cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
     }
     node := paneNode(0, "/home/user/project")
     innerW := 40
@@ -1226,7 +1226,7 @@ func TestRenderPaneHeader_RightAlign_PathAppearsAtRight(t *testing.T) {
 
 func TestRenderPaneHeader_RightAlign_FillCharsPresent(t *testing.T) {
     p := ProcListModel{
-        cfg: config.Config{PanePathRightAlign: true},
+        cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
     }
     node := paneNode(1, "/tmp")
     innerW := 40
@@ -1239,7 +1239,7 @@ func TestRenderPaneHeader_RightAlign_FillCharsPresent(t *testing.T) {
 
 func TestRenderPaneHeader_LeftAlign_NoFillChars(t *testing.T) {
     p := ProcListModel{
-        cfg: config.Config{PanePathRightAlign: false},
+        cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: false}},
     }
     node := paneNode(0, "/tmp")
     innerW := 40
@@ -1252,7 +1252,7 @@ func TestRenderPaneHeader_LeftAlign_NoFillChars(t *testing.T) {
 
 func TestRenderPaneHeader_RightAlign_NoCWD_NoFill(t *testing.T) {
     p := ProcListModel{
-        cfg: config.Config{PanePathRightAlign: true},
+        cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
     }
     node := paneNode(0, "")
     innerW := 40
@@ -1265,7 +1265,7 @@ func TestRenderPaneHeader_RightAlign_NoCWD_NoFill(t *testing.T) {
 
 func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T) {
     p := ProcListModel{
-        cfg: config.Config{PanePathRightAlign: true},
+        cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
     }
     node := paneNode(0, "/home/user/project")
     innerW := 40

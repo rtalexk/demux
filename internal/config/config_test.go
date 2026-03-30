@@ -20,11 +20,11 @@ func containsStr(s []string, v string) bool {
 
 func TestDefaults(t *testing.T) {
     cfg := config.Default()
-    if cfg.RefreshIntervalMs != 2000 {
-        t.Errorf("expected 2000, got %d", cfg.RefreshIntervalMs)
+    if cfg.RefreshIntervalMs != 3000 {
+        t.Errorf("expected 3000, got %d", cfg.RefreshIntervalMs)
     }
-    if cfg.SidebarWidth != 30 {
-        t.Errorf("expected 30, got %d", cfg.SidebarWidth)
+    if cfg.Sidebar.Width != 35 {
+        t.Errorf("expected 35, got %d", cfg.Sidebar.Width)
     }
     if cfg.Git.TimeoutMs != 500 {
         t.Errorf("expected 500, got %d", cfg.Git.TimeoutMs)
@@ -81,8 +81,10 @@ func TestLoadFromFile(t *testing.T) {
     path := filepath.Join(dir, "dmux.toml")
     os.WriteFile(path, []byte(`
 refresh_interval_ms = 1000
-sidebar_width = 40
 ignored_sessions = ["scratch"]
+
+[sidebar]
+width = 40
 
 [git]
 enabled = false
@@ -96,8 +98,8 @@ timeout_ms = 250
     if cfg.RefreshIntervalMs != 1000 {
         t.Errorf("expected 1000, got %d", cfg.RefreshIntervalMs)
     }
-    if cfg.SidebarWidth != 40 {
-        t.Errorf("expected 40, got %d", cfg.SidebarWidth)
+    if cfg.Sidebar.Width != 40 {
+        t.Errorf("expected 40, got %d", cfg.Sidebar.Width)
     }
     if len(cfg.IgnoredSessions) != 1 || cfg.IgnoredSessions[0] != "scratch" {
         t.Errorf("unexpected ignored_sessions: %v", cfg.IgnoredSessions)
@@ -112,7 +114,7 @@ func TestMissingFile(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.RefreshIntervalMs != 2000 {
+    if cfg.RefreshIntervalMs != 3000 {
         t.Errorf("expected defaults, got %d", cfg.RefreshIntervalMs)
     }
 }
@@ -198,78 +200,82 @@ replace = "rp"
     }
 }
 
-func TestDefaults_AlertFilterWindows(t *testing.T) {
+func TestDefaults_AlertFilter(t *testing.T) {
     cfg := config.Default()
-    if cfg.AlertFilterWindows != "all" {
-        t.Errorf("expected default AlertFilterWindows=\"all\", got %q", cfg.AlertFilterWindows)
+    if cfg.Sidebar.AlertFilter != "all" {
+        t.Errorf("expected default Sidebar.AlertFilter=\"all\", got %q", cfg.Sidebar.AlertFilter)
     }
 }
 
-func TestLoadFromFile_AlertFilterWindows(t *testing.T) {
+func TestLoadFromFile_AlertFilter(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`alert_filter_windows = "alerts_only"`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+alert_filter = "alerts_only"`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.AlertFilterWindows != "alerts_only" {
-        t.Errorf("expected \"alerts_only\", got %q", cfg.AlertFilterWindows)
+    if cfg.Sidebar.AlertFilter != "alerts_only" {
+        t.Errorf("expected \"alerts_only\", got %q", cfg.Sidebar.AlertFilter)
     }
 }
 
-func TestDefaults_SessionSort(t *testing.T) {
+func TestDefaults_SidebarSort(t *testing.T) {
     cfg := config.Default()
     want := []string{"priority", "last_seen", "alphabetical"}
-    if len(cfg.SessionSort) != len(want) {
-        t.Fatalf("expected SessionSort=%v, got %v", want, cfg.SessionSort)
+    if len(cfg.Sidebar.Sort) != len(want) {
+        t.Fatalf("expected Sidebar.Sort=%v, got %v", want, cfg.Sidebar.Sort)
     }
     for i, v := range want {
-        if cfg.SessionSort[i] != v {
-            t.Errorf("SessionSort[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        if cfg.Sidebar.Sort[i] != v {
+            t.Errorf("Sidebar.Sort[%d]: expected %q, got %q", i, v, cfg.Sidebar.Sort[i])
         }
     }
 }
 
-func TestLoadFromFile_SessionSort_SingleKey(t *testing.T) {
+func TestLoadFromFile_SidebarSort_SingleKey(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`session_sort = ["last_seen"]`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+sort = ["last_seen"]`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
     want := []string{"last_seen", "priority", "alphabetical"}
-    if len(cfg.SessionSort) != len(want) {
-        t.Fatalf("expected %v, got %v", want, cfg.SessionSort)
+    if len(cfg.Sidebar.Sort) != len(want) {
+        t.Fatalf("expected %v, got %v", want, cfg.Sidebar.Sort)
     }
     for i, v := range want {
-        if cfg.SessionSort[i] != v {
-            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        if cfg.Sidebar.Sort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.Sidebar.Sort[i])
         }
     }
 }
 
-func TestLoadFromFile_SessionSort_PartialCustom(t *testing.T) {
+func TestLoadFromFile_SidebarSort_PartialCustom(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`session_sort = ["alphabetical", "priority"]`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+sort = ["alphabetical", "priority"]`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
     want := []string{"alphabetical", "priority", "last_seen"}
     for i, v := range want {
-        if cfg.SessionSort[i] != v {
-            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        if cfg.Sidebar.Sort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.Sidebar.Sort[i])
         }
     }
 }
 
-func TestLoadFromFile_SessionSort_InvalidDropped(t *testing.T) {
+func TestLoadFromFile_SidebarSort_InvalidDropped(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`session_sort = ["bogus", "last_seen"]`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+sort = ["bogus", "last_seen"]`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
@@ -277,24 +283,25 @@ func TestLoadFromFile_SessionSort_InvalidDropped(t *testing.T) {
     // "bogus" dropped; "last_seen" first; "priority", "alphabetical" filled in
     want := []string{"last_seen", "priority", "alphabetical"}
     for i, v := range want {
-        if cfg.SessionSort[i] != v {
-            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        if cfg.Sidebar.Sort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.Sidebar.Sort[i])
         }
     }
 }
 
-func TestLoadFromFile_SessionSort_Empty(t *testing.T) {
+func TestLoadFromFile_SidebarSort_Empty(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`session_sort = []`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+sort = []`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
     want := []string{"priority", "last_seen", "alphabetical"}
     for i, v := range want {
-        if cfg.SessionSort[i] != v {
-            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.SessionSort[i])
+        if cfg.Sidebar.Sort[i] != v {
+            t.Errorf("[%d]: expected %q, got %q", i, v, cfg.Sidebar.Sort[i])
         }
     }
 }
@@ -323,41 +330,43 @@ replace = "mydir"
 
 func TestDefaults_FocusOnOpen(t *testing.T) {
     cfg := config.Default()
-    if cfg.FocusOnOpen != "current_window" {
-        t.Errorf("expected default FocusOnOpen=\"current_window\", got %q", cfg.FocusOnOpen)
+    if cfg.Sidebar.FocusOnOpen != "alert_window" {
+        t.Errorf("expected default Sidebar.FocusOnOpen=\"alert_window\", got %q", cfg.Sidebar.FocusOnOpen)
     }
 }
 
 func TestLoadFromFile_FocusOnOpen(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`focus_on_open = "alert_window"`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+focus_on_open = "alert_window"`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.FocusOnOpen != "alert_window" {
-        t.Errorf("expected \"alert_window\", got %q", cfg.FocusOnOpen)
+    if cfg.Sidebar.FocusOnOpen != "alert_window" {
+        t.Errorf("expected \"alert_window\", got %q", cfg.Sidebar.FocusOnOpen)
     }
 }
 
 func TestDefaults_FocusOnOpenFallback(t *testing.T) {
     cfg := config.Default()
-    if cfg.FocusOnOpenFallback != "current_window" {
-        t.Errorf("expected default FocusOnOpenFallback=\"current_window\", got %q", cfg.FocusOnOpenFallback)
+    if cfg.Sidebar.FocusOnOpenFallback != "current_window" {
+        t.Errorf("expected default Sidebar.FocusOnOpenFallback=\"current_window\", got %q", cfg.Sidebar.FocusOnOpenFallback)
     }
 }
 
 func TestLoadFromFile_FocusOnOpenFallback(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`focus_on_open_fallback = "first_window"`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+focus_on_open_fallback = "first_window"`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.FocusOnOpenFallback != "first_window" {
-        t.Errorf("expected \"first_window\", got %q", cfg.FocusOnOpenFallback)
+    if cfg.Sidebar.FocusOnOpenFallback != "first_window" {
+        t.Errorf("expected \"first_window\", got %q", cfg.Sidebar.FocusOnOpenFallback)
     }
 }
 
@@ -372,23 +381,24 @@ func TestDefaultPath_ContainsExpectedSuffix(t *testing.T) {
     }
 }
 
-func TestDefaults_SessionSwitchFocus(t *testing.T) {
+func TestDefaults_SidebarSwitchFocus(t *testing.T) {
     cfg := config.Default()
-    if cfg.SessionSwitchFocus != "severity" {
-        t.Errorf("expected default SessionSwitchFocus=\"severity\", got %q", cfg.SessionSwitchFocus)
+    if cfg.Sidebar.SwitchFocus != "severity" {
+        t.Errorf("expected default Sidebar.SwitchFocus=\"severity\", got %q", cfg.Sidebar.SwitchFocus)
     }
 }
 
-func TestLoadFromFile_SessionSwitchFocus(t *testing.T) {
+func TestLoadFromFile_SidebarSwitchFocus(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
-    os.WriteFile(path, []byte(`session_switch_focus = "newest"`), 0644)
+    os.WriteFile(path, []byte(`[sidebar]
+switch_focus = "newest"`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.SessionSwitchFocus != "newest" {
-        t.Errorf("expected \"newest\", got %q", cfg.SessionSwitchFocus)
+    if cfg.Sidebar.SwitchFocus != "newest" {
+        t.Errorf("expected \"newest\", got %q", cfg.Sidebar.SwitchFocus)
     }
 }
 

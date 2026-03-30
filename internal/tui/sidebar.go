@@ -170,7 +170,7 @@ func (s *SidebarModel) rebuildNodes() {
         }
     }
 
-    sortKeys := s.cfg.SessionSort
+    sortKeys := s.cfg.Sidebar.Sort
     if len(sortKeys) == 0 {
         sortKeys = []string{"priority", "last_seen", "alphabetical"}
     }
@@ -208,7 +208,7 @@ func (s *SidebarModel) rebuildNodes() {
         }
         exp, ok := expanded[name]
         if !ok {
-            exp = !s.cfg.SessionsCollapsed
+            exp = !s.cfg.Sidebar.Collapsed
         }
         s.nodes = append(s.nodes, SidebarNode{Session: name, IsSession: true, Expanded: exp})
         if exp {
@@ -234,7 +234,7 @@ func (s *SidebarModel) rebuildNodes() {
             })
 
             for _, wi := range winIdxs {
-                if s.filterAlerts && s.cfg.AlertFilterWindows == "alerts_only" {
+                if s.filterAlerts && s.cfg.Sidebar.AlertFilter == "alerts_only" {
                     if s.windowAlert(name, wi) == nil {
                         continue
                     }

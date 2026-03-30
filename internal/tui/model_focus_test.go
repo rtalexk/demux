@@ -12,7 +12,8 @@ import (
 
 func focusTestModel(focusOnOpen string) Model {
     cfg := config.Default()
-    cfg.FocusOnOpen = focusOnOpen
+    cfg.Sidebar.FocusOnOpen = focusOnOpen
+    cfg.Sidebar.Collapsed = false
     database, _ := db.Open(":memory:")
     return New(cfg, database)
 }
@@ -83,7 +84,7 @@ func TestFocusOnOpen_AlertSession(t *testing.T) {
 
 func TestFocusOnOpen_AlertWindow_NoAlerts_StaysAt0(t *testing.T) {
     m := focusTestModel("alert_window")
-    m.cfg.FocusOnOpenFallback = "" // no fallback — cursor must not move
+    m.cfg.Sidebar.FocusOnOpenFallback = "" // no fallback — cursor must not move
     m.height = 40
     m, _ = applyPanesMsg(m, "alpha", 0)
     m, _ = applyAlertsMsg(m, nil)
@@ -143,7 +144,7 @@ func TestFocusOnOpen_AlertSession_FallsBackToCurrentWindow_WhenNoAlerts(t *testi
 
 func TestFocusOnOpen_AlertWindow_NoFallback_WhenFallbackEmpty(t *testing.T) {
     m := focusTestModel("alert_window")
-    m.cfg.FocusOnOpenFallback = ""
+    m.cfg.Sidebar.FocusOnOpenFallback = ""
     m.height = 40
     m, _ = applyPanesMsg(m, "beta", 0)
     // No alerts, no fallback — cursor stays at 0
@@ -178,8 +179,8 @@ func TestFocusOnOpen_SubsequentAlerts_DoNotRefocus(t *testing.T) {
 
 func focusTestModelCollapsed(focusOnOpen string) Model {
     cfg := config.Default()
-    cfg.FocusOnOpen = focusOnOpen
-    cfg.SessionsCollapsed = true
+    cfg.Sidebar.FocusOnOpen = focusOnOpen
+    cfg.Sidebar.Collapsed = true
     database, _ := db.Open(":memory:")
     return New(cfg, database)
 }
@@ -187,7 +188,7 @@ func focusTestModelCollapsed(focusOnOpen string) Model {
 // alert_window with all sessions collapsed → should land on the alert *session* node
 func TestFocusOnOpen_AlertWindow_Collapsed_LandsOnAlertSession(t *testing.T) {
     m := focusTestModelCollapsed("alert_window")
-    m.cfg.FocusOnOpenFallback = ""
+    m.cfg.Sidebar.FocusOnOpenFallback = ""
     m.height = 40
     m, _ = applyPanesMsg(m, "alpha", 0)
     alerts := []db.Alert{
@@ -225,7 +226,7 @@ func TestFocusOnOpen_FirstWindow_Collapsed_FallsBackToFirstSession(t *testing.T)
 // alert_window collapsed + no alerts → applies focus_on_open_fallback
 func TestFocusOnOpen_AlertWindow_Collapsed_NoAlerts_AppliesFallback(t *testing.T) {
     m := focusTestModelCollapsed("alert_window")
-    m.cfg.FocusOnOpenFallback = "current_window"
+    m.cfg.Sidebar.FocusOnOpenFallback = "current_window"
     m.height = 40
     m, _ = applyPanesMsg(m, "beta", 0)
     m, _ = applyAlertsMsg(m, nil)
