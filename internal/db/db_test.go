@@ -3,6 +3,7 @@ package db_test
 import (
     "os"
     "path/filepath"
+    "strings"
     "testing"
     "time"
 
@@ -104,6 +105,17 @@ func TestOpen_DirPermissions(t *testing.T) {
     // kernel will not mask any bits away.
     if got := info.Mode().Perm(); got != 0700 {
         t.Errorf("dir perm = %04o, want 0700", got)
+    }
+}
+
+func TestDefaultPath_ContainsExpectedSuffix(t *testing.T) {
+    path, err := db.DefaultPath()
+    if err != nil {
+        t.Skipf("UserHomeDir not available: %v", err)
+    }
+    const suffix = ".local/share/demux/state.db"
+    if !strings.HasSuffix(path, suffix) {
+        t.Errorf("DefaultPath() = %q, want suffix %q", path, suffix)
     }
 }
 

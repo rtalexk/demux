@@ -48,8 +48,12 @@ func (d *DB) migrate() error {
     return err
 }
 
-// DefaultPath returns ~/.local/share/demux/state.db
-func DefaultPath() string {
-    home, _ := os.UserHomeDir()
-    return filepath.Join(home, ".local", "share", "demux", "state.db")
+// DefaultPath returns ~/.local/share/demux/state.db, or an error if the
+// home directory cannot be determined.
+func DefaultPath() (string, error) {
+    home, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("home dir: %w", err)
+    }
+    return filepath.Join(home, ".local", "share", "demux", "state.db"), nil
 }

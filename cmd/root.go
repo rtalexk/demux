@@ -19,7 +19,11 @@ var rootCmd = &cobra.Command{
     Short: "Monitor tmux sessions, processes, and alerts",
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg := loadConfig()
-        database, err := db.Open(db.DefaultPath())
+        dbPath, err := db.DefaultPath()
+        if err != nil {
+            return err
+        }
+        database, err := db.Open(dbPath)
         if err != nil {
             return err
         }
@@ -44,7 +48,11 @@ func loadConfig() config.Config {
 }
 
 func openDB() (*db.DB, error) {
-    return db.Open(db.DefaultPath())
+    path, err := db.DefaultPath()
+    if err != nil {
+        return nil, err
+    }
+    return db.Open(path)
 }
 
 func resolveFormat(cmd *cobra.Command) string {
