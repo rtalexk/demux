@@ -309,6 +309,18 @@ func TestNodeRows_ProcIsTwoRows(t *testing.T) {
     }
 }
 
+func TestNodeRows_WindowHeader_IsOneRow(t *testing.T) {
+    if nodeRows(ProcListNode{IsWindowHeader: true}) != 1 {
+        t.Error("expected window header to occupy 1 row")
+    }
+}
+
+func TestIsSelectable_WindowHeader_IsFalse(t *testing.T) {
+    if isSelectable(ProcListNode{IsWindowHeader: true}) {
+        t.Error("expected window header to be non-selectable")
+    }
+}
+
 // ---------- clampOffset ----------
 
 func TestClampOffset_EmptyNodes(t *testing.T) {

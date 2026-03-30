@@ -17,7 +17,8 @@ import (
 
 type ProcListNode struct {
     IsPaneHeader bool
-    IsIdle       bool // placeholder row shown when a pane has no processes
+    IsIdle         bool // placeholder row shown when a pane has no processes
+    IsWindowHeader bool // true for window-level header rows in session mode
     Pane         tmux.Pane
     GitDeviant   bool
     GitInfo      git.Info
@@ -44,6 +45,7 @@ type ProcListModel struct {
     curSession    string
     curWindow     int
     collapsedPIDs map[int32]bool // persists collapse state across SetWindowData calls
+    inSessionMode bool           // true when displaying all windows of a session
     cfg           config.Config
 }
 
@@ -53,6 +55,7 @@ type ProcListModel struct {
 // alertMap is keyed by "session:windowIndex.paneIndex" for pane-level alerts.
 func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
     p.cfg = cfg
+    p.inSessionMode = false
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
     p.primaryCWD = primaryCWDForPanes(windows)
@@ -678,7 +681,7 @@ func injectBorderTitles(rendered, leftTitle, rightTitle string) string {
 }
 
 // isSelectable reports whether the cursor may land on n.
-func isSelectable(n ProcListNode) bool { return !n.IsIdle }
+func isSelectable(n ProcListNode) bool { return !n.IsIdle && !n.IsWindowHeader }
 
 // nodeDepth returns the logical depth of a node: 0 for pane headers, otherwise Depth.
 func nodeDepth(n ProcListNode) int {
@@ -690,7 +693,7 @@ func nodeDepth(n ProcListNode) int {
 
 // nodeRows returns how many terminal rows a node occupies when rendered.
 func nodeRows(n ProcListNode) int {
-    if n.IsPaneHeader || n.IsIdle {
+    if n.IsPaneHeader || n.IsIdle || n.IsWindowHeader {
         return 1
     }
     return 2 // process: name line + stats line

@@ -36,8 +36,9 @@ var (
     sessionStyle lipgloss.Style
 
     // Process list text
-    paneHeaderStyle lipgloss.Style
-    panePathStyle   lipgloss.Style
+    paneHeaderStyle   lipgloss.Style
+    windowHeaderStyle lipgloss.Style
+    panePathStyle     lipgloss.Style
     paneSepStyle    lipgloss.Style
     procLine1Style  lipgloss.Style
     procLine2Style  lipgloss.Style
@@ -88,8 +89,9 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
     yankStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 
     sessionStyle    = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
-    paneHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
-    panePathStyle   = lipgloss.NewStyle().Foreground(t.ColorSession)
+    paneHeaderStyle   = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
+    windowHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
+    panePathStyle     = lipgloss.NewStyle().Foreground(t.ColorSession)
     paneSepStyle    = lipgloss.NewStyle().Foreground(t.ColorFgGhost)
     procLine1Style  = lipgloss.NewStyle().Foreground(t.ColorFgPrimary)
     procLine2Style  = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
