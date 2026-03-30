@@ -588,10 +588,14 @@ func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
 func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
     switch mode {
     case "current_window":
-        m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows)
+        if !m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows) {
+            // sessions collapsed: no window node visible — fall back to current session
+            m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
+        }
     case "current_session":
         m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
     case "first_window":
+        // if no window nodes visible (sessions collapsed), cursor stays at 0 = first session
         m.sidebar.FocusFirstWindow(visibleRows)
     case "first_session":
         // cursor is already 0, which is always a session node — no-op
