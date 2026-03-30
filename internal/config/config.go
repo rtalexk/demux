@@ -103,6 +103,7 @@ type ProcessesConfig struct {
 type SidebarConfig struct {
     AlertFilter string   `toml:"alert_filter"`
     FocusOnOpen string   `toml:"focus_on_open"`
+    SearchSort  string   `toml:"search_sort"`
     Sort        []string `toml:"sort"`
     SwitchFocus string   `toml:"switch_focus"`
     Width       int      `toml:"width"`
