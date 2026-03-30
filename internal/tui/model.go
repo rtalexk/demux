@@ -288,6 +288,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     if m.searchInput.IsInsert() {
+        sidebarVisibleRows := m.height - 1 - 2
+        if sidebarVisibleRows < 1 {
+            sidebarVisibleRows = 1
+        }
+        m.sidebar.visibleRows = sidebarVisibleRows
         switch msg.String() {
         case "esc", "enter":
             if msg.String() == "enter" {
@@ -364,6 +369,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     if sidebarVisibleRows < 1 {
         sidebarVisibleRows = 1
     }
+    m.sidebar.visibleRows = sidebarVisibleRows
 
     switch {
     case key.Matches(msg, keys.Up):

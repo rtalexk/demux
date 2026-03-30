@@ -23,6 +23,7 @@ type SidebarModel struct {
     nodes        []SidebarNode
     cursor       int
     offset       int // viewport scroll offset
+    visibleRows  int // last known visible row count; used by CursorDown/CursorUp
     sessions     map[string]map[int][]tmux.Pane
     alerts       map[string]db.Alert
     gitInfo         map[string]git.Info
@@ -561,7 +562,11 @@ func (s *SidebarModel) SetSearchResult(r query.Result) {}
 func (s *SidebarModel) CursorDown() {
     if s.cursor < len(s.nodes)-1 {
         s.cursor++
-        s.clampViewport(999)
+        vr := s.visibleRows
+        if vr < 1 {
+            vr = 1
+        }
+        s.clampViewport(vr)
     }
 }
 
@@ -569,7 +574,11 @@ func (s *SidebarModel) CursorDown() {
 func (s *SidebarModel) CursorUp() {
     if s.cursor > 0 {
         s.cursor--
-        s.clampViewport(999)
+        vr := s.visibleRows
+        if vr < 1 {
+            vr = 1
+        }
+        s.clampViewport(vr)
     }
 }
 
