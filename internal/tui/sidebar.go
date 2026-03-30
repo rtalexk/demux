@@ -10,6 +10,7 @@ import (
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
+    "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -551,6 +552,25 @@ func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
         }
     }
     return false
+}
+
+// SetSearchResult is a stub for Task 8 — will filter/highlight sidebar by query results.
+func (s *SidebarModel) SetSearchResult(r query.Result) {}
+
+// CursorDown moves the cursor down by one row (used during search insert mode).
+func (s *SidebarModel) CursorDown() {
+    if s.cursor < len(s.nodes)-1 {
+        s.cursor++
+        s.clampViewport(999)
+    }
+}
+
+// CursorUp moves the cursor up by one row (used during search insert mode).
+func (s *SidebarModel) CursorUp() {
+    if s.cursor > 0 {
+        s.cursor--
+        s.clampViewport(999)
+    }
 }
 
 func (s SidebarModel) Selected() *SidebarNode {

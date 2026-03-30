@@ -12,6 +12,7 @@ import (
     "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
+    "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -1431,3 +1432,6 @@ func (p *ProcListModel) CollapseAll() bool {
     }
     return changed
 }
+
+// SetSearchQuery is a stub for Task 9 — will dim/highlight proc list based on query results.
+func (p *ProcListModel) SetSearchQuery(pq query.ParsedQuery, r query.Result) {}

@@ -14,6 +14,7 @@ import (
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
+    "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -39,6 +40,12 @@ type procDataMsg struct {
 type gitResultMsg struct {
     key  string // session name, or "session:window" for deviants
     info git.Info
+}
+
+type searchDebounceMsg struct{ gen int }
+type queryResultMsg struct {
+    result query.Result
+    gen    int
 }
 
 type Model struct {
@@ -73,17 +80,23 @@ type Model struct {
 
     currentSession   string
     startupFocusDone bool
+
+    searchInput SearchInputModel
+    queryResult query.Result
+    searchGen   int
 }
 
 func New(cfg config.Config, database *db.DB) Model {
     initStyles(ThemeFromConfig(cfg.Theme), cfg.Theme.Processes, cfg.IgnoredProcesses)
-    return Model{
+    m := Model{
         cfg:       cfg,
         db:        database,
         focus:     panelSidebar,
         gitInfo:   make(map[string]git.Info),
         popupMode: os.Getenv("DEMUX_POPUP") == "1",
     }
+    m.searchInput = NewSearchInputModel()
+    return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -249,11 +262,63 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
         m.updateDetailFromSelection()
         return m, nil
+    case queryResultMsg:
+        if msg.gen == m.searchGen {
+            m.queryResult = msg.result
+            m.sidebar.SetSearchResult(msg.result)
+            m.procList.SetSearchQuery(query.Parse(m.searchInput.Value()), msg.result)
+        }
+        return m, nil
+    case searchDebounceMsg:
+        if msg.gen != m.searchGen {
+            return m, nil
+        }
+        pq := query.Parse(m.searchInput.Value())
+        gen := m.searchGen
+        return m, func() tea.Msg {
+            result, err := query.Run(pq)
+            if err != nil {
+                return queryResultMsg{gen: gen}
+            }
+            return queryResultMsg{result: result, gen: gen}
+        }
     }
     return m, nil
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    if m.searchInput.IsInsert() {
+        switch msg.String() {
+        case "esc", "enter":
+            if msg.String() == "enter" {
+                if node := m.sidebar.Selected(); node != nil {
+                    if err := tmux.SwitchClient(node.Session); err == nil {
+                        if m.popupMode {
+                            return m, tea.Quit
+                        }
+                    }
+                }
+            }
+            m.searchInput.ExitInsertMode()
+            return m, nil
+        case "ctrl+j", "ctrl+n":
+            m.sidebar.CursorDown()
+            return m, nil
+        case "ctrl+k", "ctrl+p":
+            m.sidebar.CursorUp()
+            return m, nil
+        default:
+            var cmd tea.Cmd
+            prevVal := m.searchInput.Value()
+            m.searchInput, cmd = m.searchInput.Update(msg)
+            if m.searchInput.Value() != prevVal {
+                m.searchGen++
+                return m, tea.Batch(cmd, debounceSearch(m.searchGen))
+            }
+            return m, cmd
+        }
+    }
+
     switch {
     case key.Matches(msg, keys.Quit):
         return m, tea.Quit
@@ -282,6 +347,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             m.updateDetailFromSelection()
         }
     default:
+        if msg.String() == "/" {
+            m.searchInput.EnterInsertMode()
+            return m, nil
+        }
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)
         }
@@ -774,6 +843,13 @@ func (m Model) plainBreadcrumb() string {
     return node.Session
 }
 
+
+func debounceSearch(gen int) tea.Cmd {
+    return func() tea.Msg {
+        time.Sleep(150 * time.Millisecond)
+        return searchDebounceMsg{gen: gen}
+    }
+}
 
 func primaryCWDForPanes(windows map[int][]tmux.Pane) string {
     panes, ok := windows[0]
