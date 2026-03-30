@@ -372,6 +372,26 @@ func TestDefaultPath_ContainsExpectedSuffix(t *testing.T) {
     }
 }
 
+func TestDefaults_AlertSwitchPriority(t *testing.T) {
+    cfg := config.Default()
+    if cfg.AlertSwitchPriority != "severity" {
+        t.Errorf("expected default AlertSwitchPriority=\"severity\", got %q", cfg.AlertSwitchPriority)
+    }
+}
+
+func TestLoadFromFile_AlertSwitchPriority(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    os.WriteFile(path, []byte(`alert_switch_priority = "newest"`), 0644)
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.AlertSwitchPriority != "newest" {
+        t.Errorf("expected \"newest\", got %q", cfg.AlertSwitchPriority)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
