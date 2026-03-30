@@ -530,7 +530,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m *Model) populateYankFields() {
     if m.focus == panelProcList {
         selNode := m.procList.SelectedNode()
-        if selNode != nil && !selNode.IsPaneHeader {
+        if selNode != nil && !selNode.IsPaneHeader && !selNode.IsWindowHeader {
             pr := selNode.Proc
             cwd := m.cwdMap[pr.PID]
             portStr := ""
@@ -697,7 +697,7 @@ func (m *Model) updateDetailFromSelection() {
     // panelProcList focus
     if m.focus == panelProcList {
         selNode := m.procList.SelectedNode()
-        if selNode == nil || selNode.IsPaneHeader {
+        if selNode == nil || selNode.IsPaneHeader || selNode.IsWindowHeader {
             m.detail = DetailModel{}
             return
         }

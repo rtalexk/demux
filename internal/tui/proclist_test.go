@@ -316,9 +316,9 @@ func TestNodeRows_WindowHeader_IsOneRow(t *testing.T) {
     }
 }
 
-func TestIsSelectable_WindowHeader_IsFalse(t *testing.T) {
-    if isSelectable(ProcListNode{IsWindowHeader: true}) {
-        t.Error("expected window header to be non-selectable")
+func TestIsSelectable_WindowHeader_IsTrue(t *testing.T) {
+    if !isSelectable(ProcListNode{IsWindowHeader: true}) {
+        t.Error("expected window header to be selectable")
     }
 }
 

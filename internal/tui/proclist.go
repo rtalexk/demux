@@ -902,7 +902,7 @@ func injectBorderTitles(rendered, leftTitle, rightTitle string) string {
 }
 
 // isSelectable reports whether the cursor may land on n.
-func isSelectable(n ProcListNode) bool { return !n.IsIdle && !n.IsWindowHeader }
+func isSelectable(n ProcListNode) bool { return !n.IsIdle }
 
 // nodeDepth returns the logical depth of a node: 0 for pane headers, otherwise Depth.
 func nodeDepth(n ProcListNode) int {
@@ -1074,7 +1074,7 @@ func (p *ProcListModel) peersAtDepth(pos, depth int) []int {
     if depth == 0 {
         var peers []int
         for i, n := range p.nodes {
-            if n.IsPaneHeader {
+            if n.IsPaneHeader || n.IsWindowHeader {
                 peers = append(peers, i)
             }
         }
@@ -1125,7 +1125,7 @@ func (p *ProcListModel) peersAtDepth(pos, depth int) []int {
 
 func (p *ProcListModel) JumpToNextPane() {
     for i := p.cursor + 1; i < len(p.nodes); i++ {
-        if p.nodes[i].IsPaneHeader {
+        if p.nodes[i].IsPaneHeader || p.nodes[i].IsWindowHeader {
             p.cursor = i
             return
         }
@@ -1134,7 +1134,7 @@ func (p *ProcListModel) JumpToNextPane() {
 
 func (p *ProcListModel) JumpToPrevPane() {
     for i := p.cursor - 1; i >= 0; i-- {
-        if p.nodes[i].IsPaneHeader {
+        if p.nodes[i].IsPaneHeader || p.nodes[i].IsWindowHeader {
             p.cursor = i
             return
         }
