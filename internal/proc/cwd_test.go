@@ -17,3 +17,26 @@ func TestCWDCurrentProcess(t *testing.T) {
         t.Error("expected non-empty cwd")
     }
 }
+
+func TestCWDAll_ContainsSelf(t *testing.T) {
+    m, err := proc.CWDAll()
+    if err != nil {
+        t.Skipf("CWDAll not available: %v", err)
+    }
+    pid := int32(os.Getpid())
+    cwd, ok := m[pid]
+    if !ok {
+        t.Fatalf("own PID %d not in CWDAll result", pid)
+    }
+    if cwd == "" {
+        t.Error("expected non-empty cwd for own PID")
+    }
+}
+
+func BenchmarkCWDAll(b *testing.B) {
+    for b.Loop() {
+        if _, err := proc.CWDAll(); err != nil {
+            b.Fatal(err)
+        }
+    }
+}

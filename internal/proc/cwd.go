@@ -2,6 +2,7 @@ package proc
 
 import (
     "fmt"
+    "os"
     "os/exec"
     "runtime"
     "strconv"
@@ -40,13 +41,18 @@ func cwdLsof(pid int32) (string, error) {
 }
 
 // CWDAll returns a map of PID -> CWD for all accessible processes using a
-// single bulk lsof call on darwin, falling back to per-process gopsutil on
-// other platforms. Use this instead of calling CWD in a loop.
+// single bulk lsof call on darwin, /proc/{pid}/cwd readlinks on linux,
+// falling back to per-process gopsutil on other platforms.
+// Use this instead of calling CWD in a loop.
 func CWDAll() (map[int32]string, error) {
-    if runtime.GOOS != "darwin" {
+    switch runtime.GOOS {
+    case "darwin":
+        return cwdAllLsof()
+    case "linux":
+        return cwdAllProc()
+    default:
         return cwdAllGops()
     }
-    return cwdAllLsof()
 }
 
 func cwdAllLsof() (map[int32]string, error) {
@@ -84,6 +90,28 @@ func cwdAllGops() (map[int32]string, error) {
         if err == nil && cwd != "" {
             m[pid] = cwd
         }
+    }
+    return m, nil
+}
+
+// cwdAllProc reads /proc/{pid}/cwd symlinks directly — Linux only.
+// Faster than cwdAllGops: no gopsutil allocations, just readdir + readlink.
+func cwdAllProc() (map[int32]string, error) {
+    entries, err := os.ReadDir("/proc")
+    if err != nil {
+        return nil, fmt.Errorf("readdir /proc: %w", err)
+    }
+    m := make(map[int32]string, len(entries))
+    for _, e := range entries {
+        pid, err := strconv.ParseInt(e.Name(), 10, 32)
+        if err != nil {
+            continue // skip non-numeric entries (e.g. "self", "net")
+        }
+        link, err := os.Readlink(fmt.Sprintf("/proc/%d/cwd", pid))
+        if err != nil {
+            continue // process may have exited between readdir and readlink
+        }
+        m[int32(pid)] = link
     }
     return m, nil
 }
