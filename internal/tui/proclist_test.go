@@ -5,6 +5,7 @@ import (
     "testing"
 
     "github.com/rtalex/demux/internal/config"
+    "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
@@ -1149,5 +1150,52 @@ func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T)
     }
     if !strings.Contains(plain, "─") {
         t.Errorf("expected fill chars in selected right-align line, got: %q", plain)
+    }
+}
+
+// ---------- windowAlertFromMap ----------
+
+func TestWindowAlertFromMap_ReturnsNilForEmptyMap(t *testing.T) {
+    if windowAlertFromMap(nil, "s", 0) != nil {
+        t.Error("expected nil for nil map")
+    }
+    if windowAlertFromMap(map[string]db.Alert{}, "s", 0) != nil {
+        t.Error("expected nil for empty map")
+    }
+}
+
+func TestWindowAlertFromMap_ReturnsWindowLevelAlert(t *testing.T) {
+    a := db.Alert{Target: "s:0", Level: db.LevelInfo}
+    m := map[string]db.Alert{"s:0": a}
+    got := windowAlertFromMap(m, "s", 0)
+    if got == nil || got.Target != "s:0" {
+        t.Errorf("expected alert for s:0, got %v", got)
+    }
+}
+
+func TestWindowAlertFromMap_ReturnsPaneLevelAlert(t *testing.T) {
+    a := db.Alert{Target: "s:0.1", Level: db.LevelInfo}
+    m := map[string]db.Alert{"s:0.1": a}
+    got := windowAlertFromMap(m, "s", 0)
+    if got == nil || got.Target != "s:0.1" {
+        t.Errorf("expected alert for pane s:0.1, got %v", got)
+    }
+}
+
+func TestWindowAlertFromMap_ReturnsHighestSeverity(t *testing.T) {
+    low := db.Alert{Target: "s:1.0", Level: db.LevelInfo}
+    high := db.Alert{Target: "s:1.1", Level: db.LevelError}
+    m := map[string]db.Alert{"s:1.0": low, "s:1.1": high}
+    got := windowAlertFromMap(m, "s", 1)
+    if got == nil || got.Level != db.LevelError {
+        t.Errorf("expected LevelError, got %v", got)
+    }
+}
+
+func TestWindowAlertFromMap_IgnoresOtherWindows(t *testing.T) {
+    a := db.Alert{Target: "s:2", Level: db.LevelInfo}
+    m := map[string]db.Alert{"s:2": a}
+    if windowAlertFromMap(m, "s", 0) != nil {
+        t.Error("expected nil — window 2 alert should not match window 0")
     }
 }

@@ -16,11 +16,20 @@ func parseTS(s string) time.Time {
     return time.Time{}
 }
 
+// AlertLevel represents the severity of an alert. Higher values are more severe.
+type AlertLevel = string
+
+const (
+    LevelInfo  AlertLevel = "info"
+    LevelWarn  AlertLevel = "warn"
+    LevelError AlertLevel = "error"
+)
+
 type Alert struct {
     ID        int
     Target    string
     Reason    string
-    Level     string
+    Level     AlertLevel
     Sticky    bool
     CreatedAt time.Time
 }

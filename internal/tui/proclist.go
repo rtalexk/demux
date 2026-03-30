@@ -711,6 +711,28 @@ func aggStats(pr proc.Process, tree map[int32][]proc.Process) (cpu float64, mem 
     return
 }
 
+// windowAlertFromMap returns the highest-severity alert for a window from alertMap.
+// It checks the exact window target ("session:N") and all pane targets ("session:N.P").
+func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowIndex int) *db.Alert {
+    if alertMap == nil {
+        return nil
+    }
+    exact := fmt.Sprintf("%s:%d", session, windowIndex)
+    prefix := exact + "."
+    var best *db.Alert
+    for target, a := range alertMap {
+        if target != exact && !strings.HasPrefix(target, prefix) {
+            continue
+        }
+        a := a
+        if best == nil || alertSeverity(a.Level) > alertSeverity(best.Level) ||
+            (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
+            best = &a
+        }
+    }
+    return best
+}
+
 // clampOffset adjusts p.offset so the cursor node is always within the
 // visible row window. maxRows is the total inner height of the proc panel
 // (border already subtracted).
