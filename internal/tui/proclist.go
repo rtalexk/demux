@@ -430,12 +430,38 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     for i, node := range p.nodes {
         selected := focused && i == p.cursor
         var line string
-        if node.IsPaneHeader {
-            line = p.renderPaneHeader(node, selected, innerW)
+        if node.IsWindowHeader {
+            line = p.renderWindowHeader(node, selected, innerW)
+        } else if node.IsPaneHeader {
+            paneInnerW := innerW
+            if p.inSessionMode {
+                paneInnerW -= 4
+                if paneInnerW < 0 {
+                    paneInnerW = 0
+                }
+            }
+            rendered := p.renderPaneHeader(node, selected, paneInnerW)
+            if p.inSessionMode {
+                rendered = "    " + rendered
+            }
+            line = rendered
         } else if node.IsIdle {
-            line = paneIdleStyle.Render("    idle")
+            idleText := "    idle"
+            if p.inSessionMode {
+                idleText = "    " + idleText
+            }
+            line = paneIdleStyle.Render(idleText)
         } else {
-            line = p.renderProc(node, selected)
+            rendered := p.renderProc(node, selected)
+            if p.inSessionMode {
+                parts := strings.SplitN(rendered, "\n", 2)
+                if len(parts) == 2 {
+                    rendered = "    " + parts[0] + "\n" + "    " + parts[1]
+                } else {
+                    rendered = "    " + rendered
+                }
+            }
+            line = rendered
         }
         if filter != "" && !strings.Contains(strings.ToLower(stripANSI(line)), filter) {
             continue
@@ -595,6 +621,60 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
         }
     }
     return out
+}
+
+func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, innerW int) string {
+    label := fmt.Sprintf("Win %d", node.Pane.WindowIndex)
+    if node.Pane.WindowName != "" {
+        label = fmt.Sprintf("Win %d: %s", node.Pane.WindowIndex, node.Pane.WindowName)
+    }
+
+    alertSuffix := ""
+    if node.Alert != nil {
+        alertSuffix = "  " + alertIcon(node.Alert.Level) + " " + node.Alert.Reason
+    }
+
+    pathStr := ""
+    if node.Pane.CWD != "" {
+        pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
+    }
+
+    if selected {
+        text := label + stripANSI(alertSuffix)
+        if pathStr != "" && p.cfg.PanePathRightAlign && innerW > 0 {
+            labelW := len([]rune(label + stripANSI(alertSuffix)))
+            rightW := len([]rune(pathStr))
+            fillCount := innerW - labelW - 2 - 2 - rightW
+            if fillCount < 1 {
+                fillCount = 1
+            }
+            text = label + stripANSI(alertSuffix) + "  " + strings.Repeat("─", fillCount) + "  " + pathStr
+        } else if pathStr != "" {
+            text = label + stripANSI(alertSuffix) + "  " + pathStr
+        }
+        return selectedBG.Render(text)
+    }
+
+    if pathStr == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
+        out := windowHeaderStyle.Render(label) + alertSuffix
+        if pathStr != "" {
+            out += "  " + panePathStyle.Render(pathStr)
+        }
+        return out
+    }
+
+    labelW := len([]rune(label + stripANSI(alertSuffix)))
+    rightW := len([]rune(pathStr))
+    fillCount := innerW - labelW - 2 - 2 - rightW
+    if fillCount < 1 {
+        fillCount = 1
+    }
+    return windowHeaderStyle.Render(label) +
+        alertSuffix +
+        "  " +
+        paneSepStyle.Render(strings.Repeat("─", fillCount)) +
+        "  " +
+        panePathStyle.Render(pathStr)
 }
 
 // procNameStyle returns the appropriate lipgloss style for a process name

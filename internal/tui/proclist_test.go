@@ -1338,3 +1338,37 @@ func TestSetSessionData_SetWindowDataClearsSessionMode(t *testing.T) {
         t.Error("expected inSessionMode=false after SetWindowData")
     }
 }
+
+// ---------- renderWindowHeader smoke test ----------
+
+func TestRender_SessionMode_ContainsWindowHeader(t *testing.T) {
+    panes := []tmux.Pane{
+        {Session: "s", WindowIndex: 0, PaneIndex: 0, WindowName: "edit", CWD: "/proj", PanePID: 500},
+        {Session: "s", WindowIndex: 1, PaneIndex: 0, WindowName: "run", CWD: "/proj", PanePID: 501},
+    }
+    var m ProcListModel
+    m.SetSessionData(panes, "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    out := m.Render(80, 20, false, "procs")
+    plain := stripANSI(out)
+    if !strings.Contains(plain, "Win 1") {
+        t.Errorf("expected 'Win 1' in output, got:\n%s", plain)
+    }
+}
+
+func TestRender_SessionMode_PaneHeaderIndented(t *testing.T) {
+    panes := []tmux.Pane{
+        {Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/proj", PanePID: 600},
+    }
+    var m ProcListModel
+    m.SetSessionData(panes, "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    out := m.Render(80, 20, false, "procs")
+    plain := stripANSI(out)
+    // pane 0 should appear indented with 4 leading spaces
+    if !strings.Contains(plain, "    pane 0") {
+        t.Errorf("expected '    pane 0' (4-space indent) in output, got:\n%s", plain)
+    }
+}
