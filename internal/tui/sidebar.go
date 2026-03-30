@@ -398,7 +398,13 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
             indParts = append(indParts, alertIcon(bestSessionAlert.Level))
         }
     }
-    indicators := strings.Join(indParts, " ")
+    var indicators string
+    if selected && focused {
+        sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+        indicators = strings.Join(indParts, sep)
+    } else {
+        indicators = strings.Join(indParts, " ")
+    }
 
     availW := width - 4
     indW := len([]rune(stripANSI(indicators)))
@@ -463,7 +469,13 @@ func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, wid
             indParts = append(indParts, alertIcon(a.Level))
         }
     }
-    indicators := strings.Join(indParts, " ")
+    var indicators string
+    if selected && focused {
+        sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+        indicators = strings.Join(indParts, sep)
+    } else {
+        indicators = strings.Join(indParts, " ")
+    }
 
     availW := width - 4
     indW := len([]rune(stripANSI(indicators)))
