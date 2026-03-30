@@ -40,7 +40,6 @@ type ProcListModel struct {
     nodes         []ProcListNode
     cursor        int
     offset        int // viewport scroll offset (by node index)
-    filterText    string
     primaryCWD    string
     curSession    string
     curWindow     int
@@ -416,10 +415,6 @@ func (p ProcListModel) CurrentWindow() (string, int) {
     return p.curSession, p.curWindow
 }
 
-func (p *ProcListModel) SetFilter(text string) {
-    p.filterText = text
-}
-
 func (p ProcListModel) Render(width, height int, focused bool, title string) string {
     border := procBorderInactive
     if focused {
@@ -438,9 +433,8 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         inner := noSelectionStyle.Render(hint)
         return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
     }
-    filter := strings.ToLower(p.filterText)
 
-    // build the full rendered line list (respecting filter), tracking node index
+    // build the full rendered line list, tracking node index
     type renderedLine struct {
         nodeIdx int
         text    string
@@ -488,9 +482,6 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                 }
             }
             line = rendered
-        }
-        if filter != "" && !strings.Contains(strings.ToLower(stripANSI(line)), filter) {
-            continue
         }
         allLines = append(allLines, renderedLine{nodeIdx: i, text: line})
     }

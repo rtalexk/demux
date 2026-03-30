@@ -28,9 +28,8 @@ var (
     procBorderInactive lipgloss.Style
 
     // Overlays
-    helpStyle   lipgloss.Style
-    filterStyle lipgloss.Style
-    yankStyle   lipgloss.Style
+    helpStyle lipgloss.Style
+    yankStyle lipgloss.Style
 
     // Sidebar text
     sessionStyle lipgloss.Style
@@ -84,9 +83,8 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
     procBorderActive   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession)
     procBorderInactive = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorBorder)
 
-    helpStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
-    filterStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(0, 1)
-    yankStyle   = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
+    helpStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
+    yankStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 
     sessionStyle    = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
     paneHeaderStyle   = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)

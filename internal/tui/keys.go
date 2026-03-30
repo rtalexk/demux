@@ -6,7 +6,6 @@ type keyMap struct {
     FocusSidebar  key.Binding
     FocusProcList key.Binding
     Yank          key.Binding
-    Filter        key.Binding
     Refresh       key.Binding
     Help          key.Binding
     Quit          key.Binding
@@ -35,7 +34,6 @@ var keys = keyMap{
     FocusSidebar:  key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "sidebar")),
     FocusProcList: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "procs")),
     Yank:          key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank")),
-    Filter:        key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter")),
     Refresh:       key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh")),
     Help:          key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "help")),
     Quit:          key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),

@@ -58,12 +58,10 @@ type Model struct {
     procList ProcListModel
     detail   DetailModel
     yank     YankModel
-    filter   FilterModel
     help     HelpModel
 
-    showYank   bool
-    showFilter bool
-    showHelp   bool
+    showYank bool
+    showHelp bool
 
     pulse        bool
     spinnerFrame int
@@ -84,7 +82,6 @@ func New(cfg config.Config, database *db.DB) Model {
         db:        database,
         focus:     panelSidebar,
         gitInfo:   make(map[string]git.Info),
-        filter:    NewFilterModel(),
         popupMode: os.Getenv("DEMUX_POPUP") == "1",
     }
 }
@@ -164,9 +161,6 @@ func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     // Delegate to overlay handlers first
-    if m.showFilter {
-        return m.updateFilter(msg)
-    }
     if m.showYank {
         return m.updateYank(msg)
     }
@@ -274,9 +268,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Yank):
         m.populateYankFields()
         m.showYank = true
-    case key.Matches(msg, keys.Filter):
-        m.showFilter = true
-        m.filter = NewFilterModel()
     case key.Matches(msg, keys.Refresh):
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
@@ -629,25 +620,6 @@ func (m *Model) updateDetailFromSelection() {
     }
 }
 
-func (m Model) updateFilter(msg tea.Msg) (tea.Model, tea.Cmd) {
-    switch msg := msg.(type) {
-    case tea.KeyMsg:
-        if key.Matches(msg, keys.Esc) {
-            m.showFilter = false
-            m.procList.SetFilter("")
-            return m, nil
-        }
-        if key.Matches(msg, keys.Enter) {
-            m.showFilter = false
-            return m, nil
-        }
-    }
-    var cmd tea.Cmd
-    m.filter, cmd = m.filter.Update(msg)
-    m.procList.SetFilter(m.filter.Value())
-    return m, cmd
-}
-
 func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
     switch msg := msg.(type) {
     case tea.KeyMsg:
@@ -746,9 +718,6 @@ func (m Model) View() string {
     if m.showYank {
         overlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.yank.Render())
         return overlay
-    }
-    if m.showFilter {
-        return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.filter.Render())
     }
 
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
