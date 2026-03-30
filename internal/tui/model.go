@@ -354,7 +354,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
             if node.IsSession {
-                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.AlertSwitchPriority)
+                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.SessionSwitchFocus)
                 if target == "" {
                     target = node.Session
                 }

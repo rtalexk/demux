@@ -1252,3 +1252,15 @@ func TestBestAlertTargetInSession_UnknownPriorityFallsBackToSeverity(t *testing.
         t.Errorf("expected severity fallback to return \"work:2.0\", got %q", got)
     }
 }
+
+func TestBestAlertTargetInSession_DefaultPriority(t *testing.T) {
+    now := time.Now()
+    s := makeSidebarWithAlerts([]db.Alert{
+        {Target: "work:1.0", Level: db.LevelError, CreatedAt: now},
+        {Target: "work:2.0", Level: db.LevelWarn,  CreatedAt: now.Add(-time.Minute)},
+    })
+    // "default" must return "" regardless of what alerts exist
+    if got := s.BestAlertTargetInSession("work", "default"); got != "" {
+        t.Errorf("expected \"\" for default priority, got %q", got)
+    }
+}

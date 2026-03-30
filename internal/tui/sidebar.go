@@ -93,9 +93,13 @@ func (s *SidebarModel) newestSessionAlert(session string) time.Time {
 }
 
 // BestAlertTargetInSession returns the tmux target string of the best alert
-// in the given session according to priority ("severity", "newest", "oldest").
-// Returns "" if the session has no alerts. Unknown priority values fall back to "severity".
+// in the given session according to the session_switch_focus setting.
+// Returns "" for "default" priority or when the session has no alerts.
+// Unknown values fall back to "severity".
 func (s *SidebarModel) BestAlertTargetInSession(session, priority string) string {
+    if priority == "default" {
+        return ""
+    }
     prefix := session + ":"
     var best *db.Alert
     for target, a := range s.alerts {
