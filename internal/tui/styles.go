@@ -90,7 +90,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 
     sessionStyle    = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
     paneHeaderStyle   = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
-    windowHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgPrimary)
+    windowHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
     panePathStyle     = lipgloss.NewStyle().Foreground(t.ColorSession)
     paneSepStyle    = lipgloss.NewStyle().Foreground(t.ColorFgGhost)
     procLine1Style  = lipgloss.NewStyle().Foreground(t.ColorFgPrimary)
