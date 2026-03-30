@@ -30,6 +30,7 @@ type SidebarModel struct {
     sessionActivity map[string]time.Time
     cfg             config.Config
     filterAlerts    bool
+    queryResult     query.Result
 }
 
 func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map[string]git.Info, sessionActivity map[string]time.Time, cfg config.Config) {
@@ -170,6 +171,28 @@ func (s *SidebarModel) rebuildNodes() {
             continue
         }
         s.nodes = append(s.nodes, SidebarNode{Session: name})
+    }
+
+    // Filter and optionally re-sort by search result.
+    if len(s.queryResult.Sessions) > 0 {
+        matchSet := make(map[string]query.SessionMatch, len(s.queryResult.Sessions))
+        for _, sm := range s.queryResult.Sessions {
+            matchSet[sm.Name] = sm
+        }
+
+        filtered := s.nodes[:0]
+        for _, node := range s.nodes {
+            if _, ok := matchSet[node.Session]; ok {
+                filtered = append(filtered, node)
+            }
+        }
+        s.nodes = filtered
+
+        if s.cfg.Sidebar.SearchSort == "score" {
+            sort.SliceStable(s.nodes, func(i, j int) bool {
+                return matchSet[s.nodes[i].Session].Score > matchSet[s.nodes[j].Session].Score
+            })
+        }
     }
 
     found := false
@@ -555,8 +578,14 @@ func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
     return false
 }
 
-// SetSearchResult is a stub for Task 8 — will filter/highlight sidebar by query results.
-func (s *SidebarModel) SetSearchResult(r query.Result) {}
+// SetSearchResult filters and optionally re-sorts the sidebar nodes by the
+// given query result. Passing an empty Result clears any active filter.
+func (s *SidebarModel) SetSearchResult(r query.Result) {
+    s.queryResult = r
+    s.rebuildNodes()
+    s.cursor = 0
+    s.offset = 0
+}
 
 // CursorDown moves the cursor down by one row (used during search insert mode).
 func (s *SidebarModel) CursorDown() {
