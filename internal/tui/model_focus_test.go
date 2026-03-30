@@ -185,7 +185,7 @@ func focusTestModelCollapsed(focusOnOpen string) Model {
 }
 
 // alert_window with all sessions collapsed → should land on the alert *session* node
-func TestFocusOnOpen_AlertWindow_Collapsed_FallsBackToAlertSession(t *testing.T) {
+func TestFocusOnOpen_AlertWindow_Collapsed_LandsOnAlertSession(t *testing.T) {
     m := focusTestModelCollapsed("alert_window")
     m.cfg.FocusOnOpenFallback = ""
     m.height = 40
@@ -217,8 +217,8 @@ func TestFocusOnOpen_FirstWindow_Collapsed_FallsBackToFirstSession(t *testing.T)
     m.height = 40
     m, _ = applyPanesMsg(m, "beta", 0)
     node := m.sidebar.Selected()
-    if node == nil || !node.IsSession {
-        t.Errorf("expected a session node, got %+v", node)
+    if node == nil || !node.IsSession || node.Session != "alpha" {
+        t.Errorf("expected session node alpha, got %+v", node)
     }
 }
 
