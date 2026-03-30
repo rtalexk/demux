@@ -853,8 +853,7 @@ func (m Model) View() string {
     }
     procH := contentH - detailH
 
-    // build sidebar border title: [1] Sessions (N) with optional spinner
-    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+    // build sidebar border title: [1] Sessions (N)
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
     alertFilterMark := ""
@@ -862,14 +861,6 @@ func (m Model) View() string {
         alertFilterMark = " [!]"
     }
     sidebarTitle := fmt.Sprintf(" [1] Sessions %s%s ", sessionCountStr, alertFilterMark)
-    sidebarRightTitle := ""
-    for _, info := range m.gitInfo {
-        if info.Loading {
-            frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-            sidebarRightTitle = fmt.Sprintf(" %s ", spinnerStyle.Render(frame))
-            break
-        }
-    }
 
     // build proc list border title: [2] <session> / <window>
     bc := m.plainBreadcrumb()
@@ -879,7 +870,7 @@ func (m Model) View() string {
     }
     procTitle := " [2] " + bc + procTitleSuffix
 
-    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle, sidebarRightTitle)
+    sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle, "")
     procList := m.procList.Render(procW, procH, m.focus == panelProcList, procTitle)
     detail := m.detail.Render(procW, detailH)
 
@@ -907,10 +898,27 @@ func (m Model) View() string {
         return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.filter.Render())
     }
 
-    statusBar = lipgloss.NewStyle().
-        Width(m.width).
-        MaxHeight(1).
-        Render(statusBar)
+    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+    spinnerStr := ""
+    for _, info := range m.gitInfo {
+        if info.Loading {
+            frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+            spinnerStr = " " + spinnerStyle.Render(frame) + " "
+            break
+        }
+    }
+    if spinnerStr != "" {
+        leftWidth := m.width - lipgloss.Width(spinnerStr)
+        statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
+            lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
+            spinnerStr,
+        )
+    } else {
+        statusBar = lipgloss.NewStyle().
+            Width(m.width).
+            MaxHeight(1).
+            Render(statusBar)
+    }
 
     return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 }
