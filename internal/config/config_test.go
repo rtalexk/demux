@@ -3,6 +3,7 @@ package config_test
 import (
     "os"
     "path/filepath"
+    "strings"
     "testing"
 
     "github.com/rtalex/demux/internal/config"
@@ -357,6 +358,17 @@ func TestLoadFromFile_FocusOnOpenFallback(t *testing.T) {
     }
     if cfg.FocusOnOpenFallback != "first_window" {
         t.Errorf("expected \"first_window\", got %q", cfg.FocusOnOpenFallback)
+    }
+}
+
+func TestDefaultPath_ContainsExpectedSuffix(t *testing.T) {
+    path, err := config.DefaultPath()
+    if err != nil {
+        t.Skipf("UserHomeDir not available: %v", err)
+    }
+    const suffix = ".config/demux/demux.toml"
+    if !strings.HasSuffix(path, suffix) {
+        t.Errorf("DefaultPath() = %q, want suffix %q", path, suffix)
     }
 }
 

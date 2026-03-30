@@ -45,6 +45,7 @@ func init() {
 func loadConfig() config.Config {
     path, err := config.DefaultPath()
     if err != nil {
+        // Home directory unavailable; use built-in defaults.
         return config.Default()
     }
     cfg, _ := config.Load(path)
