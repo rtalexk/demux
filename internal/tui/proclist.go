@@ -175,6 +175,145 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
     assignTreePrefixes(p.nodes)
 }
 
+// SetSessionData rebuilds the node list for all windows of a session.
+// A window header node (IsWindowHeader=true) is emitted before each window's
+// pane and process nodes. Pane CWD is suppressed when it matches the window CWD.
+func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
+    p.cfg = cfg
+    p.inSessionMode = true
+
+    grouped := tmux.GroupBySessions(panes)
+    windows := grouped[session]
+    tree := proc.BuildTree(procs)
+
+    if p.collapsedPIDs == nil {
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+
+    sessionChanged := session != p.curSession || p.curWindow != -1
+    p.curSession = session
+    p.curWindow = -1
+    p.nodes = nil
+    if sessionChanged {
+        p.cursor = 0
+        p.offset = 0
+        p.collapsedPIDs = make(map[int32]bool)
+    }
+
+    winIdxs := make([]int, 0, len(windows))
+    for wi := range windows {
+        winIdxs = append(winIdxs, wi)
+    }
+    sort.Ints(winIdxs)
+
+    for _, wi := range winIdxs {
+        wPanes := sortPanes(windows[wi])
+        if len(wPanes) == 0 {
+            continue
+        }
+        winCWD := wPanes[0].CWD
+
+        p.nodes = append(p.nodes, ProcListNode{
+            IsWindowHeader: true,
+            Pane:           wPanes[0],
+            Alert:          windowAlertFromMap(alertMap, session, wi),
+        })
+
+        for _, pane := range wPanes {
+            paneCWD := pane.CWD
+            gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+            info := gitInfo[gitKey]
+            deviant := winCWD != "" && !git.IsDescendant(paneCWD, winCWD) && paneCWD != winCWD
+
+            displayPane := pane
+            if paneCWD == winCWD {
+                displayPane.CWD = ""
+            }
+
+            headerIdx := len(p.nodes)
+            var paneAlert *db.Alert
+            if alertMap != nil {
+                paneKey := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+                if a, ok := alertMap[paneKey]; ok {
+                    paneAlert = &a
+                }
+            }
+            p.nodes = append(p.nodes, ProcListNode{
+                IsPaneHeader: true,
+                Pane:         displayPane,
+                GitDeviant:   deviant,
+                GitInfo:      info,
+                Alert:        paneAlert,
+            })
+
+            seen := make(map[int32]bool)
+            var children []proc.Process
+            if pane.PanePID != 0 {
+                children = tree[pane.PanePID]
+            } else {
+                for _, pr := range procs {
+                    cwd, ok := cwdMap[pr.PID]
+                    if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
+                        continue
+                    }
+                    children = append(children, pr)
+                }
+            }
+            var addProc func(pr proc.Process, depth int)
+            addProc = func(pr proc.Process, depth int) {
+                if seen[pr.PID] {
+                    return
+                }
+                seen[pr.PID] = true
+                if containsStr(activeIgnoredProcs, strings.ToLower(pr.FriendlyName())) {
+                    for _, child := range tree[pr.PID] {
+                        addProc(child, depth)
+                    }
+                    return
+                }
+                var hasChildren bool
+                var aggCPU float64
+                var aggMem uint64
+                var collapsed bool
+                if depth == 1 {
+                    for _, child := range tree[pr.PID] {
+                        if !containsStr(activeIgnoredProcs, strings.ToLower(child.FriendlyName())) {
+                            hasChildren = true
+                            break
+                        }
+                    }
+                    aggCPU, aggMem = aggStats(pr, tree)
+                    if _, ok := p.collapsedPIDs[pr.PID]; !ok {
+                        p.collapsedPIDs[pr.PID] = true
+                    }
+                    collapsed = p.collapsedPIDs[pr.PID]
+                }
+                p.nodes = append(p.nodes, ProcListNode{
+                    Proc:        pr,
+                    Depth:       depth,
+                    HasChildren: hasChildren,
+                    Collapsed:   collapsed,
+                    AggCPU:      aggCPU,
+                    AggMemRSS:   aggMem,
+                })
+                if depth == 1 && collapsed {
+                    return
+                }
+                for _, child := range tree[pr.PID] {
+                    addProc(child, depth+1)
+                }
+            }
+            for _, pr := range children {
+                addProc(pr, 1)
+            }
+            if len(p.nodes) == headerIdx+1 {
+                p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
+            }
+        }
+    }
+    assignTreePrefixes(p.nodes)
+}
+
 func sortPanes(panes []tmux.Pane) []tmux.Pane {
     sorted := make([]tmux.Pane, len(panes))
     copy(sorted, panes)

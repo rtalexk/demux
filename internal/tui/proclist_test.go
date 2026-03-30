@@ -1199,3 +1199,142 @@ func TestWindowAlertFromMap_IgnoresOtherWindows(t *testing.T) {
         t.Error("expected nil — window 2 alert should not match window 0")
     }
 }
+
+// ---------- SetSessionData ----------
+
+func buildSessionPanes() []tmux.Pane {
+    return []tmux.Pane{
+        // window 0, pane 0 — shell PID 10
+        {Session: "s", WindowIndex: 0, PaneIndex: 0, WindowName: "editor", CWD: "/proj", PanePID: 10},
+        // window 0, pane 1 — shell PID 11, same CWD
+        {Session: "s", WindowIndex: 0, PaneIndex: 1, WindowName: "editor", CWD: "/proj", PanePID: 11},
+        // window 1, pane 0 — shell PID 20, different CWD
+        {Session: "s", WindowIndex: 1, PaneIndex: 0, WindowName: "server", CWD: "/other", PanePID: 20},
+    }
+}
+
+func TestSetSessionData_EmitsWindowHeaders(t *testing.T) {
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    if !m.inSessionMode {
+        t.Error("expected inSessionMode=true after SetSessionData")
+    }
+    if len(m.nodes) == 0 {
+        t.Fatal("expected nodes to be populated")
+    }
+    if !m.nodes[0].IsWindowHeader {
+        t.Error("expected first node to be a window header")
+    }
+    if m.nodes[0].Pane.WindowIndex != 0 {
+        t.Errorf("expected window index 0, got %d", m.nodes[0].Pane.WindowIndex)
+    }
+    if m.nodes[0].Pane.WindowName != "editor" {
+        t.Errorf("expected window name 'editor', got %q", m.nodes[0].Pane.WindowName)
+    }
+}
+
+func TestSetSessionData_WindowsOrderedByIndex(t *testing.T) {
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    var winHeaders []int
+    for _, n := range m.nodes {
+        if n.IsWindowHeader {
+            winHeaders = append(winHeaders, n.Pane.WindowIndex)
+        }
+    }
+    if len(winHeaders) != 2 {
+        t.Fatalf("expected 2 window headers, got %d", len(winHeaders))
+    }
+    if winHeaders[0] != 0 || winHeaders[1] != 1 {
+        t.Errorf("expected windows [0, 1], got %v", winHeaders)
+    }
+}
+
+func TestSetSessionData_SuppressPaneCWDWhenMatchesWindowCWD(t *testing.T) {
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    // pane 0 and pane 1 of window 0 both have CWD "/proj" == window CWD — should be suppressed
+    for _, n := range m.nodes {
+        if n.IsPaneHeader && n.Pane.WindowIndex == 0 {
+            if n.Pane.CWD != "" {
+                t.Errorf("expected pane CWD suppressed for window 0 pane %d, got %q",
+                    n.Pane.PaneIndex, n.Pane.CWD)
+            }
+        }
+    }
+}
+
+func TestSetSessionData_ShowsPaneCWDWhenDivergent(t *testing.T) {
+    panes := []tmux.Pane{
+        {Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/proj", PanePID: 10},
+        {Session: "s", WindowIndex: 0, PaneIndex: 1, CWD: "/other", PanePID: 11}, // divergent
+    }
+    var m ProcListModel
+    m.SetSessionData(panes, "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    found := false
+    for _, n := range m.nodes {
+        if n.IsPaneHeader && n.Pane.PaneIndex == 1 {
+            found = true
+            if n.Pane.CWD != "/other" {
+                t.Errorf("expected divergent pane CWD '/other', got %q", n.Pane.CWD)
+            }
+        }
+    }
+    if !found {
+        t.Error("pane 1 header not found")
+    }
+}
+
+func TestSetSessionData_SetsWindowAlert(t *testing.T) {
+    a := db.Alert{Target: "s:0", Level: db.LevelInfo}
+    alertMap := map[string]db.Alert{"s:0": a}
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
+    )
+    if m.nodes[0].Alert == nil {
+        t.Error("expected window header to carry alert")
+    }
+}
+
+func TestSetSessionData_ResetsCursorOnSessionChange(t *testing.T) {
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    m.cursor = 3
+    m.offset = 2
+    // change to different session — should reset cursor and offset
+    m.SetSessionData(buildSessionPanes(), "other",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    if m.cursor != 0 || m.offset != 0 {
+        t.Errorf("expected cursor=0 offset=0 after session change, got cursor=%d offset=%d",
+            m.cursor, m.offset)
+    }
+}
+
+func TestSetSessionData_SetWindowDataClearsSessionMode(t *testing.T) {
+    pane := buildTestPane(100)
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    if !m.inSessionMode {
+        t.Fatal("expected inSessionMode=true")
+    }
+    m.SetWindowData([]tmux.Pane{pane}, "test", 0,
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    if m.inSessionMode {
+        t.Error("expected inSessionMode=false after SetWindowData")
+    }
+}
