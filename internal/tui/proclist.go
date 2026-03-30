@@ -468,7 +468,14 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
             }
             line = paneIdleStyle.Render(idleText)
         } else {
-            rendered := p.renderProc(node, selected)
+            procInnerW := innerW
+            if p.inSessionMode {
+                procInnerW = innerW - 4
+                if procInnerW < 0 {
+                    procInnerW = 0
+                }
+            }
+            rendered := p.renderProc(node, selected, procInnerW)
             if p.inSessionMode {
                 parts := strings.SplitN(rendered, "\n", 2)
                 if len(parts) == 2 {
@@ -737,7 +744,7 @@ func containsStr(list []string, s string) bool {
     return false
 }
 
-func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
+func (p ProcListModel) renderProc(node ProcListNode, selected bool, innerW int) string {
     pr := node.Proc
     indent := node.TreePrefix
 
@@ -754,15 +761,26 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool) string {
     // line 1: [indicator]name  pid:N  :port
     var line1 string
     if selected {
-        line1 = selectedBG.Render(indent + collapsePrefix + pr.FriendlyName())
+        plain := indent + collapsePrefix + pr.FriendlyName()
+        if pr.PID > 0 {
+            plain += fmt.Sprintf("  pid:%d", pr.PID)
+        }
+        if node.Port > 0 {
+            plain += fmt.Sprintf("  :%d", node.Port)
+        }
+        padCount := innerW - len([]rune(plain))
+        if padCount < 0 {
+            padCount = 0
+        }
+        line1 = selectedBG.Render(plain + strings.Repeat(" ", padCount))
     } else {
         line1 = treeConnectorStyle.Render(indent) + procNameStyle(pr, node.Depth).Render(collapsePrefix+pr.FriendlyName())
-    }
-    if pr.PID > 0 {
-        line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
-    }
-    if node.Port > 0 {
-        line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
+        if pr.PID > 0 {
+            line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
+        }
+        if node.Port > 0 {
+            line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
+        }
     }
 
     // line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children

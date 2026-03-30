@@ -900,7 +900,7 @@ func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testi
         TreePrefix:  "  └─ ",
         StatPrefix:  "     ",
     }
-    line := m.renderProc(node, false)
+    line := m.renderProc(node, false, 80)
     plain := stripANSI(line)
     if !strings.Contains(plain, "▶") {
         t.Errorf("expected ▶ prefix for collapsed node, got: %s", plain)
@@ -928,7 +928,7 @@ func TestRenderProc_ExpandedWithChildren_ShowsDownTriangle_NoAggStats(t *testing
         TreePrefix:  "  └─ ",
         StatPrefix:  "     ",
     }
-    line := m.renderProc(node, false)
+    line := m.renderProc(node, false, 80)
     plain := stripANSI(line)
     if !strings.Contains(plain, "▼") {
         t.Errorf("expected ▼ prefix for expanded node with children, got: %s", plain)
@@ -950,7 +950,7 @@ func TestRenderProc_NoChildren_NoTriangle(t *testing.T) {
         TreePrefix:  "  └─ ",
         StatPrefix:  "     ",
     }
-    line := m.renderProc(node, false)
+    line := m.renderProc(node, false, 80)
     plain := stripANSI(line)
     if strings.Contains(plain, "▶") || strings.Contains(plain, "▼") {
         t.Errorf("no triangle expected for node without children, got: %s", plain)
@@ -1148,8 +1148,9 @@ func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T)
     if !strings.Contains(plain, "/home/user/project") {
         t.Errorf("expected path in selected right-align line, got: %q", plain)
     }
-    if !strings.Contains(plain, "─") {
-        t.Errorf("expected fill chars in selected right-align line, got: %q", plain)
+    // selected rows use space padding, not separator chars
+    if strings.Contains(plain, "─") {
+        t.Errorf("selected right-align line should not contain separator chars, got: %q", plain)
     }
 }
 
