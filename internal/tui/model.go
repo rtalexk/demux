@@ -205,7 +205,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             m.ready = true
             cmds = append(cmds, tick(), m.fetchAlerts())
             // If startup focus landed on a window node, kick off an initial proc fetch.
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+            if node := m.sidebar.Selected(); node != nil {
                 m.procGen++
                 cmds = append(cmds, m.scheduleProcFetch())
             }
@@ -229,8 +229,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         }
         m.procs = msg.procs
         m.cwdMap = msg.cwdMap
-        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+        if node := m.sidebar.Selected(); node != nil {
+            if node.IsSession {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            } else {
+                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            }
         }
         m.updateDetailFromSelection()
         // Self-schedule next poll in 2s for the selected window.
@@ -255,7 +259,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.updateDetailFromSelection()
         // If startup focus landed on a window node, kick off an initial proc fetch.
         var startupProcCmd tea.Cmd
-        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+        if node := m.sidebar.Selected(); node != nil {
             m.procGen++
             startupProcCmd = m.scheduleProcFetch()
         }
@@ -372,7 +376,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     }
     // auto-populate proc list whenever a window node is highlighted (no Enter needed)
     // Trigger a fresh proc fetch when the highlighted window changes.
-    // Clear the proc list when a session node is highlighted.
+    // Populate proc list: window data for window nodes, session overview for session nodes.
     var cmd tea.Cmd
     if node := m.sidebar.Selected(); node != nil {
         if !node.IsSession {
@@ -383,7 +387,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 cmd = m.scheduleProcFetch()
             }
         } else {
-            m.procList.Reset()
+            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            m.procGen++
+            cmd = m.scheduleProcFetch()
         }
     }
     m.updateDetailFromSelection()
@@ -426,8 +432,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         if m.procList.ToggleCollapse() {
             // Rebuild immediately with current data. The nil guard is defensive: if the
             // sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            if node := m.sidebar.Selected(); node != nil {
+                if node.IsSession {
+                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                } else {
+                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                }
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
@@ -451,8 +461,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
     case key.Matches(msg, keys.Expand):
         if m.procList.Expand() {
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            if node := m.sidebar.Selected(); node != nil {
+                if node.IsSession {
+                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                } else {
+                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                }
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
@@ -461,8 +475,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
     case key.Matches(msg, keys.Collapse):
         if m.procList.Collapse() {
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            if node := m.sidebar.Selected(); node != nil {
+                if node.IsSession {
+                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                } else {
+                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                }
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
@@ -471,8 +489,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
     case key.Matches(msg, keys.ExpandAll):
         if m.procList.ExpandAll() {
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            if node := m.sidebar.Selected(); node != nil {
+                if node.IsSession {
+                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                } else {
+                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                }
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
@@ -481,8 +503,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
     case key.Matches(msg, keys.CollapseAll):
         if m.procList.CollapseAll() {
-            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            if node := m.sidebar.Selected(); node != nil {
+                if node.IsSession {
+                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                } else {
+                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                }
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
