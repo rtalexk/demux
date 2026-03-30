@@ -175,3 +175,63 @@ func TestFocusOnOpen_SubsequentAlerts_DoNotRefocus(t *testing.T) {
         t.Errorf("expected cursor to remain on beta:0 after sort-order-changing alertsMsg, got %+v", node)
     }
 }
+
+func focusTestModelCollapsed(focusOnOpen string) Model {
+    cfg := config.Default()
+    cfg.FocusOnOpen = focusOnOpen
+    cfg.SessionsCollapsed = true
+    database, _ := db.Open(":memory:")
+    return New(cfg, database)
+}
+
+// alert_window with all sessions collapsed → should land on the alert *session* node
+func TestFocusOnOpen_AlertWindow_Collapsed_FallsBackToAlertSession(t *testing.T) {
+    m := focusTestModelCollapsed("alert_window")
+    m.cfg.FocusOnOpenFallback = ""
+    m.height = 40
+    m, _ = applyPanesMsg(m, "alpha", 0)
+    alerts := []db.Alert{
+        {Target: "beta:0", Level: "warn", CreatedAt: time.Now()},
+    }
+    m, _ = applyAlertsMsg(m, alerts)
+    node := m.sidebar.Selected()
+    if node == nil || !node.IsSession || node.Session != "beta" {
+        t.Errorf("expected session node beta, got %+v", node)
+    }
+}
+
+// current_window with all sessions collapsed → should land on the current *session* node
+func TestFocusOnOpen_CurrentWindow_Collapsed_FallsBackToCurrentSession(t *testing.T) {
+    m := focusTestModelCollapsed("current_window")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    node := m.sidebar.Selected()
+    if node == nil || !node.IsSession || node.Session != "beta" {
+        t.Errorf("expected session node beta, got %+v", node)
+    }
+}
+
+// first_window with all sessions collapsed → cursor stays at first session (index 0)
+func TestFocusOnOpen_FirstWindow_Collapsed_FallsBackToFirstSession(t *testing.T) {
+    m := focusTestModelCollapsed("first_window")
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    node := m.sidebar.Selected()
+    if node == nil || !node.IsSession {
+        t.Errorf("expected a session node, got %+v", node)
+    }
+}
+
+// alert_window collapsed + no alerts → applies focus_on_open_fallback
+func TestFocusOnOpen_AlertWindow_Collapsed_NoAlerts_AppliesFallback(t *testing.T) {
+    m := focusTestModelCollapsed("alert_window")
+    m.cfg.FocusOnOpenFallback = "current_window"
+    m.height = 40
+    m, _ = applyPanesMsg(m, "beta", 0)
+    m, _ = applyAlertsMsg(m, nil)
+    // No alerts + collapsed → fallback "current_window" also collapses → current session
+    node := m.sidebar.Selected()
+    if node == nil || !node.IsSession || node.Session != "beta" {
+        t.Errorf("expected session node beta via fallback, got %+v", node)
+    }
+}
