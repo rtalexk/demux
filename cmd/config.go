@@ -45,6 +45,7 @@ sidebar_width = 30
 alert_filter_windows = "all"
 
 # Where to position the sidebar cursor on open: current_window | current_session | alert_window | alert_session | first_window | first_session
+# When sessions are collapsed, *_window values automatically fall back to their *_session equivalent
 focus_on_open = "current_window"
 
 # When alert_window or alert_session finds no alerts, fall back to this mode (any non-alert focus_on_open value)
