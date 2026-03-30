@@ -196,6 +196,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
         m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(msg.panes), m.cfg)
+        if m.searchInput.IsActive() {
+            m.sidebar.SetSearchResult(m.queryResult)
+        }
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -317,6 +320,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             prevVal := m.searchInput.Value()
             m.searchInput, cmd = m.searchInput.Update(msg)
             if m.searchInput.Value() != prevVal {
+                if m.searchInput.Value() == "" {
+                    // Input cleared: reset immediately without waiting for debounce.
+                    m.queryResult = query.Result{}
+                    m.sidebar.SetSearchResult(query.Result{})
+                    m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
+                    m.searchGen++ // cancel any in-flight query
+                    return m, cmd
+                }
                 m.searchGen++
                 return m, tea.Batch(cmd, debounceSearch(m.searchGen))
             }
