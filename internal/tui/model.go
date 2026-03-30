@@ -309,7 +309,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 return m, m.scheduleProcFetch()
             }
         } else {
-            m.procList.Reset()
+            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
         }
     default:
@@ -374,8 +374,6 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
     }
-    // auto-populate proc list whenever a window node is highlighted (no Enter needed)
-    // Trigger a fresh proc fetch when the highlighted window changes.
     // Populate proc list: window data for window nodes, session overview for session nodes.
     var cmd tea.Cmd
     if node := m.sidebar.Selected(); node != nil {
