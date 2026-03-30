@@ -108,7 +108,7 @@ type Config struct {
     FocusOnOpenFallback string      `toml:"focus_on_open_fallback"`
     PanePathRightAlign  bool        `toml:"pane_path_right_align"`
     SessionsCollapsed   bool        `toml:"sessions_collapsed"`
-    AlertSwitchPriority  string      `toml:"alert_switch_priority"`
+    SessionSwitchFocus  string      `toml:"session_switch_focus"`
     SessionSort         []string    `toml:"session_sort"`
     Git                 GitConfig   `toml:"git"`
     Theme              ThemeConfig `toml:"theme"`
@@ -126,7 +126,7 @@ func Default() Config {
         AlertFilterWindows:  "all",
         FocusOnOpen:         "current_window",
         FocusOnOpenFallback: "current_window",
-        AlertSwitchPriority:  "severity",
+        SessionSwitchFocus:  "severity",
         SessionSort:        []string{"priority", "last_seen", "alphabetical"},
         Git: GitConfig{
             Enabled:         true,
