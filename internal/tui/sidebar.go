@@ -179,7 +179,7 @@ func (s *SidebarModel) rebuildNodes() {
         }
         exp, ok := expanded[name]
         if !ok {
-            exp = true // default expanded
+            exp = !s.cfg.SessionsCollapsed
         }
         s.nodes = append(s.nodes, SidebarNode{Session: name, IsSession: true, Expanded: exp})
         if exp {

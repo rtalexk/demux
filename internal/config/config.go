@@ -107,6 +107,7 @@ type Config struct {
     FocusOnOpen         string      `toml:"focus_on_open"`
     FocusOnOpenFallback string      `toml:"focus_on_open_fallback"`
     PanePathRightAlign  bool        `toml:"pane_path_right_align"`
+    SessionsCollapsed   bool        `toml:"sessions_collapsed"`
     SessionSort         []string    `toml:"session_sort"`
     Git                 GitConfig   `toml:"git"`
     Theme              ThemeConfig `toml:"theme"`

@@ -57,6 +57,9 @@ session_sort = ["priority", "last_seen", "alphabetical"]
 # Right-align pane CWD paths in the process list, with a fill separator
 pane_path_right_align = false
 
+# Start with all sessions collapsed in the sidebar (windows hidden until expanded)
+sessions_collapsed = false
+
 # Path prefix aliases — shorten verbose absolute paths in the TUI.
 # Both prefix and replace support environment variables.
 # Longest matching prefix wins. Example:
