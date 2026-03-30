@@ -992,25 +992,11 @@ func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowInde
     if alertMap == nil {
         return nil
     }
-    windowKey := fmt.Sprintf("%s:%d", session, windowIndex)
-    panePrefix := windowKey + "."
-    var best *db.Alert
-    for k, a := range alertMap {
-        a := a
-        var candidate *db.Alert
-        if k == windowKey {
-            candidate = &a
-        } else if strings.HasPrefix(k, panePrefix) {
-            candidate = &a
-        }
-        if candidate == nil {
-            continue
-        }
-        if best == nil || alertSeverity(candidate.Level) > alertSeverity(best.Level) {
-            best = candidate
-        }
+    exact := fmt.Sprintf("%s:%d", session, windowIndex)
+    if a, ok := alertMap[exact]; ok {
+        return &a
     }
-    return best
+    return nil
 }
 
 // cursorNodeKey returns a stable string identity for the node at the cursor so

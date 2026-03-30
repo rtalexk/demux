@@ -1303,22 +1303,24 @@ func TestWindowAlertFromMap_ReturnsWindowLevelAlert(t *testing.T) {
     }
 }
 
-func TestWindowAlertFromMap_ReturnsPaneLevelAlert(t *testing.T) {
+func TestWindowAlertFromMap_IgnoresPaneLevelAlert(t *testing.T) {
+    // Pane-level alerts (session:N.P) must NOT appear on window headers —
+    // they are displayed exclusively on their pane row to avoid duplication.
     a := db.Alert{Target: "s:0.1", Level: db.LevelInfo}
     m := map[string]db.Alert{"s:0.1": a}
-    got := windowAlertFromMap(m, "s", 0)
-    if got == nil || got.Target != "s:0.1" {
-        t.Errorf("expected alert for pane s:0.1, got %v", got)
+    if windowAlertFromMap(m, "s", 0) != nil {
+        t.Error("expected nil — pane-level alert s:0.1 must not appear on window 0 header")
     }
 }
 
-func TestWindowAlertFromMap_ReturnsHighestSeverity(t *testing.T) {
-    low := db.Alert{Target: "s:1.0", Level: db.LevelInfo}
-    high := db.Alert{Target: "s:1.1", Level: db.LevelError}
-    m := map[string]db.Alert{"s:1.0": low, "s:1.1": high}
+func TestWindowAlertFromMap_ReturnsWindowAlertAlongsidePaneAlerts(t *testing.T) {
+    // A window-level alert coexists with pane alerts; only the window key is returned.
+    win := db.Alert{Target: "s:1", Level: db.LevelWarn}
+    pane := db.Alert{Target: "s:1.0", Level: db.LevelError}
+    m := map[string]db.Alert{"s:1": win, "s:1.0": pane}
     got := windowAlertFromMap(m, "s", 1)
-    if got == nil || got.Level != db.LevelError {
-        t.Errorf("expected LevelError, got %v", got)
+    if got == nil || got.Target != "s:1" {
+        t.Errorf("expected window-level alert s:1, got %v", got)
     }
 }
 
