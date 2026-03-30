@@ -1356,8 +1356,8 @@ func (p *ProcListModel) Expand() bool {
 }
 
 // Collapse collapses the focused node. For depth-1 nodes with children it collapses
-// directly; for depth-2 nodes it walks up to the parent depth-1 node, moves the cursor
-// there, and collapses it. Returns true if a change occurred; the caller must re-call SetWindowData.
+// directly; for nodes at any deeper depth it walks up to the ancestor depth-1 node, moves
+// the cursor there, and collapses it. Returns true if a change occurred; the caller must re-call SetWindowData.
 func (p *ProcListModel) Collapse() bool {
     if p.cursor < 0 || p.cursor >= len(p.nodes) {
         return false
@@ -1369,7 +1369,7 @@ func (p *ProcListModel) Collapse() bool {
     if p.collapsedPIDs == nil {
         p.collapsedPIDs = make(map[int32]bool)
     }
-    if n.Depth == 2 {
+    if n.Depth > 1 {
         // Walk up to the parent depth-1 node.
         for i := p.cursor - 1; i >= 0; i-- {
             if p.nodes[i].IsPaneHeader {
