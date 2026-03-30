@@ -308,7 +308,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                 m.procGen++
                 return m, m.scheduleProcFetch()
             }
-        } else {
+        } else if node != nil {
             m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
         }

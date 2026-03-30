@@ -324,7 +324,7 @@ func sortPanes(panes []tmux.Pane) []tmux.Pane {
 }
 
 // assignTreePrefixes fills TreePrefix and StatPrefix on every non-header node.
-// It must be called after p.nodes is fully built by SetWindowData.
+// It must be called after p.nodes is fully built by SetWindowData or SetSessionData.
 //
 // Connectors used:
 //   "├─ " non-last sibling at this depth
