@@ -50,11 +50,12 @@ focus_on_open = "current_window"
 # When alert_window or alert_session finds no alerts, fall back to this mode (any non-alert focus_on_open value)
 focus_on_open_fallback = "current_window"
 
-# When opening a session with alerts, which alerted window to navigate to:
-#   severity — highest severity wins; newest CreatedAt breaks ties
-#   newest   — most recent CreatedAt wins
-#   oldest   — oldest CreatedAt wins
-alert_switch_priority = "severity"
+# Which window to focus when switching to a session: default | severity | newest | oldest
+#   default  — let tmux use its last-focused window
+#   severity — navigate to highest-severity alerted window; newest tiebreaker
+#   newest   — navigate to most recently alerted window
+#   oldest   — navigate to oldest alerted window
+session_switch_focus = "severity"
 
 # Session sort order — first key wins, missing keys filled from default order
 # Valid keys: priority | last_seen | alphabetical
