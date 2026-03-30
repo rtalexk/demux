@@ -182,7 +182,6 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
     p.cfg = cfg
     p.inSessionMode = true
-    p.primaryCWD = ""
 
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
@@ -207,6 +206,16 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
         winIdxs = append(winIdxs, wi)
     }
     sort.Ints(winIdxs)
+
+    // Compute session-level primary CWD from the first window's first pane.
+    p.primaryCWD = ""
+    for _, wi := range winIdxs {
+        ps := sortPanes(windows[wi])
+        if len(ps) > 0 {
+            p.primaryCWD = ps[0].CWD
+            break
+        }
+    }
 
     for _, wi := range winIdxs {
         wPanes := sortPanes(windows[wi])
@@ -414,10 +423,17 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         border = procBorderActive
     }
     innerW := width - 2
+
+    // Right border title: show the primary CWD (session or window path).
+    rightTitle := ""
+    if p.primaryCWD != "" {
+        rightTitle = " " + format.ShortenPath(p.primaryCWD, p.cfg.PathAliases) + " "
+    }
+
     if len(p.nodes) == 0 {
         hint := "Select a window with Enter"
         inner := noSelectionStyle.Render(hint)
-        return injectBorderTitle(border.Width(width-2).Height(height-2).Render(inner), title)
+        return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
     }
     filter := strings.ToLower(p.filterText)
 
@@ -542,7 +558,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     }
 
     inner := strings.Join(resultLines, "\n")
-    return injectBorderTitle(border.Width(width-2).Height(height-2).Render(inner), title)
+    return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
 }
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int) string {
@@ -554,7 +570,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     }
 
     pathStr := ""
-    if node.Pane.CWD != "" {
+    if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {
         pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
     }
     gitSuffix := ""
@@ -567,27 +583,35 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     }
 
     if selected {
-        text := label + stripANSI(alertSuffix)
-        if pathStr != "" {
-            if p.cfg.PanePathRightAlign && innerW > 0 {
-                labelW := len([]rune(label + stripANSI(alertSuffix)))
-                rightPart := pathStr + gitSuffix
-                rightW := len([]rune(rightPart))
-                fillCount := innerW - labelW - 2 - 2 - rightW
-                if fillCount < 1 {
-                    fillCount = 1
-                }
-                text = label + stripANSI(alertSuffix) + "  " + strings.Repeat("─", fillCount) + "  " + rightPart
-            } else {
-                text = label + stripANSI(alertSuffix) + "  " + pathStr + gitSuffix
+        left := label + stripANSI(alertSuffix)
+        rightPart := pathStr + gitSuffix
+        if rightPart != "" && p.cfg.PanePathRightAlign && innerW > 0 {
+            rightW := len([]rune(rightPart))
+            padCount := innerW - len([]rune(left)) - rightW
+            if padCount < 1 {
+                padCount = 1
             }
+            return selectedBG.Render(left + strings.Repeat(" ", padCount) + rightPart)
         }
-        return selectedBG.Render(text)
+        if rightPart != "" {
+            content := left + "  " + rightPart
+            padCount := innerW - len([]rune(content))
+            if padCount < 0 {
+                padCount = 0
+            }
+            return selectedBG.Render(content + strings.Repeat(" ", padCount))
+        }
+        padCount := innerW - len([]rune(left))
+        if padCount < 0 {
+            padCount = 0
+        }
+        return selectedBG.Render(left + strings.Repeat(" ", padCount))
     }
 
-    if node.Pane.CWD == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
+    rightPart := pathStr + gitSuffix
+    if rightPart == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
         out := paneHeaderStyle.Render(label) + alertSuffix
-        if node.Pane.CWD != "" {
+        if pathStr != "" {
             out += "  " + panePathStyle.Render(pathStr)
         }
         if node.GitDeviant {
@@ -601,7 +625,6 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
     }
 
     labelW := len([]rune(label + stripANSI(alertSuffix)))
-    rightPart := pathStr + gitSuffix
     rightW := len([]rune(rightPart))
     fillCount := innerW - labelW - 2 - 2 - rightW
     if fillCount < 1 {
@@ -635,24 +658,33 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
     }
 
     pathStr := ""
-    if node.Pane.CWD != "" {
+    if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {
         pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
     }
 
     if selected {
-        text := label + stripANSI(alertSuffix)
+        left := label + stripANSI(alertSuffix)
         if pathStr != "" && p.cfg.PanePathRightAlign && innerW > 0 {
-            labelW := len([]rune(label + stripANSI(alertSuffix)))
             rightW := len([]rune(pathStr))
-            fillCount := innerW - labelW - 2 - 2 - rightW
-            if fillCount < 1 {
-                fillCount = 1
+            padCount := innerW - len([]rune(left)) - rightW
+            if padCount < 1 {
+                padCount = 1
             }
-            text = label + stripANSI(alertSuffix) + "  " + strings.Repeat("─", fillCount) + "  " + pathStr
-        } else if pathStr != "" {
-            text = label + stripANSI(alertSuffix) + "  " + pathStr
+            return selectedBG.Render(left + strings.Repeat(" ", padCount) + pathStr)
         }
-        return selectedBG.Render(text)
+        if pathStr != "" {
+            content := left + "  " + pathStr
+            padCount := innerW - len([]rune(content))
+            if padCount < 0 {
+                padCount = 0
+            }
+            return selectedBG.Render(content + strings.Repeat(" ", padCount))
+        }
+        padCount := innerW - len([]rune(left))
+        if padCount < 0 {
+            padCount = 0
+        }
+        return selectedBG.Render(left + strings.Repeat(" ", padCount))
     }
 
     if pathStr == "" || !p.cfg.PanePathRightAlign || innerW <= 0 {
