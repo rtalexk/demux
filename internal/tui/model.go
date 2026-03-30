@@ -269,6 +269,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             m.queryResult = msg.result
             m.sidebar.SetSearchResult(msg.result)
             m.procList.SetSearchQuery(query.Parse(m.searchInput.Value()), msg.result)
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                m.procGen++
+                m.updateDetailFromSelection()
+                return m, m.scheduleProcFetch()
+            }
         }
         return m, nil
     case searchDebounceMsg:
