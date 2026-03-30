@@ -204,6 +204,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             }
             m.ready = true
             cmds = append(cmds, tick(), m.fetchAlerts())
+            // If startup focus landed on a window node, kick off an initial proc fetch.
+            if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+                m.procGen++
+                cmds = append(cmds, m.scheduleProcFetch())
+            }
         }
         if m.cfg.Git.Enabled {
             for sessionName, windows := range grouped {
@@ -248,7 +253,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             }
         }
         m.updateDetailFromSelection()
-        return m, nil
+        // If startup focus landed on a window node, kick off an initial proc fetch.
+        var startupProcCmd tea.Cmd
+        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
+            m.procGen++
+            startupProcCmd = m.scheduleProcFetch()
+        }
+        return m, startupProcCmd
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
         m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
