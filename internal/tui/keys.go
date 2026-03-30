@@ -25,10 +25,6 @@ type keyMap struct {
     GotoBottom    key.Binding
     Open          key.Binding
     AlertFilter   key.Binding
-    Expand        key.Binding
-    Collapse      key.Binding
-    ExpandAll     key.Binding
-    CollapseAll   key.Binding
 }
 
 var keys = keyMap{
@@ -54,8 +50,4 @@ var keys = keyMap{
     GotoBottom:    key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
     Open:          key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open/attach")),
     AlertFilter:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "alert filter")),
-    Expand:        key.NewBinding(key.WithKeys("]")),
-    Collapse:      key.NewBinding(key.WithKeys("[")),
-    ExpandAll:     key.NewBinding(key.WithKeys("}")),
-    CollapseAll:   key.NewBinding(key.WithKeys("{")),
 }

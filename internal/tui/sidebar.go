@@ -13,13 +13,9 @@ import (
     "github.com/rtalex/demux/internal/tmux"
 )
 
-const windowIndent = "   "
 
 type SidebarNode struct {
-    Session     string
-    WindowIndex int
-    IsSession   bool
-    Expanded    bool
+    Session string
 }
 
 type SidebarModel struct {
@@ -56,26 +52,6 @@ func alertSeverity(level string) int {
     default:
         return 0
     }
-}
-
-// windowAlert returns the highest-severity alert for a window, checking both
-// window-level targets ("session:windowIndex") and pane-level targets
-// ("session:windowIndex.paneIndex"), or nil if none exist.
-func (s *SidebarModel) windowAlert(session string, windowIndex int) *db.Alert {
-    prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
-    exact := fmt.Sprintf("%s:%d", session, windowIndex)
-    var best *db.Alert
-    for target, a := range s.alerts {
-        if target != exact && !strings.HasPrefix(target, prefix) {
-            continue
-        }
-        a := a
-        if best == nil || alertSeverity(a.Level) > alertSeverity(best.Level) ||
-            (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
-            best = &a
-        }
-    }
-    return best
 }
 
 // newestSessionAlert returns the most recent alert CreatedAt for a session
@@ -134,28 +110,13 @@ func (s *SidebarModel) BestAlertTargetInSession(session, priority string) string
 }
 
 func (s *SidebarModel) rebuildNodes() {
-    // Save cursor identity so it can be restored after the rebuild changes indices.
     var curSession string
-    var curWindowIndex int
-    var curIsSession bool
     if s.cursor >= 0 && s.cursor < len(s.nodes) {
-        n := s.nodes[s.cursor]
-        curSession = n.Session
-        curWindowIndex = n.WindowIndex
-        curIsSession = n.IsSession
-    }
-
-    // preserve expanded state
-    expanded := map[string]bool{}
-    for _, n := range s.nodes {
-        if n.IsSession {
-            expanded[n.Session] = n.Expanded
-        }
+        curSession = s.nodes[s.cursor].Session
     }
 
     s.nodes = nil
 
-    // collect non-ignored sessions
     sessions := make([]string, 0, len(s.sessions))
     for name := range s.sessions {
         ignored := false
@@ -206,63 +167,19 @@ func (s *SidebarModel) rebuildNodes() {
         if s.filterAlerts && s.newestSessionAlert(name).IsZero() {
             continue
         }
-        exp, ok := expanded[name]
-        if !ok {
-            exp = !s.cfg.Sidebar.Collapsed
-        }
-        s.nodes = append(s.nodes, SidebarNode{Session: name, IsSession: true, Expanded: exp})
-        if exp {
-            windows := s.sessions[name]
-            winIdxs := make([]int, 0, len(windows))
-            for wi := range windows {
-                winIdxs = append(winIdxs, wi)
-            }
-
-            // sort: windows with alerts first (highest severity, then newest), then by index
-            sort.Slice(winIdxs, func(i, j int) bool {
-                ai := s.windowAlert(name, winIdxs[i])
-                aj := s.windowAlert(name, winIdxs[j])
-                hasi := ai != nil
-                hasj := aj != nil
-                if hasi != hasj {
-                    return hasi
-                }
-                if hasi && hasj && !ai.CreatedAt.Equal(aj.CreatedAt) {
-                    return ai.CreatedAt.After(aj.CreatedAt)
-                }
-                return winIdxs[i] < winIdxs[j]
-            })
-
-            for _, wi := range winIdxs {
-                if s.filterAlerts && s.cfg.Sidebar.AlertFilter == "alerts_only" {
-                    if s.windowAlert(name, wi) == nil {
-                        continue
-                    }
-                }
-                s.nodes = append(s.nodes, SidebarNode{Session: name, WindowIndex: wi})
-            }
-        }
+        s.nodes = append(s.nodes, SidebarNode{Session: name})
     }
 
-    // Restore cursor to the same logical node. Match IsSession to avoid
-    // conflating window:0 with its parent session node.
     found := false
     for i, n := range s.nodes {
-        if n.Session == curSession && n.WindowIndex == curWindowIndex && n.IsSession == curIsSession {
+        if n.Session == curSession {
             s.cursor = i
             found = true
             break
         }
     }
-    // If the cursor was on a window node that is now hidden (session collapsed),
-    // fall back to the parent session node.
-    if !found && !curIsSession && curSession != "" {
-        for i, n := range s.nodes {
-            if n.IsSession && n.Session == curSession {
-                s.cursor = i
-                break
-            }
-        }
+    if !found {
+        s.cursor = 0
     }
     if s.cursor >= len(s.nodes) {
         s.cursor = max(0, len(s.nodes)-1)
@@ -341,10 +258,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {
-    if node.IsSession {
-        return s.renderSession(node, selected, focused, width)
-    }
-    return s.renderWindow(node, selected, focused, width)
+    return s.renderSession(node, selected, focused, width)
 }
 
 // alignedRow builds a single sidebar line with the name on the left and
@@ -361,13 +275,6 @@ func alignedRow(name, indicators string, availWidth int) string {
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
-    prefix := " ▼ "
-    if !node.Expanded {
-        prefix = " ▶ "
-    }
-
-    // Build indicators; when focused-selected, bake in the BG colour so inner
-    // ANSI resets don't strip the row background mid-line.
     var indParts []string
     if info, ok := s.gitInfo[node.Session]; ok {
         if selected && focused {
@@ -412,100 +319,30 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if maxName < 4 {
         maxName = 4
     }
-    nameRunes := []rune(prefix + node.Session)
-    if len(nameRunes) > maxName {
-        nameRunes = append(nameRunes[:maxName-1], '…')
-    }
-    nameStr := string(nameRunes)
-
-    if selected && focused {
-        pad := availW - len([]rune(nameStr)) - indW
-        if pad < 0 {
-            pad = 0
-        }
-        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-        return selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
-    }
-    text := alignedRow(nameStr, indicators, availW)
-    if selected {
-        return selectedInactive.Bold(true).Render(text)
-    }
-    return sessionStyle.Render(text)
-}
-
-func (s SidebarModel) renderWindow(node SidebarNode, selected, focused bool, width int) string {
-    windows := s.sessions[node.Session]
-    primaryCWD := primaryCWDForPanes(windows)
-    wPanes := windows[node.WindowIndex]
-
-    name := fmt.Sprintf("%d", node.WindowIndex)
-    if len(wPanes) > 0 && wPanes[0].WindowName != "" {
-        name = fmt.Sprintf("%d: %s", node.WindowIndex, wPanes[0].WindowName)
-    }
-
-    // build indicators
-    var indParts []string
-    winCWD := windowCWDFromPanes(wPanes)
-    if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
-        gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
-        devInd := "↪"
-        if info, ok := s.gitInfo[gitKey]; ok {
-            if selected && focused {
-                if ind := compactGitIndicatorsOnBG(info, activeTheme.ColorSelected); ind != "" {
-                    devInd += " " + ind
-                }
-            } else {
-                if ind := compactGitIndicators(info); ind != "" {
-                    devInd += " " + ind
-                }
-            }
-        }
-        indParts = append(indParts, devInd)
-    }
-    if a := s.windowAlert(node.Session, node.WindowIndex); a != nil {
-        if selected && focused {
-            indParts = append(indParts, alertIconOnBG(a.Level, activeTheme.ColorSelected))
-        } else {
-            indParts = append(indParts, alertIcon(a.Level))
-        }
-    }
-    var indicators string
-    if selected && focused {
-        sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-        indicators = strings.Join(indParts, sep)
-    } else {
-        indicators = strings.Join(indParts, " ")
-    }
-
-    availW := width - 4
-    indW := len([]rune(stripANSI(indicators)))
-    maxName := availW - indW - 1
-    if maxName < 4 {
-        maxName = 4
-    }
-    nameRunes := []rune(windowIndent + name)
+    nameRunes := []rune(" " + node.Session)
     if len(nameRunes) > maxName {
         nameRunes = append(nameRunes[:maxName-1], '…')
     }
     nameStr := string(nameRunes)
 
     if selected {
-        nameRunes2 := []rune(nameStr)
-        bodyStr := string(nameRunes2[1:])
-        pad := availW - 1 - len(nameRunes2[1:]) - indW
+        bodyStr := string([]rune(nameStr)[1:])
+        pad := availW - 1 - len([]rune(bodyStr)) - indW
         if pad < 0 {
             pad = 0
         }
         if focused {
             accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
             trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-            return accent + selectedBG.Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
+            return accent + selectedBG.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
         }
         accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-        return accent + selectedInactive.Render(bodyStr+strings.Repeat(" ", pad)) + indicators
+        return accent + selectedInactive.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators
     }
-    return alignedRow(nameStr, indicators, availW)
+    text := alignedRow(nameStr, indicators, availW)
+    return sessionStyle.Render(text)
 }
+
 
 func compactGitIndicators(info git.Info) string {
     var parts []string
@@ -578,18 +415,6 @@ func alertBadge(level, reason string) string {
     return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
 }
 
-func windowCWDFromPanes(panes []tmux.Pane) string {
-    for _, p := range panes {
-        if p.PaneIndex == 0 {
-            return p.CWD
-        }
-    }
-    if len(panes) > 0 {
-        return panes[0].CWD
-    }
-    return ""
-}
-
 func (s *SidebarModel) clampViewport(visibleRows int) {
     // Reserve 2 rows for the ▲/▼ hint lines so the cursor is always
     // within the rendered content area regardless of which hints appear.
@@ -640,71 +465,6 @@ func (s SidebarModel) WindowsForSession(session string) map[int][]tmux.Pane {
     return s.sessions[session]
 }
 
-func (s *SidebarModel) ToggleExpand() {
-    if s.cursor < len(s.nodes) && s.nodes[s.cursor].IsSession {
-        s.nodes[s.cursor].Expanded = !s.nodes[s.cursor].Expanded
-        s.rebuildNodes()
-    }
-}
-
-func (s *SidebarModel) Expand() {
-    if s.cursor < len(s.nodes) && s.nodes[s.cursor].IsSession && !s.nodes[s.cursor].Expanded {
-        s.nodes[s.cursor].Expanded = true
-        s.rebuildNodes()
-    }
-}
-
-func (s *SidebarModel) Collapse() {
-    if s.cursor >= len(s.nodes) {
-        return
-    }
-    n := s.nodes[s.cursor]
-    if n.IsSession {
-        if n.Expanded {
-            s.nodes[s.cursor].Expanded = false
-            s.rebuildNodes()
-        }
-        return
-    }
-    // Window node: find parent session and collapse it, moving cursor there.
-    for i := s.cursor - 1; i >= 0; i-- {
-        if s.nodes[i].IsSession {
-            if s.nodes[i].Expanded {
-                s.cursor = i
-                s.nodes[i].Expanded = false
-                s.rebuildNodes()
-            }
-            return
-        }
-    }
-}
-
-func (s *SidebarModel) ExpandAll() {
-    changed := false
-    for i := range s.nodes {
-        if s.nodes[i].IsSession && !s.nodes[i].Expanded {
-            s.nodes[i].Expanded = true
-            changed = true
-        }
-    }
-    if changed {
-        s.rebuildNodes()
-    }
-}
-
-func (s *SidebarModel) CollapseAll() {
-    changed := false
-    for i := range s.nodes {
-        if s.nodes[i].IsSession && s.nodes[i].Expanded {
-            s.nodes[i].Expanded = false
-            changed = true
-        }
-    }
-    if changed {
-        s.rebuildNodes()
-    }
-}
-
 func (s *SidebarModel) GotoTop(visibleRows int) {
     s.cursor = 0
     s.clampViewport(visibleRows)
@@ -715,36 +475,18 @@ func (s *SidebarModel) GotoBottom(visibleRows int) {
     s.clampViewport(visibleRows)
 }
 
-func (s *SidebarModel) MoveToSessionLevel() {
-    for s.cursor > 0 && !s.nodes[s.cursor].IsSession {
-        s.cursor--
-    }
-}
+func (s *SidebarModel) MoveToSessionLevel() {}
 
 // TabPrevSession moves the cursor to the previous session node, wrapping around.
 func (s *SidebarModel) TabPrevSession(visibleRows int) {
     if len(s.nodes) == 0 {
         return
     }
-    var sessions []int
-    for i, n := range s.nodes {
-        if n.IsSession {
-            sessions = append(sessions, i)
-        }
+    if s.cursor > 0 {
+        s.cursor--
+    } else {
+        s.cursor = len(s.nodes) - 1
     }
-    if len(sessions) == 0 {
-        return
-    }
-    cur := s.cursor
-    for i := len(sessions) - 1; i >= 0; i-- {
-        if sessions[i] < cur {
-            s.cursor = sessions[i]
-            s.clampViewport(visibleRows)
-            return
-        }
-    }
-    // wrap: go to the last session
-    s.cursor = sessions[len(sessions)-1]
     s.clampViewport(visibleRows)
 }
 
@@ -753,37 +495,17 @@ func (s *SidebarModel) TabNextSession(visibleRows int) {
     if len(s.nodes) == 0 {
         return
     }
-    var sessions []int
-    for i, n := range s.nodes {
-        if n.IsSession {
-            sessions = append(sessions, i)
-        }
+    if s.cursor < len(s.nodes)-1 {
+        s.cursor++
+    } else {
+        s.cursor = 0
     }
-    if len(sessions) == 0 {
-        return
-    }
-    cur := s.cursor
-    for _, idx := range sessions {
-        if idx > cur {
-            s.cursor = idx
-            s.clampViewport(visibleRows)
-            return
-        }
-    }
-    // wrap: go back to the first session
-    s.cursor = sessions[0]
     s.clampViewport(visibleRows)
 }
 
 // SessionCount returns the number of visible (non-ignored) sessions.
 func (s SidebarModel) SessionCount() int {
-    count := 0
-    for _, n := range s.nodes {
-        if n.IsSession {
-            count++
-        }
-    }
-    return count
+    return len(s.nodes)
 }
 
 // AlertFilterActive reports whether the alert filter is currently on.
@@ -796,9 +518,8 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     s.filterAlerts = !s.filterAlerts
     s.rebuildNodes()
     if s.filterAlerts {
-        s.focusFirstAlertWindow()
+        s.FocusFirstAlertSession(visibleRows)
     }
-    // Clamp cursor to valid range before calling clampViewport.
     if s.cursor >= len(s.nodes) {
         s.cursor = max(0, len(s.nodes)-1)
     }
@@ -806,33 +527,11 @@ func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
     return s.filterAlerts
 }
 
-func (s *SidebarModel) focusFirstAlertWindow() bool {
+// FocusNode positions the cursor on the session node matching session.
+// Returns true if found, false otherwise.
+func (s *SidebarModel) FocusNode(session string, visibleRows int) bool {
     for i, n := range s.nodes {
-        if n.IsSession {
-            continue
-        }
-        if s.windowAlert(n.Session, n.WindowIndex) != nil {
-            s.cursor = i
-            return true
-        }
-    }
-    return false
-}
-
-// FocusNode positions the cursor on the node matching session+windowIndex.
-// If isSessionLevel is true, targets the session node; otherwise targets the window node.
-// Returns true if a matching node was found; false if not (e.g. sessions are collapsed).
-func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel bool, visibleRows int) bool {
-    for i, n := range s.nodes {
-        if n.Session != session {
-            continue
-        }
-        if isSessionLevel && n.IsSession {
-            s.cursor = i
-            s.clampViewport(visibleRows)
-            return true
-        }
-        if !isSessionLevel && !n.IsSession && n.WindowIndex == windowIndex {
+        if n.Session == session {
             s.cursor = i
             s.clampViewport(visibleRows)
             return true
@@ -845,31 +544,7 @@ func (s *SidebarModel) FocusNode(session string, windowIndex int, isSessionLevel
 // Returns true if a matching node was found, false otherwise.
 func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
     for i, n := range s.nodes {
-        if !n.IsSession {
-            continue
-        }
         if !s.newestSessionAlert(n.Session).IsZero() {
-            s.cursor = i
-            s.clampViewport(visibleRows)
-            return true
-        }
-    }
-    return false
-}
-
-// FocusFirstAlertWindow positions the cursor on the first window node that has any alert.
-// Returns true if a matching node was found, false otherwise.
-func (s *SidebarModel) FocusFirstAlertWindow(visibleRows int) bool {
-    found := s.focusFirstAlertWindow()
-    s.clampViewport(visibleRows)
-    return found
-}
-
-// FocusFirstWindow positions the cursor on the first window node in the list.
-// Returns true if a window node was found, false if the list contains only session nodes.
-func (s *SidebarModel) FocusFirstWindow(visibleRows int) bool {
-    for i, n := range s.nodes {
-        if !n.IsSession {
             s.cursor = i
             s.clampViewport(visibleRows)
             return true

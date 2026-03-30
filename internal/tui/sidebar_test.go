@@ -14,7 +14,7 @@ import (
 func makeNodes(n int) []SidebarNode {
     nodes := make([]SidebarNode, n)
     for i := range nodes {
-        nodes[i] = SidebarNode{Session: strings.Repeat("s", i+1), IsSession: true}
+        nodes[i] = SidebarNode{Session: strings.Repeat("s", i+1)}
     }
     return nodes
 }
@@ -228,7 +228,7 @@ func TestRender_hintsDoNotExceedVisibleRows(t *testing.T) {
 
 func TestRenderSession_longNameTruncated(t *testing.T) {
     s := sidebarWithNodes([]SidebarNode{
-        {Session: "a-very-long-session-name-that-exceeds-width", IsSession: true},
+        {Session: "a-very-long-session-name-that-exceeds-width"},
     })
     width := 20
     text := s.renderSession(s.nodes[0], false, false, width)
@@ -243,7 +243,7 @@ func TestRenderSession_longNameTruncated(t *testing.T) {
 
 func TestRenderSession_shortNameNotTruncated(t *testing.T) {
     s := sidebarWithNodes([]SidebarNode{
-        {Session: "short", IsSession: true},
+        {Session: "short"},
     })
     text := s.renderSession(s.nodes[0], false, false, 40)
     if strings.Contains(stripANSI(text), "…") {
@@ -317,13 +317,10 @@ func TestSidebarGotoBottom_EmptyNodes_NoPanic(t *testing.T) {
 
 // --- SessionCount ---
 
-func TestSessionCount_CountsOnlySessionNodes(t *testing.T) {
+func TestSessionCount_CountsAllNodes(t *testing.T) {
     nodes := []SidebarNode{
-        {Session: "a", IsSession: true},
-        {Session: "a", WindowIndex: 0},
-        {Session: "a", WindowIndex: 1},
-        {Session: "b", IsSession: true},
-        {Session: "b", WindowIndex: 0},
+        {Session: "a"},
+        {Session: "b"},
     }
     s := sidebarWithNodes(nodes)
     if s.SessionCount() != 2 {
@@ -407,9 +404,7 @@ func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
     s.rebuildNodes()
     var got []string
     for _, n := range s.nodes {
-        if n.IsSession {
-            got = append(got, n.Session)
-        }
+        got = append(got, n.Session)
     }
     want := []string{"alpha", "beta", "charlie"}
     if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -447,29 +442,6 @@ func TestRebuildNodes_NewestAlertSessionSortsFirst(t *testing.T) {
     }
 }
 
-func TestRebuildNodes_WindowWithAlertSortsFirst(t *testing.T) {
-    t1 := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil, 2: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:2.0": {Target: "sess:2.0", CreatedAt: t1},
-        },
-    }
-    s.rebuildNodes()
-    // Find window nodes for "sess"
-    var winIdxs []int
-    for _, n := range s.nodes {
-        if !n.IsSession && n.Session == "sess" {
-            winIdxs = append(winIdxs, n.WindowIndex)
-        }
-    }
-    if len(winIdxs) == 0 || winIdxs[0] != 2 {
-        t.Errorf("expected window 2 (has alert) first, got %v", winIdxs)
-    }
-}
-
 // --- Alert filter ---
 
 func TestRebuildNodes_LastSeenSort(t *testing.T) {
@@ -487,9 +459,7 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
     s.rebuildNodes()
     var got []string
     for _, n := range s.nodes {
-        if n.IsSession {
-            got = append(got, n.Session)
-        }
+        got = append(got, n.Session)
     }
     // beta is more recent → should appear first
     if len(got) < 2 || got[0] != "beta" {
@@ -513,9 +483,7 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
     s.rebuildNodes()
     var got []string
     for _, n := range s.nodes {
-        if n.IsSession {
-            got = append(got, n.Session)
-        }
+        got = append(got, n.Session)
     }
     want := []string{"alpha", "beta", "charlie"}
     if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -537,64 +505,18 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         t.Error("expected ToggleAlertFilter to return true (filter now active)")
     }
     for _, n := range s.nodes {
-        if n.IsSession && n.Session == "alpha" {
+        if n.Session == "alpha" {
             t.Error("alpha (no alerts) should be hidden when filter is active")
         }
     }
     hasBeta := false
     for _, n := range s.nodes {
-        if n.IsSession && n.Session == "beta" {
+        if n.Session == "beta" {
             hasBeta = true
         }
     }
     if !hasBeta {
         t.Error("beta (has alerts) should be visible when filter is active")
-    }
-}
-
-func TestToggleAlertFilter_AllWindows_ShowsAllWindowsOfAlertedSession(t *testing.T) {
-    t1 := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
-    }
-    s.ToggleAlertFilter(10)
-    var winIdxs []int
-    for _, n := range s.nodes {
-        if !n.IsSession {
-            winIdxs = append(winIdxs, n.WindowIndex)
-        }
-    }
-    if len(winIdxs) != 2 {
-        t.Errorf("expected both windows visible with alert_filter=all, got %v", winIdxs)
-    }
-}
-
-func TestToggleAlertFilter_AlertsOnly_HidesWindowsWithoutAlert(t *testing.T) {
-    t1 := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:1.0": {Target: "sess:1.0", CreatedAt: t1},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "alerts_only"}},
-    }
-    s.ToggleAlertFilter(10)
-    var winIdxs []int
-    for _, n := range s.nodes {
-        if !n.IsSession {
-            winIdxs = append(winIdxs, n.WindowIndex)
-        }
-    }
-    if len(winIdxs) != 1 || winIdxs[0] != 1 {
-        t.Errorf("expected only window 1 (has alert) visible with alert_filter=alerts_only, got %v", winIdxs)
     }
 }
 
@@ -612,14 +534,8 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
     if active {
         t.Error("expected ToggleAlertFilter to return false (filter now inactive)")
     }
-    var sessions []string
-    for _, n := range s.nodes {
-        if n.IsSession {
-            sessions = append(sessions, n.Session)
-        }
-    }
-    if len(sessions) != 2 {
-        t.Errorf("expected both sessions after toggle off, got %v", sessions)
+    if len(s.nodes) != 2 {
+        t.Errorf("expected both sessions after toggle off, got %d nodes", len(s.nodes))
     }
 }
 
@@ -638,58 +554,8 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     }
 }
 
-func TestToggleAlertFilter_AlertsOnly_BothWindowsWithPaneAlertsVisible(t *testing.T) {
-    now := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:0.0": {Target: "sess:0.0", CreatedAt: now},
-            "sess:1.0": {Target: "sess:1.0", CreatedAt: now},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "alerts_only"}},
-    }
-    s.ToggleAlertFilter(10)
-    var winIdxs []int
-    for _, n := range s.nodes {
-        if !n.IsSession {
-            winIdxs = append(winIdxs, n.WindowIndex)
-        }
-    }
-    if len(winIdxs) != 2 {
-        t.Errorf("expected both windows visible when both have pane alerts, got %v", winIdxs)
-    }
-}
-
-func TestToggleAlertFilter_FocusesFirstAlertedWindow(t *testing.T) {
-    t1 := time.Now()
-    // "alpha" has no alert; "beta" has a pane alert on window 0, pane 0.
-    // After rebuild with filter on, nodes will be:
-    //   [0] session "beta" (IsSession=true)
-    //   [1] window "beta":0  <- first alerted window
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts: map[string]db.Alert{
-            "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
-    }
-    s.ToggleAlertFilter(10)
-    if s.cursor != 1 {
-        t.Errorf("expected cursor=1 (first alerted window), got %d", s.cursor)
-    }
-    node := s.nodes[s.cursor]
-    if node.IsSession {
-        t.Error("expected cursor to be on a window node, not a session node")
-    }
-    if node.Session != "beta" || node.WindowIndex != 0 {
-        t.Errorf("expected cursor on beta:0, got session=%q window=%d", node.Session, node.WindowIndex)
-    }
-}
-
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
-    // Filter on with no window-level alerts: cursor should clamp to last valid node.
+    // Filter on with no alerts: cursor should clamp to last valid node.
     s := SidebarModel{
         sessions: makeSessions("sess"),
         alerts:   map[string]db.Alert{},
@@ -715,26 +581,10 @@ func TestFocusNode_SessionLevel(t *testing.T) {
         cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
     }
     s.rebuildNodes()
-    s.FocusNode("beta", 0, true, 20)
+    s.FocusNode("beta", 20)
     node := s.Selected()
-    if node == nil || !node.IsSession || node.Session != "beta" {
+    if node == nil || node.Session != "beta" {
         t.Errorf("expected session node beta, got %+v", node)
-    }
-}
-
-func TestFocusNode_WindowLevel(t *testing.T) {
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 2: nil},
-        },
-        alerts: map[string]db.Alert{},
-        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes()
-    s.FocusNode("sess", 2, false, 20)
-    node := s.Selected()
-    if node == nil || node.IsSession || node.Session != "sess" || node.WindowIndex != 2 {
-        t.Errorf("expected window node sess:2, got %+v", node)
     }
 }
 
@@ -744,7 +594,7 @@ func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
         alerts:   map[string]db.Alert{},
     }
     s.rebuildNodes()
-    s.FocusNode("nonexistent", 0, true, 20)
+    s.FocusNode("nonexistent", 20)
     if s.cursor != 0 {
         t.Errorf("expected cursor=0, got %d", s.cursor)
     }
@@ -764,7 +614,7 @@ func TestFocusFirstAlertSession_MovesToAlertedSession(t *testing.T) {
     s.rebuildNodes()
     s.FocusFirstAlertSession(20)
     node := s.Selected()
-    if node == nil || !node.IsSession || node.Session != "beta" {
+    if node == nil || node.Session != "beta" {
         t.Errorf("expected session node beta, got %+v", node)
     }
 }
@@ -778,105 +628,6 @@ func TestFocusFirstAlertSession_NoAlerts_LeavesCursorAt0(t *testing.T) {
     s.FocusFirstAlertSession(20)
     if s.cursor != 0 {
         t.Errorf("expected cursor=0, got %d", s.cursor)
-    }
-}
-
-// --- FocusFirstAlertWindow ---
-
-func TestFocusFirstAlertWindow_MovesToAlertedWindow(t *testing.T) {
-    t1 := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil, 2: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:2.0": {Target: "sess:2.0", Level: "warn", CreatedAt: t1},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes()
-    s.FocusFirstAlertWindow(20)
-    node := s.Selected()
-    if node == nil || node.IsSession || node.Session != "sess" || node.WindowIndex != 2 {
-        t.Errorf("expected window node sess:2, got %+v", node)
-    }
-}
-
-func TestFocusFirstAlertWindow_NoAlerts_LeavesCursorAt0(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-    }
-    s.rebuildNodes()
-    s.FocusFirstAlertWindow(20)
-    if s.cursor != 0 {
-        t.Errorf("expected cursor=0, got %d", s.cursor)
-    }
-}
-
-// --- FocusFirstWindow ---
-
-func TestFocusFirstWindow_MovesToFirstWindowNode(t *testing.T) {
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil},
-        },
-        alerts: map[string]db.Alert{},
-        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes()
-    found := s.FocusFirstWindow(20)
-    if !found {
-        t.Fatal("expected found=true")
-    }
-    node := s.Selected()
-    if node == nil || node.IsSession {
-        t.Errorf("expected a window node, got %+v", node)
-    }
-}
-
-func TestFocusFirstWindow_NoWindows_ReturnsFalse(t *testing.T) {
-    // A session with no windows produces only a session node
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{},
-        alerts:   map[string]db.Alert{},
-    }
-    s.rebuildNodes()
-    found := s.FocusFirstWindow(20)
-    if found {
-        t.Error("expected found=false when no window nodes exist")
-    }
-}
-
-// --- FocusFirstAlertWindow returns bool ---
-
-func TestFocusFirstAlertWindow_ReturnsTrue_WhenFound(t *testing.T) {
-    t1 := time.Now()
-    s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "sess": {0: nil, 1: nil},
-        },
-        alerts: map[string]db.Alert{
-            "sess:1.0": {Target: "sess:1.0", Level: "warn", CreatedAt: t1},
-        },
-        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes()
-    found := s.FocusFirstAlertWindow(20)
-    if !found {
-        t.Error("expected found=true")
-    }
-}
-
-func TestFocusFirstAlertWindow_ReturnsFalse_WhenNotFound(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-    }
-    s.rebuildNodes()
-    found := s.FocusFirstAlertWindow(20)
-    if found {
-        t.Error("expected found=false when no alerted windows")
     }
 }
 
@@ -907,251 +658,6 @@ func TestFocusFirstAlertSession_ReturnsFalse_WhenNotFound(t *testing.T) {
     found := s.FocusFirstAlertSession(20)
     if found {
         t.Error("expected found=false when no alerted sessions")
-    }
-}
-
-// --- Expand ---
-
-func TestExpand_CollapsedSession_AddsWindowNodes(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    // Seed nodes with alpha collapsed so Expand has something to do
-    s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
-    s.cursor = 0
-    s.Expand()
-    // rebuildNodes ran: alpha is now expanded; window node must appear
-    if len(s.nodes) < 2 {
-        t.Fatalf("expected session + window node after Expand(), got %d nodes", len(s.nodes))
-    }
-    if !s.nodes[0].Expanded {
-        t.Error("expected alpha to be expanded")
-    }
-    if s.nodes[1].IsSession {
-        t.Error("expected second node to be a window node")
-    }
-}
-
-func TestExpand_AlreadyExpanded_NoChange(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // alpha expanded by default
-    before := len(s.nodes)
-    s.cursor = 0
-    s.Expand()
-    if len(s.nodes) != before {
-        t.Errorf("expected no change when already expanded, got %d nodes (was %d)", len(s.nodes), before)
-    }
-}
-
-func TestExpand_WindowNode_NoOp(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // nodes = [alpha, alpha-win0]
-    before := len(s.nodes)
-    s.cursor = 1 // window node
-    s.Expand()
-    if len(s.nodes) != before {
-        t.Errorf("expected no change when cursor is on a window node, got %d nodes (was %d)", len(s.nodes), before)
-    }
-}
-
-// --- Collapse ---
-
-func TestCollapse_ExpandedSession_RemovesWindowNodes(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // alpha expanded; nodes = [alpha, alpha-win0]
-    s.cursor = 0
-    s.Collapse()
-    if len(s.nodes) != 1 {
-        t.Errorf("expected 1 node (session only) after Collapse(), got %d", len(s.nodes))
-    }
-    if s.nodes[0].Expanded {
-        t.Error("expected alpha to be collapsed")
-    }
-}
-
-func TestCollapse_AlreadyCollapsed_NoChange(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.nodes = []SidebarNode{{Session: "alpha", IsSession: true, Expanded: false}}
-    s.cursor = 0
-    s.Collapse()
-    if len(s.nodes) != 1 {
-        t.Errorf("expected 1 node unchanged, got %d", len(s.nodes))
-    }
-}
-
-func TestCollapse_WindowNode_CollapsesParentSession(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // nodes = [alpha, alpha-win0]
-    s.cursor = 1     // window node
-    s.Collapse()
-    // parent session should be collapsed; cursor should move to it
-    if len(s.nodes) != 1 {
-        t.Errorf("expected 1 node (session only) after Collapse() on window, got %d", len(s.nodes))
-    }
-    if s.nodes[0].Expanded {
-        t.Error("expected parent session to be collapsed")
-    }
-    if s.cursor != 0 {
-        t.Errorf("expected cursor to move to parent session (0), got %d", s.cursor)
-    }
-}
-
-// --- ExpandAll ---
-
-func TestExpandAll_CollapsedSessions_ExpandsAll(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    // Start with both collapsed
-    s.nodes = []SidebarNode{
-        {Session: "alpha", IsSession: true, Expanded: false},
-        {Session: "beta", IsSession: true, Expanded: false},
-    }
-    s.ExpandAll()
-    sessionCount, windowCount := 0, 0
-    for _, n := range s.nodes {
-        if n.IsSession {
-            sessionCount++
-            if !n.Expanded {
-                t.Errorf("expected session %q to be expanded after ExpandAll()", n.Session)
-            }
-        } else {
-            windowCount++
-        }
-    }
-    if sessionCount != 2 {
-        t.Errorf("expected 2 session nodes, got %d", sessionCount)
-    }
-    if windowCount != 2 {
-        t.Errorf("expected 2 window nodes after ExpandAll(), got %d", windowCount)
-    }
-}
-
-func TestExpandAll_AllAlreadyExpanded_NoChange(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // both expanded by default
-    before := len(s.nodes)
-    s.ExpandAll()
-    if len(s.nodes) != before {
-        t.Errorf("expected no change when all already expanded, got %d nodes (was %d)", len(s.nodes), before)
-    }
-}
-
-// --- CollapseAll ---
-
-func TestCollapseAll_ExpandedSessions_CollapsesAll(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // both expanded; nodes = [alpha, alpha-win0, beta, beta-win0]
-    s.CollapseAll()
-    if len(s.nodes) != 2 {
-        t.Errorf("expected 2 session nodes after CollapseAll(), got %d", len(s.nodes))
-    }
-    for _, n := range s.nodes {
-        if n.Expanded {
-            t.Errorf("expected session %q to be collapsed after CollapseAll()", n.Session)
-        }
-    }
-}
-
-func TestCollapseAll_AllAlreadyCollapsed_NoChange(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.nodes = []SidebarNode{
-        {Session: "alpha", IsSession: true, Expanded: false},
-        {Session: "beta", IsSession: true, Expanded: false},
-    }
-    before := len(s.nodes)
-    s.CollapseAll()
-    if len(s.nodes) != before {
-        t.Errorf("expected no change when all already collapsed, got %d nodes (was %d)", len(s.nodes), before)
-    }
-}
-
-// ---------- cursor restoration after expand/collapse ----------
-
-func TestCollapseAll_CursorOnWindowNode_FallsBackToParentSession(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
-    // Focus alpha's window node (index 1).
-    s.cursor = 1
-    s.CollapseAll()
-    // Window node is gone; cursor must land on parent session "alpha" (index 0).
-    if s.cursor != 0 {
-        t.Errorf("expected cursor=0 (alpha session) after CollapseAll, got %d", s.cursor)
-    }
-    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "alpha" {
-        t.Errorf("expected cursor on alpha session node, got %+v", n)
-    }
-}
-
-func TestExpandAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}, Collapsed: true}},
-    }
-    s.rebuildNodes() // both collapsed: [alpha(session), beta(session)]
-    // Focus beta session (index 1); after ExpandAll alpha gains a window node
-    // so beta's index shifts from 1 to 2.
-    s.cursor = 1
-    s.ExpandAll()
-    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "beta" {
-        t.Errorf("expected cursor on beta session node after ExpandAll, got %+v", n)
-    }
-}
-
-func TestCollapseAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
-    s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-    }
-    s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
-    // Focus beta session (index 2).
-    s.cursor = 2
-    s.CollapseAll()
-    // Both sessions collapsed: [alpha(session), beta(session)]; beta is now index 1.
-    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "beta" {
-        t.Errorf("expected cursor on beta session node after CollapseAll, got %+v", n)
     }
 }
 
