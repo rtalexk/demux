@@ -354,7 +354,11 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
             if node.IsSession {
-                tmux.SwitchClient(node.Session)
+                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.AlertSwitchPriority)
+                if target == "" {
+                    target = node.Session
+                }
+                tmux.SwitchClient(target)
             } else {
                 m.resolveAlertForWindow(node.Session, node.WindowIndex)
                 tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
