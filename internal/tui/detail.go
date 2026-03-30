@@ -2,6 +2,7 @@ package tui
 
 import (
     "fmt"
+    "path/filepath"
     "strings"
 
     "github.com/rtalex/demux/internal/config"
@@ -111,6 +112,18 @@ func (d DetailModel) Render(width, height int) string {
     return detailBorder.Width(innerW).Height(height - 2).Render(inner)
 }
 
+func worktreeValue(info git.Info) string {
+    if info.RepoRoot == "" {
+        return info.Worktree
+    }
+    root := info.RepoRoot
+    // Bare-repo worktree convention: demux/.bare + demux/main/ → show parent "demux"
+    if filepath.Base(root) == info.Worktree {
+        root = filepath.Dir(root)
+    }
+    return info.Worktree + " (" + filepath.Base(root) + ")"
+}
+
 func row(label, value string) string {
     return detailLabelStyle.Render(label) + detailValueStyle.Render(value)
 }
@@ -124,7 +137,7 @@ func (d DetailModel) renderSession() []string {
         row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
     }
     if d.gitInfo.Worktree != "" {
-        lines = append(lines, row("worktree", d.gitInfo.Worktree))
+        lines = append(lines, row("worktree", worktreeValue(d.gitInfo)))
     }
     if d.gitInfo.Branch != "" {
         branch := d.gitInfo.Branch
@@ -151,7 +164,7 @@ func (d DetailModel) renderWindow() []string {
         row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
     }
     if d.gitInfo.Worktree != "" {
-        lines = append(lines, row("worktree", d.gitInfo.Worktree))
+        lines = append(lines, row("worktree", worktreeValue(d.gitInfo)))
     }
     if d.gitInfo.Branch != "" {
         branch := d.gitInfo.Branch
@@ -199,7 +212,7 @@ func (d DetailModel) renderProc(innerWidth int) []string {
     if d.procGit.Branch != "" {
         lines = append(lines, "")
         if d.procGit.Worktree != "" {
-            lines = append(lines, row("worktree", d.procGit.Worktree))
+            lines = append(lines, row("worktree", worktreeValue(d.procGit)))
         }
         branch := d.procGit.Branch
         if ind := gitIndicatorsLong(d.procGit); ind != "" {
