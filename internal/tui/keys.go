@@ -32,8 +32,8 @@ type keyMap struct {
 }
 
 var keys = keyMap{
-    FocusSidebar:  key.NewBinding(key.WithKeys("1"), key.WithHelp("1", "sidebar")),
-    FocusProcList: key.NewBinding(key.WithKeys("2"), key.WithHelp("2", "procs")),
+    FocusSidebar:  key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "sidebar")),
+    FocusProcList: key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "procs")),
     Yank:          key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "yank")),
     Filter:        key.NewBinding(key.WithKeys("f"), key.WithHelp("f", "filter")),
     Refresh:       key.NewBinding(key.WithKeys("R"), key.WithHelp("R", "refresh")),
@@ -45,7 +45,7 @@ var keys = keyMap{
     Esc:           key.NewBinding(key.WithKeys("esc")),
     Kill:          key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "kill")),
     Restart:       key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restart")),
-    Log:           key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "log")),
+    Log:           key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "log")),
     JumpUp:        key.NewBinding(key.WithKeys("K")),
     JumpDown:      key.NewBinding(key.WithKeys("J")),
     Tab:           key.NewBinding(key.WithKeys("tab")),

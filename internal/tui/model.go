@@ -706,22 +706,22 @@ func (m Model) View() string {
     }
     procH := contentH - detailH
 
-    // build sidebar border title: [1] Sessions (N)
+    // build sidebar border title: [h] Sessions (N)
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
     alertFilterMark := ""
     if m.sidebar.AlertFilterActive() {
         alertFilterMark = " [!]"
     }
-    sidebarTitle := fmt.Sprintf(" [1] Sessions %s%s ", sessionCountStr, alertFilterMark)
+    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, alertFilterMark)
 
-    // build proc list border title: [2] <session> / <window>
+    // build proc list border title: [l] <session> / <window>
     bc := m.plainBreadcrumb()
     procTitleSuffix := " "
     if runes := []rune(bc); len(runes) > 0 && isIconRune(runes[len(runes)-1]) {
         procTitleSuffix = "  "
     }
-    procTitle := " [2] " + bc + procTitleSuffix
+    procTitle := " [l] " + bc + procTitleSuffix
 
     sidebar := m.sidebar.Render(sidebarW, contentH, m.focus == panelSidebar, sidebarTitle, "")
     procList := m.procList.Render(procW, procH, m.focus == panelProcList, procTitle)
