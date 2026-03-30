@@ -44,9 +44,10 @@ type ProcListModel struct {
     primaryCWD    string
     curSession    string
     curWindow     int
-    collapsedPIDs map[int32]bool // persists collapse state across SetWindowData calls
-    inSessionMode bool           // true when displaying all windows of a session
-    cfg           config.Config
+    collapsedPIDs   map[int32]bool // persists collapse state across SetWindowData calls
+    pendingSeekKey  string         // node identity to restore cursor after next rebuild
+    inSessionMode   bool           // true when displaying all windows of a session
+    cfg             config.Config
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
@@ -173,6 +174,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
         }
     }
     assignTreePrefixes(p.nodes)
+    p.applyPendingSeek()
 }
 
 // SetSessionData rebuilds the node list for all windows of a session.
@@ -323,6 +325,7 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
         }
     }
     assignTreePrefixes(p.nodes)
+    p.applyPendingSeek()
 }
 
 func sortPanes(panes []tmux.Pane) []tmux.Pane {
@@ -1004,6 +1007,77 @@ func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowInde
     return best
 }
 
+// cursorNodeKey returns a stable string identity for the node at the cursor so
+// that applyPendingSeek can restore focus after a rebuild changes indices.
+//
+// Key format:
+//   - window header → "win:<windowIndex>"
+//   - pane header   → "pane:<windowIndex>:<paneIndex>"
+//   - idle marker   → "idle:<windowIndex>:<paneIndex>"  (uses containing pane)
+//   - process       → "pid:<PID>"  (for depth>1 uses the depth-1 ancestor's PID)
+func (p *ProcListModel) cursorNodeKey() string {
+    if p.cursor < 0 || p.cursor >= len(p.nodes) {
+        return ""
+    }
+    n := p.nodes[p.cursor]
+    switch {
+    case n.IsWindowHeader:
+        return fmt.Sprintf("win:%d", n.Pane.WindowIndex)
+    case n.IsPaneHeader:
+        return fmt.Sprintf("pane:%d:%d", n.Pane.WindowIndex, n.Pane.PaneIndex)
+    case n.IsIdle:
+        for i := p.cursor - 1; i >= 0; i-- {
+            if p.nodes[i].IsPaneHeader {
+                ph := p.nodes[i]
+                return fmt.Sprintf("idle:%d:%d", ph.Pane.WindowIndex, ph.Pane.PaneIndex)
+            }
+        }
+        return ""
+    case n.Depth > 1:
+        for i := p.cursor - 1; i >= 0; i-- {
+            if p.nodes[i].Depth == 1 {
+                return fmt.Sprintf("pid:%d", p.nodes[i].Proc.PID)
+            }
+        }
+        return ""
+    default:
+        return fmt.Sprintf("pid:%d", n.Proc.PID)
+    }
+}
+
+// applyPendingSeek moves the cursor to the node matching pendingSeekKey, then
+// clears the field. Called at the end of each SetWindowData / SetSessionData.
+func (p *ProcListModel) applyPendingSeek() {
+    if p.pendingSeekKey == "" {
+        return
+    }
+    key := p.pendingSeekKey
+    p.pendingSeekKey = ""
+    // Track the most recent pane header for idle-node matching.
+    var curPaneWin, curPanePane int
+    for i, n := range p.nodes {
+        if n.IsPaneHeader {
+            curPaneWin = n.Pane.WindowIndex
+            curPanePane = n.Pane.PaneIndex
+        }
+        var nkey string
+        switch {
+        case n.IsWindowHeader:
+            nkey = fmt.Sprintf("win:%d", n.Pane.WindowIndex)
+        case n.IsPaneHeader:
+            nkey = fmt.Sprintf("pane:%d:%d", n.Pane.WindowIndex, n.Pane.PaneIndex)
+        case n.IsIdle:
+            nkey = fmt.Sprintf("idle:%d:%d", curPaneWin, curPanePane)
+        case n.Proc.PID != 0:
+            nkey = fmt.Sprintf("pid:%d", n.Proc.PID)
+        }
+        if nkey != "" && nkey == key {
+            p.cursor = i
+            return
+        }
+    }
+}
+
 // clampOffset adjusts p.offset so the cursor node is always within the
 // visible row window. maxRows is the total inner height of the proc panel
 // (border already subtracted).
@@ -1333,10 +1407,13 @@ func (p *ProcListModel) Collapse() bool {
 
 // ExpandAll expands all depth-1 process nodes that have children.
 // Returns true if any change occurred; the caller must re-call SetWindowData.
+// pendingSeekKey is set so that applyPendingSeek can restore focus after
+// the rebuild changes indices.
 func (p *ProcListModel) ExpandAll() bool {
     if p.collapsedPIDs == nil {
         p.collapsedPIDs = make(map[int32]bool)
     }
+    p.pendingSeekKey = p.cursorNodeKey()
     changed := false
     for _, n := range p.nodes {
         if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {
@@ -1352,10 +1429,13 @@ func (p *ProcListModel) ExpandAll() bool {
 
 // CollapseAll collapses all depth-1 process nodes that have children.
 // Returns true if any change occurred; the caller must re-call SetWindowData.
+// pendingSeekKey is set so that applyPendingSeek (called by SetWindowData) can
+// restore focus to the same logical node after the rebuild changes indices.
 func (p *ProcListModel) CollapseAll() bool {
     if p.collapsedPIDs == nil {
         p.collapsedPIDs = make(map[int32]bool)
     }
+    p.pendingSeekKey = p.cursorNodeKey()
     changed := false
     for _, n := range p.nodes {
         if n.IsPaneHeader || n.IsIdle || n.Depth != 1 || !n.HasChildren {

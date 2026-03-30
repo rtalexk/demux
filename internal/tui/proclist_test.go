@@ -886,6 +886,109 @@ func TestCollapseAll_AllAlreadyCollapsed_ReturnsFalse(t *testing.T) {
     }
 }
 
+// CollapseAll with cursor on depth-2 should set pendingSeekKey to the depth-1
+// ancestor's pid key, and applyPendingSeek should restore cursor after rebuild.
+func TestCollapseAll_CursorOnDepth2_SeeksToParent(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false, 20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {Proc: proc.Process{PID: 11, Name: "childA"}, Depth: 2},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 2, // depth-2 child of procA
+    }
+    m.CollapseAll()
+    if m.pendingSeekKey != "pid:10" {
+        t.Errorf("expected pendingSeekKey=\"pid:10\", got %q", m.pendingSeekKey)
+    }
+
+    // Simulate rebuild: depth-2 nodes gone, D1(pid=10) now at index 1.
+    m.nodes = []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true, Collapsed: true},
+        {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true, Collapsed: true},
+    }
+    m.applyPendingSeek()
+
+    if m.cursor != 1 {
+        t.Errorf("expected cursor=1 (procA, pid=10), got %d", m.cursor)
+    }
+    if m.pendingSeekKey != "" {
+        t.Errorf("expected pendingSeekKey to be cleared, got %q", m.pendingSeekKey)
+    }
+}
+
+// CollapseAll with cursor on a depth-3 node should seek to the depth-1 ancestor.
+func TestCollapseAll_CursorOnDepth3_SeeksToDepth1Ancestor(t *testing.T) {
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false, 20: false},
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {Proc: proc.Process{PID: 11, Name: "childA"}, Depth: 2},
+            {Proc: proc.Process{PID: 12, Name: "grandchildA"}, Depth: 3},
+            {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 3, // depth-3 grandchild of procA
+    }
+    m.CollapseAll()
+    if m.pendingSeekKey != "pid:10" {
+        t.Errorf("expected pendingSeekKey=\"pid:10\", got %q", m.pendingSeekKey)
+    }
+
+    m.nodes = []ProcListNode{
+        {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+        {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true, Collapsed: true},
+        {Proc: proc.Process{PID: 20, Name: "procB"}, Depth: 1, HasChildren: true, Collapsed: true},
+    }
+    m.applyPendingSeek()
+
+    if m.cursor != 1 {
+        t.Errorf("expected cursor=1 (procA, pid=10), got %d", m.cursor)
+    }
+}
+
+// CollapseAll with cursor on a pane header should keep focus on that same pane
+// header even when preceding windows lose children and indices shift.
+func TestCollapseAll_CursorOnPaneHeader_SeeksToPaneHeader(t *testing.T) {
+    // Session mode: Win0 has expanded D1(pid=10) with D2(pid=11), Win1 has a
+    // pane header (cursor) with an idle node.
+    m := ProcListModel{
+        collapsedPIDs: map[int32]bool{10: false},
+        nodes: []ProcListNode{
+            {IsWindowHeader: true, Pane: tmux.Pane{WindowIndex: 0}},
+            {IsPaneHeader: true, Pane: tmux.Pane{WindowIndex: 0, PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+            {Proc: proc.Process{PID: 11, Name: "childA"}, Depth: 2},
+            {IsWindowHeader: true, Pane: tmux.Pane{WindowIndex: 1}},
+            {IsPaneHeader: true, Pane: tmux.Pane{WindowIndex: 1, PaneIndex: 0}}, // cursor
+            {IsIdle: true, Depth: 1},
+        },
+        cursor: 5, // pane header of Win1
+    }
+    m.CollapseAll()
+    if m.pendingSeekKey != "pane:1:0" {
+        t.Errorf("expected pendingSeekKey=\"pane:1:0\", got %q", m.pendingSeekKey)
+    }
+
+    // Simulate rebuild: Win0's D2 is gone; pane header of Win1 shifts from 5→4.
+    m.nodes = []ProcListNode{
+        {IsWindowHeader: true, Pane: tmux.Pane{WindowIndex: 0}},
+        {IsPaneHeader: true, Pane: tmux.Pane{WindowIndex: 0, PaneIndex: 0}},
+        {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true, Collapsed: true},
+        {IsWindowHeader: true, Pane: tmux.Pane{WindowIndex: 1}},
+        {IsPaneHeader: true, Pane: tmux.Pane{WindowIndex: 1, PaneIndex: 0}}, // now index 4
+        {IsIdle: true, Depth: 1},
+    }
+    m.applyPendingSeek()
+
+    if m.cursor != 4 {
+        t.Errorf("expected cursor=4 (pane header Win1), got %d", m.cursor)
+    }
+}
+
 // ---------- clampOffset cursor bounds ----------
 
 // Regression: CollapseAll shrinks p.nodes; clampOffset must clamp p.cursor to
