@@ -78,6 +78,20 @@ func (s *SidebarModel) windowAlert(session string, windowIndex int) *db.Alert {
     return best
 }
 
+// newestSessionAlert returns the most recent alert CreatedAt for a session
+// (checking pane-level targets "session:window.pane"), or zero time if none.
+func (s *SidebarModel) newestSessionAlert(session string) time.Time {
+    var newest time.Time
+    for target, a := range s.alerts {
+        if strings.HasPrefix(target, session+":") || target == session {
+            if a.CreatedAt.After(newest) {
+                newest = a.CreatedAt
+            }
+        }
+    }
+    return newest
+}
+
 // BestAlertTargetInSession returns the tmux target string of the best alert
 // in the given session according to priority ("severity", "newest", "oldest").
 // Returns "" if the session has no alerts. Unknown priority values fall back to "severity".
@@ -113,20 +127,6 @@ func (s *SidebarModel) BestAlertTargetInSession(session, priority string) string
         return ""
     }
     return best.Target
-}
-
-// newestSessionAlert returns the most recent alert CreatedAt for a session
-// (checking pane-level targets "session:window.pane"), or zero time if none.
-func (s *SidebarModel) newestSessionAlert(session string) time.Time {
-    var newest time.Time
-    for target, a := range s.alerts {
-        if strings.HasPrefix(target, session+":") || target == session {
-            if a.CreatedAt.After(newest) {
-                newest = a.CreatedAt
-            }
-        }
-    }
-    return newest
 }
 
 func (s *SidebarModel) rebuildNodes() {
