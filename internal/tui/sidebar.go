@@ -550,6 +550,22 @@ func alertIconOnBG(level string, bg lipgloss.Color) string {
     return ""
 }
 
+// alertBadge renders the alert reason with a severity-based background color.
+func alertBadge(level, reason string) string {
+    var fg, bg lipgloss.Color
+    switch level {
+    case "info":
+        fg, bg = activeTheme.ColorAlertInfo, activeTheme.ColorAlertInfoBg
+    case "warn":
+        fg, bg = activeTheme.ColorAlertWarn, activeTheme.ColorAlertWarnBg
+    case "error":
+        fg, bg = activeTheme.ColorAlertError, activeTheme.ColorAlertErrorBg
+    default:
+        return reason
+    }
+    return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
+}
+
 func windowCWDFromPanes(panes []tmux.Pane) string {
     for _, p := range panes {
         if p.PaneIndex == 0 {

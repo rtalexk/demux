@@ -34,9 +34,12 @@ type Theme struct {
     ColorGitAhead  lipgloss.Color
 
     // Alerts
-    ColorAlertInfo  lipgloss.Color
-    ColorAlertWarn  lipgloss.Color
-    ColorAlertError lipgloss.Color
+    ColorAlertInfo   lipgloss.Color
+    ColorAlertWarn   lipgloss.Color
+    ColorAlertError  lipgloss.Color
+    ColorAlertInfoBg  lipgloss.Color
+    ColorAlertWarnBg  lipgloss.Color
+    ColorAlertErrorBg lipgloss.Color
 
     // Semantic
     ColorPort    lipgloss.Color
@@ -72,9 +75,12 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
         ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),
         ColorGitAhead:  lipgloss.Color(tc.ColorGitAhead),
 
-        ColorAlertInfo:  lipgloss.Color(tc.ColorAlertInfo),
-        ColorAlertWarn:  lipgloss.Color(tc.ColorAlertWarn),
-        ColorAlertError: lipgloss.Color(tc.ColorAlertError),
+        ColorAlertInfo:   lipgloss.Color(tc.ColorAlertInfo),
+        ColorAlertWarn:   lipgloss.Color(tc.ColorAlertWarn),
+        ColorAlertError:  lipgloss.Color(tc.ColorAlertError),
+        ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
+        ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
+        ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
 
         ColorPort:    lipgloss.Color(tc.ColorPort),
         ColorPortBg:  lipgloss.Color(tc.ColorPortBg),

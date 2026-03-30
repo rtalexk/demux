@@ -576,7 +576,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = "  " + alertIcon(node.Alert.Level) + " " + node.Alert.Reason
+        alertSuffix = " ---- " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
     }
 
     pathStr := ""
@@ -664,7 +664,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = "  " + alertIcon(node.Alert.Level) + " " + node.Alert.Reason
+        alertSuffix = " ---- " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
     }
 
     pathStr := ""
@@ -985,26 +985,18 @@ func aggStats(pr proc.Process, tree map[int32][]proc.Process) (cpu float64, mem 
     return
 }
 
-// windowAlertFromMap returns the highest-severity alert for a window from alertMap.
-// It checks the exact window target ("session:N") and all pane targets ("session:N.P").
+// windowAlertFromMap returns the window-level alert for a window from alertMap.
+// It checks only the exact window target ("session:N"); pane-level alerts
+// ("session:N.P") are not included so they appear only on their pane header.
 func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowIndex int) *db.Alert {
     if alertMap == nil {
         return nil
     }
     exact := fmt.Sprintf("%s:%d", session, windowIndex)
-    prefix := exact + "."
-    var best *db.Alert
-    for target, a := range alertMap {
-        if target != exact && !strings.HasPrefix(target, prefix) {
-            continue
-        }
-        a := a
-        if best == nil || alertSeverity(a.Level) > alertSeverity(best.Level) ||
-            (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
-            best = &a
-        }
+    if a, ok := alertMap[exact]; ok {
+        return &a
     }
-    return best
+    return nil
 }
 
 // cursorNodeKey returns a stable string identity for the node at the cursor so

@@ -75,9 +75,12 @@ type ThemeConfig struct {
     ColorGitBehind string `toml:"color_git_behind"`
     ColorGitAhead  string `toml:"color_git_ahead"`
 
-    ColorAlertInfo  string `toml:"color_alert_info"`
-    ColorAlertWarn  string `toml:"color_alert_warn"`
-    ColorAlertError string `toml:"color_alert_error"`
+    ColorAlertInfo   string `toml:"color_alert_info"`
+    ColorAlertWarn   string `toml:"color_alert_warn"`
+    ColorAlertError  string `toml:"color_alert_error"`
+    ColorAlertInfoBg  string `toml:"color_alert_info_bg"`
+    ColorAlertWarnBg  string `toml:"color_alert_warn_bg"`
+    ColorAlertErrorBg string `toml:"color_alert_error_bg"`
 
     ColorPort    string `toml:"color_port"`
     ColorPortBg  string `toml:"color_port_bg"`
@@ -159,9 +162,12 @@ func Default() Config {
             ColorGitBehind: "#74c7ec",
             ColorGitAhead:  "#a6e3a1",
 
-            ColorAlertInfo:  "#89b4fa",
-            ColorAlertWarn:  "#f9e2af",
-            ColorAlertError: "#f38ba8",
+            ColorAlertInfo:   "#89b4fa",
+            ColorAlertWarn:   "#f9e2af",
+            ColorAlertError:  "#f38ba8",
+            ColorAlertInfoBg:  "#1a2a4d",
+            ColorAlertWarnBg:  "#3d3500",
+            ColorAlertErrorBg: "#3d1020",
 
             ColorPort:    "#a6e3a1",
             ColorPortBg:  "#1a3a2a",
