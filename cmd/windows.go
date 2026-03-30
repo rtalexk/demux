@@ -58,7 +58,10 @@ func runWindows(cmd *cobra.Command, _ []string) error {
 
     primaryCWD := primaryCWDForSession(windows)
 
-    database, _ := openDB()
+    database, err := openDB()
+    if err != nil {
+        return err
+    }
     defer database.Close()
     alerts, _ := database.AlertList()
     alertsByWindow := map[string]int{}
