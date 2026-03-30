@@ -177,10 +177,12 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 
 // SetSessionData rebuilds the node list for all windows of a session.
 // A window header node (IsWindowHeader=true) is emitted before each window's
-// pane and process nodes. Pane CWD is suppressed when it matches the window CWD.
+// pane and process nodes. Window CWD is taken as the CWD of the lowest-indexed pane;
+// pane CWD is suppressed when it matches that value.
 func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
     p.cfg = cfg
     p.inSessionMode = true
+    p.primaryCWD = ""
 
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
