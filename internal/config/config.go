@@ -136,6 +136,7 @@ func Default() Config {
         Sidebar: SidebarConfig{
             AlertFilter: "all",
             FocusOnOpen: "alert_session",
+            SearchSort:  "score",
             Sort:        []string{"priority", "last_seen", "alphabetical"},
             SwitchFocus: "severity",
             Width:       35,

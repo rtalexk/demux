@@ -188,7 +188,7 @@ func (s *SidebarModel) rebuildNodes() {
         }
         s.nodes = filtered
 
-        if s.cfg.Sidebar.SearchSort != "default" {
+        if s.cfg.Sidebar.SearchSort == "score" {
             sort.SliceStable(s.nodes, func(i, j int) bool {
                 return matchSet[s.nodes[i].Session].Score > matchSet[s.nodes[j].Session].Score
             })
