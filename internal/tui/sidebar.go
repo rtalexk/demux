@@ -180,7 +180,7 @@ func (s *SidebarModel) rebuildNodes() {
             matchSet[sm.Name] = sm
         }
 
-        filtered := s.nodes[:0]
+        filtered := s.nodes[:0:0]
         for _, node := range s.nodes {
             if _, ok := matchSet[node.Session]; ok {
                 filtered = append(filtered, node)
