@@ -43,30 +43,7 @@ func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map
     s.gitInfo = gitInfo
     s.sessionActivity = sessionActivity
     s.cfg = cfg
-
-    // preserve cursor position, rebuild nodes
-    selectedSession := ""
-    selectedWindow := -1
-    selectedIsSession := false
-    if s.cursor < len(s.nodes) {
-        n := s.nodes[s.cursor]
-        selectedSession = n.Session
-        selectedWindow = n.WindowIndex
-        selectedIsSession = n.IsSession
-    }
-
     s.rebuildNodes()
-
-    // restore cursor — match IsSession too so window:0 doesn't collapse back to its parent session node
-    for i, n := range s.nodes {
-        if n.Session == selectedSession && n.WindowIndex == selectedWindow && n.IsSession == selectedIsSession {
-            s.cursor = i
-            break
-        }
-    }
-    if s.cursor >= len(s.nodes) {
-        s.cursor = max(0, len(s.nodes)-1)
-    }
 }
 
 // alertSeverity maps alert level to a numeric priority (higher = more severe).
@@ -116,6 +93,17 @@ func (s *SidebarModel) newestSessionAlert(session string) time.Time {
 }
 
 func (s *SidebarModel) rebuildNodes() {
+    // Save cursor identity so it can be restored after the rebuild changes indices.
+    var curSession string
+    var curWindowIndex int
+    var curIsSession bool
+    if s.cursor >= 0 && s.cursor < len(s.nodes) {
+        n := s.nodes[s.cursor]
+        curSession = n.Session
+        curWindowIndex = n.WindowIndex
+        curIsSession = n.IsSession
+    }
+
     // preserve expanded state
     expanded := map[string]bool{}
     for _, n := range s.nodes {
@@ -213,6 +201,30 @@ func (s *SidebarModel) rebuildNodes() {
                 s.nodes = append(s.nodes, SidebarNode{Session: name, WindowIndex: wi})
             }
         }
+    }
+
+    // Restore cursor to the same logical node. Match IsSession to avoid
+    // conflating window:0 with its parent session node.
+    found := false
+    for i, n := range s.nodes {
+        if n.Session == curSession && n.WindowIndex == curWindowIndex && n.IsSession == curIsSession {
+            s.cursor = i
+            found = true
+            break
+        }
+    }
+    // If the cursor was on a window node that is now hidden (session collapsed),
+    // fall back to the parent session node.
+    if !found && !curIsSession && curSession != "" {
+        for i, n := range s.nodes {
+            if n.IsSession && n.Session == curSession {
+                s.cursor = i
+                break
+            }
+        }
+    }
+    if s.cursor >= len(s.nodes) {
+        s.cursor = max(0, len(s.nodes)-1)
     }
 }
 

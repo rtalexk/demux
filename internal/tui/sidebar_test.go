@@ -1105,3 +1105,56 @@ func TestCollapseAll_AllAlreadyCollapsed_NoChange(t *testing.T) {
         t.Errorf("expected no change when all already collapsed, got %d nodes (was %d)", len(s.nodes), before)
     }
 }
+
+// ---------- cursor restoration after expand/collapse ----------
+
+func TestCollapseAll_CursorOnWindowNode_FallsBackToParentSession(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
+    // Focus alpha's window node (index 1).
+    s.cursor = 1
+    s.CollapseAll()
+    // Window node is gone; cursor must land on parent session "alpha" (index 0).
+    if s.cursor != 0 {
+        t.Errorf("expected cursor=0 (alpha session) after CollapseAll, got %d", s.cursor)
+    }
+    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "alpha" {
+        t.Errorf("expected cursor on alpha session node, got %+v", n)
+    }
+}
+
+func TestExpandAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}, SessionsCollapsed: true},
+    }
+    s.rebuildNodes() // both collapsed: [alpha(session), beta(session)]
+    // Focus beta session (index 1); after ExpandAll alpha gains a window node
+    // so beta's index shifts from 1 to 2.
+    s.cursor = 1
+    s.ExpandAll()
+    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "beta" {
+        t.Errorf("expected cursor on beta session node after ExpandAll, got %+v", n)
+    }
+}
+
+func TestCollapseAll_CursorOnSessionNode_StaysOnSameSession(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{SessionSort: []string{"alphabetical"}},
+    }
+    s.rebuildNodes() // [alpha(session), alpha-win0, beta(session), beta-win0]
+    // Focus beta session (index 2).
+    s.cursor = 2
+    s.CollapseAll()
+    // Both sessions collapsed: [alpha(session), beta(session)]; beta is now index 1.
+    if n := s.nodes[s.cursor]; !n.IsSession || n.Session != "beta" {
+        t.Errorf("expected cursor on beta session node after CollapseAll, got %+v", n)
+    }
+}
