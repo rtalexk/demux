@@ -93,11 +93,15 @@ func TestOpen_DirPermissions(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
-    d.Close()
+    if err := d.Close(); err != nil {
+        t.Fatalf("close: %v", err)
+    }
     info, err := os.Stat(filepath.Dir(path))
     if err != nil {
         t.Fatal(err)
     }
+    // 0700 has no bits in common with any standard umask, so the
+    // kernel will not mask any bits away.
     if got := info.Mode().Perm(); got != 0700 {
         t.Errorf("dir perm = %04o, want 0700", got)
     }
