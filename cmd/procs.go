@@ -3,6 +3,7 @@ package cmd
 import (
     "fmt"
     "os"
+    "sync"
     "time"
 
     "github.com/mattn/go-isatty"
@@ -46,6 +47,41 @@ func (r procRow) Fields() []string {
     return base
 }
 
+type paneGitWork struct {
+    key     string // "session:windowIndex:paneIndex"
+    paneCWD string
+}
+
+// fetchGitForPanes fetches git info for each pane work item in parallel,
+// capped at gitConcurrencyCap concurrent goroutines (defined in sessions.go).
+// Returns a map of key -> git.Info (entry absent on error).
+func fetchGitForPanes(work []paneGitWork, timeoutMs int) map[string]git.Info {
+    results := make(map[string]git.Info, len(work))
+    if len(work) == 0 {
+        return results
+    }
+    var mu sync.Mutex
+    var wg sync.WaitGroup
+    sem := make(chan struct{}, gitConcurrencyCap)
+    for _, w := range work {
+        wg.Add(1)
+        w := w
+        go func() {
+            defer wg.Done()
+            sem <- struct{}{}
+            defer func() { <-sem }()
+            info, err := git.Fetch(w.paneCWD, timeoutMs)
+            if err == nil {
+                mu.Lock()
+                results[w.key] = info
+                mu.Unlock()
+            }
+        }()
+    }
+    wg.Wait()
+    return results
+}
+
 func runProcs(cmd *cobra.Command, _ []string) error {
     cfg := loadConfig()
 
@@ -74,6 +110,33 @@ func runProcs(cmd *cobra.Command, _ []string) error {
         headers = append(headers, "GIT")
     }
 
+    // Pre-fetch git info in parallel for all deviant panes.
+    var gitWork []paneGitWork
+    if procsGit {
+        for sessionName, windows := range grouped {
+            if procsSession != "" && sessionName != procsSession {
+                continue
+            }
+            if isIgnored(cfg, sessionName) {
+                continue
+            }
+            primaryCWD := primaryCWDForSession(windows)
+            for wi, wPanes := range windows {
+                if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
+                    continue
+                }
+                for _, pane := range wPanes {
+                    paneCWD := pane.CWD
+                    if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
+                        key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
+                        gitWork = append(gitWork, paneGitWork{key: key, paneCWD: paneCWD})
+                    }
+                }
+            }
+        }
+    }
+    gitResults := fetchGitForPanes(gitWork, cfg.Git.TimeoutMs)
+
     var rows []format.Row
 
     for sessionName, windows := range grouped {
@@ -95,17 +158,16 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                 paneCWD := pane.CWD
                 gitCol := "—"
                 if procsGit {
+                    key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
                     if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
-                        info, err := git.Fetch(paneCWD, cfg.Git.TimeoutMs)
-                        if err != nil {
-                            gitCol = cfg.Git.ErrorDisplay
-                        } else {
+                        if info, ok := gitResults[key]; ok {
                             gitCol = "↪ " + info.Branch + " " + gitIndicators(info)
+                        } else {
+                            gitCol = cfg.Git.ErrorDisplay
                         }
                     }
                 }
 
-                // pane header row
                 rows = append(rows, procRow{
                     session:    sessionName,
                     window:     fmt.Sprint(wi),
@@ -121,7 +183,6 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                     includeGit: procsGit,
                 })
 
-                // child processes matching this pane's CWD
                 for _, p := range allProcs {
                     cwd, ok := cwdByPID[p.PID]
                     if !ok || cwd != paneCWD {

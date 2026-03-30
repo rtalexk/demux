@@ -4,6 +4,7 @@ import (
     "fmt"
     "os"
     "strings"
+    "sync"
 
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/config"
@@ -48,6 +49,43 @@ func (r sessionRow) Fields() []string {
         return append(base, gitCols...)
     }
     return base
+}
+
+type sessionGitWork struct {
+    sessionName string
+    primaryCWD  string
+}
+
+const gitConcurrencyCap = 8
+
+// fetchGitForSessions fetches git info for each work item in parallel,
+// capped at gitConcurrencyCap concurrent goroutines.
+// Returns a map of sessionName -> git.Info (entry absent on error).
+func fetchGitForSessions(work []sessionGitWork, timeoutMs int, errorDisplay string) map[string]git.Info {
+    results := make(map[string]git.Info, len(work))
+    if len(work) == 0 {
+        return results
+    }
+    var mu sync.Mutex
+    var wg sync.WaitGroup
+    sem := make(chan struct{}, gitConcurrencyCap)
+    for _, w := range work {
+        wg.Add(1)
+        w := w
+        go func() {
+            defer wg.Done()
+            sem <- struct{}{}
+            defer func() { <-sem }()
+            info, err := git.Fetch(w.primaryCWD, timeoutMs)
+            if err == nil {
+                mu.Lock()
+                results[w.sessionName] = info
+                mu.Unlock()
+            }
+        }()
+    }
+    wg.Wait()
+    return results
 }
 
 func runSessions(cmd *cobra.Command, _ []string) error {
@@ -101,6 +139,20 @@ func runSessions(cmd *cobra.Command, _ []string) error {
         }
     }
 
+    // Pre-fetch git info in parallel for all non-ignored sessions.
+    var gitWork []sessionGitWork
+    if sessionsGit || sessionsGitOnly {
+        for sessionName, windows := range grouped {
+            if isIgnored(cfg, sessionName) {
+                continue
+            }
+            if cwd := primaryCWDForSession(windows); cwd != "" {
+                gitWork = append(gitWork, sessionGitWork{sessionName, cwd})
+            }
+        }
+    }
+    gitResults := fetchGitForSessions(gitWork, cfg.Git.TimeoutMs, cfg.Git.ErrorDisplay)
+
     var rows []format.Row
     for sessionName, windows := range grouped {
         if isIgnored(cfg, sessionName) {
@@ -131,25 +183,22 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 
         if sessionsGit || sessionsGitOnly {
             primaryCWD := primaryCWDForSession(windows)
-            if primaryCWD != "" {
-                info, err := git.Fetch(primaryCWD, cfg.Git.TimeoutMs)
-                if err != nil {
-                    row.branch = cfg.Git.ErrorDisplay
-                    row.dirty = "—"
-                    row.ahead = "—"
-                    row.behind = "—"
-                } else {
-                    row.branch = info.Branch
-                    if info.Dirty {
-                        row.dirty = "yes"
-                    } else {
-                        row.dirty = "no"
-                    }
-                    row.ahead = fmt.Sprint(info.Ahead)
-                    row.behind = fmt.Sprint(info.Behind)
-                }
-            } else {
+            if primaryCWD == "" {
                 row.branch = cfg.Git.FallbackDisplay
+                row.dirty = "—"
+                row.ahead = "—"
+                row.behind = "—"
+            } else if info, ok := gitResults[sessionName]; ok {
+                row.branch = info.Branch
+                if info.Dirty {
+                    row.dirty = "yes"
+                } else {
+                    row.dirty = "no"
+                }
+                row.ahead = fmt.Sprint(info.Ahead)
+                row.behind = fmt.Sprint(info.Behind)
+            } else {
+                row.branch = cfg.Git.ErrorDisplay
                 row.dirty = "—"
                 row.ahead = "—"
                 row.behind = "—"
