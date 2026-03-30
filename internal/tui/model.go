@@ -29,7 +29,6 @@ type tickMsg time.Time
 type panesMsg struct {
     panes          []tmux.Pane
     currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
-    currentWindow  int
 }
 type alertsMsg struct{ alerts []db.Alert }
 type procDataMsg struct {
@@ -75,7 +74,6 @@ type Model struct {
     popupMode    bool // true when launched with DEMUX_POPUP=1; quits after attach
 
     currentSession   string
-    currentWindow    int
     startupFocusDone bool
 }
 
@@ -109,8 +107,8 @@ func (m Model) fetchPanes() tea.Cmd {
         if err != nil {
             return panesMsg{}
         }
-        session, window, _ := tmux.CurrentTarget()
-        return panesMsg{panes: panes, currentSession: session, currentWindow: window}
+        session, _, _ := tmux.CurrentTarget()
+        return panesMsg{panes: panes, currentSession: session}
     }
 }
 
@@ -196,9 +194,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if !m.ready {
             // First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
             m.currentSession = msg.currentSession
-            m.currentWindow = msg.currentWindow
             switch m.cfg.Sidebar.FocusOnOpen {
-            case "current_window", "current_session", "first_window", "first_session":
+            case "current_session", "first_session":
                 visibleRows := max(1, m.height-1-2)
                 m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
             }
@@ -230,11 +227,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.procs = msg.procs
         m.cwdMap = msg.cwdMap
         if node := m.sidebar.Selected(); node != nil {
-            if node.IsSession {
-                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-            } else {
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-            }
+            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
         }
         m.updateDetailFromSelection()
         // Self-schedule next poll in 2s for the selected window.
@@ -245,18 +238,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if !m.startupFocusDone {
             m.startupFocusDone = true
             visibleRows := max(1, m.height-1-2)
-            switch m.cfg.Sidebar.FocusOnOpen {
-            case "alert_window":
-                if !m.sidebar.FocusFirstAlertWindow(visibleRows) {
-                    // window node not found (sessions collapsed or no alert on any window) — try alert session before falling back
-                    if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.Sidebar.FocusOnOpenFallback != "" {
-                        m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpenFallback, visibleRows)
-                    }
-                }
-            case "alert_session":
-                if !m.sidebar.FocusFirstAlertSession(visibleRows) && m.cfg.Sidebar.FocusOnOpenFallback != "" {
-                    m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpenFallback, visibleRows)
-                }
+            if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
+                m.sidebar.FocusFirstAlertSession(visibleRows)
             }
         }
         m.updateDetailFromSelection()
@@ -303,15 +286,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             sidebarVisibleRows = 1
         }
         m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
-        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-            prevSess, prevWin := m.procList.CurrentWindow()
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-            m.updateDetailFromSelection()
-            if node.Session != prevSess || node.WindowIndex != prevWin {
-                m.procGen++
-                return m, m.scheduleProcFetch()
-            }
-        } else if node != nil {
+        if node := m.sidebar.Selected(); node != nil {
             m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
         }
@@ -345,57 +320,35 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.GotoBottom(sidebarVisibleRows)
     case key.Matches(msg, keys.Enter):
         if node := m.sidebar.Selected(); node != nil {
-            if node.IsSession {
-                m.sidebar.ToggleExpand()
-            } else {
-                // move focus to proclist
-                m.focus = panelProcList
-                m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                m.updateDetailFromSelection()
+            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
+            if target == "" {
+                target = node.Session
             }
-        }
-    case key.Matches(msg, keys.Open):
-        if node := m.sidebar.Selected(); node != nil {
-            if node.IsSession {
-                target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
-                if target == "" {
-                    target = node.Session
-                }
-                tmux.SwitchClient(target)
-            } else {
-                m.resolveAlertForWindow(node.Session, node.WindowIndex)
-                tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
-            }
+            tmux.SwitchClient(target)
             if m.popupMode {
                 return m, tea.Quit
             }
         }
-    case key.Matches(msg, keys.Expand):
-        m.sidebar.Expand()
-    case key.Matches(msg, keys.Collapse):
-        m.sidebar.Collapse()
-    case key.Matches(msg, keys.ExpandAll):
-        m.sidebar.ExpandAll()
-    case key.Matches(msg, keys.CollapseAll):
-        m.sidebar.CollapseAll()
+    case key.Matches(msg, keys.Open):
+        if node := m.sidebar.Selected(); node != nil {
+            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
+            if target == "" {
+                target = node.Session
+            }
+            tmux.SwitchClient(target)
+            if m.popupMode {
+                return m, tea.Quit
+            }
+        }
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
     }
-    // Populate proc list: window data for window nodes, session overview for session nodes.
+    // Populate proc list: session overview for all nodes.
     var cmd tea.Cmd
     if node := m.sidebar.Selected(); node != nil {
-        if !node.IsSession {
-            prevSess, prevWin := m.procList.CurrentWindow()
-            m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-            if node.Session != prevSess || node.WindowIndex != prevWin {
-                m.procGen++
-                cmd = m.scheduleProcFetch()
-            }
-        } else {
-            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-            m.procGen++
-            cmd = m.scheduleProcFetch()
-        }
+        m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+        m.procGen++
+        cmd = m.scheduleProcFetch()
     }
     m.updateDetailFromSelection()
     return m, cmd
@@ -438,87 +391,23 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             // Rebuild immediately with current data. The nil guard is defensive: if the
             // sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
             if node := m.sidebar.Selected(); node != nil {
-                if node.IsSession {
-                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                } else {
-                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                }
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             }
             m.procGen++
             m.procList.clampOffset(procH - 2)
             m.updateDetailFromSelection()
             return m, m.scheduleDelayedProcFetch()
-        }
-        if node := m.sidebar.Selected(); node != nil && !node.IsSession {
-            m.resolveAlertForWindow(node.Session, node.WindowIndex)
-            tmux.SwitchClient(fmt.Sprintf("%s:%d", node.Session, node.WindowIndex))
-            if m.popupMode {
-                return m, tea.Quit
-            }
         }
     case key.Matches(msg, keys.Open):
-        if pane := m.procList.SelectedPane(); pane != nil {
-            m.resolveAlertForWindow(pane.Session, pane.WindowIndex)
-            tmux.SwitchClient(fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex))
+        if node := m.sidebar.Selected(); node != nil {
+            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
+            if target == "" {
+                target = node.Session
+            }
+            tmux.SwitchClient(target)
             if m.popupMode {
                 return m, tea.Quit
             }
-        }
-    case key.Matches(msg, keys.Expand):
-        if m.procList.Expand() {
-            if node := m.sidebar.Selected(); node != nil {
-                if node.IsSession {
-                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                } else {
-                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                }
-            }
-            m.procGen++
-            m.procList.clampOffset(procH - 2)
-            m.updateDetailFromSelection()
-            return m, m.scheduleDelayedProcFetch()
-        }
-    case key.Matches(msg, keys.Collapse):
-        if m.procList.Collapse() {
-            if node := m.sidebar.Selected(); node != nil {
-                if node.IsSession {
-                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                } else {
-                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                }
-            }
-            m.procGen++
-            m.procList.clampOffset(procH - 2)
-            m.updateDetailFromSelection()
-            return m, m.scheduleDelayedProcFetch()
-        }
-    case key.Matches(msg, keys.ExpandAll):
-        if m.procList.ExpandAll() {
-            if node := m.sidebar.Selected(); node != nil {
-                if node.IsSession {
-                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                } else {
-                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                }
-            }
-            m.procGen++
-            m.procList.clampOffset(procH - 2)
-            m.updateDetailFromSelection()
-            return m, m.scheduleDelayedProcFetch()
-        }
-    case key.Matches(msg, keys.CollapseAll):
-        if m.procList.CollapseAll() {
-            if node := m.sidebar.Selected(); node != nil {
-                if node.IsSession {
-                    m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                } else {
-                    m.procList.SetWindowData(m.panes, node.Session, node.WindowIndex, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-                }
-            }
-            m.procGen++
-            m.procList.clampOffset(procH - 2)
-            m.updateDetailFromSelection()
-            return m, m.scheduleDelayedProcFetch()
         }
     case key.Matches(msg, keys.Esc):
         m.focus = panelSidebar
@@ -554,54 +443,24 @@ func (m *Model) populateYankFields() {
             return
         }
     }
-    // session or window node from sidebar
-    node := m.sidebar.Selected()
-    if node != nil {
-        if node.IsSession {
-            m.yank.SetFields([]YankField{
-                {Key: "n", Label: "session", Value: node.Session},
-                {Key: "t", Label: "target", Value: node.Session},
-            })
-        } else {
-            m.yank.SetFields([]YankField{
-                {Key: "n", Label: "session", Value: node.Session},
-                {Key: "t", Label: "target", Value: fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)},
-            })
-        }
-    }
-}
-
-func (m *Model) resolveAlertForWindow(session string, windowIndex int) {
-    prefix := fmt.Sprintf("%s:%d.", session, windowIndex)
-    exact := fmt.Sprintf("%s:%d", session, windowIndex)
-    for _, a := range m.alerts {
-        if (a.Target != exact && !strings.HasPrefix(a.Target, prefix)) || a.Sticky {
-            continue
-        }
-        if err := m.db.AlertRemove(a.Target); err != nil {
-            m.statusMsg = "error removing alert: " + err.Error()
-            m.statusExp = time.Now().Add(2 * time.Second)
-        }
+    // session node from sidebar
+    if node := m.sidebar.Selected(); node != nil {
+        m.yank.SetFields([]YankField{
+            {Key: "n", Label: "session", Value: node.Session},
+            {Key: "t", Label: "target", Value: node.Session},
+        })
     }
 }
 
 // applyNonAlertFocusMode applies a non-alert focus mode to the sidebar.
-// Valid modes: current_window, current_session, first_window, first_session.
+// Valid modes: current_session, first_session.
 // No-ops on empty or unrecognised mode.
 func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
     switch mode {
-    case "current_window":
-        if !m.sidebar.FocusNode(m.currentSession, m.currentWindow, false, visibleRows) {
-            // sessions collapsed: no window node visible — fall back to current session
-            m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
-        }
     case "current_session":
-        m.sidebar.FocusNode(m.currentSession, m.currentWindow, true, visibleRows)
-    case "first_window":
-        // if no window nodes visible (sessions collapsed), cursor stays at 0 = first session
-        m.sidebar.FocusFirstWindow(visibleRows)
+        m.sidebar.FocusNode(m.currentSession, visibleRows)
     case "first_session":
-        // cursor is already 0, which is always a session node — no-op
+        // cursor is already 0, which is always the first session — no-op
     }
 }
 
@@ -620,88 +479,42 @@ func (m *Model) updateDetailFromSelection() {
             m.detail = DetailModel{}
             return
         }
-        if node.IsSession {
-            grouped := tmux.GroupBySessions(m.panes)
-            windows := grouped[node.Session]
-            alertCount := 0
-            for _, a := range m.alerts {
-                if strings.HasPrefix(a.Target, node.Session+":") {
-                    alertCount++
+        grouped := tmux.GroupBySessions(m.panes)
+        windows := grouped[node.Session]
+        alertCount := 0
+        for _, a := range m.alerts {
+            if strings.HasPrefix(a.Target, node.Session+":") {
+                alertCount++
+            }
+        }
+        sessionCWD := primaryCWDForPanes(windows)
+        // count processes whose CWD is under the session's primary CWD
+        procCount := 0
+        if sessionCWD != "" {
+            for _, pr := range m.procs {
+                cwd := m.cwdMap[pr.PID]
+                if cwd == "" {
+                    continue
+                }
+                if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+                    procCount++
                 }
             }
-            sessionCWD := primaryCWDForPanes(windows)
-            // count processes whose CWD is under the session's primary CWD
-            procCount := 0
-            if sessionCWD != "" {
-                for _, pr := range m.procs {
-                    cwd := m.cwdMap[pr.PID]
-                    if cwd == "" {
-                        continue
-                    }
-                    if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
-                        procCount++
-                    }
-                }
-            }
-            paneCount := 0
-            for _, wp := range windows {
-                paneCount += len(wp)
-            }
-            m.detail = DetailModel{
-                cfg:        m.cfg,
-                selType:    DetailSession,
-                session:    node.Session,
-                sessionCWD: sessionCWD,
-                gitInfo:    m.gitInfo[node.Session],
-                winCount:   len(windows),
-                paneCount:  paneCount,
-                procCount:  procCount,
-                alertCount: alertCount,
-            }
-        } else {
-            // window node selected
-            grouped := tmux.GroupBySessions(m.panes)
-            windows := grouped[node.Session]
-            wPanes := windows[node.WindowIndex]
-            gitKey := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
-            var windowAlert *db.Alert
-            target := fmt.Sprintf("%s:%d", node.Session, node.WindowIndex)
-            if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
-                windowAlert = a
-            }
-            sessionCWD := primaryCWDForPanes(windows)
-            alertCount := 0
-            for _, a := range m.alerts {
-                if strings.HasPrefix(a.Target, node.Session+":") {
-                    alertCount++
-                }
-            }
-            procCount := 0
-            if sessionCWD != "" {
-                for _, pr := range m.procs {
-                    cwd := m.cwdMap[pr.PID]
-                    if cwd == "" {
-                        continue
-                    }
-                    if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
-                        procCount++
-                    }
-                }
-            }
-            m.detail = DetailModel{
-                cfg:         m.cfg,
-                selType:     DetailWindow,
-                session:     node.Session,
-                sessionCWD:  sessionCWD,
-                gitInfo:     m.gitInfo[node.Session],
-                winCount:    len(windows),
-                procCount:   procCount,
-                alertCount:  alertCount,
-                windowIndex: node.WindowIndex,
-                windowPanes: wPanes,
-                windowGit:   m.gitInfo[gitKey],
-                windowAlert: windowAlert,
-            }
+        }
+        paneCount := 0
+        for _, wp := range windows {
+            paneCount += len(wp)
+        }
+        m.detail = DetailModel{
+            cfg:        m.cfg,
+            selType:    DetailSession,
+            session:    node.Session,
+            sessionCWD: sessionCWD,
+            gitInfo:    m.gitInfo[node.Session],
+            winCount:   len(windows),
+            paneCount:  paneCount,
+            procCount:  procCount,
+            alertCount: alertCount,
         }
         return
     }
@@ -949,15 +762,7 @@ func (m Model) plainBreadcrumb() string {
     if node == nil {
         return ""
     }
-    if node.IsSession {
-        return node.Session
-    }
-    windows := m.sidebar.WindowsForSession(node.Session)
-    winLabel := fmt.Sprintf("%d", node.WindowIndex)
-    if panes, ok := windows[node.WindowIndex]; ok && len(panes) > 0 {
-        winLabel = fmt.Sprintf("%d: %s", node.WindowIndex, panes[0].WindowName)
-    }
-    return node.Session + " / " + winLabel
+    return node.Session
 }
 
 
