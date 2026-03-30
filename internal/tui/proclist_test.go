@@ -886,6 +886,32 @@ func TestCollapseAll_AllAlreadyCollapsed_ReturnsFalse(t *testing.T) {
     }
 }
 
+// ---------- clampOffset cursor bounds ----------
+
+// Regression: CollapseAll shrinks p.nodes; clampOffset must clamp p.cursor to
+// prevent out-of-bounds panics on subsequent MoveUp/MoveDown calls.
+func TestClampOffset_CursorBeyondNodes_ClampsToBounds(t *testing.T) {
+    m := ProcListModel{
+        nodes: []ProcListNode{
+            {IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}},
+            {Proc: proc.Process{PID: 10, Name: "procA"}, Depth: 1, HasChildren: true},
+        },
+        cursor: 15, // out of bounds after a CollapseAll rebuild
+        offset: 15,
+    }
+    m.clampOffset(10)
+    if m.cursor >= len(m.nodes) {
+        t.Errorf("cursor %d still out of bounds (len=%d)", m.cursor, len(m.nodes))
+    }
+    if m.offset < 0 || m.offset >= len(m.nodes) {
+        t.Errorf("offset %d out of bounds (len=%d)", m.offset, len(m.nodes))
+    }
+    // MoveUp must not panic
+    m.MoveUp()
+    // MoveDown must not panic
+    m.MoveDown()
+}
+
 // ---------- renderProc collapse rendering ----------
 
 func TestRenderProc_CollapsedWithChildren_ShowsRightTriangleAndAggStats(t *testing.T) {

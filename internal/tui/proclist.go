@@ -1010,7 +1010,11 @@ func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowInde
 func (p *ProcListModel) clampOffset(maxRows int) {
     if len(p.nodes) == 0 {
         p.offset = 0
+        p.cursor = 0
         return
+    }
+    if p.cursor >= len(p.nodes) {
+        p.cursor = len(p.nodes) - 1
     }
     if p.cursor < p.offset {
         p.offset = p.cursor
