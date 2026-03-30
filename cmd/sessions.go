@@ -61,7 +61,7 @@ const gitConcurrencyCap = 8
 // fetchGitForSessions fetches git info for each work item in parallel,
 // capped at gitConcurrencyCap concurrent goroutines.
 // Returns a map of sessionName -> git.Info (entry absent on error).
-func fetchGitForSessions(work []sessionGitWork, timeoutMs int, errorDisplay string) map[string]git.Info {
+func fetchGitForSessions(work []sessionGitWork, timeoutMs int) map[string]git.Info {
     results := make(map[string]git.Info, len(work))
     if len(work) == 0 {
         return results
@@ -151,7 +151,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
             }
         }
     }
-    gitResults := fetchGitForSessions(gitWork, cfg.Git.TimeoutMs, cfg.Git.ErrorDisplay)
+    gitResults := fetchGitForSessions(gitWork, cfg.Git.TimeoutMs)
 
     var rows []format.Row
     for sessionName, windows := range grouped {
