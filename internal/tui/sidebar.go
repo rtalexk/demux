@@ -583,8 +583,6 @@ func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
 func (s *SidebarModel) SetSearchResult(r query.Result) {
     s.queryResult = r
     s.rebuildNodes()
-    s.cursor = 0
-    s.offset = 0
 }
 
 // CursorDown moves the cursor down by one row (used during search insert mode).

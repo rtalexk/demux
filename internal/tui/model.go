@@ -198,9 +198,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
         m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(msg.panes), m.cfg)
-        if m.searchInput.IsActive() {
-            m.sidebar.SetSearchResult(m.queryResult)
-        }
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -313,9 +310,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             return m, nil
         case "ctrl+j", "ctrl+n":
             m.sidebar.CursorDown()
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                m.procGen++
+                m.updateDetailFromSelection()
+                return m, m.scheduleProcFetch()
+            }
             return m, nil
         case "ctrl+k", "ctrl+p":
             m.sidebar.CursorUp()
+            if node := m.sidebar.Selected(); node != nil {
+                m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+                m.procGen++
+                m.updateDetailFromSelection()
+                return m, m.scheduleProcFetch()
+            }
             return m, nil
         default:
             var cmd tea.Cmd
