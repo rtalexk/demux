@@ -130,3 +130,46 @@ func TestRun_MatchPos(t *testing.T) {
         t.Error("expected non-empty MatchPos for session match")
     }
 }
+
+func TestParse_BareTag(t *testing.T) {
+    // Bare tags with no term should be scoped with empty term, not ScopeAll.
+    tests := []struct {
+        raw   string
+        scope query.QueryScope
+        term  string
+    }{
+        {"s:", query.ScopeSession, ""},
+        {"w:", query.ScopeWindow, ""},
+        {"p:", query.ScopeProcess, ""},
+    }
+    for _, tt := range tests {
+        pq := query.Parse(tt.raw)
+        if pq.Scope != tt.scope {
+            t.Errorf("Parse(%q).Scope = %v, want %v", tt.raw, pq.Scope, tt.scope)
+        }
+        if pq.Term != tt.term {
+            t.Errorf("Parse(%q).Term = %q, want %q", tt.raw, pq.Term, tt.term)
+        }
+    }
+}
+
+func TestRun_NonContiguousWindowIndices(t *testing.T) {
+    // Windows 0 and 2 (index 1 was deleted) — winIdxOrder mapping must survive this.
+    panes := []tmux.Pane{
+        {Session: "work", WindowIndex: 0, WindowName: "shell", PanePID: 100},
+        {Session: "work", WindowIndex: 2, WindowName: "vim-edit", PanePID: 101},
+    }
+    result := query.RunWith(query.Parse("w:vim"), panes, nil)
+    if len(result.Sessions) != 1 {
+        t.Fatalf("expected 1 session, got %d", len(result.Sessions))
+    }
+    if len(result.Sessions[0].Windows) != 1 {
+        t.Fatalf("expected 1 window match, got %d", len(result.Sessions[0].Windows))
+    }
+    if result.Sessions[0].Windows[0].Index != 2 {
+        t.Errorf("expected window index 2, got %d", result.Sessions[0].Windows[0].Index)
+    }
+    if result.Sessions[0].Windows[0].Name != "vim-edit" {
+        t.Errorf("expected 'vim-edit', got %q", result.Sessions[0].Windows[0].Name)
+    }
+}

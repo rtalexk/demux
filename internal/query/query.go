@@ -52,13 +52,13 @@ type ProcMatch struct {
 func Parse(raw string) ParsedQuery {
     pq := ParsedQuery{Raw: raw}
     switch {
-    case len(raw) > 2 && raw[:2] == "s:":
+    case len(raw) >= 2 && raw[:2] == "s:":
         pq.Scope = ScopeSession
         pq.Term = raw[2:]
-    case len(raw) > 2 && raw[:2] == "w:":
+    case len(raw) >= 2 && raw[:2] == "w:":
         pq.Scope = ScopeWindow
         pq.Term = raw[2:]
-    case len(raw) > 2 && raw[:2] == "p:":
+    case len(raw) >= 2 && raw[:2] == "p:":
         pq.Scope = ScopeProcess
         pq.Term = raw[2:]
     default:
@@ -108,6 +108,8 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
     if pq.Scope == ScopeAll || pq.Scope == ScopeWindow {
         for sessionName, windows := range sessions {
             winNames := make([]string, 0, len(windows))
+            // winIdxOrder maps dense slice positions → real tmux window indices,
+            // since fuzzy.Find returns m.Index as position in the input slice.
             winIdxOrder := make([]int, 0, len(windows))
             for idx, wPanes := range windows {
                 if len(wPanes) > 0 {
