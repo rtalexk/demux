@@ -48,6 +48,9 @@ type Theme struct {
     ColorCpuLow  lipgloss.Color
     ColorCpuMed  lipgloss.Color
     ColorCpuHigh lipgloss.Color
+
+    // Search
+    ColorFgSearchHighlight lipgloss.Color
 }
 
 // ThemeFromConfig builds a Theme directly from the config values.
@@ -88,5 +91,7 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
         ColorCpuLow:  lipgloss.Color(tc.ColorCpuLow),
         ColorCpuMed:  lipgloss.Color(tc.ColorCpuMed),
         ColorCpuHigh: lipgloss.Color(tc.ColorCpuHigh),
+
+        ColorFgSearchHighlight: lipgloss.Color(tc.ColorFgSearchHighlight),
     }
 }

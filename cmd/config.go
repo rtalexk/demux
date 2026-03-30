@@ -136,6 +136,9 @@ color_cpu_low  = "#7f849c"
 color_cpu_med  = "#f9e2af"
 color_cpu_high = "#f38ba8"
 
+# Search match highlight color
+color_fg_search_highlight = "#f9e2af"
+
 # Process type classification — controls how process names are coloured
 [theme.processes]
 editors = ["nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"]

@@ -89,6 +89,8 @@ type ThemeConfig struct {
     ColorCpuLow  string `toml:"color_cpu_low"`
     ColorCpuMed  string `toml:"color_cpu_med"`
     ColorCpuHigh string `toml:"color_cpu_high"`
+
+    ColorFgSearchHighlight string `toml:"color_fg_search_highlight"`
 }
 
 // ProcessesConfig defines which process names belong to each display category.
@@ -186,6 +188,8 @@ func Default() Config {
             ColorCpuLow:  "#7f849c",
             ColorCpuMed:  "#f9e2af",
             ColorCpuHigh: "#f38ba8",
+
+            ColorFgSearchHighlight: "#f9e2af",
 
             Processes: ProcessesConfig{
                 Editors: []string{"nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"},
