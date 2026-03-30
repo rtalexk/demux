@@ -456,7 +456,10 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
             line = p.renderWindowHeader(node, selected, innerW)
             if searchActive && !selected {
                 pos := p.windowMatchPos(p.curSession, node.Pane.WindowIndex)
-                if pos == nil {
+                if pos != nil {
+                    highlighted := highlightMatchPos(node.Pane.WindowName, pos)
+                    line = strings.Replace(line, node.Pane.WindowName, highlighted, 1)
+                } else {
                     line = dimStyle.Render(line)
                 }
             }
@@ -1505,7 +1508,7 @@ func highlightMatchPos(name string, pos []int) string {
     for _, p := range pos {
         posSet[p] = true
     }
-    accentStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorSession)
+    accentStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgSearchHighlight)
     var b strings.Builder
     for i, ch := range name {
         if posSet[i] {

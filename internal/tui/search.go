@@ -17,7 +17,7 @@ type SearchInputModel struct {
 
 func NewSearchInputModel() SearchInputModel {
     ti := textinput.New()
-    ti.Placeholder = "search…"
+    ti.Placeholder = "Press / to search..."
     return SearchInputModel{input: ti}
 }
 
