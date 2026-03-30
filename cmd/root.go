@@ -43,7 +43,11 @@ func init() {
 }
 
 func loadConfig() config.Config {
-    cfg, _ := config.Load(config.DefaultPath())
+    path, err := config.DefaultPath()
+    if err != nil {
+        return config.Default()
+    }
+    cfg, _ := config.Load(path)
     return cfg
 }
 

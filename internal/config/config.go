@@ -2,7 +2,9 @@ package config
 
 import (
     "errors"
+    "fmt"
     "os"
+    "path/filepath"
     "sort"
     "strings"
 
@@ -207,8 +209,12 @@ func Load(path string) (Config, error) {
     return cfg, nil
 }
 
-// DefaultPath returns ~/.config/demux/demux.toml
-func DefaultPath() string {
-    home, _ := os.UserHomeDir()
-    return home + "/.config/demux/demux.toml"
+// DefaultPath returns ~/.config/demux/demux.toml, or an error if the
+// home directory cannot be determined.
+func DefaultPath() (string, error) {
+    home, err := os.UserHomeDir()
+    if err != nil {
+        return "", fmt.Errorf("home dir: %w", err)
+    }
+    return filepath.Join(home, ".config", "demux", "demux.toml"), nil
 }
