@@ -28,10 +28,11 @@ type DetailModel struct {
     cfg     config.Config
 
     // session
-    session      string
-    sessionCWD   string
-    configPath   string // populated for config-only (non-live) sessions
-    isConfigOnly bool   // true when session exists in config but is not currently live
+    session        string
+    sessionCWD     string
+    configPath     string // populated for config-only (non-live) sessions
+    configWorktree string // worktree name for config-only sessions with Worktree=true
+    isConfigOnly   bool   // true when session exists in config but is not currently live
     gitInfo      git.Info
     prInfo       string
     winCount     int
@@ -139,6 +140,9 @@ func (d DetailModel) renderSession() []string {
         var lines []string
         if d.configPath != "" {
             lines = append(lines, row("path", format.ShortenPath(d.configPath, d.cfg.PathAliases)))
+        }
+        if d.configWorktree != "" {
+            lines = append(lines, row("worktree", d.configWorktree))
         }
         return lines
     }

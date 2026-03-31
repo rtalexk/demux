@@ -700,17 +700,22 @@ func (m *Model) updateDetailFromSelection() {
         sess := m.sidebar.FindSession(node.Session)
         isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
         configPath := ""
+        configWorktree := ""
         if isConfigOnly && sess.Config != nil {
             configPath = sess.Config.Path
+            if sess.Config.Worktree && configPath != "" {
+                configWorktree = filepath.Base(configPath)
+            }
         }
         m.detail = DetailModel{
-            cfg:          m.cfg,
-            selType:      DetailSession,
-            session:      node.Session,
-            sessionCWD:   sessionCWD,
-            isConfigOnly: isConfigOnly,
-            configPath:   configPath,
-            gitInfo:      m.gitInfo[node.Session],
+            cfg:            m.cfg,
+            selType:        DetailSession,
+            session:        node.Session,
+            sessionCWD:     sessionCWD,
+            isConfigOnly:   isConfigOnly,
+            configPath:     configPath,
+            configWorktree: configWorktree,
+            gitInfo:        m.gitInfo[node.Session],
             winCount:     len(windows),
             paneCount:    paneCount,
             procCount:    procCount,
