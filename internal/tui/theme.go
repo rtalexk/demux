@@ -45,6 +45,9 @@ type Theme struct {
     IconAlertWarn  string
     IconAlertError string
 
+    IconTmuxSession string
+    IconCfgSession  string
+
     // Semantic
     ColorPort    lipgloss.Color
     ColorPortBg  lipgloss.Color
@@ -92,6 +95,9 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
         IconAlertInfo:  tc.IconAlertInfo,
         IconAlertWarn:  tc.IconAlertWarn,
         IconAlertError: tc.IconAlertError,
+
+        IconTmuxSession: tc.IconTmuxSession,
+        IconCfgSession:  tc.IconCfgSession,
 
         ColorPort:    lipgloss.Color(tc.ColorPort),
         ColorPortBg:  lipgloss.Color(tc.ColorPortBg),
