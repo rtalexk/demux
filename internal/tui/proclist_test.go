@@ -1213,7 +1213,7 @@ func TestRenderPaneHeader_RightAlign_PathAppearsAtRight(t *testing.T) {
     }
     node := paneNode(0, "/home/user/project")
     innerW := 40
-    line := p.renderPaneHeader(node, false, innerW)
+    line := p.renderPaneHeader(node, false, innerW, false)
     plain := stripANSI(line)
     runes := []rune(plain)
     if len(runes) != innerW {
@@ -1230,7 +1230,7 @@ func TestRenderPaneHeader_RightAlign_FillCharsPresent(t *testing.T) {
     }
     node := paneNode(1, "/tmp")
     innerW := 40
-    line := p.renderPaneHeader(node, false, innerW)
+    line := p.renderPaneHeader(node, false, innerW, false)
     plain := stripANSI(line)
     if !strings.Contains(plain, "─") {
         t.Errorf("expected fill chars (─) in right-aligned line, got: %q", plain)
@@ -1243,7 +1243,7 @@ func TestRenderPaneHeader_LeftAlign_NoFillChars(t *testing.T) {
     }
     node := paneNode(0, "/tmp")
     innerW := 40
-    line := p.renderPaneHeader(node, false, innerW)
+    line := p.renderPaneHeader(node, false, innerW, false)
     plain := stripANSI(line)
     if strings.Contains(plain, "─") {
         t.Errorf("expected no fill chars in left-aligned line, got: %q", plain)
@@ -1256,7 +1256,7 @@ func TestRenderPaneHeader_RightAlign_NoCWD_NoFill(t *testing.T) {
     }
     node := paneNode(0, "")
     innerW := 40
-    line := p.renderPaneHeader(node, false, innerW)
+    line := p.renderPaneHeader(node, false, innerW, false)
     plain := stripANSI(line)
     if strings.Contains(plain, "─") {
         t.Errorf("expected no fill when CWD is empty, got: %q", plain)
@@ -1269,7 +1269,7 @@ func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T)
     }
     node := paneNode(0, "/home/user/project")
     innerW := 40
-    line := p.renderPaneHeader(node, true, innerW)
+    line := p.renderPaneHeader(node, true, innerW, false)
     plain := stripANSI(line)
     if !strings.Contains(plain, "pane 0") {
         t.Errorf("expected label in selected right-align line, got: %q", plain)

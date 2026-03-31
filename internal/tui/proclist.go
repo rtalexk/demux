@@ -489,8 +489,9 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                     paneInnerW = 0
                 }
             }
-            rendered := p.renderPaneHeader(node, selected, paneInnerW)
-            if i+1 < len(p.nodes) && p.nodes[i+1].IsIdle {
+            hasIdle := i+1 < len(p.nodes) && p.nodes[i+1].IsIdle
+            rendered := p.renderPaneHeader(node, selected, paneInnerW, hasIdle)
+            if hasIdle && !selected {
                 rendered += "  " + paneIdleStyle.Render("idle")
             }
             if p.inSessionMode {
@@ -609,7 +610,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
 }
 
-func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int) string {
+func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
     label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
 
     alertSuffix := ""
@@ -648,6 +649,20 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
                 padCount = 0
             }
             return selectedBG.Render(content + strings.Repeat(" ", padCount))
+        }
+        if hasIdle {
+            // Render "label  idle" inline, then fill the remaining width with
+            // the selected background so the row doesn't wrap.
+            const idleVisualW = 6 // len("  idle")
+            padCount := innerW - len([]rune(left)) - idleVisualW
+            if padCount < 0 {
+                padCount = 0
+            }
+            idleRendered := paneIdleStyle.Background(activeTheme.ColorSelected).Render("idle")
+            return selectedBG.Render(left) +
+                selectedBG.Render("  ") +
+                idleRendered +
+                selectedBG.Render(strings.Repeat(" ", padCount))
         }
         padCount := innerW - len([]rune(left))
         if padCount < 0 {
