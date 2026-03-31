@@ -490,6 +490,9 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                 }
             }
             rendered := p.renderPaneHeader(node, selected, paneInnerW)
+            if i+1 < len(p.nodes) && p.nodes[i+1].IsIdle {
+                rendered += "  " + paneIdleStyle.Render("idle")
+            }
             if p.inSessionMode {
                 rendered = "    " + rendered
             }
@@ -498,11 +501,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
                 line = dimStyle.Render(stripANSI(line))
             }
         } else if node.IsIdle {
-            idleText := "    idle"
-            if p.inSessionMode {
-                idleText = "    " + idleText
-            }
-            line = paneIdleStyle.Render(idleText)
+            continue
         } else {
             procInnerW := innerW
             if p.inSessionMode {
@@ -1006,7 +1005,10 @@ func nodeDepth(n ProcListNode) int {
 
 // nodeRows returns how many terminal rows a node occupies when rendered.
 func nodeRows(n ProcListNode) int {
-    if n.IsPaneHeader || n.IsIdle || n.IsWindowHeader {
+    if n.IsIdle {
+        return 0
+    }
+    if n.IsPaneHeader || n.IsWindowHeader {
         return 1
     }
     return 2 // process: name line + stats line

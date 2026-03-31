@@ -298,9 +298,9 @@ func TestNodeRows_PaneHeaderIsOneRow(t *testing.T) {
     }
 }
 
-func TestNodeRows_IdleIsOneRow(t *testing.T) {
-    if nodeRows(ProcListNode{IsIdle: true}) != 1 {
-        t.Error("expected 1 row for idle placeholder")
+func TestNodeRows_IdleIsZeroRows(t *testing.T) {
+    if nodeRows(ProcListNode{IsIdle: true}) != 0 {
+        t.Error("expected 0 rows for idle placeholder (rendered inline on pane header)")
     }
 }
 
