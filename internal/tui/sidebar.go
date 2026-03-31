@@ -71,6 +71,20 @@ func (s *SidebarModel) newestSessionAlert(session string) time.Time {
     return newest
 }
 
+// highestSessionAlertSeverity returns the maximum alertSeverity value across
+// all alerts belonging to the session, or -1 if the session has no alerts.
+func (s *SidebarModel) highestSessionAlertSeverity(session string) int {
+    best := -1
+    for target, a := range s.alerts {
+        if strings.HasPrefix(target, session+":") || target == session {
+            if sv := alertSeverity(a.Level); sv > best {
+                best = sv
+            }
+        }
+    }
+    return best
+}
+
 // BestAlertTargetInSession returns the tmux target string of the best alert
 // in the given session according to the session_switch_focus setting.
 // Returns "" for "default" priority or when the session has no alerts.
@@ -143,15 +157,22 @@ func (s *SidebarModel) rebuildNodes() {
         for _, key := range sortKeys {
             switch key {
             case "priority":
-                ti := s.newestSessionAlert(si)
-                tj := s.newestSessionAlert(sj)
-                hasI := !ti.IsZero()
-                hasJ := !tj.IsZero()
+                svi := s.highestSessionAlertSeverity(si)
+                svj := s.highestSessionAlertSeverity(sj)
+                hasI := svi >= 0
+                hasJ := svj >= 0
                 if hasI != hasJ {
                     return hasI
                 }
-                if hasI && hasJ && !ti.Equal(tj) {
-                    return ti.After(tj)
+                if hasI && hasJ {
+                    if svi != svj {
+                        return svi > svj
+                    }
+                    ti := s.newestSessionAlert(si)
+                    tj := s.newestSessionAlert(sj)
+                    if !ti.Equal(tj) {
+                        return ti.After(tj)
+                    }
                 }
             case "last_seen":
                 ai := s.sessionActivity[si]

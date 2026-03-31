@@ -473,6 +473,30 @@ func TestRebuildNodes_NewestAlertSessionSortsFirst(t *testing.T) {
     }
 }
 
+// TestRebuildNodes_PrioritySort_SeverityBeatsRecency is the regression test for
+// the bug where a newer info alert sorted before an older warn alert. Severity
+// must be compared first; recency is only a tiebreaker within the same level.
+func TestRebuildNodes_PrioritySort_SeverityBeatsRecency(t *testing.T) {
+    // dm-main has a newer info alert; vem-main has an older warn alert.
+    // warn > info, so vem-main must sort first regardless of timestamp.
+    older := time.Now().Add(-time.Minute)
+    newer := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("dm-main", "vem-main"),
+        alerts: map[string]db.Alert{
+            "dm-main:0.0":  {Target: "dm-main:0.0", Level: "info", CreatedAt: newer},
+            "vem-main:0.0": {Target: "vem-main:0.0", Level: "warn", CreatedAt: older},
+        },
+    }
+    s.rebuildNodes()
+    if len(s.nodes) < 2 {
+        t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+    }
+    if s.nodes[0].Session != "vem-main" {
+        t.Errorf("expected vem-main (warn) first, got %q", s.nodes[0].Session)
+    }
+}
+
 // --- Alert filter ---
 
 func TestRebuildNodes_LastSeenSort(t *testing.T) {
