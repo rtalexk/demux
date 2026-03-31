@@ -112,11 +112,11 @@ type ProcessesConfig struct {
 type SidebarConfig struct {
     DefaultFilter string   `toml:"default_filter"`
     FocusOnOpen   string   `toml:"focus_on_open"`
-    SearchSort  string   `toml:"search_sort"`
-    Sort        []string `toml:"sort"`
-    SwitchFocus  string `toml:"switch_focus"`
-    Width        int    `toml:"width"`
-    ShowLastSeen bool   `toml:"show_last_seen"`
+    SearchSort    string   `toml:"search_sort"`
+    Sort          []string `toml:"sort"`
+    SwitchFocus   string   `toml:"switch_focus"`
+    Width         int      `toml:"width"`
+    ShowLastSeen  bool     `toml:"show_last_seen"`
 }
 
 type ProcessListConfig struct {
