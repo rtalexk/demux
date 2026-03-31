@@ -79,6 +79,10 @@ switch_focus = "severity"
 # Right-align pane CWD paths in the process list, with a fill separator
 path_right_align = false
 
+[status_bar]
+# Show the status bar at the bottom of the screen
+show = true
+
 [git]
 # Enable git status indicators in the sidebar
 enabled = true
