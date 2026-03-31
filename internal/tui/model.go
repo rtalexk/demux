@@ -953,11 +953,6 @@ func (m Model) View() string {
         }
     }
 
-    if m.showYank {
-        overlay := lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.yank.Render())
-        return overlay
-    }
-
     spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     spinnerStr := ""
     if m.cfg.Git.ShowSpinner {
@@ -986,6 +981,9 @@ func (m Model) View() string {
 
     if m.showHelp {
         return overlayCenter(m.help.Render(), full, m.width, m.height)
+    }
+    if m.showYank {
+        return overlayCenter(m.yank.Render(), full, m.width, m.height)
     }
 
     return full
