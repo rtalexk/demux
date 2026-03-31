@@ -185,7 +185,8 @@ func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
     return func() tea.Msg {
         info, err := git.Fetch(dir, timeoutMs)
         if err != nil {
-            return gitResultMsg{key: k, info: git.Info{}}
+            // Preserve Dir and IsWorktreeRoot even when git is unavailable.
+            return gitResultMsg{key: k, info: git.Info{Dir: info.Dir, IsWorktreeRoot: info.IsWorktreeRoot}}
         }
         return gitResultMsg{key: k, info: info}
     }
