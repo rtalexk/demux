@@ -586,7 +586,6 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     return " " + gap + iconPrefix + sessionStyle.Render(text)
 }
 
-
 // formatAge returns a fixed-width 3-char age string for a session's last-seen
 // timestamp. Format: ' Xs' / 'XXs' for seconds, ' Xm' / 'XXm' for minutes,
 // ' Xh' / 'XXh' for hours, ' Xd' / 'XXd' for days.
