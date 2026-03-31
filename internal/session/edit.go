@@ -20,7 +20,7 @@ func AppendEntry(path string, e ConfigEntry) error {
         return err
     }
     for _, ex := range existing {
-        if ex.Name == e.Name && ex.Alias == e.Alias {
+        if ex.DisplayName() == e.DisplayName() {
             return fmt.Errorf("session %q already exists in %s", e.DisplayName(), filepath.Base(path))
         }
     }
@@ -31,8 +31,10 @@ func AppendEntry(path string, e ConfigEntry) error {
     }
     defer f.Close()
 
-    _, err = fmt.Fprint(f, formatBlock(e))
-    return err
+    if _, err = fmt.Fprint(f, formatBlock(e)); err != nil {
+        return fmt.Errorf("write %s: %w", filepath.Base(path), err)
+    }
+    return nil
 }
 
 func formatBlock(e ConfigEntry) string {
