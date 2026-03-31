@@ -282,6 +282,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
                 m.sidebar.FocusFirstAlertSession(visibleRows)
             }
+            if m.cfg.Sidebar.FocusSearchOnOpen {
+                m.searchInput.EnterInsertMode()
+            }
         }
         m.updateDetailFromSelection()
         // If startup focus landed on a window node, kick off an initial proc fetch.
