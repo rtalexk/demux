@@ -704,7 +704,7 @@ func (m *Model) updateDetailFromSelection() {
         if isConfigOnly && sess.Config != nil {
             configPath = sess.Config.Path
             if sess.Config.Worktree && configPath != "" {
-                configWorktree = filepath.Base(configPath)
+                configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
             }
         }
         m.detail = DetailModel{
