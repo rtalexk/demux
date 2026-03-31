@@ -21,7 +21,7 @@ type SidebarFilter string
 const (
     FilterTmux     SidebarFilter = "t"
     FilterAll      SidebarFilter = "a"
-    FilterConfig   SidebarFilter = "g"
+    FilterConfig   SidebarFilter = "c"
     FilterWorktree SidebarFilter = "w"
     FilterPriority SidebarFilter = "!"
 )
@@ -790,7 +790,7 @@ var filterShortcuts = []struct {
 }{
     {FilterAll, "[a] All"},
     {FilterTmux, "[t] Tmux"},
-    {FilterConfig, "[g] Cfg"},
+    {FilterConfig, "[c] Cfg"},
     {FilterWorktree, "[w] Workt"},
     {FilterPriority, "[!] Prior"},
 }

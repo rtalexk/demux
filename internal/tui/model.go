@@ -483,6 +483,8 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.TabNextSession(sidebarVisibleRows)
     case key.Matches(msg, keys.ShiftTab):
         m.sidebar.TabPrevSession(sidebarVisibleRows)
+    case key.Matches(msg, keys.GotoTop):
+        m.sidebar.GotoTop(sidebarVisibleRows)
     case key.Matches(msg, keys.GotoBottom):
         m.sidebar.GotoBottom(sidebarVisibleRows)
     case key.Matches(msg, keys.Enter), key.Matches(msg, keys.Open):
@@ -552,6 +554,8 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procList.JumpToPrevPane()
     case key.Matches(msg, keys.JumpDown):
         m.procList.JumpToNextPane()
+    case key.Matches(msg, keys.GotoTop):
+        m.procList.GotoTop()
     case key.Matches(msg, keys.GotoBottom):
         m.procList.GotoBottom()
     case key.Matches(msg, keys.Enter):

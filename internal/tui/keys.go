@@ -20,6 +20,7 @@ type keyMap struct {
     JumpDown      key.Binding
     Tab           key.Binding
     ShiftTab      key.Binding
+    GotoTop         key.Binding
     GotoBottom      key.Binding
     FilterTmux      key.Binding
     FilterAll       key.Binding
@@ -51,10 +52,11 @@ var keys = keyMap{
     JumpDown:      key.NewBinding(key.WithKeys("J")),
     Tab:           key.NewBinding(key.WithKeys("tab")),
     ShiftTab:      key.NewBinding(key.WithKeys("shift+tab")),
+    GotoTop:        key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "top")),
     GotoBottom:     key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")),
     FilterTmux:     key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tmux")),
     FilterAll:      key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "all")),
-    FilterConfig:   key.NewBinding(key.WithKeys("g"), key.WithHelp("g", "config")),
+    FilterConfig:   key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "config")),
     FilterWorktree: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktree")),
     Open:          key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open/attach")),
     AlertFilter:   key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "alert filter")),
