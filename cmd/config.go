@@ -124,6 +124,9 @@ color_git_behind = "#74c7ec"
 color_git_ahead  = "#a6e3a1"
 
 # Alert icons
+icon_alert_info  = "ℹ️"
+icon_alert_warn  = "⚠️"
+icon_alert_error = "🚨"
 color_alert_info  = "#89b4fa"
 color_alert_warn  = "#f9e2af"
 color_alert_error = "#f38ba8"
