@@ -391,6 +391,28 @@ switch_focus = "newest"`), 0644)
     }
 }
 
+func TestDefault_Mode(t *testing.T) {
+    cfg := config.Default()
+    if cfg.Mode != "full" {
+        t.Errorf("expected default Mode %q, got %q", "full", cfg.Mode)
+    }
+}
+
+func TestLoad_ModeCompact(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    if err := os.WriteFile(path, []byte(`mode = "compact"`), 0644); err != nil {
+        t.Fatal(err)
+    }
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.Mode != "compact" {
+        t.Errorf("expected Mode %q, got %q", "compact", cfg.Mode)
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")

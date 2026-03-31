@@ -128,6 +128,7 @@ type Config struct {
     IgnoredProcesses  []string          `toml:"ignored_processes"`
     DefaultFormat     string            `toml:"default_format"`
     StatusBarFormat   string            `toml:"status_bar_format"`
+    Mode              string            `toml:"mode"`
     Sidebar           SidebarConfig     `toml:"sidebar"`
     ProcessList       ProcessListConfig `toml:"process_list"`
     Git               GitConfig         `toml:"git"`
@@ -142,6 +143,7 @@ func Default() Config {
         IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
+        Mode:              "full",
         Sidebar: SidebarConfig{
             DefaultFilter: "t",
             FocusOnOpen:   "alert_session",
