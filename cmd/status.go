@@ -44,6 +44,8 @@ func runStatus(cmd *cobra.Command, _ []string) error {
         }
     }
 
+    cfg := loadConfig()
+
     fmtName := resolveFormat(cmd)
     if fmtName == "table" {
         // status command defaults to tmux format
@@ -57,15 +59,15 @@ func runStatus(cmd *cobra.Command, _ []string) error {
         } else {
             sep := ""
             if infos > 0 {
-                fmt.Print(tmuxCounter("#[fg=cyan]", "", infos))
+                fmt.Print(tmuxCounter("#[fg=cyan]", cfg.Theme.IconAlertInfo, infos))
                 sep = " "
             }
             if warns > 0 {
-                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=yellow]", "", warns))
+                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=yellow]", cfg.Theme.IconAlertWarn, warns))
                 sep = " "
             }
             if errors > 0 {
-                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=red,bold]", "", errors))
+                fmt.Printf("%s%s", sep, tmuxCounter("#[fg=red,bold]", cfg.Theme.IconAlertError, errors))
             }
             fmt.Print("#[default]")
         }
