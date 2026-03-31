@@ -433,6 +433,11 @@ func alignedRow(name, indicators string, availWidth int) string {
     return name + strings.Repeat(" ", pad) + indicators
 }
 
+// FindSession returns a pointer to the Session with the given display name, or nil.
+func (s SidebarModel) FindSession(displayName string) *session.Session {
+    return s.findSession(displayName)
+}
+
 // findSession returns a pointer to the Session with the given display name, or nil.
 func (s SidebarModel) findSession(displayName string) *session.Session {
     for i := range s.sessions {

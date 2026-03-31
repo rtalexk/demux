@@ -308,6 +308,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         case "esc", "enter":
             if msg.String() == "enter" {
                 if node := m.sidebar.Selected(); node != nil {
+                    sess := m.sidebar.FindSession(node.Session)
+                    if sess != nil && !sess.IsLive && sess.IsConfig {
+                        if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+                            m.statusMsg = "launch failed: " + err.Error()
+                            m.statusExp = time.Now().Add(5 * time.Second)
+                            m.searchInput.ExitInsertMode()
+                            return m, nil
+                        }
+                        m.searchInput.ExitInsertMode()
+                        return m, m.fetchPanes()
+                    }
                     if err := tmux.SwitchClient(node.Session); err == nil {
                         if m.popupMode {
                             return m, tea.Quit
@@ -439,26 +450,25 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.TabPrevSession(sidebarVisibleRows)
     case key.Matches(msg, keys.GotoBottom):
         m.sidebar.GotoBottom(sidebarVisibleRows)
-    case key.Matches(msg, keys.Enter):
+    case key.Matches(msg, keys.Enter), key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
+            sess := m.sidebar.FindSession(node.Session)
+            if sess != nil && !sess.IsLive && sess.IsConfig {
+                if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+                    m.statusMsg = "launch failed: " + err.Error()
+                    m.statusExp = time.Now().Add(5 * time.Second)
+                    return m, nil
+                }
+                return m, m.fetchPanes()
+            }
             target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
             if target == "" {
                 target = node.Session
             }
-            tmux.SwitchClient(target)
-            if m.popupMode {
-                return m, tea.Quit
-            }
-        }
-    case key.Matches(msg, keys.Open):
-        if node := m.sidebar.Selected(); node != nil {
-            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
-            if target == "" {
-                target = node.Session
-            }
-            tmux.SwitchClient(target)
-            if m.popupMode {
-                return m, tea.Quit
+            if err := tmux.SwitchClient(target); err == nil {
+                if m.popupMode {
+                    return m, tea.Quit
+                }
             }
         }
     case key.Matches(msg, keys.Esc):
