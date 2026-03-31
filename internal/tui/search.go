@@ -17,7 +17,7 @@ type SearchInputModel struct {
 
 func NewSearchInputModel() SearchInputModel {
     ti := textinput.New()
-    ti.Placeholder = "Press / to search..."
+    ti.Placeholder = "Press f to search..."
     return SearchInputModel{input: ti}
 }
 
@@ -52,7 +52,7 @@ func (s SearchInputModel) Update(msg tea.Msg) (SearchInputModel, tea.Cmd) {
 
 // View renders the 3-line bordered search box at the given width.
 func (s SearchInputModel) View(width int) string {
-    const title = "[/] Search"
+    const title = "[f] Search"
 
     inputView := s.input.View()
     innerWidth := width - 2 // subtract left + right border chars

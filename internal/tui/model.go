@@ -380,7 +380,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             m.updateDetailFromSelection()
         }
     default:
-        if msg.String() == "/" {
+        if msg.String() == "f" {
             m.searchInput.EnterInsertMode()
             return m, nil
         }
