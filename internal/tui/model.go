@@ -410,9 +410,11 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.focus = panelSidebar
         m.updateDetailFromSelection()
     case key.Matches(msg, keys.FocusProcList):
+        // compact mode: FocusProcList is a no-op; panelSidebar is the only panel
         if m.cfg.Mode != "compact" {
             m.focus = panelProcList
         }
+        // updateDetailFromSelection gates on m.focus, so safe to call unconditionally
         m.updateDetailFromSelection()
     case key.Matches(msg, keys.Help):
         m.showHelp = !m.showHelp
