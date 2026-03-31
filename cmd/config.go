@@ -61,6 +61,9 @@ show_last_seen = true
 # Where to position the sidebar cursor on open: current_session | alert_session | first_session
 focus_on_open = "alert_session"
 
+# Start with cursor in the search input (also available as --search flag)
+# focus_search_on_open = false
+
 # Initial sidebar filter on startup: t (tmux) | a (all) | g (config) | w (worktree) | ! (priority)
 default_filter = "t"
 
