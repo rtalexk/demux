@@ -489,10 +489,12 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             if target == "" {
                 target = node.Session
             }
-            if err := tmux.SwitchClient(target); err == nil {
-                if m.popupMode {
-                    return m, tea.Quit
-                }
+            err := tmux.SwitchClient(target)
+            if err != nil && target != node.Session {
+                err = tmux.SwitchClient(node.Session)
+            }
+            if err == nil && m.popupMode {
+                return m, tea.Quit
             }
         }
     case key.Matches(msg, keys.Esc):
@@ -592,11 +594,13 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             return m, m.scheduleDelayedProcFetch()
         }
     case key.Matches(msg, keys.Open):
-        if node := m.sidebar.Selected(); node != nil {
-            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
-            if target == "" {
-                target = node.Session
-            }
+        var target string
+        if pane := m.procList.SelectedPane(); pane != nil {
+            target = fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+        } else if node := m.sidebar.Selected(); node != nil {
+            target = node.Session
+        }
+        if target != "" {
             tmux.SwitchClient(target)
             if m.popupMode {
                 return m, tea.Quit
