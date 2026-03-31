@@ -553,7 +553,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
     active := s.ToggleAlertFilter(10)
     if !active {
@@ -582,7 +582,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
     s.ToggleAlertFilter(10) // on
     active := s.ToggleAlertFilter(10) // off
@@ -598,7 +598,7 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("a"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
     if s.AlertFilterActive() {
         t.Error("expected AlertFilterActive=false before toggle")
@@ -614,7 +614,7 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("sess"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
     // With no alerts, filter on hides all sessions → nodes is empty.
     s.cursor = 5 // out of range
