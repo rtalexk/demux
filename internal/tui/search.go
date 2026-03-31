@@ -54,15 +54,24 @@ func (s SearchInputModel) Update(msg tea.Msg) (SearchInputModel, tea.Cmd) {
 func (s SearchInputModel) View(width int) string {
     const title = "[f] Search"
 
+    if s.insert {
+        s.input.Placeholder = "Type to search..."
+    } else {
+        s.input.Placeholder = "Press f to search..."
+    }
     inputView := s.input.View()
     innerWidth := width - 2 // subtract left + right border chars
 
+    // Determine border color.
+    borderColor := activeTheme.ColorBorder
+    if s.IsActive() {
+        borderColor = activeTheme.ColorSession
+    }
+    borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+
     // Style the inner content line.
     innerStyle := lipgloss.NewStyle().Width(innerWidth)
-    if s.IsActive() && !s.insert {
-        innerStyle = innerStyle.Foreground(activeTheme.ColorSession) // accent when active
-    }
-    mid := "│" + innerStyle.Render(inputView) + "│"
+    mid := borderStyle.Render("│") + innerStyle.Render(inputView) + borderStyle.Render("│")
 
     // Build top border with title.
     titleWidth := runewidth.StringWidth(title)
@@ -70,8 +79,8 @@ func (s SearchInputModel) View(width int) string {
     if dashCount < 0 {
         dashCount = 0
     }
-    top := "┌─" + title + strings.Repeat("─", dashCount) + "┐"
-    bot := "└" + strings.Repeat("─", innerWidth) + "┘"
+    top := borderStyle.Render("╭─") + title + borderStyle.Render(strings.Repeat("─", dashCount)+"╮")
+    bot := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
 
     return top + "\n" + mid + "\n" + bot
 }
