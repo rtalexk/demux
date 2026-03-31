@@ -258,8 +258,8 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
             if info.RepoRoot != "" {
                 return filepath.Dir(info.RepoRoot)
             }
-            // Session CWD is likely the worktree root itself (git unavailable there).
-            if info.Dir != "" {
+            // Session CWD is the worktree root (contains .bare/, git unavailable there).
+            if info.IsWorktreeRoot {
                 return info.Dir
             }
         }
