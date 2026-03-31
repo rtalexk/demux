@@ -540,34 +540,44 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     }
     iconW := len([]rune(stripANSI(iconPrefix)))
 
-    availW := width - 4 - iconW
+    // Row format: [focus(1)] [gap(2)] [icon(iconW)] [name+indicators(availW)]
+    // Box content = width-2. Selected rows append trail(2), so body must fill
+    // width-2 - 1 - 2 - iconW - 2 = width-7-iconW chars.
+    availW := width - 7 - iconW
+    if availW < 4 {
+        availW = 4
+    }
     indW := len([]rune(stripANSI(indicators)))
-    maxName := availW - indW - 1
+    maxName := availW - indW
     if maxName < 4 {
         maxName = 4
     }
-    nameRunes := []rune(" " + node.Session)
+    nameRunes := []rune(node.Session)
     if len(nameRunes) > maxName {
         nameRunes = append(nameRunes[:maxName-1], '…')
     }
     nameStr := string(nameRunes)
 
-    if selected {
-        bodyStr := string([]rune(nameStr)[1:])
-        pad := availW - 1 - len([]rune(bodyStr)) - indW
+    const gap = "  " // 2-space gap between focus indicator and icon
+    if selected && focused {
+        pad := availW - len([]rune(nameStr)) - indW
         if pad < 0 {
             pad = 0
         }
-        if focused {
-            accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
-            trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-            return iconPrefix + accent + selectedBG.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
+        indicator := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
+        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
+        return indicator + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+    }
+    if selected {
+        pad := availW - len([]rune(nameStr)) - indW
+        if pad < 0 {
+            pad = 0
         }
-        accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-        return iconPrefix + accent + selectedInactive.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators
+        indicator := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
+        return indicator + gap + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
     }
     text := alignedRow(nameStr, indicators, availW)
-    return iconPrefix + sessionStyle.Render(text)
+    return " " + gap + iconPrefix + sessionStyle.Render(text)
 }
 
 
