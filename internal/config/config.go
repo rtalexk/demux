@@ -83,6 +83,10 @@ type ThemeConfig struct {
     ColorAlertWarnBg  string `toml:"color_alert_warn_bg"`
     ColorAlertErrorBg string `toml:"color_alert_error_bg"`
 
+    IconAlertInfo  string `toml:"icon_alert_info"`
+    IconAlertWarn  string `toml:"icon_alert_warn"`
+    IconAlertError string `toml:"icon_alert_error"`
+
     ColorPort    string `toml:"color_port"`
     ColorPortBg  string `toml:"color_port_bg"`
     ColorClean   string `toml:"color_clean"`
@@ -181,6 +185,10 @@ func Default() Config {
             ColorAlertInfoBg:  "#1a2a4d",
             ColorAlertWarnBg:  "#3d3500",
             ColorAlertErrorBg: "#3d1020",
+
+            IconAlertInfo:  "ℹ️",
+            IconAlertWarn:  "⚠️",
+            IconAlertError: "🚨",
 
             ColorPort:    "#a6e3a1",
             ColorPortBg:  "#1a3a2a",
