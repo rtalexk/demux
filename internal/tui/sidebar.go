@@ -60,6 +60,9 @@ func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gi
 // SetFilter changes the active sidebar filter. Pressing ! while already on !
 // restores the previous filter (toggle behavior).
 func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
+    if f == s.filter && f != FilterPriority {
+        return
+    }
     if f == FilterPriority && s.filter == FilterPriority {
         f = s.prevFilter
     } else {
