@@ -15,6 +15,7 @@ import (
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/query"
+    "github.com/rtalex/demux/internal/session"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -197,7 +198,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
-        m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(msg.panes), m.cfg)
+        m.sidebar.SetData(session.Merge(msg.panes, nil), m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -243,7 +244,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
+        m.sidebar.SetData(session.Merge(m.panes, nil), msg.alerts, m.gitInfo, m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
             visibleRows := max(1, m.height-1-2-searchBoxH)
@@ -261,7 +262,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, startupProcCmd
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
-        m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
+        m.sidebar.SetData(session.Merge(m.panes, nil), m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         return m, nil
     case queryResultMsg:
@@ -376,7 +377,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         if sidebarVisibleRows < 1 {
             sidebarVisibleRows = 1
         }
-        m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
+        m.sidebar.SetFilter(FilterPriority, sidebarVisibleRows)
         if node := m.sidebar.Selected(); node != nil {
             m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
@@ -794,11 +795,11 @@ func (m Model) View() string {
     // build sidebar border title: [h] Sessions (N)
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
-    alertFilterMark := ""
-    if m.sidebar.AlertFilterActive() {
-        alertFilterMark = " [!]"
+    filterMark := ""
+    if f := m.sidebar.ActiveFilter(); f != FilterTmux {
+        filterMark = " [" + string(f) + "]"
     }
-    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, alertFilterMark)
+    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, filterMark)
 
     // build proc list border title: [l] <session> / <window>
     bc := m.plainBreadcrumb()
