@@ -41,6 +41,9 @@ func (s SearchInputModel) Value() string { return s.input.Value() }
 // IsActive returns true when a non-empty query is set.
 func (s SearchInputModel) IsActive() bool { return s.input.Value() != "" }
 
+// Clear resets the query text without changing insert/normal mode.
+func (s *SearchInputModel) Clear() { s.input.SetValue("") }
+
 func (s SearchInputModel) Update(msg tea.Msg) (SearchInputModel, tea.Cmd) {
     var cmd tea.Cmd
     s.input, cmd = s.input.Update(msg)

@@ -384,6 +384,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             m.searchInput.EnterInsertMode()
             return m, nil
         }
+        if msg.String() == "ctrl+u" && m.searchInput.IsActive() {
+            m.searchInput.Clear()
+            m.queryResult = query.Result{}
+            m.sidebar.SetSearchResult(query.Result{})
+            m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
+            m.searchGen++
+            return m, nil
+        }
         if m.focus == panelSidebar {
             return m.handleSidebarKey(msg)
         }
