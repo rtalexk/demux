@@ -569,6 +569,30 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
     }
 }
 
+func TestSetFilter_AllFiltersToggle(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
+        filter:   FilterTmux,
+        prevFilter: FilterTmux,
+    }
+    // Switch to FilterAll, then press again — should toggle back to FilterTmux.
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterAll {
+        t.Fatalf("expected FilterAll, got %q", s.ActiveFilter())
+    }
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterTmux {
+        t.Errorf("expected toggle back to FilterTmux, got %q", s.ActiveFilter())
+    }
+    // After toggling back, pressing FilterAll again should go to FilterAll.
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterAll {
+        t.Errorf("expected FilterAll after re-press, got %q", s.ActiveFilter())
+    }
+}
+
 func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
     t1 := time.Now()
     s := SidebarModel{

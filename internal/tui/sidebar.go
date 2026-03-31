@@ -57,14 +57,11 @@ func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gi
     s.rebuildNodes()
 }
 
-// SetFilter changes the active sidebar filter. Pressing ! while already on !
-// restores the previous filter (toggle behavior).
+// SetFilter changes the active sidebar filter. Pressing the current filter's
+// key again toggles back to the previous filter (toggle behavior for all filters).
 func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
-    if f == s.filter && f != FilterPriority {
-        return
-    }
-    if f == FilterPriority && s.filter == FilterPriority {
-        f = s.prevFilter
+    if f == s.filter {
+        f, s.prevFilter = s.prevFilter, s.filter
     } else {
         s.prevFilter = s.filter
     }
