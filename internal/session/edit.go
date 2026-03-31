@@ -145,13 +145,18 @@ func blockHasField(block, key, value string) bool {
     needle := fmt.Sprintf("%q", value)
     for _, line := range strings.Split(block, "\n") {
         trimmed := strings.TrimSpace(line)
-        if strings.HasPrefix(trimmed, key) {
-            rest := strings.TrimSpace(strings.TrimPrefix(trimmed, key))
-            if strings.HasPrefix(rest, "=") {
-                val := strings.TrimSpace(strings.TrimPrefix(rest, "="))
-                if val == needle {
-                    return true
-                }
+        if !strings.HasPrefix(trimmed, key) {
+            continue
+        }
+        rest := strings.TrimPrefix(trimmed, key)
+        if len(rest) == 0 || (rest[0] != '=' && rest[0] != ' ' && rest[0] != '\t') {
+            continue
+        }
+        rest = strings.TrimSpace(rest)
+        if strings.HasPrefix(rest, "=") {
+            val := strings.TrimSpace(strings.TrimPrefix(rest, "="))
+            if val == needle {
+                return true
             }
         }
     }
