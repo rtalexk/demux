@@ -1003,6 +1003,54 @@ func TestRenderSession_ShowsConfigIcon(t *testing.T) {
     }
 }
 
+func TestRenderSession_ShowsLastSeen(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+    }, config.ProcessesConfig{}, nil)
+    activity := time.Now().Add(-5 * time.Minute)
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "myses", IsLive: true, Activity: activity},
+        },
+        alerts:  map[string]db.Alert{},
+        gitInfo: map[string]git.Info{},
+        cfg: config.Config{
+            Sidebar: config.SidebarConfig{ShowLastSeen: true},
+        },
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, " 5m") {
+        t.Errorf("expected last-seen ' 5m' in row, got: %q", plain)
+    }
+}
+
+func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+    }, config.ProcessesConfig{}, nil)
+    activity := time.Now().Add(-5 * time.Minute)
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "xyz", IsLive: true, Activity: activity},
+        },
+        alerts:  map[string]db.Alert{},
+        gitInfo: map[string]git.Info{},
+        cfg: config.Config{
+            Sidebar: config.SidebarConfig{ShowLastSeen: false},
+        },
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if strings.Contains(plain, "m") || strings.Contains(plain, "s") || strings.Contains(plain, "h") || strings.Contains(plain, "d") {
+        t.Errorf("expected no age indicator when ShowLastSeen=false, got: %q", plain)
+    }
+}
+
 func TestFilterShortcutBar_FitsWidth(t *testing.T) {
     initStyles(Theme{
         ColorSession: lipgloss.Color("#89b4fa"),

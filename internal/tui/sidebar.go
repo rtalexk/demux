@@ -531,6 +531,16 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
             indParts = append(indParts, alertIcon(bestSessionAlert.Level))
         }
     }
+    if s.cfg.Sidebar.ShowLastSeen {
+        if sess := s.FindSession(node.Session); sess != nil && !sess.Activity.IsZero() {
+            age := formatAge(sess.Activity, time.Now())
+            if selected && focused {
+                indParts = append(indParts, hintStyle.Background(activeTheme.ColorSelected).Render(age))
+            } else {
+                indParts = append(indParts, hintStyle.Render(age))
+            }
+        }
+    }
     var indicators string
     if selected && focused {
         sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
