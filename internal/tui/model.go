@@ -1008,6 +1008,7 @@ func (m Model) compactView() string {
     }
     sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, filterMark)
 
+    // compact mode: sidebar is the only panel and always has focus
     sidebarContent := m.sidebar.Render(m.width, contentH-searchBoxH, true, sidebarTitle, "")
     searchBox := m.searchInput.View(m.width)
     leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
@@ -1016,7 +1017,29 @@ func (m Model) compactView() string {
     if m.statusMsg != "" && time.Now().Before(m.statusExp) {
         statusBar = m.statusMsg
     }
-    statusBar = lipgloss.NewStyle().Width(m.width).MaxHeight(1).Render(statusBar)
+    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+    spinnerStr := ""
+    if m.cfg.Git.ShowSpinner {
+        for _, info := range m.gitInfo {
+            if info.Loading {
+                frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+                spinnerStr = " " + spinnerStyle.Render(frame) + " "
+                break
+            }
+        }
+    }
+    if spinnerStr != "" {
+        leftWidth := m.width - lipgloss.Width(spinnerStr)
+        statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
+            lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
+            spinnerStr,
+        )
+    } else {
+        statusBar = lipgloss.NewStyle().
+            Width(m.width).
+            MaxHeight(1).
+            Render(statusBar)
+    }
 
     full := lipgloss.JoinVertical(lipgloss.Left, leftCol, statusBar)
 
