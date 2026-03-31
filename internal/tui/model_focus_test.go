@@ -66,3 +66,29 @@ func TestFocusOnOpen_FirstSession(t *testing.T) {
         t.Errorf("expected a session node, got nil")
     }
 }
+
+func TestFocusSearchOnOpen_true(t *testing.T) {
+    cfg := config.Default()
+    cfg.Sidebar.FocusSearchOnOpen = true
+    database, _ := db.Open(":memory:")
+    m := New(cfg, database)
+    m.height = 40
+    m, _ = applyPanesMsg(m, "alpha")
+    m, _ = applyAlertsMsg(m, nil)
+    if !m.searchInput.IsInsert() {
+        t.Errorf("expected searchInput to be in insert mode when FocusSearchOnOpen = true")
+    }
+}
+
+func TestFocusSearchOnOpen_false(t *testing.T) {
+    cfg := config.Default()
+    cfg.Sidebar.FocusSearchOnOpen = false
+    database, _ := db.Open(":memory:")
+    m := New(cfg, database)
+    m.height = 40
+    m, _ = applyPanesMsg(m, "alpha")
+    m, _ = applyAlertsMsg(m, nil)
+    if m.searchInput.IsInsert() {
+        t.Errorf("expected searchInput to not be in insert mode when FocusSearchOnOpen = false")
+    }
+}
