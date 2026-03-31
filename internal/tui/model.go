@@ -273,12 +273,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         }
         m.updateDetailFromSelection()
         // If startup focus landed on a window node, kick off an initial proc fetch.
-        var startupProcCmd tea.Cmd
+        var cmds []tea.Cmd
         if node := m.sidebar.Selected(); node != nil {
             m.procGen++
-            startupProcCmd = m.scheduleProcFetch()
+            cmds = append(cmds, m.scheduleProcFetch())
         }
-        return m, startupProcCmd
+        if pruneCmd := m.pruneStaleAlerts(); pruneCmd != nil {
+            cmds = append(cmds, pruneCmd)
+        }
+        return m, tea.Batch(cmds...)
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
         merged := session.Merge(m.panes, m.configEntries)
@@ -658,6 +661,53 @@ func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
         m.sidebar.FocusNode(m.currentSession, visibleRows)
     case "first_session":
         // cursor is already 0, which is always the first session — no-op
+    }
+}
+
+// pruneStaleAlerts removes non-sticky alerts whose pane/window/session target no
+// longer appears in the current pane list. Returns a cmd that removes the stale
+// entries from the DB and re-fetches the alert list, or nil if nothing to prune.
+func (m *Model) pruneStaleAlerts() tea.Cmd {
+    if len(m.panes) == 0 {
+        return nil
+    }
+    // Build lookup sets for every live target granularity.
+    paneTargets := make(map[string]bool, len(m.panes))
+    winTargets := make(map[string]bool)
+    sesTargets := make(map[string]bool)
+    for _, p := range m.panes {
+        paneTargets[fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)] = true
+        winTargets[fmt.Sprintf("%s:%d", p.Session, p.WindowIndex)] = true
+        sesTargets[p.Session] = true
+    }
+
+    var stale []string
+    for _, a := range m.alerts {
+        switch {
+        case strings.Contains(a.Target, "."):
+            if !paneTargets[a.Target] {
+                stale = append(stale, a.Target)
+            }
+        case strings.Contains(a.Target, ":"):
+            if !winTargets[a.Target] {
+                stale = append(stale, a.Target)
+            }
+        default:
+            if !sesTargets[a.Target] {
+                stale = append(stale, a.Target)
+            }
+        }
+    }
+    if len(stale) == 0 {
+        return nil
+    }
+    d := m.db
+    return func() tea.Msg {
+        for _, t := range stale {
+            d.AlertRemove(t)
+        }
+        alerts, _ := d.AlertList()
+        return alertsMsg{alerts: alerts}
     }
 }
 
