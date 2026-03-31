@@ -153,6 +153,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
 
             p.nodes = append(p.nodes, ProcListNode{
                 Proc:        pr,
+                Pane:        pane,
                 Depth:       depth,
                 HasChildren: hasChildren,
                 Collapsed:   collapsed,
@@ -305,6 +306,7 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
                 }
                 p.nodes = append(p.nodes, ProcListNode{
                     Proc:        pr,
+                    Pane:        pane,
                     Depth:       depth,
                     HasChildren: hasChildren,
                     Collapsed:   collapsed,
