@@ -174,7 +174,7 @@ func (s *SidebarModel) rebuildNodes() {
     }
 
     // Filter and optionally re-sort by search result.
-    if len(s.queryResult.Sessions) > 0 {
+    if s.queryResult.Sessions != nil {
         matchSet := make(map[string]query.SessionMatch, len(s.queryResult.Sessions))
         for _, sm := range s.queryResult.Sessions {
             matchSet[sm.Name] = sm

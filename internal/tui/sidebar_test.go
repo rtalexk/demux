@@ -7,6 +7,7 @@ import (
 
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
+    "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -394,6 +395,23 @@ func makeSessions(names ...string) map[string]map[int][]tmux.Pane {
         m[n] = map[int][]tmux.Pane{0: nil}
     }
     return m
+}
+
+// TestRebuildNodes_ZeroResultSearch is a regression test for the bug where a
+// search with no matches still showed all sessions. When queryResult.Sessions
+// is non-nil but empty (active search, zero matches), rebuildNodes must
+// produce an empty node list, not the full unfiltered list.
+func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta", "gamma"),
+        alerts:   map[string]db.Alert{},
+        // Non-nil empty slice = active search with no matches.
+        queryResult: query.Result{Sessions: []query.SessionMatch{}},
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 0 {
+        t.Errorf("expected 0 nodes for a zero-result search, got %d", len(s.nodes))
+    }
 }
 
 func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
