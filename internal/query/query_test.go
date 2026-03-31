@@ -130,7 +130,7 @@ func TestRun_MatchPos(t *testing.T) {
     }
     result := query.RunWith(query.Parse("wok"), panes, nil)
     if len(result.Sessions) != 1 {
-        t.Fatalf("expected 1 session, got %q", "work")
+        t.Fatalf("expected 1 session, got %d", len(result.Sessions))
     }
     if len(result.Sessions[0].MatchPos) == 0 {
         t.Error("expected non-empty MatchPos for session match")
