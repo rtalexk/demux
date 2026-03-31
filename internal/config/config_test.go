@@ -200,24 +200,34 @@ replace = "rp"
     }
 }
 
-func TestDefaults_AlertFilter(t *testing.T) {
+func TestDefaults_NewIconFields(t *testing.T) {
     cfg := config.Default()
-    if cfg.Sidebar.AlertFilter != "all" {
-        t.Errorf("expected default Sidebar.AlertFilter=\"all\", got %q", cfg.Sidebar.AlertFilter)
+    if cfg.Theme.IconTmuxSession != "⊞" {
+        t.Errorf("expected ⊞, got %q", cfg.Theme.IconTmuxSession)
+    }
+    if cfg.Theme.IconCfgSession != "⚙︎" {
+        t.Errorf("expected ⚙︎, got %q", cfg.Theme.IconCfgSession)
     }
 }
 
-func TestLoadFromFile_AlertFilter(t *testing.T) {
+func TestDefaults_DefaultFilter(t *testing.T) {
+    cfg := config.Default()
+    if cfg.Sidebar.DefaultFilter != "t" {
+        t.Errorf("expected t, got %q", cfg.Sidebar.DefaultFilter)
+    }
+}
+
+func TestLoadFromFile_DefaultFilter(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
     os.WriteFile(path, []byte(`[sidebar]
-alert_filter = "alerts_only"`), 0644)
+default_filter = "a"`), 0644)
     cfg, err := config.Load(path)
     if err != nil {
         t.Fatal(err)
     }
-    if cfg.Sidebar.AlertFilter != "alerts_only" {
-        t.Errorf("expected \"alerts_only\", got %q", cfg.Sidebar.AlertFilter)
+    if cfg.Sidebar.DefaultFilter != "a" {
+        t.Errorf("expected a, got %q", cfg.Sidebar.DefaultFilter)
     }
 }
 

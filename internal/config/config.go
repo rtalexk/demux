@@ -87,6 +87,9 @@ type ThemeConfig struct {
     IconAlertWarn  string `toml:"icon_alert_warn"`
     IconAlertError string `toml:"icon_alert_error"`
 
+    IconTmuxSession string `toml:"icon_tmux_session"`
+    IconCfgSession  string `toml:"icon_cfg_session"`
+
     ColorPort    string `toml:"color_port"`
     ColorPortBg  string `toml:"color_port_bg"`
     ColorClean   string `toml:"color_clean"`
@@ -107,8 +110,8 @@ type ProcessesConfig struct {
 }
 
 type SidebarConfig struct {
-    AlertFilter string   `toml:"alert_filter"`
-    FocusOnOpen string   `toml:"focus_on_open"`
+    DefaultFilter string   `toml:"default_filter"`
+    FocusOnOpen   string   `toml:"focus_on_open"`
     SearchSort  string   `toml:"search_sort"`
     Sort        []string `toml:"sort"`
     SwitchFocus string   `toml:"switch_focus"`
@@ -140,8 +143,8 @@ func Default() Config {
         DefaultFormat:     "text",
         StatusBarFormat:   "tmux",
         Sidebar: SidebarConfig{
-            AlertFilter: "all",
-            FocusOnOpen: "alert_session",
+            DefaultFilter: "t",
+            FocusOnOpen:   "alert_session",
             SearchSort:  "score",
             Sort:        []string{"priority", "last_seen", "alphabetical"},
             SwitchFocus: "severity",
@@ -189,6 +192,9 @@ func Default() Config {
             IconAlertInfo:  "ℹ️",
             IconAlertWarn:  "⚠️",
             IconAlertError: "🚨",
+
+            IconTmuxSession: "⊞",
+            IconCfgSession:  "⚙︎",
 
             ColorPort:    "#a6e3a1",
             ColorPortBg:  "#1a3a2a",
