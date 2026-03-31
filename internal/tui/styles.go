@@ -112,3 +112,45 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
     gitBehindStyle = lipgloss.NewStyle().Foreground(t.ColorGitBehind)
     gitDirtyStyle  = lipgloss.NewStyle().Foreground(t.ColorGitDirty)
 }
+
+// alertIcon renders the configured icon for the given alert level, colored by theme.
+func alertIcon(level string) string {
+    switch level {
+    case "info":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Render(activeTheme.IconAlertInfo)
+    case "warn":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Render(activeTheme.IconAlertWarn)
+    case "error":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Render(activeTheme.IconAlertError)
+    }
+    return ""
+}
+
+// alertIconOnBG renders the configured icon with a background color applied.
+func alertIconOnBG(level string, bg lipgloss.Color) string {
+    switch level {
+    case "info":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Background(bg).Render(activeTheme.IconAlertInfo)
+    case "warn":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Background(bg).Render(activeTheme.IconAlertWarn)
+    case "error":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Background(bg).Render(activeTheme.IconAlertError)
+    }
+    return ""
+}
+
+// alertBadge renders the alert reason with a severity-based background color.
+func alertBadge(level, reason string) string {
+    var fg, bg lipgloss.Color
+    switch level {
+    case "info":
+        fg, bg = activeTheme.ColorAlertInfo, activeTheme.ColorAlertInfoBg
+    case "warn":
+        fg, bg = activeTheme.ColorAlertWarn, activeTheme.ColorAlertWarnBg
+    case "error":
+        fg, bg = activeTheme.ColorAlertError, activeTheme.ColorAlertErrorBg
+    default:
+        return reason
+    }
+    return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
+}

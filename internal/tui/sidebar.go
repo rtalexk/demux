@@ -400,46 +400,6 @@ func compactGitIndicatorsOnBG(info git.Info, bg lipgloss.Color) string {
     return strings.Join(parts, sep)
 }
 
-func alertIcon(level string) string {
-    switch level {
-    case "info":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Render("●")
-    case "warn":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Render("")
-    case "error":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Render("⚑")
-    }
-    return ""
-}
-
-func alertIconOnBG(level string, bg lipgloss.Color) string {
-    switch level {
-    case "info":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Background(bg).Render("●")
-    case "warn":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Background(bg).Render("")
-    case "error":
-        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Background(bg).Render("⚑")
-    }
-    return ""
-}
-
-// alertBadge renders the alert reason with a severity-based background color.
-func alertBadge(level, reason string) string {
-    var fg, bg lipgloss.Color
-    switch level {
-    case "info":
-        fg, bg = activeTheme.ColorAlertInfo, activeTheme.ColorAlertInfoBg
-    case "warn":
-        fg, bg = activeTheme.ColorAlertWarn, activeTheme.ColorAlertWarnBg
-    case "error":
-        fg, bg = activeTheme.ColorAlertError, activeTheme.ColorAlertErrorBg
-    default:
-        return reason
-    }
-    return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
-}
-
 func (s *SidebarModel) clampViewport(visibleRows int) {
     // Reserve 2 rows for the ▲/▼ hint lines so the cursor is always
     // within the rendered content area regardless of which hints appear.
