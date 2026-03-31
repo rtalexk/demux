@@ -10,6 +10,7 @@ import (
     "github.com/charmbracelet/bubbles/key"
     tea "github.com/charmbracelet/bubbletea"
     "github.com/charmbracelet/lipgloss"
+    xansi "github.com/charmbracelet/x/ansi"
     runewidth "github.com/mattn/go-runewidth"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
@@ -194,6 +195,15 @@ func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     // Delegate to overlay handlers first
+    if m.showHelp {
+        if msg, ok := msg.(tea.KeyMsg); ok {
+            if key.Matches(msg, keys.Esc) || key.Matches(msg, keys.Help) || msg.String() == "q" {
+                m.showHelp = false
+                return m, nil
+            }
+        }
+        return m, nil
+    }
     if m.showYank {
         return m.updateYank(msg)
     }
@@ -879,10 +889,6 @@ func (m Model) View() string {
         return "loading..."
     }
 
-    if m.showHelp {
-        return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, m.help.Render())
-    }
-
     sidebarW := m.cfg.Sidebar.Width
     if sidebarW <= 0 {
         sidebarW = 30
@@ -976,7 +982,50 @@ func (m Model) View() string {
             Render(statusBar)
     }
 
-    return lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
+    full := lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
+
+    if m.showHelp {
+        return overlayCenter(m.help.Render(), full, m.width, m.height)
+    }
+
+    return full
+}
+
+// overlayCenter places fg centered on top of bg (bgW×bgH visible columns).
+// Uses ANSI-aware slicing so the background content remains visible.
+func overlayCenter(fg, bg string, bgW, bgH int) string {
+    fgLines := strings.Split(fg, "\n")
+    bgLines := strings.Split(bg, "\n")
+
+    fgH := len(fgLines)
+    fgW := 0
+    for _, l := range fgLines {
+        if w := lipgloss.Width(l); w > fgW {
+            fgW = w
+        }
+    }
+
+    startY := (bgH - fgH) / 2
+    startX := (bgW - fgW) / 2
+    if startX < 0 {
+        startX = 0
+    }
+    if startY < 0 {
+        startY = 0
+    }
+
+    result := make([]string, len(bgLines))
+    for i, bgLine := range bgLines {
+        fgIdx := i - startY
+        if fgIdx < 0 || fgIdx >= fgH {
+            result[i] = bgLine
+            continue
+        }
+        left := xansi.Truncate(bgLine, startX, "")
+        right := xansi.TruncateLeft(bgLine, startX+fgW, "")
+        result[i] = left + fgLines[fgIdx] + right
+    }
+    return strings.Join(result, "\n")
 }
 
 // isIconRune reports whether r is likely a terminal icon that renders as 2
