@@ -122,6 +122,9 @@ func TestRun_SessionScope_Default(t *testing.T) {
     if len(result.Sessions[0].Windows) != 0 {
         t.Errorf("expected no window matches for bare-text search, got %d", len(result.Sessions[0].Windows))
     }
+    if len(result.Sessions[0].Procs) != 0 {
+        t.Errorf("expected no proc matches for bare-text search, got %d", len(result.Sessions[0].Procs))
+    }
 }
 
 func TestRun_MatchPos(t *testing.T) {
