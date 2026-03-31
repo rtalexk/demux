@@ -9,8 +9,7 @@ import (
 type QueryScope int
 
 const (
-    ScopeAll     QueryScope = iota
-    ScopeSession
+    ScopeSession QueryScope = iota
     ScopeWindow
     ScopeProcess
 )
@@ -48,13 +47,11 @@ type ProcMatch struct {
 }
 
 // Parse extracts scope and term from a raw query string.
-// A scope tag (s:, w:, p:) must appear at the start; mid-string tags are ignored.
+// A scope tag (w:, p:) must appear at the start; mid-string tags are ignored.
+// Bare text defaults to ScopeSession.
 func Parse(raw string) ParsedQuery {
     pq := ParsedQuery{Raw: raw}
     switch {
-    case len(raw) >= 2 && raw[:2] == "s:":
-        pq.Scope = ScopeSession
-        pq.Term = raw[2:]
     case len(raw) >= 2 && raw[:2] == "w:":
         pq.Scope = ScopeWindow
         pq.Term = raw[2:]
@@ -62,7 +59,7 @@ func Parse(raw string) ParsedQuery {
         pq.Scope = ScopeProcess
         pq.Term = raw[2:]
     default:
-        pq.Scope = ScopeAll
+        pq.Scope = ScopeSession
         pq.Term = raw
     }
     return pq
@@ -92,7 +89,7 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
     }
 
     // session name matching
-    if pq.Scope == ScopeAll || pq.Scope == ScopeSession {
+    if pq.Scope == ScopeSession {
         names := make([]string, 0, len(sessions))
         for name := range sessions {
             names = append(names, name)
@@ -105,7 +102,7 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
     }
 
     // window name matching
-    if pq.Scope == ScopeAll || pq.Scope == ScopeWindow {
+    if pq.Scope == ScopeWindow {
         for sessionName, windows := range sessions {
             winNames := make([]string, 0, len(windows))
             // winIdxOrder maps dense slice positions → real tmux window indices,
@@ -132,7 +129,7 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
     }
 
     // process name matching
-    if pq.Scope == ScopeAll || pq.Scope == ScopeProcess {
+    if pq.Scope == ScopeProcess {
         for sessionName, windows := range sessions {
             var descendants []proc.Process
             for _, wPanes := range windows {
@@ -173,7 +170,7 @@ func Run(pq ParsedQuery) (Result, error) {
         return Result{}, err
     }
     var procs []proc.Process
-    if pq.Scope == ScopeProcess || pq.Scope == ScopeAll {
+    if pq.Scope == ScopeProcess {
         procs, err = proc.Snapshot()
         if err != nil {
             return Result{}, err
