@@ -411,7 +411,9 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
     if focused {
         style = borderActive
     }
-    return injectBorderTitles(style.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+    rendered := injectBorderTitles(style.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+    shortcutBar := filterShortcutBar(s.filter, width-2)
+    return injectBottomBorderLabel(rendered, shortcutBar)
 }
 
 func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width int) string {
@@ -725,6 +727,41 @@ func (s *SidebarModel) CursorUp() {
         }
         s.clampViewport(vr)
     }
+}
+
+// filterShortcuts lists all filter shortcuts in trim-priority order (right-to-left trimming).
+var filterShortcuts = []struct {
+    filter SidebarFilter
+    label  string
+}{
+    {FilterAll, "[a] All"},
+    {FilterTmux, "[t] Tmux"},
+    {FilterConfig, "[g] Cfg"},
+    {FilterWorktree, "[w] Workt"},
+    {FilterPriority, "[!] Prior"},
+}
+
+// filterShortcutBar builds the centered shortcut string for the sidebar bottom border.
+// The active filter's label is highlighted with ColorSession + bold.
+// Shortcuts are trimmed right-to-left when they don't fit in innerWidth runes.
+// At minimum, "[t] Tmux" (index 1) is always kept.
+func filterShortcutBar(active SidebarFilter, innerWidth int) string {
+    parts := make([]string, len(filterShortcuts))
+    for i, sc := range filterShortcuts {
+        if sc.filter == active {
+            parts[i] = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Bold(true).Render(sc.label)
+        } else {
+            parts[i] = hintStyle.Render(sc.label)
+        }
+    }
+    // Trim right-to-left until the string fits, keeping at least [t] Tmux (index 1).
+    for end := len(parts); end > 1; end-- {
+        candidate := strings.Join(parts[:end], " ")
+        if len([]rune(stripANSI(candidate))) <= innerWidth {
+            return candidate
+        }
+    }
+    return parts[1] // always show [t] Tmux as fallback
 }
 
 func (s SidebarModel) Selected() *SidebarNode {

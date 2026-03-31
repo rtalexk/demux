@@ -966,3 +966,36 @@ func TestRenderSession_ShowsConfigIcon(t *testing.T) {
         t.Errorf("expected config icon ★ in row, got: %q", plain)
     }
 }
+
+func TestFilterShortcutBar_FitsWidth(t *testing.T) {
+    initStyles(Theme{
+        ColorSession: lipgloss.Color("#89b4fa"),
+        ColorFgMuted: lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+    bar := filterShortcutBar(FilterTmux, 50)
+    plain := stripANSI(bar)
+    if !strings.Contains(plain, "[t]") {
+        t.Error("expected [t] in shortcut bar")
+    }
+    if !strings.Contains(plain, "[a]") {
+        t.Error("expected [a] in shortcut bar")
+    }
+    if !strings.Contains(plain, "[!]") {
+        t.Error("expected [!] in shortcut bar at width 50")
+    }
+}
+
+func TestFilterShortcutBar_TrimmedWhenNarrow(t *testing.T) {
+    initStyles(Theme{
+        ColorSession: lipgloss.Color("#89b4fa"),
+        ColorFgMuted: lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+    bar := filterShortcutBar(FilterTmux, 12)
+    plain := stripANSI(bar)
+    if !strings.Contains(plain, "[t]") {
+        t.Error("expected [t] to survive trimming")
+    }
+    if strings.Contains(plain, "[!]") {
+        t.Errorf("expected [!] to be trimmed at width 12, got: %q", plain)
+    }
+}
