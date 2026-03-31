@@ -131,7 +131,6 @@ type Config struct {
     IgnoredSessions   []string          `toml:"ignored_sessions"`
     IgnoredProcesses  []string          `toml:"ignored_processes"`
     DefaultFormat     string            `toml:"default_format"`
-    StatusBarFormat   string            `toml:"status_bar_format"`
     Mode              string            `toml:"mode"`
     Sidebar           SidebarConfig     `toml:"sidebar"`
     ProcessList       ProcessListConfig `toml:"process_list"`
@@ -147,7 +146,6 @@ func Default() Config {
         IgnoredSessions:   []string{},
         IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
-        StatusBarFormat:   "tmux",
         Mode:              "full",
         Sidebar: SidebarConfig{
             DefaultFilter: "t",

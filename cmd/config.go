@@ -35,9 +35,6 @@ ignored_processes = ["zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"]
 # Default output format for CLI commands: text | table | json
 default_format = "text"
 
-# Status bar format string (tmux #(...) syntax)
-status_bar_format = "tmux"
-
 # UI layout mode: full | compact
 # compact renders only the sidebar + search (no process list or detail panel)
 # Pair compact mode with a narrower tmux popup, e.g.:
