@@ -15,6 +15,7 @@ type Info struct {
     Dirty    bool
     Ahead    int
     Behind   int
+    Dir      string // directory passed to Fetch; set even when git is unavailable
     RepoRoot string
     Worktree string // non-empty when inside a linked worktree (name of the worktree)
     PR       string
@@ -63,12 +64,13 @@ func Fetch(dir string, timeoutMs int) (Info, error) {
 
     out, err := exec.CommandContext(ctx, "git", "-C", dir, "status", "--porcelain=v1", "-b").Output()
     if err != nil {
-        return Info{}, fmt.Errorf("git status: %w", err)
+        return Info{Dir: dir}, fmt.Errorf("git status: %w", err)
     }
     info, err := ParseStatus(string(out))
     if err != nil {
         return info, err
     }
+    info.Dir = dir
 
     rootOut, _ := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--show-toplevel").Output()
     info.RepoRoot = strings.TrimSpace(string(rootOut))

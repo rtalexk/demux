@@ -254,8 +254,14 @@ func (s *SidebarModel) visibleSessions() []session.Session {
 // For config sessions with Worktree=true: filepath.Dir(Config.Path).
 func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
     if sess.IsLive {
-        if info, ok := s.gitInfo[sess.DisplayName]; ok && info.RepoRoot != "" {
-            return filepath.Dir(info.RepoRoot)
+        if info, ok := s.gitInfo[sess.DisplayName]; ok {
+            if info.RepoRoot != "" {
+                return filepath.Dir(info.RepoRoot)
+            }
+            // Session CWD is likely the worktree root itself (git unavailable there).
+            if info.Dir != "" {
+                return info.Dir
+            }
         }
     }
     if sess.IsConfig && sess.Config != nil && sess.Config.Worktree {
