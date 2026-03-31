@@ -431,6 +431,29 @@ func alignedRow(name, indicators string, availWidth int) string {
     return name + strings.Repeat(" ", pad) + indicators
 }
 
+// findSession returns a pointer to the Session with the given display name, or nil.
+func (s SidebarModel) findSession(displayName string) *session.Session {
+    for i := range s.sessions {
+        if s.sessions[i].DisplayName == displayName {
+            return &s.sessions[i]
+        }
+    }
+    return nil
+}
+
+// sessionIcon returns the rendered icon for a sidebar session row.
+func sessionIcon(sess session.Session) string {
+    var icon string
+    if sess.IsConfig && sess.Config != nil && sess.Config.Icon != "" {
+        icon = sess.Config.Icon
+    } else if sess.IsLive && !sess.IsConfig {
+        icon = activeTheme.IconTmuxSession
+    } else {
+        icon = activeTheme.IconCfgSession
+    }
+    return sessionIconStyle.Render(icon)
+}
+
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
     var indParts []string
     if info, ok := s.gitInfo[node.Session]; ok {
@@ -470,7 +493,14 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
         indicators = strings.Join(indParts, " ")
     }
 
-    availW := width - 4
+    // Icon prefix: look up the session and render its icon.
+    iconPrefix := ""
+    if sess := s.findSession(node.Session); sess != nil {
+        iconPrefix = sessionIcon(*sess) + " "
+    }
+    iconW := len([]rune(stripANSI(iconPrefix)))
+
+    availW := width - 4 - iconW
     indW := len([]rune(stripANSI(indicators)))
     maxName := availW - indW - 1
     if maxName < 4 {
@@ -491,13 +521,13 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
         if focused {
             accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
             trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-            return accent + selectedBG.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
+            return iconPrefix + accent + selectedBG.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators + trail
         }
         accent := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-        return accent + selectedInactive.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators
+        return iconPrefix + accent + selectedInactive.Bold(true).Render(bodyStr+strings.Repeat(" ", pad)) + indicators
     }
     text := alignedRow(nameStr, indicators, availW)
-    return sessionStyle.Render(text)
+    return iconPrefix + sessionStyle.Render(text)
 }
 
 

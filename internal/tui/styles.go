@@ -63,6 +63,9 @@ var (
     gitAheadStyle  lipgloss.Style
     gitBehindStyle lipgloss.Style
     gitDirtyStyle  lipgloss.Style
+
+    // Session icon
+    sessionIconStyle lipgloss.Style
 )
 
 // initStyles rebuilds every style using the given theme and merges proc-type
@@ -111,6 +114,8 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
     gitAheadStyle  = lipgloss.NewStyle().Foreground(t.ColorGitAhead)
     gitBehindStyle = lipgloss.NewStyle().Foreground(t.ColorGitBehind)
     gitDirtyStyle  = lipgloss.NewStyle().Foreground(t.ColorGitDirty)
+
+    sessionIconStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 }
 
 // alertIcon renders the configured icon for the given alert level, colored by theme.

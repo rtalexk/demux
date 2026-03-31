@@ -5,6 +5,7 @@ import (
     "testing"
     "time"
 
+    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
@@ -914,5 +915,54 @@ func TestVisibleSessions_FilterWorktree_MatchesByRoot(t *testing.T) {
     // Both sess-a and sess-b have root /repo/worktrees, other has /elsewhere
     if len(s.nodes) != 2 {
         t.Errorf("expected 2 sessions sharing worktree root, got %d: %v", len(s.nodes), s.nodes)
+    }
+}
+
+func TestRenderSession_ShowsIcon(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+        ColorSession:    lipgloss.Color("#89b4fa"),
+        ColorBorder:     lipgloss.Color("#313244"),
+        ColorSelected:   lipgloss.Color("#2a2a4a"),
+        ColorFgMuted:    lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "myapp", IsLive: true, IsConfig: false},
+        },
+        filter: FilterTmux,
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, "⊞") {
+        t.Errorf("expected Tmux icon ⊞ in row, got: %q", plain)
+    }
+}
+
+func TestRenderSession_ShowsConfigIcon(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+        ColorSession:    lipgloss.Color("#89b4fa"),
+        ColorBorder:     lipgloss.Color("#313244"),
+        ColorSelected:   lipgloss.Color("#2a2a4a"),
+        ColorFgMuted:    lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+
+    cfg := session.ConfigEntry{Name: "main", Alias: "dotf", Path: "/foo", Icon: "★"}
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "dotf-main", IsLive: false, IsConfig: true, Config: &cfg},
+        },
+        filter: FilterConfig,
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, "★") {
+        t.Errorf("expected config icon ★ in row, got: %q", plain)
     }
 }
