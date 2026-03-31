@@ -114,8 +114,9 @@ type SidebarConfig struct {
     FocusOnOpen   string   `toml:"focus_on_open"`
     SearchSort  string   `toml:"search_sort"`
     Sort        []string `toml:"sort"`
-    SwitchFocus string   `toml:"switch_focus"`
-    Width       int      `toml:"width"`
+    SwitchFocus  string `toml:"switch_focus"`
+    Width        int    `toml:"width"`
+    ShowLastSeen bool   `toml:"show_last_seen"`
 }
 
 type ProcessListConfig struct {
@@ -152,8 +153,9 @@ func Default() Config {
             FocusOnOpen:   "alert_session",
             SearchSort:  "score",
             Sort:        []string{"priority", "last_seen", "alphabetical"},
-            SwitchFocus: "severity",
-            Width:       35,
+            SwitchFocus:  "severity",
+            Width:        35,
+            ShowLastSeen: true,
         },
         StatusBar: StatusBarConfig{Show: true},
         Git: GitConfig{

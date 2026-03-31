@@ -420,6 +420,13 @@ func TestDefault_StatusBarShow(t *testing.T) {
     }
 }
 
+func TestDefaults_SidebarShowLastSeen(t *testing.T) {
+    cfg := config.Default()
+    if !cfg.Sidebar.ShowLastSeen {
+        t.Error("expected Sidebar.ShowLastSeen to default to true")
+    }
+}
+
 func TestLoad_StatusBarShowFalse(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")

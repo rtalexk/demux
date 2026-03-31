@@ -55,6 +55,9 @@ mode = "full"
 # Sidebar width in columns
 width = 35
 
+# Show last-seen age indicator on each live session row (e.g. " 5s", "12m", " 3h", "14d")
+show_last_seen = true
+
 # Where to position the sidebar cursor on open: current_session | alert_session | first_session
 focus_on_open = "alert_session"
 
