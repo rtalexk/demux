@@ -13,12 +13,16 @@ import (
 )
 
 var formatFlag string
+var compactFlag bool
 
 var rootCmd = &cobra.Command{
     Use:   "demux",
     Short: "Monitor tmux sessions, processes, and alerts",
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg := loadConfig()
+        if compactFlag {
+            cfg.Mode = "compact"
+        }
         dbPath, err := db.DefaultPath()
         if err != nil {
             return err
@@ -40,6 +44,7 @@ func Execute() {
 
 func init() {
     rootCmd.PersistentFlags().StringVar(&formatFlag, "format", "", "Output format: text|table|json")
+    rootCmd.PersistentFlags().BoolVar(&compactFlag, "compact", false, "Launch in compact mode (sidebar + search only)")
 }
 
 func loadConfig() config.Config {
