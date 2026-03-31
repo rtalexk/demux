@@ -41,6 +41,10 @@ type Theme struct {
     ColorAlertWarnBg  lipgloss.Color
     ColorAlertErrorBg lipgloss.Color
 
+    IconAlertInfo  string
+    IconAlertWarn  string
+    IconAlertError string
+
     // Semantic
     ColorPort    lipgloss.Color
     ColorPortBg  lipgloss.Color
@@ -84,6 +88,10 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
         ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
         ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
         ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
+
+        IconAlertInfo:  tc.IconAlertInfo,
+        IconAlertWarn:  tc.IconAlertWarn,
+        IconAlertError: tc.IconAlertError,
 
         ColorPort:    lipgloss.Color(tc.ColorPort),
         ColorPortBg:  lipgloss.Color(tc.ColorPortBg),
