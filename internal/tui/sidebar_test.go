@@ -1093,9 +1093,11 @@ func TestFormatAge(t *testing.T) {
         ago  time.Duration
         want string
     }{
-        {"5 seconds",       5 * time.Second,                " 5s"},
-        {"10 seconds",      10 * time.Second,               "10s"},
-        {"59 seconds",      59 * time.Second,               "59s"},
+        {"0 seconds",        0 * time.Second,                "now"},
+        {"5 seconds",        5 * time.Second,                "now"},
+        {"14 seconds",      14 * time.Second,               "now"},
+        {"15 seconds",      15 * time.Second,               "<1m"},
+        {"59 seconds",      59 * time.Second,               "<1m"},
         {"1 minute",        1 * time.Minute,                " 1m"},
         {"9 minutes",       9 * time.Minute,                " 9m"},
         {"10 minutes",      10 * time.Minute,               "10m"},

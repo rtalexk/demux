@@ -597,34 +597,38 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 }
 
 // formatAge returns a fixed-width 3-char age string for a session's last-seen
-// timestamp. Format: ' Xs' / 'XXs' for seconds, ' Xm' / 'XXm' for minutes,
-// ' Xh' / 'XXh' for hours, ' Xd' / 'XXd' for days.
+// timestamp. Special cases: <15s → "now", <1m → "<1m". For longer durations:
+// ' Xm' / 'XXm' for minutes, ' Xh' / 'XXh' for hours, ' Xd' / 'XXd' for days.
 // Single-digit values are space-padded on the left.
 func formatAge(t, now time.Time) string {
     d := now.Sub(t)
     if d < 0 {
         d = 0
     }
-    var n int
-    var unit byte
     switch {
+    case d < 15*time.Second:
+        return "now"
     case d < time.Minute:
-        n = int(d.Seconds())
-        unit = 's'
+        return "<1m"
     case d < time.Hour:
-        n = int(d.Minutes())
-        unit = 'm'
+        n := int(d.Minutes())
+        if n < 10 {
+            return fmt.Sprintf(" %dm", n)
+        }
+        return fmt.Sprintf("%dm", n)
     case d < 24*time.Hour:
-        n = int(d.Hours())
-        unit = 'h'
+        n := int(d.Hours())
+        if n < 10 {
+            return fmt.Sprintf(" %dh", n)
+        }
+        return fmt.Sprintf("%dh", n)
     default:
-        n = int(d.Hours() / 24)
-        unit = 'd'
+        n := int(d.Hours() / 24)
+        if n < 10 {
+            return fmt.Sprintf(" %dd", n)
+        }
+        return fmt.Sprintf("%dd", n)
     }
-    if n < 10 {
-        return fmt.Sprintf(" %d%c", n, unit)
-    }
-    return fmt.Sprintf("%d%c", n, unit)
 }
 
 func compactGitIndicators(info git.Info) string {
