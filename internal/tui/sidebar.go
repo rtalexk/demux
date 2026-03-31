@@ -543,7 +543,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     // Row format: [focus(1)] [gap(2)] [icon(iconW)] [name+indicators(availW)]
     // Box content = width-2. Selected rows append trail(2), so body must fill
     // width-2 - 1 - 2 - iconW - 2 = width-7-iconW chars.
-    availW := width - 7 - iconW
+    availW := width - 6 - iconW
     if availW < 4 {
         availW = 4
     }
@@ -558,7 +558,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     }
     nameStr := string(nameRunes)
 
-    const gap = "  " // 2-space gap between focus indicator and icon
+    const gap = " " // 1-space gap between focus indicator and icon
     if selected && focused {
         pad := availW - len([]rune(nameStr)) - indW
         if pad < 0 {
