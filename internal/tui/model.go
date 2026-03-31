@@ -30,6 +30,8 @@ const (
 
 const searchBoxH = 3
 
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
 // Message types
 type tickMsg time.Time
 type panesMsg struct {
@@ -408,7 +410,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.focus = panelSidebar
         m.updateDetailFromSelection()
     case key.Matches(msg, keys.FocusProcList):
-        m.focus = panelProcList
+        if m.cfg.Mode != "compact" {
+            m.focus = panelProcList
+        }
         m.updateDetailFromSelection()
     case key.Matches(msg, keys.Help):
         m.showHelp = !m.showHelp
@@ -961,7 +965,6 @@ func (m Model) View() string {
         }
     }
 
-    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     spinnerStr := ""
     if m.cfg.Git.ShowSpinner {
         for _, info := range m.gitInfo {
@@ -1017,7 +1020,6 @@ func (m Model) compactView() string {
     if m.statusMsg != "" && time.Now().Before(m.statusExp) {
         statusBar = m.statusMsg
     }
-    spinnerFrames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
     spinnerStr := ""
     if m.cfg.Git.ShowSpinner {
         for _, info := range m.gitInfo {
