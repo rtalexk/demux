@@ -14,6 +14,7 @@ import (
 
 var formatFlag string
 var compactFlag bool
+var searchFlag bool
 
 var rootCmd = &cobra.Command{
     Use:   "demux",
@@ -22,6 +23,9 @@ var rootCmd = &cobra.Command{
         cfg := loadConfig()
         if compactFlag {
             cfg.Mode = "compact"
+        }
+        if searchFlag {
+            cfg.Sidebar.FocusSearchOnOpen = true
         }
         dbPath, err := db.DefaultPath()
         if err != nil {
@@ -45,6 +49,7 @@ func Execute() {
 func init() {
     rootCmd.PersistentFlags().StringVar(&formatFlag, "format", "", "Output format: text|table|json")
     rootCmd.PersistentFlags().BoolVar(&compactFlag, "compact", false, "Launch in compact mode (sidebar + search only)")
+    rootCmd.PersistentFlags().BoolVar(&searchFlag, "search", false, "Start with focus in the search input")
 }
 
 func loadConfig() config.Config {
