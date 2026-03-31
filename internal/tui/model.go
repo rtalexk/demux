@@ -105,7 +105,11 @@ func New(cfg config.Config, database *db.DB) Model {
     m.searchInput = NewSearchInputModel()
     cfgPath, _ := config.DefaultPath()
     m.configDir = filepath.Dir(cfgPath)
-    m.configEntries, _ = session.LoadConfigSessions(m.configDir)
+    var loadErr error
+    m.configEntries, loadErr = session.LoadConfigSessions(m.configDir)
+    if loadErr != nil {
+        fmt.Fprintf(os.Stderr, "demux: failed to load config sessions from %s: %v\n", m.configDir, loadErr)
+    }
     if cfg.Sidebar.DefaultFilter != "" {
         m.sidebar.filter = SidebarFilter(cfg.Sidebar.DefaultFilter)
     } else {
@@ -693,16 +697,24 @@ func (m *Model) updateDetailFromSelection() {
         for _, wp := range windows {
             paneCount += len(wp)
         }
+        sess := m.sidebar.FindSession(node.Session)
+        isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
+        configPath := ""
+        if isConfigOnly && sess.Config != nil {
+            configPath = sess.Config.Path
+        }
         m.detail = DetailModel{
-            cfg:        m.cfg,
-            selType:    DetailSession,
-            session:    node.Session,
-            sessionCWD: sessionCWD,
-            gitInfo:    m.gitInfo[node.Session],
-            winCount:   len(windows),
-            paneCount:  paneCount,
-            procCount:  procCount,
-            alertCount: alertCount,
+            cfg:          m.cfg,
+            selType:      DetailSession,
+            session:      node.Session,
+            sessionCWD:   sessionCWD,
+            isConfigOnly: isConfigOnly,
+            configPath:   configPath,
+            gitInfo:      m.gitInfo[node.Session],
+            winCount:     len(windows),
+            paneCount:    paneCount,
+            procCount:    procCount,
+            alertCount:   alertCount,
         }
         return
     }

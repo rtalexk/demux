@@ -28,14 +28,16 @@ type DetailModel struct {
     cfg     config.Config
 
     // session
-    session    string
-    sessionCWD string
-    gitInfo    git.Info
-    prInfo     string
-    winCount   int
-    paneCount  int
-    procCount  int
-    alertCount int
+    session      string
+    sessionCWD   string
+    configPath   string // populated for config-only (non-live) sessions
+    isConfigOnly bool   // true when session exists in config but is not currently live
+    gitInfo      git.Info
+    prInfo       string
+    winCount     int
+    paneCount    int
+    procCount    int
+    alertCount   int
 
     // window
     windowIndex int
@@ -133,6 +135,13 @@ func inlineStat(label, value string) string {
 }
 
 func (d DetailModel) renderSession() []string {
+    if d.isConfigOnly {
+        var lines []string
+        if d.configPath != "" {
+            lines = append(lines, row("path", format.ShortenPath(d.configPath, d.cfg.PathAliases)))
+        }
+        return lines
+    }
     lines := []string{
         row("path", format.ShortenPath(d.sessionCWD, d.cfg.PathAliases)),
     }
