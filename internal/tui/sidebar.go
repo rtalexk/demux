@@ -587,6 +587,37 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 }
 
 
+// formatAge returns a fixed-width 3-char age string for a session's last-seen
+// timestamp. Format: ' Xs' / 'XXs' for seconds, ' Xm' / 'XXm' for minutes,
+// ' Xh' / 'XXh' for hours, ' Xd' / 'XXd' for days.
+// Single-digit values are space-padded on the left.
+func formatAge(t, now time.Time) string {
+    d := now.Sub(t)
+    if d < 0 {
+        d = 0
+    }
+    var n int
+    var unit byte
+    switch {
+    case d < time.Minute:
+        n = int(d.Seconds())
+        unit = 's'
+    case d < time.Hour:
+        n = int(d.Minutes())
+        unit = 'm'
+    case d < 24*time.Hour:
+        n = int(d.Hours())
+        unit = 'h'
+    default:
+        n = int(d.Hours() / 24)
+        unit = 'd'
+    }
+    if n < 10 {
+        return fmt.Sprintf(" %d%c", n, unit)
+    }
+    return fmt.Sprintf("%d%c", n, unit)
+}
+
 func compactGitIndicators(info git.Info) string {
     var parts []string
     if info.Ahead > 0 {

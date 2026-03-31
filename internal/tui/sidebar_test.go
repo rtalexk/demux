@@ -1035,3 +1035,38 @@ func TestFilterShortcutBar_TrimmedWhenNarrow(t *testing.T) {
         t.Errorf("expected [!] to be trimmed at width 12, got: %q", plain)
     }
 }
+
+// --- formatAge ---
+
+func TestFormatAge(t *testing.T) {
+    now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+    cases := []struct {
+        desc string
+        ago  time.Duration
+        want string
+    }{
+        {"5 seconds",       5 * time.Second,                " 5s"},
+        {"10 seconds",      10 * time.Second,               "10s"},
+        {"59 seconds",      59 * time.Second,               "59s"},
+        {"1 minute",        1 * time.Minute,                " 1m"},
+        {"9 minutes",       9 * time.Minute,                " 9m"},
+        {"10 minutes",      10 * time.Minute,               "10m"},
+        {"59 minutes",      59 * time.Minute,               "59m"},
+        {"1 hour",          1 * time.Hour,                  " 1h"},
+        {"9 hours",         9 * time.Hour,                  " 9h"},
+        {"10 hours",        10 * time.Hour,                 "10h"},
+        {"23 hours",        23 * time.Hour,                 "23h"},
+        {"1 day",           24 * time.Hour,                 " 1d"},
+        {"9 days",          9 * 24 * time.Hour,             " 9d"},
+        {"10 days",         10 * 24 * time.Hour,            "10d"},
+        {"99 days",         99 * 24 * time.Hour,            "99d"},
+    }
+    for _, tc := range cases {
+        t.Run(tc.desc, func(t *testing.T) {
+            got := formatAge(now.Add(-tc.ago), now)
+            if got != tc.want {
+                t.Errorf("formatAge(%v ago): want %q, got %q", tc.ago, tc.want, got)
+            }
+        })
+    }
+}
