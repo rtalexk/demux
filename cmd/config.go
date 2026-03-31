@@ -38,6 +38,12 @@ default_format = "text"
 # Status bar format string (tmux #(...) syntax)
 status_bar_format = "tmux"
 
+# UI layout mode: full | compact
+# compact renders only the sidebar + search (no process list or detail panel)
+# Pair compact mode with a narrower tmux popup, e.g.:
+#   bind-key D display-popup -w 40 -h 80% -E "demux --compact"
+mode = "full"
+
 # Path prefix aliases — shorten verbose absolute paths in the TUI.
 # Both prefix and replace support environment variables.
 # Longest matching prefix wins. Example:
