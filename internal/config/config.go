@@ -122,6 +122,10 @@ type ProcessListConfig struct {
     PathRightAlign bool `toml:"path_right_align"`
 }
 
+type StatusBarConfig struct {
+    Show bool `toml:"show"`
+}
+
 type Config struct {
     RefreshIntervalMs int               `toml:"refresh_interval_ms"`
     IgnoredSessions   []string          `toml:"ignored_sessions"`
@@ -131,6 +135,7 @@ type Config struct {
     Mode              string            `toml:"mode"`
     Sidebar           SidebarConfig     `toml:"sidebar"`
     ProcessList       ProcessListConfig `toml:"process_list"`
+    StatusBar         StatusBarConfig   `toml:"status_bar"`
     Git               GitConfig         `toml:"git"`
     Theme             ThemeConfig       `toml:"theme"`
     PathAliases       []PathAlias       `toml:"path_aliases"`
@@ -152,6 +157,7 @@ func Default() Config {
             SwitchFocus: "severity",
             Width:       35,
         },
+        StatusBar: StatusBarConfig{Show: true},
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,

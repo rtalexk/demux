@@ -413,6 +413,28 @@ func TestLoad_ModeCompact(t *testing.T) {
     }
 }
 
+func TestDefault_StatusBarShow(t *testing.T) {
+    cfg := config.Default()
+    if !cfg.StatusBar.Show {
+        t.Error("expected StatusBar.Show to default to true")
+    }
+}
+
+func TestLoad_StatusBarShowFalse(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "demux.toml")
+    if err := os.WriteFile(path, []byte("[status_bar]\nshow = false"), 0644); err != nil {
+        t.Fatal(err)
+    }
+    cfg, err := config.Load(path)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if cfg.StatusBar.Show {
+        t.Error("expected StatusBar.Show = false when set in config")
+    }
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "demux.toml")
