@@ -324,13 +324,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
             if msg.String() == "enter" {
                 if node := m.sidebar.Selected(); node != nil {
                     sess := m.sidebar.FindSession(node.Session)
-                    if sess != nil && !sess.IsLive && sess.IsConfig {
+                    if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
                         if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
                             m.statusMsg = "launch failed: " + err.Error()
                             m.statusExp = time.Now().Add(5 * time.Second)
+                            m.sidebar.SetLaunchErr(err.Error())
                             m.searchInput.ExitInsertMode()
                             return m, nil
                         }
+                        m.sidebar.ClearLaunchErr()
                         m.searchInput.ExitInsertMode()
                         return m, m.fetchPanes()
                     }
@@ -468,12 +470,14 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Enter), key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
             sess := m.sidebar.FindSession(node.Session)
-            if sess != nil && !sess.IsLive && sess.IsConfig {
+            if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
                 if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
                     m.statusMsg = "launch failed: " + err.Error()
                     m.statusExp = time.Now().Add(5 * time.Second)
+                    m.sidebar.SetLaunchErr(err.Error())
                     return m, nil
                 }
+                m.sidebar.ClearLaunchErr()
                 return m, m.fetchPanes()
             }
             target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)

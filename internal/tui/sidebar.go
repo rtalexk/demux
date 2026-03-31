@@ -43,6 +43,7 @@ type SidebarModel struct {
     prevFilter  SidebarFilter
     filterHint  string
     queryResult query.Result
+    launchErr   string // shown inline when last launch attempt failed
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gitInfo map[string]git.Info, cfg config.Config) {
@@ -407,6 +408,15 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
     }
 
     inner := strings.Join(lines, "\n")
+    if s.launchErr != "" {
+        errLine := lipgloss.NewStyle().
+            Foreground(activeTheme.ColorFgMuted).
+            Italic(true).
+            Width(width - 2).
+            Align(lipgloss.Center).
+            Render("⚠ " + s.launchErr)
+        inner += "\n" + errLine
+    }
     style := borderInactive
     if focused {
         style = borderActive
@@ -435,11 +445,6 @@ func alignedRow(name, indicators string, availWidth int) string {
 
 // FindSession returns a pointer to the Session with the given display name, or nil.
 func (s SidebarModel) FindSession(displayName string) *session.Session {
-    return s.findSession(displayName)
-}
-
-// findSession returns a pointer to the Session with the given display name, or nil.
-func (s SidebarModel) findSession(displayName string) *session.Session {
     for i := range s.sessions {
         if s.sessions[i].DisplayName == displayName {
             return &s.sessions[i]
@@ -447,6 +452,12 @@ func (s SidebarModel) findSession(displayName string) *session.Session {
     }
     return nil
 }
+
+// SetLaunchErr stores a launch error message for inline sidebar display.
+func (s *SidebarModel) SetLaunchErr(msg string) { s.launchErr = msg }
+
+// ClearLaunchErr clears any stored launch error.
+func (s *SidebarModel) ClearLaunchErr() { s.launchErr = "" }
 
 // sessionIcon returns the rendered icon for a sidebar session row.
 func sessionIcon(sess session.Session) string {
@@ -502,7 +513,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 
     // Icon prefix: look up the session and render its icon.
     iconPrefix := ""
-    if sess := s.findSession(node.Session); sess != nil {
+    if sess := s.FindSession(node.Session); sess != nil {
         iconPrefix = sessionIcon(*sess) + " "
     }
     iconW := len([]rune(stripANSI(iconPrefix)))
