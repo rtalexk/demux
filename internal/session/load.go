@@ -1,6 +1,7 @@
 package session
 
 import (
+    "errors"
     "fmt"
     "os"
     "path/filepath"
@@ -24,7 +25,7 @@ func LoadConfigSessions(configDir string) ([]ConfigEntry, error) {
         var f sessionsFile
         _, err := toml.DecodeFile(path, &f)
         if err != nil {
-            if os.IsNotExist(err) {
+            if errors.Is(err, os.ErrNotExist) {
                 continue
             }
             return result, fmt.Errorf("load %s: %w", name, err)
