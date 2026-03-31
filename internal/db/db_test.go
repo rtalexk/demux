@@ -23,7 +23,7 @@ func openTestDB(t *testing.T) *db.DB {
 func TestAlertSetAndList(t *testing.T) {
     d := openTestDB(t)
 
-    err := d.AlertSet("feature-auth:2", "waiting for input", "info", false)
+    err := d.AlertSet("feature-auth:2", "waiting for input", "info")
     if err != nil {
         t.Fatal(err)
     }
@@ -42,16 +42,13 @@ func TestAlertSetAndList(t *testing.T) {
     if a.Level != "info" {
         t.Errorf("unexpected level: %s", a.Level)
     }
-    if a.Sticky {
-        t.Error("expected non-sticky")
-    }
 }
 
 func TestAlertSetReplacesExisting(t *testing.T) {
     d := openTestDB(t)
 
-    d.AlertSet("s:1", "reason 1", "info", false)
-    d.AlertSet("s:1", "reason 2", "error", true)
+    d.AlertSet("s:1", "reason 1", "info")
+    d.AlertSet("s:1", "reason 2", "error")
 
     alerts, _ := d.AlertList()
     if len(alerts) != 1 {
@@ -65,7 +62,7 @@ func TestAlertSetReplacesExisting(t *testing.T) {
 func TestAlertRemove(t *testing.T) {
     d := openTestDB(t)
 
-    d.AlertSet("s:1", "r", "info", false)
+    d.AlertSet("s:1", "r", "info")
     err := d.AlertRemove("s:1")
     if err != nil {
         t.Fatal(err)
@@ -80,7 +77,7 @@ func TestAlertRemove(t *testing.T) {
 func TestAlertCreatedAt(t *testing.T) {
     d := openTestDB(t)
     before := time.Now().UTC().Truncate(time.Second)
-    d.AlertSet("s:1", "r", "warn", false)
+    d.AlertSet("s:1", "r", "warn")
     alerts, _ := d.AlertList()
     if alerts[0].CreatedAt.Before(before) {
         t.Error("created_at is before insert time")
@@ -132,7 +129,7 @@ func TestAlertByTarget(t *testing.T) {
     }
 
     // found
-    d.AlertSet("s:1", "reason", "warn", true)
+    d.AlertSet("s:1", "reason", "warn")
     a, err = d.AlertByTarget("s:1")
     if err != nil {
         t.Fatal(err)
@@ -140,7 +137,7 @@ func TestAlertByTarget(t *testing.T) {
     if a == nil {
         t.Fatal("expected alert, got nil")
     }
-    if a.Target != "s:1" || a.Level != "warn" || !a.Sticky {
+    if a.Target != "s:1" || a.Level != "warn" {
         t.Errorf("unexpected alert: %+v", a)
     }
     if a.CreatedAt.IsZero() {

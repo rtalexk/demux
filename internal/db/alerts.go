@@ -30,20 +30,18 @@ type Alert struct {
     Target    string
     Reason    string
     Level     AlertLevel
-    Sticky    bool
     CreatedAt time.Time
 }
 
-func (d *DB) AlertSet(target, reason, level string, sticky bool) error {
+func (d *DB) AlertSet(target, reason, level string) error {
     _, err := d.sql.Exec(`
-        INSERT INTO alerts (target, reason, level, sticky, created_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO alerts (target, reason, level, created_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(target) DO UPDATE SET
             reason     = excluded.reason,
             level      = excluded.level,
-            sticky     = excluded.sticky,
             created_at = excluded.created_at
-    `, target, reason, level, sticky)
+    `, target, reason, level)
     return err
 }
 
@@ -54,7 +52,7 @@ func (d *DB) AlertRemove(target string) error {
 
 func (d *DB) AlertList() ([]Alert, error) {
     rows, err := d.sql.Query(`
-        SELECT id, target, reason, level, sticky, created_at
+        SELECT id, target, reason, level, created_at
         FROM alerts ORDER BY created_at ASC
     `)
     if err != nil {
@@ -66,7 +64,7 @@ func (d *DB) AlertList() ([]Alert, error) {
     for rows.Next() {
         var a Alert
         var createdAt string
-        if err := rows.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &a.Sticky, &createdAt); err != nil {
+        if err := rows.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &createdAt); err != nil {
             return nil, err
         }
         a.CreatedAt = parseTS(createdAt)
@@ -78,12 +76,12 @@ func (d *DB) AlertList() ([]Alert, error) {
 // AlertByTarget returns the alert for a target, or nil if not found.
 func (d *DB) AlertByTarget(target string) (*Alert, error) {
     row := d.sql.QueryRow(`
-        SELECT id, target, reason, level, sticky, created_at
+        SELECT id, target, reason, level, created_at
         FROM alerts WHERE target = ?
     `, target)
     var a Alert
     var createdAt string
-    err := row.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &a.Sticky, &createdAt)
+    err := row.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &createdAt)
     if err != nil {
         if errors.Is(err, sql.ErrNoRows) {
             return nil, nil

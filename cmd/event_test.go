@@ -38,10 +38,10 @@ func TestPaneFocusClearsAlertsIncludingSticky(t *testing.T) {
     }
     defer d.Close()
 
-    if err := d.AlertSet("work:2.3", "Claude finished", "info", false); err != nil {
+    if err := d.AlertSet("work:2.3", "Claude finished", "info"); err != nil {
         t.Fatal(err)
     }
-    if err := d.AlertSet("work:2", "needs attention", "warn", true); err != nil {
+    if err := d.AlertSet("work:2", "needs attention", "warn"); err != nil {
         t.Fatal(err)
     }
 

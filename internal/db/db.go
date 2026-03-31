@@ -41,7 +41,6 @@ func (d *DB) migrate() error {
             target     TEXT NOT NULL UNIQUE,
             reason     TEXT NOT NULL,
             level      TEXT NOT NULL,
-            sticky     BOOLEAN NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
     `)

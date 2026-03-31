@@ -12,19 +12,17 @@ var (
     alertRemoveTarget string
     alertReason       string
     alertLevel        string
-    alertSticky       bool
 )
 
 type alertRow struct {
     target  string
     level   string
     reason  string
-    sticky  string
     created string
 }
 
 func (r alertRow) Fields() []string {
-    return []string{r.target, r.level, r.reason, r.sticky, r.created}
+    return []string{r.target, r.level, r.reason, r.created}
 }
 
 var alertCmd = &cobra.Command{
@@ -50,7 +48,7 @@ var alertSetCmd = &cobra.Command{
         }
         defer d.Close()
 
-        if err := d.AlertSet(alertSetTarget, alertReason, alertLevel, alertSticky); err != nil {
+        if err := d.AlertSet(alertSetTarget, alertReason, alertLevel); err != nil {
             return fmt.Errorf("alert set: %w", err)
         }
         fmt.Printf("Alert set for %s\n", alertSetTarget)
@@ -89,18 +87,13 @@ func runAlertList(cmd *cobra.Command, args []string) error {
         return fmt.Errorf("alert list: %w", err)
     }
 
-    headers := []string{"TARGET", "LEVEL", "REASON", "STICKY", "CREATED"}
+    headers := []string{"TARGET", "LEVEL", "REASON", "CREATED"}
     rows := make([]format.Row, len(alerts))
     for i, a := range alerts {
-        sticky := "false"
-        if a.Sticky {
-            sticky = "true"
-        }
         rows[i] = alertRow{
             target:  a.Target,
             level:   a.Level,
             reason:  a.Reason,
-            sticky:  sticky,
             created: formatAge(a.CreatedAt),
         }
     }
@@ -115,7 +108,6 @@ func init() {
     alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Target: session:window or session:window.pane (required)")
     alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text (required)")
     alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error")
-    alertSetCmd.Flags().BoolVar(&alertSticky, "sticky", false, "Make alert sticky")
     alertSetCmd.MarkFlagRequired("target")
     alertSetCmd.MarkFlagRequired("reason")
 

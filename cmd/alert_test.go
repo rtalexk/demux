@@ -14,7 +14,7 @@ func TestAlertCRUD(t *testing.T) {
     defer d.Close()
 
     // set
-    if err := d.AlertSet("s:1", "waiting", "info", false); err != nil {
+    if err := d.AlertSet("s:1", "waiting", "info"); err != nil {
         t.Fatal(err)
     }
 
@@ -28,7 +28,7 @@ func TestAlertCRUD(t *testing.T) {
     }
 
     // replace
-    d.AlertSet("s:1", "new reason", "warn", true)
+    d.AlertSet("s:1", "new reason", "warn")
     alerts, _ = d.AlertList()
     if len(alerts) != 1 || alerts[0].Reason != "new reason" {
         t.Errorf("expected replaced alert")
