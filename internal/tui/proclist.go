@@ -614,7 +614,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = " ---- " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
+        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
     }
 
     pathStr := ""
@@ -702,7 +702,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = " ---- " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
+        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
     }
 
     pathStr := ""
@@ -712,7 +712,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
     if selected {
         left := label + stripANSI(alertSuffix)
-        if pathStr != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
+        if pathStr != "" && innerW > 0 {
             rightW := len([]rune(pathStr))
             padCount := innerW - len([]rune(left)) - rightW
             if padCount < 1 {
@@ -735,7 +735,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
         return selectedBG.Render(left + strings.Repeat(" ", padCount))
     }
 
-    if pathStr == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
+    if pathStr == "" || innerW <= 0 {
         out := windowHeaderStyle.Render(label) + alertSuffix
         if pathStr != "" {
             out += "  " + panePathStyle.Render(pathStr)
