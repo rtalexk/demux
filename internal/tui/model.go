@@ -913,7 +913,10 @@ func (m Model) View() string {
     }
 
     // sidebar spans full content height; proclist + detail stack on the right
-    contentH := m.height - 1 // 1 (status bar)
+    contentH := m.height
+    if m.cfg.StatusBar.Show {
+        contentH-- // reserve 1 row for status bar
+    }
     innerW := procW - 2
     detailContent := m.detail.ContentLines(innerW)
     detailH := detailContent + 2 // +2 for border
@@ -955,42 +958,45 @@ func (m Model) View() string {
     content := lipgloss.JoinHorizontal(lipgloss.Top, leftCol, right)
     body := content
 
-    statusBar := ""
-    if m.statusMsg != "" && time.Now().Before(m.statusExp) {
-        statusBar = m.statusMsg
-    }
-    if statusBar == "" {
-        if m.focus == panelSidebar {
-            statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:alerts  ?:help  q:quit"
-        } else {
-            statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
+    var full string
+    if m.cfg.StatusBar.Show {
+        statusBar := ""
+        if m.statusMsg != "" && time.Now().Before(m.statusExp) {
+            statusBar = m.statusMsg
         }
-    }
-
-    spinnerStr := ""
-    if m.cfg.Git.ShowSpinner {
-        for _, info := range m.gitInfo {
-            if info.Loading {
-                frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-                spinnerStr = " " + spinnerStyle.Render(frame) + " "
-                break
+        if statusBar == "" {
+            if m.focus == panelSidebar {
+                statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:alerts  ?:help  q:quit"
+            } else {
+                statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
             }
         }
-    }
-    if spinnerStr != "" {
-        leftWidth := m.width - lipgloss.Width(spinnerStr)
-        statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
-            lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
-            spinnerStr,
-        )
+        spinnerStr := ""
+        if m.cfg.Git.ShowSpinner {
+            for _, info := range m.gitInfo {
+                if info.Loading {
+                    frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+                    spinnerStr = " " + spinnerStyle.Render(frame) + " "
+                    break
+                }
+            }
+        }
+        if spinnerStr != "" {
+            leftWidth := m.width - lipgloss.Width(spinnerStr)
+            statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
+                lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
+                spinnerStr,
+            )
+        } else {
+            statusBar = lipgloss.NewStyle().
+                Width(m.width).
+                MaxHeight(1).
+                Render(statusBar)
+        }
+        full = lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
     } else {
-        statusBar = lipgloss.NewStyle().
-            Width(m.width).
-            MaxHeight(1).
-            Render(statusBar)
+        full = body
     }
-
-    full := lipgloss.JoinVertical(lipgloss.Left, body, statusBar)
 
     if m.showHelp {
         return overlayCenter(m.help.Render(), full, m.width, m.height)
@@ -1003,7 +1009,10 @@ func (m Model) View() string {
 }
 
 func (m Model) compactView() string {
-    contentH := m.height - 1 // 1 for status bar
+    contentH := m.height
+    if m.cfg.StatusBar.Show {
+        contentH-- // reserve 1 row for status bar
+    }
 
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
@@ -1018,34 +1027,38 @@ func (m Model) compactView() string {
     searchBox := m.searchInput.View(m.width)
     leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
 
-    statusBar := "  j/k:nav  Enter:open  !:alerts  ?:help  q:quit"
-    if m.statusMsg != "" && time.Now().Before(m.statusExp) {
-        statusBar = m.statusMsg
-    }
-    spinnerStr := ""
-    if m.cfg.Git.ShowSpinner {
-        for _, info := range m.gitInfo {
-            if info.Loading {
-                frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
-                spinnerStr = " " + spinnerStyle.Render(frame) + " "
-                break
+    var full string
+    if m.cfg.StatusBar.Show {
+        statusBar := "  j/k:nav  Enter:open  !:alerts  ?:help  q:quit"
+        if m.statusMsg != "" && time.Now().Before(m.statusExp) {
+            statusBar = m.statusMsg
+        }
+        spinnerStr := ""
+        if m.cfg.Git.ShowSpinner {
+            for _, info := range m.gitInfo {
+                if info.Loading {
+                    frame := spinnerFrames[m.spinnerFrame%len(spinnerFrames)]
+                    spinnerStr = " " + spinnerStyle.Render(frame) + " "
+                    break
+                }
             }
         }
-    }
-    if spinnerStr != "" {
-        leftWidth := m.width - lipgloss.Width(spinnerStr)
-        statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
-            lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
-            spinnerStr,
-        )
+        if spinnerStr != "" {
+            leftWidth := m.width - lipgloss.Width(spinnerStr)
+            statusBar = lipgloss.JoinHorizontal(lipgloss.Top,
+                lipgloss.NewStyle().Width(leftWidth).MaxHeight(1).Render(statusBar),
+                spinnerStr,
+            )
+        } else {
+            statusBar = lipgloss.NewStyle().
+                Width(m.width).
+                MaxHeight(1).
+                Render(statusBar)
+        }
+        full = lipgloss.JoinVertical(lipgloss.Left, leftCol, statusBar)
     } else {
-        statusBar = lipgloss.NewStyle().
-            Width(m.width).
-            MaxHeight(1).
-            Render(statusBar)
+        full = leftCol
     }
-
-    full := lipgloss.JoinVertical(lipgloss.Left, leftCol, statusBar)
 
     if m.showHelp {
         return overlayCenter(m.help.Render(), full, m.width, m.height)
