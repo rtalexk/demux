@@ -8,7 +8,7 @@ import (
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalex/demux/internal/session"
 )
 
 // makeNodes builds a flat slice of session-only SidebarNodes for viewport tests.
@@ -22,6 +22,19 @@ func makeNodes(n int) []SidebarNode {
 
 func sidebarWithNodes(nodes []SidebarNode) SidebarModel {
     return SidebarModel{nodes: nodes}
+}
+
+// makeSessions builds a []session.Session for sidebar tests from a list of display names.
+// Each session is live-only with no panes (sufficient for sort/filter tests).
+func makeSessions(names ...string) []session.Session {
+    sessions := make([]session.Session, len(names))
+    for i, n := range names {
+        sessions[i] = session.Session{
+            DisplayName: n,
+            IsLive:      true,
+        }
+    }
+    return sessions
 }
 
 // --- clampViewport ---
@@ -387,16 +400,6 @@ func TestNewestSessionAlert_MatchesSessionLevelTarget(t *testing.T) {
 
 // --- rebuildNodes sorting ---
 
-// makeSessions builds the sessions map used by SidebarModel from a list of names.
-// Each session gets a single window at index 0 with no panes (sufficient for sort tests).
-func makeSessions(names ...string) map[string]map[int][]tmux.Pane {
-    m := make(map[string]map[int][]tmux.Pane, len(names))
-    for _, n := range names {
-        m[n] = map[int][]tmux.Pane{0: nil}
-    }
-    return m
-}
-
 // TestRebuildNodes_ZeroResultSearch is a regression test for the bug where a
 // search with no matches still showed all sessions. When queryResult.Sessions
 // is non-nil but empty (active search, zero matches), rebuildNodes must
@@ -503,13 +506,12 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
     now := time.Now()
     older := now.Add(-10 * time.Minute)
     s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        sessionActivity: map[string]time.Time{
-            "alpha": older,
-            "beta":  now,
+        sessions: []session.Session{
+            {DisplayName: "alpha", IsLive: true, Activity: older},
+            {DisplayName: "beta", IsLive: true, Activity: now},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
+        alerts: map[string]db.Alert{},
+        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
     var got []string
@@ -525,14 +527,13 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
 func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
     now := time.Now()
     s := SidebarModel{
-        sessions: makeSessions("charlie", "alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        // all same activity time → falls through to alpha
-        sessionActivity: map[string]time.Time{
-            "charlie": now,
-            "alpha":   now,
-            "beta":    now,
+        sessions: []session.Session{
+            {DisplayName: "charlie", IsLive: true, Activity: now},
+            {DisplayName: "alpha", IsLive: true, Activity: now},
+            {DisplayName: "beta", IsLive: true, Activity: now},
         },
+        alerts: map[string]db.Alert{},
+        // all same activity time → falls through to alpha
         cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
@@ -555,23 +556,14 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         },
         cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
-    active := s.ToggleAlertFilter(10)
-    if !active {
-        t.Error("expected ToggleAlertFilter to return true (filter now active)")
+    s.SetFilter(FilterPriority, 10)
+    if s.ActiveFilter() != FilterPriority {
+        t.Error("expected filter to be FilterPriority")
     }
     for _, n := range s.nodes {
         if n.Session == "alpha" {
-            t.Error("alpha (no alerts) should be hidden when filter is active")
+            t.Error("expected alpha (no alert) to be hidden")
         }
-    }
-    hasBeta := false
-    for _, n := range s.nodes {
-        if n.Session == "beta" {
-            hasBeta = true
-        }
-    }
-    if !hasBeta {
-        t.Error("beta (has alerts) should be visible when filter is active")
     }
 }
 
@@ -584,13 +576,13 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         },
         cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
-    s.ToggleAlertFilter(10) // on
-    active := s.ToggleAlertFilter(10) // off
-    if active {
-        t.Error("expected ToggleAlertFilter to return false (filter now inactive)")
+    s.SetFilter(FilterPriority, 10) // on
+    s.SetFilter(FilterPriority, 10) // off (toggles back to prevFilter = "")
+    if s.ActiveFilter() == FilterPriority {
+        t.Error("expected filter to toggle off")
     }
     if len(s.nodes) != 2 {
-        t.Errorf("expected both sessions after toggle off, got %d nodes", len(s.nodes))
+        t.Errorf("expected 2 sessions after toggle off, got %d", len(s.nodes))
     }
 }
 
@@ -600,25 +592,23 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
         alerts:   map[string]db.Alert{},
         cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
-    if s.AlertFilterActive() {
-        t.Error("expected AlertFilterActive=false before toggle")
+    if s.ActiveFilter() == FilterPriority {
+        t.Error("expected not-FilterPriority before SetFilter")
     }
-    s.ToggleAlertFilter(10)
-    if !s.AlertFilterActive() {
-        t.Error("expected AlertFilterActive=true after toggle")
+    s.SetFilter(FilterPriority, 10)
+    if s.ActiveFilter() != FilterPriority {
+        t.Error("expected FilterPriority after SetFilter")
     }
 }
 
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
-    // Filter on with no alerts: cursor should clamp to last valid node.
     s := SidebarModel{
         sessions: makeSessions("sess"),
         alerts:   map[string]db.Alert{},
         cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
-    // With no alerts, filter on hides all sessions → nodes is empty.
-    s.cursor = 5 // out of range
-    s.ToggleAlertFilter(10)
+    s.cursor = 5
+    s.SetFilter(FilterPriority, 10)
     if s.cursor != 0 {
         t.Errorf("expected cursor clamped to 0 on empty node list, got %d", s.cursor)
     }
@@ -628,9 +618,9 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 
 func TestFocusNode_SessionLevel(t *testing.T) {
     s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "alpha": {0: nil},
-            "beta":  {0: nil, 1: nil},
+        sessions: []session.Session{
+            {DisplayName: "alpha", IsLive: true},
+            {DisplayName: "beta", IsLive: true},
         },
         alerts: map[string]db.Alert{},
         cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},

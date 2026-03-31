@@ -11,38 +11,66 @@ import (
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalex/demux/internal/session"
 )
 
+// SidebarFilter determines which sessions are visible in the sidebar.
+type SidebarFilter string
+
+const (
+    FilterTmux     SidebarFilter = "t"
+    FilterAll      SidebarFilter = "a"
+    FilterConfig   SidebarFilter = "g"
+    FilterWorktree SidebarFilter = "w"
+    FilterPriority SidebarFilter = "!"
+)
 
 type SidebarNode struct {
     Session string
 }
 
 type SidebarModel struct {
-    nodes        []SidebarNode
-    cursor       int
-    offset       int // viewport scroll offset
-    visibleRows  int // last known visible row count; used by CursorDown/CursorUp
-    sessions     map[string]map[int][]tmux.Pane
-    alerts       map[string]db.Alert
-    gitInfo         map[string]git.Info
-    sessionActivity map[string]time.Time
-    cfg             config.Config
-    filterAlerts    bool
-    queryResult     query.Result
+    nodes       []SidebarNode
+    cursor      int
+    offset      int // viewport scroll offset
+    visibleRows int // last known visible row count; used by CursorDown/CursorUp
+    sessions    []session.Session
+    alerts      map[string]db.Alert
+    gitInfo     map[string]git.Info
+    cfg         config.Config
+    filter      SidebarFilter
+    prevFilter  SidebarFilter
+    filterHint  string
+    queryResult query.Result
 }
 
-func (s *SidebarModel) SetData(panes []tmux.Pane, alerts []db.Alert, gitInfo map[string]git.Info, sessionActivity map[string]time.Time, cfg config.Config) {
-    s.sessions = tmux.GroupBySessions(panes)
+func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gitInfo map[string]git.Info, cfg config.Config) {
+    s.sessions = sessions
     s.alerts = make(map[string]db.Alert, len(alerts))
     for _, a := range alerts {
         s.alerts[a.Target] = a
     }
     s.gitInfo = gitInfo
-    s.sessionActivity = sessionActivity
     s.cfg = cfg
     s.rebuildNodes()
+}
+
+// SetFilter changes the active sidebar filter. Pressing ! while already on !
+// restores the previous filter (toggle behavior).
+func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
+    if f == FilterPriority && s.filter == FilterPriority {
+        f = s.prevFilter
+    } else {
+        s.prevFilter = s.filter
+    }
+    s.filter = f
+    s.rebuildNodes()
+    s.clampViewport(visibleRows)
+}
+
+// ActiveFilter returns the current active filter.
+func (s SidebarModel) ActiveFilter() SidebarFilter {
+    return s.filter
 }
 
 // alertSeverity maps alert level to a numeric priority (higher = more severe).
@@ -59,10 +87,10 @@ func alertSeverity(level string) int {
 
 // newestSessionAlert returns the most recent alert CreatedAt for a session
 // (checking pane-level targets "session:window.pane"), or zero time if none.
-func (s *SidebarModel) newestSessionAlert(session string) time.Time {
+func (s *SidebarModel) newestSessionAlert(sess string) time.Time {
     var newest time.Time
     for target, a := range s.alerts {
-        if strings.HasPrefix(target, session+":") || target == session {
+        if strings.HasPrefix(target, sess+":") || target == sess {
             if a.CreatedAt.After(newest) {
                 newest = a.CreatedAt
             }
@@ -73,10 +101,10 @@ func (s *SidebarModel) newestSessionAlert(session string) time.Time {
 
 // highestSessionAlertSeverity returns the maximum alertSeverity value across
 // all alerts belonging to the session, or -1 if the session has no alerts.
-func (s *SidebarModel) highestSessionAlertSeverity(session string) int {
+func (s *SidebarModel) highestSessionAlertSeverity(sess string) int {
     best := -1
     for target, a := range s.alerts {
-        if strings.HasPrefix(target, session+":") || target == session {
+        if strings.HasPrefix(target, sess+":") || target == sess {
             if sv := alertSeverity(a.Level); sv > best {
                 best = sv
             }
@@ -89,14 +117,14 @@ func (s *SidebarModel) highestSessionAlertSeverity(session string) int {
 // in the given session according to the session_switch_focus setting.
 // Returns "" for "default" priority or when the session has no alerts.
 // Unknown values fall back to "severity".
-func (s *SidebarModel) BestAlertTargetInSession(session, priority string) string {
+func (s *SidebarModel) BestAlertTargetInSession(sess, priority string) string {
     if priority == "default" {
         return ""
     }
-    prefix := session + ":"
+    prefix := sess + ":"
     var best *db.Alert
     for target, a := range s.alerts {
-        if target != session && !strings.HasPrefix(target, prefix) {
+        if target != sess && !strings.HasPrefix(target, prefix) {
             continue
         }
         a := a
@@ -133,32 +161,39 @@ func (s *SidebarModel) rebuildNodes() {
     }
 
     s.nodes = nil
+    s.filterHint = ""
 
-    sessions := make([]string, 0, len(s.sessions))
-    for name := range s.sessions {
+    // Build visible session list.
+    var visible []session.Session
+    for _, sess := range s.sessions {
         ignored := false
         for _, ig := range s.cfg.IgnoredSessions {
-            if ig == name {
+            if ig == sess.DisplayName {
                 ignored = true
                 break
             }
         }
-        if !ignored {
-            sessions = append(sessions, name)
+        if ignored {
+            continue
         }
+        // Filter: priority mode hides sessions without alerts.
+        if s.filter == FilterPriority && s.newestSessionAlert(sess.DisplayName).IsZero() {
+            continue
+        }
+        visible = append(visible, sess)
     }
 
     sortKeys := s.cfg.Sidebar.Sort
     if len(sortKeys) == 0 {
         sortKeys = []string{"priority", "last_seen", "alphabetical"}
     }
-    sort.Slice(sessions, func(i, j int) bool {
-        si, sj := sessions[i], sessions[j]
+    sort.Slice(visible, func(i, j int) bool {
+        si, sj := visible[i], visible[j]
         for _, key := range sortKeys {
             switch key {
             case "priority":
-                svi := s.highestSessionAlertSeverity(si)
-                svj := s.highestSessionAlertSeverity(sj)
+                svi := s.highestSessionAlertSeverity(si.DisplayName)
+                svj := s.highestSessionAlertSeverity(sj.DisplayName)
                 hasI := svi >= 0
                 hasJ := svj >= 0
                 if hasI != hasJ {
@@ -168,39 +203,33 @@ func (s *SidebarModel) rebuildNodes() {
                     if svi != svj {
                         return svi > svj
                     }
-                    ti := s.newestSessionAlert(si)
-                    tj := s.newestSessionAlert(sj)
+                    ti := s.newestSessionAlert(si.DisplayName)
+                    tj := s.newestSessionAlert(sj.DisplayName)
                     if !ti.Equal(tj) {
                         return ti.After(tj)
                     }
                 }
             case "last_seen":
-                ai := s.sessionActivity[si]
-                aj := s.sessionActivity[sj]
-                if !ai.Equal(aj) {
-                    return ai.After(aj)
+                if !si.Activity.Equal(sj.Activity) {
+                    return si.Activity.After(sj.Activity)
                 }
             case "alphabetical":
-                return si < sj
+                return si.DisplayName < sj.DisplayName
             }
         }
         return false
     })
 
-    for _, name := range sessions {
-        if s.filterAlerts && s.newestSessionAlert(name).IsZero() {
-            continue
-        }
-        s.nodes = append(s.nodes, SidebarNode{Session: name})
+    for _, sess := range visible {
+        s.nodes = append(s.nodes, SidebarNode{Session: sess.DisplayName})
     }
 
-    // Filter and optionally re-sort by search result.
+    // Apply search filter (score-sort overrides cfg sort).
     if s.queryResult.Sessions != nil {
         matchSet := make(map[string]query.SessionMatch, len(s.queryResult.Sessions))
         for _, sm := range s.queryResult.Sessions {
             matchSet[sm.Name] = sm
         }
-
         filtered := s.nodes[:0:0]
         for _, node := range s.nodes {
             if _, ok := matchSet[node.Session]; ok {
@@ -277,10 +306,19 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
     }
 
     var lines []string
-    if len(s.nodes) == 0 && s.filterAlerts {
-        lines = append(lines, centeredHint("no alerts"))
-    } else if len(s.nodes) == 0 && s.queryResult.Sessions != nil {
-        lines = append(lines, centeredHint("no results"))
+    if len(s.nodes) == 0 {
+        var hintText string
+        switch {
+        case s.filterHint != "":
+            hintText = s.filterHint
+        case s.filter == FilterPriority:
+            hintText = "no alerts"
+        case s.queryResult.Sessions != nil:
+            hintText = "no results"
+        default:
+            hintText = "no sessions"
+        }
+        lines = append(lines, centeredHint(hintText))
     } else {
         if hasAbove {
             lines = append(lines, centeredHint("▲ more"))
@@ -469,10 +507,6 @@ func (s *SidebarModel) MoveDown(visibleRows int) {
     s.clampViewport(visibleRows)
 }
 
-func (s SidebarModel) WindowsForSession(session string) map[int][]tmux.Pane {
-    return s.sessions[session]
-}
-
 func (s *SidebarModel) GotoTop(visibleRows int) {
     s.cursor = 0
     s.clampViewport(visibleRows)
@@ -516,30 +550,11 @@ func (s SidebarModel) SessionCount() int {
     return len(s.nodes)
 }
 
-// AlertFilterActive reports whether the alert filter is currently on.
-func (s SidebarModel) AlertFilterActive() bool {
-    return s.filterAlerts
-}
-
-// ToggleAlertFilter flips the alert filter flag, rebuilds nodes, and returns the new state.
-func (s *SidebarModel) ToggleAlertFilter(visibleRows int) bool {
-    s.filterAlerts = !s.filterAlerts
-    s.rebuildNodes()
-    if s.filterAlerts {
-        s.FocusFirstAlertSession(visibleRows)
-    }
-    if s.cursor >= len(s.nodes) {
-        s.cursor = max(0, len(s.nodes)-1)
-    }
-    s.clampViewport(visibleRows)
-    return s.filterAlerts
-}
-
-// FocusNode positions the cursor on the session node matching session.
+// FocusNode positions the cursor on the session node matching sess.
 // Returns true if found, false otherwise.
-func (s *SidebarModel) FocusNode(session string, visibleRows int) bool {
+func (s *SidebarModel) FocusNode(sess string, visibleRows int) bool {
     for i, n := range s.nodes {
-        if n.Session == session {
+        if n.Session == sess {
             s.cursor = i
             s.clampViewport(visibleRows)
             return true
