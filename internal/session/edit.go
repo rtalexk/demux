@@ -37,24 +37,32 @@ func AppendEntry(path string, e ConfigEntry) error {
     return nil
 }
 
+// tomlQuote wraps s in double quotes with only the escapes required for a
+// TOML basic string: backslash and double-quote. Unicode is left as literal.
+func tomlQuote(s string) string {
+    s = strings.ReplaceAll(s, "\\", "\\\\")
+    s = strings.ReplaceAll(s, "\"", "\\\"")
+    return "\"" + s + "\""
+}
+
 func formatBlock(e ConfigEntry) string {
     var sb strings.Builder
     sb.WriteString("\n[[session]]\n")
-    sb.WriteString(fmt.Sprintf("name  = \"%s\"\n", e.Name))
-    sb.WriteString(fmt.Sprintf("alias = \"%s\"\n", e.Alias))
-    sb.WriteString(fmt.Sprintf("path  = \"%s\"\n", e.Path))
+    sb.WriteString(fmt.Sprintf("name  = %s\n", tomlQuote(e.Name)))
+    sb.WriteString(fmt.Sprintf("alias = %s\n", tomlQuote(e.Alias)))
+    sb.WriteString(fmt.Sprintf("path  = %s\n", tomlQuote(e.Path)))
     if e.Worktree {
         sb.WriteString("worktree = true\n")
     }
     if len(e.Labels) > 0 {
         quoted := make([]string, len(e.Labels))
         for i, l := range e.Labels {
-            quoted[i] = fmt.Sprintf("\"%s\"", l)
+            quoted[i] = tomlQuote(l)
         }
         sb.WriteString(fmt.Sprintf("labels   = [%s]\n", strings.Join(quoted, ", ")))
     }
     if e.Icon != "" {
-        sb.WriteString(fmt.Sprintf("icon     = \"%s\"\n", e.Icon))
+        sb.WriteString(fmt.Sprintf("icon     = %s\n", tomlQuote(e.Icon)))
     }
     return sb.String()
 }
@@ -142,7 +150,7 @@ func splitBlocks(content string) (blocks []string, preamble string) {
 
 // blockHasField reports whether the block contains key = "value" (handles extra spaces around =).
 func blockHasField(block, key, value string) bool {
-    needle := fmt.Sprintf("%q", value)
+    needle := tomlQuote(value)
     for _, line := range strings.Split(block, "\n") {
         trimmed := strings.TrimSpace(line)
         if !strings.HasPrefix(trimmed, key) {
