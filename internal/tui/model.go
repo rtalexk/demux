@@ -372,12 +372,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Refresh):
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
-    case key.Matches(msg, keys.AlertFilter):
+    case key.Matches(msg, keys.AlertFilter),
+        key.Matches(msg, keys.FilterTmux),
+        key.Matches(msg, keys.FilterAll),
+        key.Matches(msg, keys.FilterConfig),
+        key.Matches(msg, keys.FilterWorktree):
+
         sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
         if sidebarVisibleRows < 1 {
             sidebarVisibleRows = 1
         }
-        m.sidebar.SetFilter(FilterPriority, sidebarVisibleRows)
+        var newFilter SidebarFilter
+        switch {
+        case key.Matches(msg, keys.AlertFilter):
+            newFilter = FilterPriority
+        case key.Matches(msg, keys.FilterTmux):
+            newFilter = FilterTmux
+        case key.Matches(msg, keys.FilterAll):
+            newFilter = FilterAll
+        case key.Matches(msg, keys.FilterConfig):
+            newFilter = FilterConfig
+        case key.Matches(msg, keys.FilterWorktree):
+            newFilter = FilterWorktree
+        }
+        m.sidebar.SetFilter(newFilter, sidebarVisibleRows)
         if node := m.sidebar.Selected(); node != nil {
             m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
@@ -419,8 +437,6 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.TabNextSession(sidebarVisibleRows)
     case key.Matches(msg, keys.ShiftTab):
         m.sidebar.TabPrevSession(sidebarVisibleRows)
-    case key.Matches(msg, keys.GotoTop):
-        m.sidebar.GotoTop(sidebarVisibleRows)
     case key.Matches(msg, keys.GotoBottom):
         m.sidebar.GotoBottom(sidebarVisibleRows)
     case key.Matches(msg, keys.Enter):
@@ -487,8 +503,6 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procList.JumpToPrevPane()
     case key.Matches(msg, keys.JumpDown):
         m.procList.JumpToNextPane()
-    case key.Matches(msg, keys.GotoTop):
-        m.procList.GotoTop()
     case key.Matches(msg, keys.GotoBottom):
         m.procList.GotoBottom()
     case key.Matches(msg, keys.Enter):
