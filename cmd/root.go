@@ -17,8 +17,9 @@ var compactFlag bool
 var searchFlag bool
 
 var rootCmd = &cobra.Command{
-    Use:   "demux",
-    Short: "Monitor tmux sessions, processes, and alerts",
+    Use:          "demux",
+    Short:        "Monitor tmux sessions, processes, and alerts",
+    SilenceUsage: true,
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg := loadConfig()
         if compactFlag {
