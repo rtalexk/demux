@@ -2,6 +2,7 @@ package tui
 
 import (
     "fmt"
+    "path/filepath"
     "sort"
     "strings"
     "time"
@@ -154,34 +155,104 @@ func (s *SidebarModel) BestAlertTargetInSession(sess, priority string) string {
     return best.Target
 }
 
+// visibleSessions returns sessions matching the current filter with IgnoredSessions removed.
+// For FilterWorktree with no resolvable root, returns nil and sets s.filterHint.
+func (s *SidebarModel) visibleSessions() []session.Session {
+    ignore := func(name string) bool {
+        for _, ig := range s.cfg.IgnoredSessions {
+            if ig == name {
+                return true
+            }
+        }
+        return false
+    }
+
+    var out []session.Session
+
+    switch s.filter {
+    case FilterAll:
+        for _, sess := range s.sessions {
+            if !ignore(sess.DisplayName) {
+                out = append(out, sess)
+            }
+        }
+
+    case FilterConfig:
+        for _, sess := range s.sessions {
+            if sess.IsConfig && !ignore(sess.DisplayName) {
+                out = append(out, sess)
+            }
+        }
+
+    case FilterPriority:
+        for _, sess := range s.sessions {
+            if sess.IsLive && !s.newestSessionAlert(sess.DisplayName).IsZero() && !ignore(sess.DisplayName) {
+                out = append(out, sess)
+            }
+        }
+
+    case FilterWorktree:
+        var curDisplayName string
+        if s.cursor >= 0 && s.cursor < len(s.nodes) {
+            curDisplayName = s.nodes[s.cursor].Session
+        }
+        var rootRef string
+        for _, sess := range s.sessions {
+            if sess.DisplayName == curDisplayName {
+                rootRef = s.sessionWorktreeRoot(sess)
+                break
+            }
+        }
+        if rootRef == "" {
+            s.filterHint = "no sessions in this worktree"
+            return nil
+        }
+        for _, sess := range s.sessions {
+            if !ignore(sess.DisplayName) {
+                if r := s.sessionWorktreeRoot(sess); r != "" && r == rootRef {
+                    out = append(out, sess)
+                }
+            }
+        }
+
+    default: // FilterTmux and unknown values
+        for _, sess := range s.sessions {
+            if sess.IsLive && !ignore(sess.DisplayName) {
+                out = append(out, sess)
+            }
+        }
+    }
+
+    return out
+}
+
+// sessionWorktreeRoot returns the worktree root path for a session, or "".
+// For live sessions: filepath.Dir(gitInfo.RepoRoot).
+// For config sessions with Worktree=true: filepath.Dir(Config.Path).
+func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
+    if sess.IsLive {
+        if info, ok := s.gitInfo[sess.DisplayName]; ok && info.RepoRoot != "" {
+            return filepath.Dir(info.RepoRoot)
+        }
+    }
+    if sess.IsConfig && sess.Config != nil && sess.Config.Worktree {
+        return filepath.Dir(sess.Config.Path)
+    }
+    return ""
+}
+
 func (s *SidebarModel) rebuildNodes() {
     var curSession string
     if s.cursor >= 0 && s.cursor < len(s.nodes) {
         curSession = s.nodes[s.cursor].Session
     }
 
-    s.nodes = nil
+    // Call visibleSessions before clearing s.nodes so FilterWorktree can
+    // read the current cursor session from s.nodes[s.cursor].
     s.filterHint = ""
+    visible := s.visibleSessions()
 
-    // Build visible session list.
-    var visible []session.Session
-    for _, sess := range s.sessions {
-        ignored := false
-        for _, ig := range s.cfg.IgnoredSessions {
-            if ig == sess.DisplayName {
-                ignored = true
-                break
-            }
-        }
-        if ignored {
-            continue
-        }
-        // Filter: priority mode hides sessions without alerts.
-        if s.filter == FilterPriority && s.newestSessionAlert(sess.DisplayName).IsZero() {
-            continue
-        }
-        visible = append(visible, sess)
-    }
+    s.nodes = nil
 
     sortKeys := s.cfg.Sidebar.Sort
     if len(sortKeys) == 0 {

@@ -7,6 +7,7 @@ import (
 
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
+    "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/session"
 )
@@ -809,5 +810,109 @@ func TestBestAlertTargetInSession_DefaultPriority(t *testing.T) {
     // "default" must return "" regardless of what alerts exist
     if got := s.BestAlertTargetInSession("work", "default"); got != "" {
         t.Errorf("expected \"\" for default priority, got %q", got)
+    }
+}
+
+// --- visibleSessions filter tests ---
+
+func TestVisibleSessions_FilterTmux(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+        },
+        filter: FilterTmux,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 1 || s.nodes[0].Session != "live" {
+        t.Errorf("FilterTmux should show only live sessions, got %v", s.nodes)
+    }
+}
+
+func TestVisibleSessions_FilterConfig(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+            {DisplayName: "both", IsLive: true, IsConfig: true},
+        },
+        filter: FilterConfig,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 2 {
+        t.Errorf("FilterConfig should show IsConfig sessions, got %d", len(s.nodes))
+    }
+}
+
+func TestVisibleSessions_FilterAll(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+        },
+        filter: FilterAll,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 2 {
+        t.Errorf("FilterAll should show all sessions, got %d", len(s.nodes))
+    }
+}
+
+func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "alerted", IsLive: true},
+            {DisplayName: "clean", IsLive: true},
+        },
+        alerts: map[string]db.Alert{
+            "alerted": {Target: "alerted", Level: "warn", CreatedAt: time.Now()},
+        },
+        filter: FilterPriority,
+        cfg:    config.Config{},
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 1 || s.nodes[0].Session != "alerted" {
+        t.Errorf("FilterPriority should show only alerted sessions, got %v", s.nodes)
+    }
+}
+
+func TestVisibleSessions_FilterWorktree_NoRoot(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "no-git", IsLive: true},
+        },
+        filter:  FilterWorktree,
+        gitInfo: map[string]git.Info{},
+    }
+    s.nodes = []SidebarNode{{Session: "no-git"}} // pre-set cursor target
+    s.rebuildNodes()
+    if len(s.nodes) != 0 {
+        t.Error("expected empty list when no worktree root resolvable")
+    }
+    if s.filterHint == "" {
+        t.Error("expected filterHint to be set for no-root worktree filter")
+    }
+}
+
+func TestVisibleSessions_FilterWorktree_MatchesByRoot(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "sess-a", IsLive: true},
+            {DisplayName: "sess-b", IsLive: true},
+            {DisplayName: "other", IsLive: true},
+        },
+        filter: FilterWorktree,
+        gitInfo: map[string]git.Info{
+            "sess-a": {RepoRoot: "/repo/worktrees/a"},
+            "sess-b": {RepoRoot: "/repo/worktrees/b"},
+            "other":  {RepoRoot: "/elsewhere/c"},
+        },
+    }
+    // Cursor on sess-a; its root = /repo/worktrees
+    s.nodes = []SidebarNode{{Session: "sess-a"}}
+    s.rebuildNodes()
+    // Both sess-a and sess-b have root /repo/worktrees, other has /elsewhere
+    if len(s.nodes) != 2 {
+        t.Errorf("expected 2 sessions sharing worktree root, got %d: %v", len(s.nodes), s.nodes)
     }
 }
