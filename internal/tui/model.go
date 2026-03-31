@@ -3,6 +3,7 @@ package tui
 import (
     "fmt"
     "os"
+    "path/filepath"
     "strings"
     "time"
 
@@ -87,6 +88,9 @@ type Model struct {
     searchInput SearchInputModel
     queryResult query.Result
     searchGen   int
+
+    configEntries []session.ConfigEntry
+    configDir     string
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -99,6 +103,14 @@ func New(cfg config.Config, database *db.DB) Model {
         popupMode: os.Getenv("DEMUX_POPUP") == "1",
     }
     m.searchInput = NewSearchInputModel()
+    cfgPath, _ := config.DefaultPath()
+    m.configDir = filepath.Dir(cfgPath)
+    m.configEntries, _ = session.LoadConfigSessions(m.configDir)
+    if cfg.Sidebar.DefaultFilter != "" {
+        m.sidebar.filter = SidebarFilter(cfg.Sidebar.DefaultFilter)
+    } else {
+        m.sidebar.filter = FilterTmux
+    }
     return m
 }
 
@@ -198,7 +210,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
-        m.sidebar.SetData(session.Merge(msg.panes, nil), m.alerts, m.gitInfo, m.cfg)
+        merged := session.Merge(msg.panes, m.configEntries)
+        m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -244,7 +257,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        m.sidebar.SetData(session.Merge(m.panes, nil), msg.alerts, m.gitInfo, m.cfg)
+        merged := session.Merge(m.panes, m.configEntries)
+        m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
             visibleRows := max(1, m.height-1-2-searchBoxH)
@@ -262,7 +276,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, startupProcCmd
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
-        m.sidebar.SetData(session.Merge(m.panes, nil), m.alerts, m.gitInfo, m.cfg)
+        merged := session.Merge(m.panes, m.configEntries)
+        m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         return m, nil
     case queryResultMsg:
