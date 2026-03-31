@@ -893,6 +893,10 @@ func (m Model) View() string {
         return "loading..."
     }
 
+    if m.cfg.Mode == "compact" {
+        return m.compactView()
+    }
+
     sidebarW := m.cfg.Sidebar.Width
     if sidebarW <= 0 {
         sidebarW = 30
@@ -990,6 +994,38 @@ func (m Model) View() string {
         return overlayCenter(m.yank.Render(), full, m.width, m.height)
     }
 
+    return full
+}
+
+func (m Model) compactView() string {
+    contentH := m.height - 1 // 1 for status bar
+
+    sessionCount := m.sidebar.SessionCount()
+    sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
+    filterMark := ""
+    if f := m.sidebar.ActiveFilter(); f != FilterTmux {
+        filterMark = " [" + string(f) + "]"
+    }
+    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, filterMark)
+
+    sidebarContent := m.sidebar.Render(m.width, contentH-searchBoxH, true, sidebarTitle, "")
+    searchBox := m.searchInput.View(m.width)
+    leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
+
+    statusBar := "  j/k:nav  Enter:open  !:alerts  ?:help  q:quit"
+    if m.statusMsg != "" && time.Now().Before(m.statusExp) {
+        statusBar = m.statusMsg
+    }
+    statusBar = lipgloss.NewStyle().Width(m.width).MaxHeight(1).Render(statusBar)
+
+    full := lipgloss.JoinVertical(lipgloss.Left, leftCol, statusBar)
+
+    if m.showHelp {
+        return overlayCenter(m.help.Render(), full, m.width, m.height)
+    }
+    if m.showYank {
+        return overlayCenter(m.yank.Render(), full, m.width, m.height)
+    }
     return full
 }
 
