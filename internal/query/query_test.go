@@ -14,13 +14,12 @@ func TestParse(t *testing.T) {
         scope query.QueryScope
         term  string
     }{
-        {"", query.ScopeAll, ""},
-        {"foo", query.ScopeAll, "foo"},
-        {"s:bar", query.ScopeSession, "bar"},
+        {"", query.ScopeSession, ""},
+        {"foo", query.ScopeSession, "foo"},
         {"w:baz", query.ScopeWindow, "baz"},
         {"p:qux", query.ScopeProcess, "qux"},
-        {"s:my project", query.ScopeSession, "my project"},
-        {"query1 w:query2", query.ScopeAll, "query1 w:query2"},
+        {"w:my project", query.ScopeWindow, "my project"},
+        {"query1 w:query2", query.ScopeSession, "query1 w:query2"},
     }
     for _, tt := range tests {
         pq := query.Parse(tt.raw)
@@ -50,7 +49,7 @@ func TestRun_SessionScope(t *testing.T) {
         {Session: "personal", WindowIndex: 0, WindowName: "vim", PanePID: 200},
         {Session: "dots", WindowIndex: 0, WindowName: "sh", PanePID: 300},
     }
-    result := query.RunWith(query.Parse("s:wor"), panes, nil)
+    result := query.RunWith(query.Parse("wor"), panes, nil)
     if len(result.Sessions) != 1 {
         t.Fatalf("expected 1 session match, got %d", len(result.Sessions))
     }
@@ -107,14 +106,21 @@ func TestRun_ProcessScope(t *testing.T) {
     }
 }
 
-func TestRun_AllScope_MultiMatch(t *testing.T) {
+func TestRun_SessionScope_Default(t *testing.T) {
+    // Bare text searches sessions only — window names are not matched.
     panes := []tmux.Pane{
         {Session: "vim-session", WindowIndex: 0, WindowName: "editor", PanePID: 100},
         {Session: "work", WindowIndex: 0, WindowName: "vim-win", PanePID: 200},
     }
     result := query.RunWith(query.Parse("vim"), panes, nil)
-    if len(result.Sessions) != 2 {
-        t.Fatalf("expected 2 sessions, got %d", len(result.Sessions))
+    if len(result.Sessions) != 1 {
+        t.Fatalf("expected 1 session (vim-session), got %d", len(result.Sessions))
+    }
+    if result.Sessions[0].Name != "vim-session" {
+        t.Errorf("expected 'vim-session', got %q", result.Sessions[0].Name)
+    }
+    if len(result.Sessions[0].Windows) != 0 {
+        t.Errorf("expected no window matches for bare-text search, got %d", len(result.Sessions[0].Windows))
     }
 }
 
@@ -122,7 +128,7 @@ func TestRun_MatchPos(t *testing.T) {
     panes := []tmux.Pane{
         {Session: "work", WindowIndex: 0, WindowName: "main", PanePID: 100},
     }
-    result := query.RunWith(query.Parse("s:wok"), panes, nil)
+    result := query.RunWith(query.Parse("wok"), panes, nil)
     if len(result.Sessions) != 1 {
         t.Fatalf("expected 1 session, got %q", "work")
     }
@@ -132,13 +138,12 @@ func TestRun_MatchPos(t *testing.T) {
 }
 
 func TestParse_BareTag(t *testing.T) {
-    // Bare tags with no term should be scoped with empty term, not ScopeAll.
+    // Bare tags with no term should be scoped with empty term, not ScopeSession.
     tests := []struct {
         raw   string
         scope query.QueryScope
         term  string
     }{
-        {"s:", query.ScopeSession, ""},
         {"w:", query.ScopeWindow, ""},
         {"p:", query.ScopeProcess, ""},
     }
