@@ -41,6 +41,7 @@ type SidebarModel struct {
     cfg         config.Config
     filter      SidebarFilter
     prevFilter  SidebarFilter
+    prevSession string // selected session before last filter switch; restored on toggle-back
     filterHint  string
     queryResult query.Result
     launchErr   string // shown inline when last launch attempt failed
@@ -58,16 +59,37 @@ func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gi
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
-// key again toggles back to the previous filter (toggle behavior for all filters).
+// key again toggles back to the previous filter and restores the cursor to
+// the session that was selected before the filter was applied.
 func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
+    curSession := ""
+    if node := s.Selected(); node != nil {
+        curSession = node.Session
+    }
+
+    var restoreSession string
     if f == s.filter {
+        restoreSession = s.prevSession
+        s.prevSession = curSession
         f, s.prevFilter = s.prevFilter, s.filter
     } else {
+        s.prevSession = curSession
         s.prevFilter = s.filter
     }
+
     s.filter = f
     s.rebuildNodes()
     s.clampViewport(visibleRows)
+
+    if restoreSession != "" {
+        for i, n := range s.nodes {
+            if n.Session == restoreSession {
+                s.cursor = i
+                s.clampViewport(visibleRows)
+                break
+            }
+        }
+    }
 }
 
 // ActiveFilter returns the current active filter.

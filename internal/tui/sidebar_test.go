@@ -577,15 +577,27 @@ func TestSetFilter_AllFiltersToggle(t *testing.T) {
         filter:   FilterTmux,
         prevFilter: FilterTmux,
     }
-    // Switch to FilterAll, then press again — should toggle back to FilterTmux.
+    // Move cursor to "beta" (index 1 after rebuild).
+    s.rebuildNodes()
+    s.cursor = 1 // "beta"
+
+    // Switch to FilterAll — cursor should follow "beta", prevSession saved as "beta".
     s.SetFilter(FilterAll, 10)
     if s.ActiveFilter() != FilterAll {
         t.Fatalf("expected FilterAll, got %q", s.ActiveFilter())
     }
+    // Move to "alpha" in the all-sessions view.
+    s.cursor = 0
+
+    // Toggle back — cursor should be restored to "beta".
     s.SetFilter(FilterAll, 10)
     if s.ActiveFilter() != FilterTmux {
         t.Errorf("expected toggle back to FilterTmux, got %q", s.ActiveFilter())
     }
+    if len(s.nodes) > 0 && s.nodes[s.cursor].Session != "beta" {
+        t.Errorf("expected cursor restored to beta, got %q", s.nodes[s.cursor].Session)
+    }
+
     // After toggling back, pressing FilterAll again should go to FilterAll.
     s.SetFilter(FilterAll, 10)
     if s.ActiveFilter() != FilterAll {
