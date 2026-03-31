@@ -113,3 +113,74 @@ func TestAppendEntry_OptionalFields(t *testing.T) {
         t.Error("icon should be present")
     }
 }
+
+func TestRemoveEntry_RemovesMatchingBlock(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "sessions.toml")
+    writeTOML(t, dir, "sessions.toml", `[[session]]
+name  = "main"
+alias = "proj"
+path  = "/proj"
+
+[[session]]
+name  = "other"
+alias = "oth"
+path  = "/other"
+`)
+    if err := RemoveEntry(path, "main", "proj"); err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    data, err := os.ReadFile(path)
+    if err != nil {
+        t.Fatalf("read file: %v", err)
+    }
+    s := string(data)
+    if strings.Contains(s, `alias = "proj"`) {
+        t.Error("removed entry should not be present")
+    }
+    if !strings.Contains(s, `alias = "oth"`) {
+        t.Error("other entry should be preserved")
+    }
+}
+
+func TestRemoveEntry_NotFound(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "sessions.toml")
+    writeTOML(t, dir, "sessions.toml", `[[session]]
+name  = "main"
+alias = "proj"
+path  = "/proj"
+`)
+    err := RemoveEntry(path, "main", "wrong-alias")
+    if err == nil {
+        t.Error("expected not-found error")
+    }
+}
+
+func TestRemoveEntry_FileNotExist(t *testing.T) {
+    path := filepath.Join(t.TempDir(), "missing.toml")
+    err := RemoveEntry(path, "main", "proj")
+    if err == nil {
+        t.Error("expected error for missing file")
+    }
+}
+
+func TestRemoveEntry_OnlyEntry(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "sessions.toml")
+    writeTOML(t, dir, "sessions.toml", `[[session]]
+name  = "main"
+alias = "proj"
+path  = "/proj"
+`)
+    if err := RemoveEntry(path, "main", "proj"); err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    data, err := os.ReadFile(path)
+    if err != nil {
+        t.Fatalf("read file: %v", err)
+    }
+    if strings.Contains(string(data), "[[session]]") {
+        t.Error("session block should be gone")
+    }
+}

@@ -70,3 +70,90 @@ func loadRawEntries(path string) ([]ConfigEntry, error) {
     }
     return f.Sessions, nil
 }
+
+// RemoveEntry removes the [[session]] block matching both name and alias from path.
+// Returns an error if the file does not exist or the entry is not found.
+func RemoveEntry(path, name, alias string) error {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        return fmt.Errorf("read %s: %w", filepath.Base(path), err)
+    }
+
+    blocks, preamble := splitBlocks(string(data))
+
+    target := -1
+    for i, b := range blocks {
+        if blockHasField(b, "name", name) && blockHasField(b, "alias", alias) {
+            target = i
+            break
+        }
+    }
+    if target == -1 {
+        return fmt.Errorf("session %q (alias %q) not found in %s", name, alias, filepath.Base(path))
+    }
+
+    blocks = append(blocks[:target], blocks[target+1:]...)
+
+    var sb strings.Builder
+    sb.WriteString(preamble)
+    for _, b := range blocks {
+        sb.WriteString(b)
+    }
+
+    result := strings.TrimRight(sb.String(), "\n")
+    if result != "" {
+        result += "\n"
+    }
+
+    return os.WriteFile(path, []byte(result), 0644)
+}
+
+// splitBlocks splits TOML content into a preamble (lines before first [[session]])
+// and a slice of [[session]] block strings (each starting with "[[session]]\n").
+func splitBlocks(content string) (blocks []string, preamble string) {
+    lines := strings.Split(content, "\n")
+    var pre []string
+    var cur []string
+    inBlock := false
+
+    for _, line := range lines {
+        if strings.TrimSpace(line) == "[[session]]" {
+            if inBlock {
+                blocks = append(blocks, strings.Join(cur, "\n")+"\n")
+                cur = nil
+            }
+            inBlock = true
+            cur = append(cur, line)
+        } else if inBlock {
+            cur = append(cur, line)
+        } else {
+            pre = append(pre, line)
+        }
+    }
+    if inBlock && len(cur) > 0 {
+        blocks = append(blocks, strings.Join(cur, "\n")+"\n")
+    }
+    preamble = strings.Join(pre, "\n")
+    if preamble != "" && !strings.HasSuffix(preamble, "\n") {
+        preamble += "\n"
+    }
+    return blocks, preamble
+}
+
+// blockHasField reports whether the block contains key = "value" (handles extra spaces around =).
+func blockHasField(block, key, value string) bool {
+    needle := fmt.Sprintf("%q", value)
+    for _, line := range strings.Split(block, "\n") {
+        trimmed := strings.TrimSpace(line)
+        if strings.HasPrefix(trimmed, key) {
+            rest := strings.TrimSpace(strings.TrimPrefix(trimmed, key))
+            if strings.HasPrefix(rest, "=") {
+                val := strings.TrimSpace(strings.TrimPrefix(rest, "="))
+                if val == needle {
+                    return true
+                }
+            }
+        }
+    }
+    return false
+}
