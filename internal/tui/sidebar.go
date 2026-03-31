@@ -258,6 +258,8 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
     var lines []string
     if len(s.nodes) == 0 && s.filterAlerts {
         lines = append(lines, centeredHint("no alerts"))
+    } else if len(s.nodes) == 0 && s.queryResult.Sessions != nil {
+        lines = append(lines, centeredHint("no results"))
     } else {
         if hasAbove {
             lines = append(lines, centeredHint("▲ more"))

@@ -414,6 +414,19 @@ func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
     }
 }
 
+func TestRender_NoResultsHint(t *testing.T) {
+    s := SidebarModel{
+        sessions:    makeSessions("alpha", "beta"),
+        alerts:      map[string]db.Alert{},
+        queryResult: query.Result{Sessions: []query.SessionMatch{}},
+    }
+    s.rebuildNodes()
+    out := s.Render(40, 10, false, "", "")
+    if !strings.Contains(stripANSI(out), "no results") {
+        t.Errorf("expected 'no results' hint when search returns zero matches, got: %q", stripANSI(out))
+    }
+}
+
 func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("charlie", "alpha", "beta"),

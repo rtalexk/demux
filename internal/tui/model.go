@@ -274,6 +274,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 m.procGen++
                 m.updateDetailFromSelection()
                 return m, m.scheduleProcFetch()
+            } else {
+                m.procList.Reset()
             }
         }
         return m, nil
