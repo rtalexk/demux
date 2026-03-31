@@ -257,6 +257,32 @@ func TestRenderSession_longNameTruncated(t *testing.T) {
     }
 }
 
+func TestRenderSession_truncatedNameWithIndicators_noOverflow(t *testing.T) {
+    // Regression: when a name is truncated and indicators are present, the
+    // separator space (enforced by alignedRow) must be pre-reserved in maxName
+    // so the row does not exceed availW.
+    initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+    activity := time.Now().Add(-6 * 24 * time.Hour) // "6d" indicator (3 chars)
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "hf-garmin-credentials-integration", IsLive: true, Activity: activity},
+        },
+        alerts:  map[string]db.Alert{},
+        gitInfo: map[string]git.Info{},
+        cfg:     config.Config{Sidebar: config.SidebarConfig{ShowLastSeen: true}},
+    }
+    s.rebuildNodes()
+    width := 30
+    text := s.renderSession(s.nodes[0], false, false, width)
+    runes := []rune(stripANSI(text))
+    if len(runes) > width-2 {
+        t.Errorf("truncated row length %d exceeds width-2=%d", len(runes), width-2)
+    }
+    if !strings.Contains(stripANSI(text), "…") {
+        t.Error("expected ellipsis in truncated name")
+    }
+}
+
 func TestRenderSession_shortNameNotTruncated(t *testing.T) {
     s := sidebarWithNodes([]SidebarNode{
         {Session: "short"},

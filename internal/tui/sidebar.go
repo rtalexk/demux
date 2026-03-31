@@ -565,6 +565,9 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     }
     indW := len([]rune(stripANSI(indicators)))
     maxName := availW - indW
+    if indW > 0 {
+        maxName-- // alignedRow enforces pad>=1 separator; reserve it so truncation doesn't overflow
+    }
     if maxName < 4 {
         maxName = 4
     }
