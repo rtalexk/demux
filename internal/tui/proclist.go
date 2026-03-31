@@ -1542,3 +1542,78 @@ func highlightMatchPos(name string, pos []int) string {
     }
     return b.String()
 }
+
+// injectBottomBorderLabel splices label into the bottom border line of a
+// lipgloss-rendered box, centered. ANSI color codes are preserved.
+func injectBottomBorderLabel(rendered, label string) string {
+    if label == "" {
+        return rendered
+    }
+    // Determine the bottom border line.
+    // Lipgloss may or may not append a trailing newline; handle both.
+    var bottomLine, prefix, trailing string
+    lastNL := strings.LastIndexByte(rendered, '\n')
+    if lastNL < 0 {
+        // No newlines at all: entire string is the bottom border.
+        bottomLine = rendered
+        prefix = ""
+        trailing = ""
+    } else if lastNL == len(rendered)-1 {
+        // String ends with \n: bottom border is between prevNL and lastNL.
+        prevNL := strings.LastIndexByte(rendered[:lastNL], '\n')
+        trailing = rendered[lastNL:] // the trailing \n
+        if prevNL < 0 {
+            prefix = ""
+            bottomLine = rendered[:lastNL]
+        } else {
+            prefix = rendered[:prevNL+1]
+            bottomLine = rendered[prevNL+1 : lastNL]
+        }
+    } else {
+        // String does NOT end with \n: bottom border is rendered[lastNL+1:].
+        prefix = rendered[:lastNL+1]
+        bottomLine = rendered[lastNL+1:]
+        trailing = ""
+    }
+
+    plain := stripANSI(bottomLine)
+    runes := []rune(plain)
+    if len(runes) < 4 {
+        return rendered
+    }
+
+    totalInner := len(runes) - 2
+    labelVisible := []rune(stripANSI(label))
+    if len(labelVisible) > totalInner {
+        return rendered
+    }
+
+    fill := string(runes[1])
+    cornerLeft := string(runes[0])
+    cornerRight := string(runes[len(runes)-1])
+
+    leftPad := (totalInner - len(labelVisible)) / 2
+    rightPad := totalInner - len(labelVisible) - leftPad
+
+    // Preserve ANSI prefix/suffix from original bottom line.
+    cornerLeftIdx := strings.Index(bottomLine, cornerLeft)
+    cornerRightIdx := strings.LastIndex(bottomLine, cornerRight)
+    ansiPrefix, ansiSuffix := "", ""
+    if cornerLeftIdx > 0 {
+        ansiPrefix = bottomLine[:cornerLeftIdx]
+    }
+    if cornerRightIdx >= 0 {
+        after := cornerRightIdx + len(cornerRight)
+        if after <= len(bottomLine) {
+            ansiSuffix = bottomLine[after:]
+        }
+    }
+
+    newBottom := ansiPrefix + cornerLeft + ansiSuffix +
+        strings.Repeat(fill, leftPad) +
+        label +
+        strings.Repeat(fill, rightPad) +
+        ansiPrefix + cornerRight + ansiSuffix
+
+    return prefix + newBottom + trailing
+}

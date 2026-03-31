@@ -3,7 +3,9 @@ package git
 import (
     "context"
     "fmt"
+    "os"
     "os/exec"
+    "path/filepath"
     "regexp"
     "strconv"
     "strings"
@@ -15,7 +17,9 @@ type Info struct {
     Dirty    bool
     Ahead    int
     Behind   int
-    RepoRoot string
+    Dir            string // directory passed to Fetch; set even when git is unavailable
+    IsWorktreeRoot bool   // true when Dir contains a .bare/ subdirectory
+    RepoRoot       string
     Worktree string // non-empty when inside a linked worktree (name of the worktree)
     PR       string
     Loading  bool
@@ -63,12 +67,17 @@ func Fetch(dir string, timeoutMs int) (Info, error) {
 
     out, err := exec.CommandContext(ctx, "git", "-C", dir, "status", "--porcelain=v1", "-b").Output()
     if err != nil {
-        return Info{}, fmt.Errorf("git status: %w", err)
+        info := Info{Dir: dir}
+        if fi, statErr := os.Stat(filepath.Join(dir, ".bare")); statErr == nil && fi.IsDir() {
+            info.IsWorktreeRoot = true
+        }
+        return info, fmt.Errorf("git status: %w", err)
     }
     info, err := ParseStatus(string(out))
     if err != nil {
         return info, err
     }
+    info.Dir = dir
 
     rootOut, _ := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--show-toplevel").Output()
     info.RepoRoot = strings.TrimSpace(string(rootOut))

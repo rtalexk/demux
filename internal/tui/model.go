@@ -3,6 +3,7 @@ package tui
 import (
     "fmt"
     "os"
+    "path/filepath"
     "strings"
     "time"
 
@@ -15,6 +16,7 @@ import (
     "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/query"
+    "github.com/rtalex/demux/internal/session"
     "github.com/rtalex/demux/internal/tmux"
 )
 
@@ -86,6 +88,9 @@ type Model struct {
     searchInput SearchInputModel
     queryResult query.Result
     searchGen   int
+
+    configEntries []session.ConfigEntry
+    configDir     string
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -98,6 +103,18 @@ func New(cfg config.Config, database *db.DB) Model {
         popupMode: os.Getenv("DEMUX_POPUP") == "1",
     }
     m.searchInput = NewSearchInputModel()
+    cfgPath, _ := config.DefaultPath()
+    m.configDir = filepath.Dir(cfgPath)
+    var loadErr error
+    m.configEntries, loadErr = session.LoadConfigSessions(m.configDir)
+    if loadErr != nil {
+        fmt.Fprintf(os.Stderr, "demux: failed to load config sessions from %s: %v\n", m.configDir, loadErr)
+    }
+    if cfg.Sidebar.DefaultFilter != "" {
+        m.sidebar.filter = SidebarFilter(cfg.Sidebar.DefaultFilter)
+    } else {
+        m.sidebar.filter = FilterTmux
+    }
     return m
 }
 
@@ -168,7 +185,8 @@ func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
     return func() tea.Msg {
         info, err := git.Fetch(dir, timeoutMs)
         if err != nil {
-            return gitResultMsg{key: k, info: git.Info{}}
+            // Preserve Dir and IsWorktreeRoot even when git is unavailable.
+            return gitResultMsg{key: k, info: git.Info{Dir: info.Dir, IsWorktreeRoot: info.IsWorktreeRoot}}
         }
         return gitResultMsg{key: k, info: info}
     }
@@ -197,7 +215,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
-        m.sidebar.SetData(msg.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(msg.panes), m.cfg)
+        merged := session.Merge(msg.panes, m.configEntries)
+        m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
         if !m.ready {
@@ -243,7 +262,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        m.sidebar.SetData(m.panes, msg.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
+        merged := session.Merge(m.panes, m.configEntries)
+        m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
             visibleRows := max(1, m.height-1-2-searchBoxH)
@@ -261,7 +281,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, startupProcCmd
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
-        m.sidebar.SetData(m.panes, m.alerts, m.gitInfo, tmux.SessionActivityMap(m.panes), m.cfg)
+        merged := session.Merge(m.panes, m.configEntries)
+        m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         return m, nil
     case queryResultMsg:
@@ -307,6 +328,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         case "esc", "enter":
             if msg.String() == "enter" {
                 if node := m.sidebar.Selected(); node != nil {
+                    sess := m.sidebar.FindSession(node.Session)
+                    if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
+                        if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+                            m.statusMsg = "launch failed: " + err.Error()
+                            m.statusExp = time.Now().Add(5 * time.Second)
+                            m.sidebar.SetLaunchErr(err.Error())
+                            m.searchInput.ExitInsertMode()
+                            return m, nil
+                        }
+                        m.sidebar.ClearLaunchErr()
+                        m.searchInput.ExitInsertMode()
+                        return m, m.fetchPanes()
+                    }
                     if err := tmux.SwitchClient(node.Session); err == nil {
                         if m.popupMode {
                             return m, tea.Quit
@@ -371,12 +405,30 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     case key.Matches(msg, keys.Refresh):
         m.procGen++
         return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
-    case key.Matches(msg, keys.AlertFilter):
+    case key.Matches(msg, keys.AlertFilter),
+        key.Matches(msg, keys.FilterTmux),
+        key.Matches(msg, keys.FilterAll),
+        key.Matches(msg, keys.FilterConfig),
+        key.Matches(msg, keys.FilterWorktree):
+
         sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
         if sidebarVisibleRows < 1 {
             sidebarVisibleRows = 1
         }
-        m.sidebar.ToggleAlertFilter(sidebarVisibleRows)
+        var newFilter SidebarFilter
+        switch {
+        case key.Matches(msg, keys.AlertFilter):
+            newFilter = FilterPriority
+        case key.Matches(msg, keys.FilterTmux):
+            newFilter = FilterTmux
+        case key.Matches(msg, keys.FilterAll):
+            newFilter = FilterAll
+        case key.Matches(msg, keys.FilterConfig):
+            newFilter = FilterConfig
+        case key.Matches(msg, keys.FilterWorktree):
+            newFilter = FilterWorktree
+        }
+        m.sidebar.SetFilter(newFilter, sidebarVisibleRows)
         if node := m.sidebar.Selected(); node != nil {
             m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
             m.updateDetailFromSelection()
@@ -418,30 +470,29 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.sidebar.TabNextSession(sidebarVisibleRows)
     case key.Matches(msg, keys.ShiftTab):
         m.sidebar.TabPrevSession(sidebarVisibleRows)
-    case key.Matches(msg, keys.GotoTop):
-        m.sidebar.GotoTop(sidebarVisibleRows)
     case key.Matches(msg, keys.GotoBottom):
         m.sidebar.GotoBottom(sidebarVisibleRows)
-    case key.Matches(msg, keys.Enter):
+    case key.Matches(msg, keys.Enter), key.Matches(msg, keys.Open):
         if node := m.sidebar.Selected(); node != nil {
+            sess := m.sidebar.FindSession(node.Session)
+            if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
+                if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+                    m.statusMsg = "launch failed: " + err.Error()
+                    m.statusExp = time.Now().Add(5 * time.Second)
+                    m.sidebar.SetLaunchErr(err.Error())
+                    return m, nil
+                }
+                m.sidebar.ClearLaunchErr()
+                return m, m.fetchPanes()
+            }
             target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
             if target == "" {
                 target = node.Session
             }
-            tmux.SwitchClient(target)
-            if m.popupMode {
-                return m, tea.Quit
-            }
-        }
-    case key.Matches(msg, keys.Open):
-        if node := m.sidebar.Selected(); node != nil {
-            target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
-            if target == "" {
-                target = node.Session
-            }
-            tmux.SwitchClient(target)
-            if m.popupMode {
-                return m, tea.Quit
+            if err := tmux.SwitchClient(target); err == nil {
+                if m.popupMode {
+                    return m, tea.Quit
+                }
             }
         }
     case key.Matches(msg, keys.Esc):
@@ -486,8 +537,6 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         m.procList.JumpToPrevPane()
     case key.Matches(msg, keys.JumpDown):
         m.procList.JumpToNextPane()
-    case key.Matches(msg, keys.GotoTop):
-        m.procList.GotoTop()
     case key.Matches(msg, keys.GotoBottom):
         m.procList.GotoBottom()
     case key.Matches(msg, keys.Enter):
@@ -649,16 +698,29 @@ func (m *Model) updateDetailFromSelection() {
         for _, wp := range windows {
             paneCount += len(wp)
         }
+        sess := m.sidebar.FindSession(node.Session)
+        isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
+        configPath := ""
+        configWorktree := ""
+        if isConfigOnly && sess.Config != nil {
+            configPath = sess.Config.Path
+            if sess.Config.Worktree && configPath != "" {
+                configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
+            }
+        }
         m.detail = DetailModel{
-            cfg:        m.cfg,
-            selType:    DetailSession,
-            session:    node.Session,
-            sessionCWD: sessionCWD,
-            gitInfo:    m.gitInfo[node.Session],
-            winCount:   len(windows),
-            paneCount:  paneCount,
-            procCount:  procCount,
-            alertCount: alertCount,
+            cfg:            m.cfg,
+            selType:        DetailSession,
+            session:        node.Session,
+            sessionCWD:     sessionCWD,
+            isConfigOnly:   isConfigOnly,
+            configPath:     configPath,
+            configWorktree: configWorktree,
+            gitInfo:        m.gitInfo[node.Session],
+            winCount:     len(windows),
+            paneCount:    paneCount,
+            procCount:    procCount,
+            alertCount:   alertCount,
         }
         return
     }
@@ -794,11 +856,11 @@ func (m Model) View() string {
     // build sidebar border title: [h] Sessions (N)
     sessionCount := m.sidebar.SessionCount()
     sessionCountStr := statValueStyle.Render(fmt.Sprintf("(%d)", sessionCount))
-    alertFilterMark := ""
-    if m.sidebar.AlertFilterActive() {
-        alertFilterMark = " [!]"
+    filterMark := ""
+    if f := m.sidebar.ActiveFilter(); f != FilterTmux {
+        filterMark = " [" + string(f) + "]"
     }
-    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, alertFilterMark)
+    sidebarTitle := fmt.Sprintf(" [h] Sessions %s%s ", sessionCountStr, filterMark)
 
     // build proc list border title: [l] <session> / <window>
     bc := m.plainBreadcrumb()

@@ -5,10 +5,12 @@ import (
     "testing"
     "time"
 
+    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
+    "github.com/rtalex/demux/internal/git"
     "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalex/demux/internal/session"
 )
 
 // makeNodes builds a flat slice of session-only SidebarNodes for viewport tests.
@@ -22,6 +24,19 @@ func makeNodes(n int) []SidebarNode {
 
 func sidebarWithNodes(nodes []SidebarNode) SidebarModel {
     return SidebarModel{nodes: nodes}
+}
+
+// makeSessions builds a []session.Session for sidebar tests from a list of display names.
+// Each session is live-only with no panes (sufficient for sort/filter tests).
+func makeSessions(names ...string) []session.Session {
+    sessions := make([]session.Session, len(names))
+    for i, n := range names {
+        sessions[i] = session.Session{
+            DisplayName: n,
+            IsLive:      true,
+        }
+    }
+    return sessions
 }
 
 // --- clampViewport ---
@@ -387,16 +402,6 @@ func TestNewestSessionAlert_MatchesSessionLevelTarget(t *testing.T) {
 
 // --- rebuildNodes sorting ---
 
-// makeSessions builds the sessions map used by SidebarModel from a list of names.
-// Each session gets a single window at index 0 with no panes (sufficient for sort tests).
-func makeSessions(names ...string) map[string]map[int][]tmux.Pane {
-    m := make(map[string]map[int][]tmux.Pane, len(names))
-    for _, n := range names {
-        m[n] = map[int][]tmux.Pane{0: nil}
-    }
-    return m
-}
-
 // TestRebuildNodes_ZeroResultSearch is a regression test for the bug where a
 // search with no matches still showed all sessions. When queryResult.Sessions
 // is non-nil but empty (active search, zero matches), rebuildNodes must
@@ -503,13 +508,12 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
     now := time.Now()
     older := now.Add(-10 * time.Minute)
     s := SidebarModel{
-        sessions: makeSessions("alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        sessionActivity: map[string]time.Time{
-            "alpha": older,
-            "beta":  now,
+        sessions: []session.Session{
+            {DisplayName: "alpha", IsLive: true, Activity: older},
+            {DisplayName: "beta", IsLive: true, Activity: now},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
+        alerts: map[string]db.Alert{},
+        cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
     var got []string
@@ -525,14 +529,13 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
 func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
     now := time.Now()
     s := SidebarModel{
-        sessions: makeSessions("charlie", "alpha", "beta"),
-        alerts:   map[string]db.Alert{},
-        // all same activity time → falls through to alpha
-        sessionActivity: map[string]time.Time{
-            "charlie": now,
-            "alpha":   now,
-            "beta":    now,
+        sessions: []session.Session{
+            {DisplayName: "charlie", IsLive: true, Activity: now},
+            {DisplayName: "alpha", IsLive: true, Activity: now},
+            {DisplayName: "beta", IsLive: true, Activity: now},
         },
+        alerts: map[string]db.Alert{},
+        // all same activity time → falls through to alpha
         cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
     }
     s.rebuildNodes()
@@ -553,25 +556,52 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
-    active := s.ToggleAlertFilter(10)
-    if !active {
-        t.Error("expected ToggleAlertFilter to return true (filter now active)")
+    s.SetFilter(FilterPriority, 10)
+    if s.ActiveFilter() != FilterPriority {
+        t.Error("expected filter to be FilterPriority")
     }
     for _, n := range s.nodes {
         if n.Session == "alpha" {
-            t.Error("alpha (no alerts) should be hidden when filter is active")
+            t.Error("expected alpha (no alert) to be hidden")
         }
     }
-    hasBeta := false
-    for _, n := range s.nodes {
-        if n.Session == "beta" {
-            hasBeta = true
-        }
+}
+
+func TestSetFilter_AllFiltersToggle(t *testing.T) {
+    s := SidebarModel{
+        sessions: makeSessions("alpha", "beta"),
+        alerts:   map[string]db.Alert{},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
+        filter:   FilterTmux,
+        prevFilter: FilterTmux,
     }
-    if !hasBeta {
-        t.Error("beta (has alerts) should be visible when filter is active")
+    // Move cursor to "beta" (index 1 after rebuild).
+    s.rebuildNodes()
+    s.cursor = 1 // "beta"
+
+    // Switch to FilterAll — cursor should follow "beta", prevSession saved as "beta".
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterAll {
+        t.Fatalf("expected FilterAll, got %q", s.ActiveFilter())
+    }
+    // Move to "alpha" in the all-sessions view.
+    s.cursor = 0
+
+    // Toggle back — cursor should be restored to "beta".
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterTmux {
+        t.Errorf("expected toggle back to FilterTmux, got %q", s.ActiveFilter())
+    }
+    if len(s.nodes) > 0 && s.nodes[s.cursor].Session != "beta" {
+        t.Errorf("expected cursor restored to beta, got %q", s.nodes[s.cursor].Session)
+    }
+
+    // After toggling back, pressing FilterAll again should go to FilterAll.
+    s.SetFilter(FilterAll, 10)
+    if s.ActiveFilter() != FilterAll {
+        t.Errorf("expected FilterAll after re-press, got %q", s.ActiveFilter())
     }
 }
 
@@ -582,15 +612,15 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         alerts: map[string]db.Alert{
             "beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
         },
-        cfg: config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
-    s.ToggleAlertFilter(10) // on
-    active := s.ToggleAlertFilter(10) // off
-    if active {
-        t.Error("expected ToggleAlertFilter to return false (filter now inactive)")
+    s.SetFilter(FilterPriority, 10) // on
+    s.SetFilter(FilterPriority, 10) // off (toggles back to prevFilter = "")
+    if s.ActiveFilter() == FilterPriority {
+        t.Error("expected filter to toggle off")
     }
     if len(s.nodes) != 2 {
-        t.Errorf("expected both sessions after toggle off, got %d nodes", len(s.nodes))
+        t.Errorf("expected 2 sessions after toggle off, got %d", len(s.nodes))
     }
 }
 
@@ -598,27 +628,25 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
     s := SidebarModel{
         sessions: makeSessions("a"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
-    if s.AlertFilterActive() {
-        t.Error("expected AlertFilterActive=false before toggle")
+    if s.ActiveFilter() == FilterPriority {
+        t.Error("expected not-FilterPriority before SetFilter")
     }
-    s.ToggleAlertFilter(10)
-    if !s.AlertFilterActive() {
-        t.Error("expected AlertFilterActive=true after toggle")
+    s.SetFilter(FilterPriority, 10)
+    if s.ActiveFilter() != FilterPriority {
+        t.Error("expected FilterPriority after SetFilter")
     }
 }
 
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
-    // Filter on with no alerts: cursor should clamp to last valid node.
     s := SidebarModel{
         sessions: makeSessions("sess"),
         alerts:   map[string]db.Alert{},
-        cfg:      config.Config{Sidebar: config.SidebarConfig{AlertFilter: "all"}},
+        cfg:      config.Config{Sidebar: config.SidebarConfig{}},
     }
-    // With no alerts, filter on hides all sessions → nodes is empty.
-    s.cursor = 5 // out of range
-    s.ToggleAlertFilter(10)
+    s.cursor = 5
+    s.SetFilter(FilterPriority, 10)
     if s.cursor != 0 {
         t.Errorf("expected cursor clamped to 0 on empty node list, got %d", s.cursor)
     }
@@ -628,9 +656,9 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 
 func TestFocusNode_SessionLevel(t *testing.T) {
     s := SidebarModel{
-        sessions: map[string]map[int][]tmux.Pane{
-            "alpha": {0: nil},
-            "beta":  {0: nil, 1: nil},
+        sessions: []session.Session{
+            {DisplayName: "alpha", IsLive: true},
+            {DisplayName: "beta", IsLive: true},
         },
         alerts: map[string]db.Alert{},
         cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
@@ -819,5 +847,191 @@ func TestBestAlertTargetInSession_DefaultPriority(t *testing.T) {
     // "default" must return "" regardless of what alerts exist
     if got := s.BestAlertTargetInSession("work", "default"); got != "" {
         t.Errorf("expected \"\" for default priority, got %q", got)
+    }
+}
+
+// --- visibleSessions filter tests ---
+
+func TestVisibleSessions_FilterTmux(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+        },
+        filter: FilterTmux,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 1 || s.nodes[0].Session != "live" {
+        t.Errorf("FilterTmux should show only live sessions, got %v", s.nodes)
+    }
+}
+
+func TestVisibleSessions_FilterConfig(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+            {DisplayName: "both", IsLive: true, IsConfig: true},
+        },
+        filter: FilterConfig,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 2 {
+        t.Errorf("FilterConfig should show IsConfig sessions, got %d", len(s.nodes))
+    }
+}
+
+func TestVisibleSessions_FilterAll(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "live", IsLive: true},
+            {DisplayName: "cfg-only", IsLive: false, IsConfig: true},
+        },
+        filter: FilterAll,
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 2 {
+        t.Errorf("FilterAll should show all sessions, got %d", len(s.nodes))
+    }
+}
+
+func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "alerted", IsLive: true},
+            {DisplayName: "clean", IsLive: true},
+        },
+        alerts: map[string]db.Alert{
+            "alerted": {Target: "alerted", Level: "warn", CreatedAt: time.Now()},
+        },
+        filter: FilterPriority,
+        cfg:    config.Config{},
+    }
+    s.rebuildNodes()
+    if len(s.nodes) != 1 || s.nodes[0].Session != "alerted" {
+        t.Errorf("FilterPriority should show only alerted sessions, got %v", s.nodes)
+    }
+}
+
+func TestVisibleSessions_FilterWorktree_NoRoot(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "no-git", IsLive: true},
+        },
+        filter:  FilterWorktree,
+        gitInfo: map[string]git.Info{},
+    }
+    s.nodes = []SidebarNode{{Session: "no-git"}} // pre-set cursor target
+    s.rebuildNodes()
+    if len(s.nodes) != 0 {
+        t.Error("expected empty list when no worktree root resolvable")
+    }
+    if s.filterHint == "" {
+        t.Error("expected filterHint to be set for no-root worktree filter")
+    }
+}
+
+func TestVisibleSessions_FilterWorktree_MatchesByRoot(t *testing.T) {
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "sess-a", IsLive: true},
+            {DisplayName: "sess-b", IsLive: true},
+            {DisplayName: "other", IsLive: true},
+        },
+        filter: FilterWorktree,
+        gitInfo: map[string]git.Info{
+            "sess-a": {RepoRoot: "/repo/worktrees/a"},
+            "sess-b": {RepoRoot: "/repo/worktrees/b"},
+            "other":  {RepoRoot: "/elsewhere/c"},
+        },
+    }
+    // Cursor on sess-a; its root = /repo/worktrees
+    s.nodes = []SidebarNode{{Session: "sess-a"}}
+    s.rebuildNodes()
+    // Both sess-a and sess-b have root /repo/worktrees, other has /elsewhere
+    if len(s.nodes) != 2 {
+        t.Errorf("expected 2 sessions sharing worktree root, got %d: %v", len(s.nodes), s.nodes)
+    }
+}
+
+func TestRenderSession_ShowsIcon(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+        ColorSession:    lipgloss.Color("#89b4fa"),
+        ColorBorder:     lipgloss.Color("#313244"),
+        ColorSelected:   lipgloss.Color("#2a2a4a"),
+        ColorFgMuted:    lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "myapp", IsLive: true, IsConfig: false},
+        },
+        filter: FilterTmux,
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, "⊞") {
+        t.Errorf("expected Tmux icon ⊞ in row, got: %q", plain)
+    }
+}
+
+func TestRenderSession_ShowsConfigIcon(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+        ColorSession:    lipgloss.Color("#89b4fa"),
+        ColorBorder:     lipgloss.Color("#313244"),
+        ColorSelected:   lipgloss.Color("#2a2a4a"),
+        ColorFgMuted:    lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+
+    cfg := session.ConfigEntry{Name: "main", Alias: "dotf", Path: "/foo", Icon: "★"}
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "dotf-main", IsLive: false, IsConfig: true, Config: &cfg},
+        },
+        filter: FilterConfig,
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, "★") {
+        t.Errorf("expected config icon ★ in row, got: %q", plain)
+    }
+}
+
+func TestFilterShortcutBar_FitsWidth(t *testing.T) {
+    initStyles(Theme{
+        ColorSession: lipgloss.Color("#89b4fa"),
+        ColorFgMuted: lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+    bar := filterShortcutBar(FilterTmux, 50)
+    plain := stripANSI(bar)
+    if !strings.Contains(plain, "[t]") {
+        t.Error("expected [t] in shortcut bar")
+    }
+    if !strings.Contains(plain, "[a]") {
+        t.Error("expected [a] in shortcut bar")
+    }
+    if !strings.Contains(plain, "[!]") {
+        t.Error("expected [!] in shortcut bar at width 50")
+    }
+}
+
+func TestFilterShortcutBar_TrimmedWhenNarrow(t *testing.T) {
+    initStyles(Theme{
+        ColorSession: lipgloss.Color("#89b4fa"),
+        ColorFgMuted: lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+    bar := filterShortcutBar(FilterTmux, 12)
+    plain := stripANSI(bar)
+    if !strings.Contains(plain, "[t]") {
+        t.Error("expected [t] to survive trimming")
+    }
+    if strings.Contains(plain, "[!]") {
+        t.Errorf("expected [!] to be trimmed at width 12, got: %q", plain)
     }
 }

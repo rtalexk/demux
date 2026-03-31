@@ -46,14 +46,17 @@ status_bar_format = "tmux"
 # replace = "~"
 
 [sidebar]
+# Session files: ~/.config/demux/sessions.toml and ~/.config/demux/private.toml
+# contain user-defined sessions. See docs for the [[session]] format.
+
 # Sidebar width in columns
 width = 35
 
 # Where to position the sidebar cursor on open: current_session | alert_session | first_session
 focus_on_open = "alert_session"
 
-# When the ! alert filter is active, which sessions to show: all | alerts_only
-alert_filter = "all"
+# Initial sidebar filter on startup: t (tmux) | a (all) | g (config) | w (worktree) | ! (priority)
+default_filter = "t"
 
 # Session sort order — first key wins, missing keys filled from default order
 # Valid keys: priority | last_seen | alphabetical
@@ -127,6 +130,10 @@ color_git_ahead  = "#a6e3a1"
 icon_alert_info  = "ℹ️"
 icon_alert_warn  = "⚠️"
 icon_alert_error = "🚨"
+
+# Session source icons
+icon_tmux_session = "⊞"
+icon_cfg_session  = "⚙︎"
 color_alert_info  = "#89b4fa"
 color_alert_warn  = "#f9e2af"
 color_alert_error = "#f38ba8"
