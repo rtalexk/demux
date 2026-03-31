@@ -581,8 +581,25 @@ func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
 // SetSearchResult filters and optionally re-sorts the sidebar nodes by the
 // given query result. Passing an empty Result clears any active filter.
 func (s *SidebarModel) SetSearchResult(r query.Result) {
+    // When clearing the search (empty result), keep the cursor on the same
+    // session so the proclist doesn't change and lose its scroll position.
+    var prevSession string
+    if len(r.Sessions) == 0 {
+        if node := s.Selected(); node != nil {
+            prevSession = node.Session
+        }
+    }
     s.queryResult = r
     s.rebuildNodes()
+    if prevSession != "" {
+        for i, node := range s.nodes {
+            if node.Session == prevSession {
+                s.cursor = i
+                s.clampViewport(s.visibleRows)
+                return
+            }
+        }
+    }
     s.cursor = 0
     s.offset = 0
 }
