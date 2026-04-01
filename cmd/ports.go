@@ -84,7 +84,7 @@ func runPorts(cmd *cobra.Command, _ []string) error {
             session: session,
             window:  window,
             pane:    pane,
-            up:      formatDuration(p.Uptime),
+            up:      format.Duration(p.Uptime),
         })
     }
 

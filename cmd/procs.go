@@ -3,8 +3,6 @@ package cmd
 import (
     "fmt"
     "os"
-    "sync"
-    "time"
 
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/format"
@@ -48,40 +46,6 @@ func (r procRow) Fields() []string {
     return base
 }
 
-type paneGitWork struct {
-    key     string // "session:windowIndex:paneIndex"
-    paneCWD string
-}
-
-// fetchGitForPanes fetches git info for each pane work item in parallel,
-// capped at gitConcurrencyCap concurrent goroutines (defined in sessions.go).
-// Returns a map of key -> git.Info (entry absent on error).
-func fetchGitForPanes(work []paneGitWork, timeoutMs int) map[string]git.Info {
-    results := make(map[string]git.Info, len(work))
-    if len(work) == 0 {
-        return results
-    }
-    var mu sync.Mutex
-    var wg sync.WaitGroup
-    sem := make(chan struct{}, gitConcurrencyCap)
-    for _, w := range work {
-        wg.Add(1)
-        w := w
-        go func() {
-            defer wg.Done()
-            sem <- struct{}{}
-            defer func() { <-sem }()
-            info, err := git.Fetch(w.paneCWD, timeoutMs)
-            if err == nil {
-                mu.Lock()
-                results[w.key] = info
-                mu.Unlock()
-            }
-        }()
-    }
-    wg.Wait()
-    return results
-}
 
 func runProcs(cmd *cobra.Command, _ []string) error {
     cfg := loadConfig()
@@ -118,7 +82,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
     }
 
     // Pre-fetch git info in parallel for all deviant panes.
-    var gitWork []paneGitWork
+    var gitWork []git.ConcurrentWork
     if procsGit {
         for sessionName, windows := range grouped {
             if procsSession != "" && sessionName != procsSession {
@@ -127,7 +91,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
             if isIgnored(cfg, sessionName) {
                 continue
             }
-            primaryCWD := primaryCWDForSession(windows)
+            primaryCWD := tmux.PrimaryPaneCWD(windows[0])
             for wi, wPanes := range windows {
                 if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
                     continue
@@ -136,13 +100,13 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                     paneCWD := pane.CWD
                     if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
                         key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
-                        gitWork = append(gitWork, paneGitWork{key: key, paneCWD: paneCWD})
+                        gitWork = append(gitWork, git.ConcurrentWork{Key: key, Dir: paneCWD})
                     }
                 }
             }
         }
     }
-    gitResults := fetchGitForPanes(gitWork, cfg.Git.TimeoutMs)
+    gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
 
     var rows []format.Row
 
@@ -154,7 +118,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
             continue
         }
 
-        primaryCWD := primaryCWDForSession(windows)
+        primaryCWD := tmux.PrimaryPaneCWD(windows[0])
 
         for wi, wPanes := range windows {
             if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
@@ -168,7 +132,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                     key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
                     if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
                         if info, ok := gitResults[key]; ok {
-                            gitCol = "↪ " + info.Branch + " " + gitIndicators(info)
+                            gitCol = "↪ " + info.Branch + " " + git.Indicators(info)
                         } else {
                             gitCol = cfg.Git.ErrorDisplay
                         }
@@ -206,9 +170,9 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                         process:    p.Name,
                         pid:        fmt.Sprint(p.PID),
                         cpu:        fmt.Sprintf("%.1f%%", p.CPU),
-                        mem:        formatMem(p.MemRSS),
+                        mem:        format.Mem(p.MemRSS),
                         port:       portStr,
-                        up:         formatDuration(p.Uptime),
+                        up:         format.Duration(p.Uptime),
                         cwd:        paneCWD,
                         gitCol:     "—",
                         includeGit: procsGit,
@@ -223,23 +187,3 @@ func runProcs(cmd *cobra.Command, _ []string) error {
     return nil
 }
 
-func formatMem(bytes uint64) string {
-    mb := float64(bytes) / 1024 / 1024
-    return fmt.Sprintf("%.1fMB", mb)
-}
-
-func formatDuration(d time.Duration) string {
-    h := int(d.Hours())
-    m := int(d.Minutes()) % 60
-    s := int(d.Seconds()) % 60
-    switch {
-    case h >= 24:
-        return fmt.Sprintf("%dd%dh", h/24, h%24)
-    case h > 0:
-        return fmt.Sprintf("%dh%dm", h, m)
-    case m > 0:
-        return fmt.Sprintf("%dm", m)
-    default:
-        return fmt.Sprintf("%ds", s)
-    }
-}

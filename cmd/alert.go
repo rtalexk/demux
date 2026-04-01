@@ -94,7 +94,7 @@ func runAlertList(cmd *cobra.Command, args []string) error {
             target:  a.Target,
             level:   a.Level,
             reason:  a.Reason,
-            created: formatAge(a.CreatedAt),
+            created: format.Age(a.CreatedAt),
         }
     }
 

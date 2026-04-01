@@ -61,7 +61,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
     p.inSessionMode = false
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
-    p.primaryCWD = primaryCWDForPanes(windows)
+    p.primaryCWD = tmux.PrimaryPaneCWD(windows[0])
     wPanes := windows[windowIndex]
 
     tree := proc.BuildTree(procs)
