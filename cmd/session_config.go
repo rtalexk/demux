@@ -31,7 +31,7 @@ var (
 )
 
 var sessionAddCmd = &cobra.Command{
-    Use:   "add",
+    Use:   "config-add",
     Short: "Add a session entry to sessions.toml (or private.toml with --private)",
     RunE:  runSessionAdd,
 }
@@ -103,7 +103,7 @@ var (
 )
 
 var sessionGetConfigCmd = &cobra.Command{
-    Use:   "get-config",
+    Use:   "config-get",
     Short: "Print the config block for a session",
     RunE:  runSessionGetConfig,
 }
@@ -147,9 +147,10 @@ var (
 )
 
 var sessionRemoveCmd = &cobra.Command{
-    Use:   "remove",
-    Short: "Remove a session entry from sessions.toml (or private.toml with --private)",
-    RunE:  runSessionRemove,
+    Use:     "config-remove",
+    Aliases: []string{"config-rm"},
+    Short:   "Remove a session entry from sessions.toml (or private.toml with --private)",
+    RunE:    runSessionRemove,
 }
 
 func init() {

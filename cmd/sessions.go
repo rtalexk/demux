@@ -17,20 +17,20 @@ import (
 )
 
 var (
-    sessionsGit     bool
-    sessionsGitOnly bool
+    sessionListGit     bool
+    sessionListGitOnly bool
 )
 
-var sessionsCmd = &cobra.Command{
-    Use:   "sessions",
+var sessionListCmd = &cobra.Command{
+    Use:   "list",
     Short: "List all tmux sessions",
     RunE:  runSessions,
 }
 
 func init() {
-    rootCmd.AddCommand(sessionsCmd)
-    sessionsCmd.Flags().BoolVar(&sessionsGit, "git", false, "Include git columns")
-    sessionsCmd.Flags().BoolVar(&sessionsGitOnly, "git-only", false, "Show only session + git columns")
+    sessionCmd.AddCommand(sessionListCmd)
+    sessionListCmd.Flags().BoolVar(&sessionListGit, "git", false, "Include git columns")
+    sessionListCmd.Flags().BoolVar(&sessionListGitOnly, "git-only", false, "Show only session + git columns")
 }
 
 type sessionRow struct {
@@ -113,9 +113,9 @@ func runSessions(cmd *cobra.Command, _ []string) error {
     }
 
     headers := []string{"SESSION", "WINDOWS", "PROCS", "ALERTS", "STATUS"}
-    if sessionsGitOnly {
+    if sessionListGitOnly {
         headers = []string{"SESSION", "BRANCH", "DIRTY", "AHEAD", "BEHIND"}
-    } else if sessionsGit {
+    } else if sessionListGit {
         headers = append(headers, "BRANCH", "DIRTY", "AHEAD", "BEHIND")
     }
 
@@ -141,7 +141,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 
     // Pre-fetch git info in parallel for all non-ignored sessions.
     var gitWork []sessionGitWork
-    if sessionsGit || sessionsGitOnly {
+    if sessionListGit || sessionListGitOnly {
         for sessionName, windows := range grouped {
             if isIgnored(cfg, sessionName) {
                 continue
@@ -177,11 +177,11 @@ func runSessions(cmd *cobra.Command, _ []string) error {
             procs:      fmt.Sprint(sessionProcCount[sessionName]),
             alerts:     fmt.Sprint(len(sessionAlerts)),
             status:     status,
-            includeGit: sessionsGit,
-            gitOnly:    sessionsGitOnly,
+            includeGit: sessionListGit,
+            gitOnly:    sessionListGitOnly,
         }
 
-        if sessionsGit || sessionsGitOnly {
+        if sessionListGit || sessionListGitOnly {
             primaryCWD := primaryCWDForSession(windows)
             if primaryCWD == "" {
                 row.branch = cfg.Git.FallbackDisplay
