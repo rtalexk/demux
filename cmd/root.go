@@ -66,7 +66,7 @@ var rootCmd = &cobra.Command{
         }
         database, err := db.Open(dbPath)
         if err != nil {
-            return err
+            return fmt.Errorf("open db: %w", err)
         }
         defer database.Close()
         return tui.Run(cfg, database)
@@ -89,10 +89,14 @@ func init() {
 func loadConfig() config.Config {
     path, err := config.DefaultPath()
     if err != nil {
-        // Home directory unavailable; use built-in defaults.
+        demuxlog.Warn("cannot determine config path", "err", err)
         return config.Default()
     }
-    cfg, _ := config.Load(path)
+    cfg, err := config.Load(path)
+    if err != nil {
+        demuxlog.Warn("failed to load config, using defaults", "path", path, "err", err)
+        return config.Default()
+    }
     return cfg
 }
 
