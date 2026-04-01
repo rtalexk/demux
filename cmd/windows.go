@@ -8,6 +8,7 @@ import (
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/tmux"
     "github.com/spf13/cobra"
 )
@@ -63,7 +64,10 @@ func runWindows(cmd *cobra.Command, _ []string) error {
         return err
     }
     defer database.Close()
-    alerts, _ := database.AlertList()
+    alerts, err := database.AlertList()
+    if err != nil {
+        demuxlog.Warn("failed to list alerts", "err", err)
+    }
     alertsByWindow := map[string]int{}
     for _, a := range alerts {
         parts := strings.SplitN(a.Target, ":", 2)

@@ -15,6 +15,7 @@ import (
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/git"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/query"
     "github.com/rtalex/demux/internal/session"
@@ -111,7 +112,7 @@ func New(cfg config.Config, database *db.DB) Model {
     var loadErr error
     m.sessionsConfig, loadErr = session.LoadConfigSessions(m.configDir)
     if loadErr != nil {
-        fmt.Fprintf(os.Stderr, "demux: failed to load config sessions from %s: %v\n", m.configDir, loadErr)
+        demuxlog.Error("failed to load config sessions", "dir", m.configDir, "err", loadErr)
     }
     if cfg.Sidebar.DefaultFilter != "" {
         m.sidebar.filter = SidebarFilter(cfg.Sidebar.DefaultFilter)
@@ -136,7 +137,7 @@ func tick() tea.Cmd {
 func resolveWindowSpecs(ids []string, templates map[string]session.WindowTemplate) []tmux.WindowSpec {
     specs, unknown := session.ResolveWindowSpecs(ids, templates)
     for _, id := range unknown {
-        fmt.Fprintf(os.Stderr, "demux: session references unknown window_template id %q\n", id)
+        demuxlog.Warn("session references unknown window_template id", "id", id)
     }
     return specs
 }
@@ -154,7 +155,10 @@ func (m Model) fetchPanes() tea.Cmd {
 
 func (m Model) fetchAlerts() tea.Cmd {
     return func() tea.Msg {
-        alerts, _ := m.db.AlertList()
+        alerts, err := m.db.AlertList()
+        if err != nil {
+            demuxlog.Warn("fetch alerts failed", "err", err)
+        }
         return alertsMsg{alerts: alerts}
     }
 }
@@ -168,7 +172,10 @@ func (m Model) scheduleProcFetch() tea.Cmd {
         if err != nil {
             return procDataMsg{gen: gen}
         }
-        cwdMap, _ := proc.CWDAll()
+        cwdMap, err := proc.CWDAll()
+        if err != nil {
+            demuxlog.Warn("cwd fetch failed", "err", err)
+        }
         if cwdMap == nil {
             cwdMap = make(map[int32]string)
         }
@@ -184,7 +191,10 @@ func (m Model) scheduleDelayedProcFetch() tea.Cmd {
         if err != nil {
             return procDataMsg{gen: gen}
         }
-        cwdMap, _ := proc.CWDAll()
+        cwdMap, err := proc.CWDAll()
+        if err != nil {
+            demuxlog.Warn("cwd fetch failed", "err", err)
+        }
         if cwdMap == nil {
             cwdMap = make(map[int32]string)
         }
@@ -760,7 +770,10 @@ func (m *Model) pruneStaleAlerts() tea.Cmd {
         for _, t := range stale {
             d.AlertRemove(t)
         }
-        alerts, _ := d.AlertList()
+        alerts, err := d.AlertList()
+        if err != nil {
+            demuxlog.Warn("fetch alerts failed", "err", err)
+        }
         return alertsMsg{alerts: alerts}
     }
 }
