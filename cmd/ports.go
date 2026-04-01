@@ -6,6 +6,7 @@ import (
 
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/format"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
     "github.com/spf13/cobra"
@@ -32,16 +33,22 @@ func (r portRow) Fields() []string {
 func runPorts(cmd *cobra.Command, _ []string) error {
     ports, err := proc.ListeningPorts()
     if err != nil {
-        return err
+        return fmt.Errorf("list ports: %w", err)
     }
 
-    procs, _ := proc.Snapshot()
+    procs, err := proc.Snapshot()
+    if err != nil {
+        demuxlog.Warn("proc snapshot failed", "err", err)
+    }
     pidToProc := map[int32]proc.Process{}
     for _, p := range procs {
         pidToProc[p.PID] = p
     }
 
-    allPanes, _ := tmux.ListPanes()
+    allPanes, err := tmux.ListPanes()
+    if err != nil {
+        demuxlog.Warn("tmux panes unavailable", "err", err)
+    }
     type paneRef struct{ session, window, pane string }
     cwdToPane := map[string]paneRef{}
     for _, p := range allPanes {

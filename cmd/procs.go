@@ -9,6 +9,7 @@ import (
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
     "github.com/spf13/cobra"
@@ -92,12 +93,18 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 
     allProcs, err := proc.Snapshot()
     if err != nil {
-        return err
+        return fmt.Errorf("snapshot procs: %w", err)
     }
 
-    cwdByPID, _ := proc.CWDAll()
+    cwdByPID, err := proc.CWDAll()
+    if err != nil {
+        demuxlog.Warn("cwd fetch failed", "err", err)
+    }
 
-    ports, _ := proc.ListeningPorts()
+    ports, err := proc.ListeningPorts()
+    if err != nil {
+        demuxlog.Warn("port list failed", "err", err)
+    }
     portByPID := map[int32]int{}
     for _, p := range ports {
         portByPID[p.PID] = p.Port
