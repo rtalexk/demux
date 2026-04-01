@@ -64,6 +64,13 @@ func formatBlock(e ConfigEntry) string {
     if e.Icon != "" {
         sb.WriteString(fmt.Sprintf("icon     = %s\n", tomlQuote(e.Icon)))
     }
+    if len(e.Windows) > 0 {
+        quoted := make([]string, len(e.Windows))
+        for i, w := range e.Windows {
+            quoted[i] = tomlQuote(w)
+        }
+        sb.WriteString(fmt.Sprintf("windows  = [%s]\n", strings.Join(quoted, ", ")))
+    }
     return sb.String()
 }
 

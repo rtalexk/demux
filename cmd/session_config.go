@@ -24,6 +24,7 @@ var (
     sessionAddWorktree bool
     sessionAddLabels   string
     sessionAddIcon     string
+    sessionAddWindows  string
     sessionAddPrivate  bool
 )
 
@@ -40,6 +41,7 @@ func init() {
     sessionAddCmd.Flags().BoolVar(&sessionAddWorktree, "worktree", false, "Mark as a worktree session")
     sessionAddCmd.Flags().StringVar(&sessionAddLabels, "labels", "", "Comma-separated labels (e.g. work,rust)")
     sessionAddCmd.Flags().StringVar(&sessionAddIcon, "icon", "", "Icon glyph")
+    sessionAddCmd.Flags().StringVar(&sessionAddWindows, "windows", "", "Comma-separated window template ids (e.g. editor,terminal)")
     sessionAddCmd.Flags().BoolVar(&sessionAddPrivate, "private", false, "Write to private.toml instead of sessions.toml")
 
     _ = sessionAddCmd.MarkFlagRequired("name")
@@ -64,6 +66,15 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
         }
     }
 
+    var windows []string
+    if sessionAddWindows != "" {
+        for _, w := range strings.Split(sessionAddWindows, ",") {
+            if t := strings.TrimSpace(w); t != "" {
+                windows = append(windows, t)
+            }
+        }
+    }
+
     e := session.ConfigEntry{
         Name:     sessionAddName,
         Alias:    sessionAddAlias,
@@ -71,6 +82,7 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
         Worktree: sessionAddWorktree,
         Labels:   labels,
         Icon:     sessionAddIcon,
+        Windows:  windows,
     }
 
     if err := session.AppendEntry(path, e); err != nil {

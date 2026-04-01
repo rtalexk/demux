@@ -40,6 +40,9 @@ func TestAppendEntry_CreatesFile(t *testing.T) {
     if strings.Contains(s, "icon") {
         t.Error("empty icon should be omitted")
     }
+    if strings.Contains(s, "windows") {
+        t.Error("empty windows should be omitted")
+    }
 }
 
 func TestAppendEntry_AppendsToExistingFile(t *testing.T) {
@@ -111,6 +114,40 @@ func TestAppendEntry_OptionalFields(t *testing.T) {
     }
     if !strings.Contains(s, `icon     = "󰅩"`) {
         t.Error("icon should be present")
+    }
+}
+
+func TestAppendEntry_Windows(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "sessions.toml")
+    e := ConfigEntry{
+        Name:    "main",
+        Alias:   "myproj",
+        Path:    "/home/user/myproj",
+        Windows: []string{"editor", "terminal"},
+    }
+    if err := AppendEntry(path, e); err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+    data, err := os.ReadFile(path)
+    if err != nil {
+        t.Fatalf("read file: %v", err)
+    }
+    s := string(data)
+    if !strings.Contains(s, `windows  = ["editor", "terminal"]`) {
+        t.Errorf("windows field not serialized correctly, got:\n%s", s)
+    }
+    // round-trip: load back and verify
+    entries, loadErr := LoadConfigSessions(dir)
+    if loadErr != nil {
+        t.Fatalf("load: %v", loadErr)
+    }
+    if len(entries.Entries) != 1 {
+        t.Fatalf("expected 1 entry, got %d", len(entries.Entries))
+    }
+    got := entries.Entries[0].Windows
+    if len(got) != 2 || got[0] != "editor" || got[1] != "terminal" {
+        t.Errorf("round-trip windows mismatch: %v", got)
     }
 }
 
