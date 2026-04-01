@@ -11,6 +11,7 @@ import (
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/format"
     "github.com/rtalex/demux/internal/git"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/proc"
     "github.com/rtalex/demux/internal/tmux"
     "github.com/spf13/cobra"
@@ -102,7 +103,10 @@ func runSessions(cmd *cobra.Command, _ []string) error {
         return err
     }
     defer database.Close()
-    alerts, _ := database.AlertList()
+    alerts, err := database.AlertList()
+    if err != nil {
+        demuxlog.Warn("failed to list alerts", "err", err)
+    }
 
     alertsBySession := map[string][]db.Alert{}
     for _, a := range alerts {
@@ -119,8 +123,14 @@ func runSessions(cmd *cobra.Command, _ []string) error {
         headers = append(headers, "BRANCH", "DIRTY", "AHEAD", "BEHIND")
     }
 
-    allProcs, _ := proc.Snapshot()
-    cwdByPID, _ := proc.CWDAll()
+    allProcs, err := proc.Snapshot()
+    if err != nil {
+        demuxlog.Warn("proc snapshot failed", "err", err)
+    }
+    cwdByPID, err := proc.CWDAll()
+    if err != nil {
+        demuxlog.Warn("cwd fetch failed", "err", err)
+    }
 
     sessionProcCount := map[string]int{}
     for sessionName, windows := range grouped {
