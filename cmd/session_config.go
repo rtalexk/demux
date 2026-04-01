@@ -21,7 +21,7 @@ var sessionCmd = &cobra.Command{
 
 var (
     sessionAddName     string
-    sessionAddAlias    string
+    sessionAddGroup    string
     sessionAddPath     string
     sessionAddWorktree bool
     sessionAddLabels   string
@@ -38,7 +38,7 @@ var sessionAddCmd = &cobra.Command{
 
 func init() {
     sessionAddCmd.Flags().StringVar(&sessionAddName, "name", "", "Session name (required)")
-    sessionAddCmd.Flags().StringVar(&sessionAddAlias, "alias", "", "Session alias (required)")
+    sessionAddCmd.Flags().StringVar(&sessionAddGroup, "group", "", "Session group")
     sessionAddCmd.Flags().StringVar(&sessionAddPath, "path", "", "Path to session directory (required)")
     sessionAddCmd.Flags().BoolVar(&sessionAddWorktree, "worktree", false, "Mark as a worktree session")
     sessionAddCmd.Flags().StringVar(&sessionAddLabels, "labels", "", "Comma-separated labels (e.g. work,rust)")
@@ -47,7 +47,6 @@ func init() {
     sessionAddCmd.Flags().BoolVar(&sessionAddPrivate, "private", false, "Write to private.toml instead of sessions.toml")
 
     _ = sessionAddCmd.MarkFlagRequired("name")
-    _ = sessionAddCmd.MarkFlagRequired("alias")
     _ = sessionAddCmd.MarkFlagRequired("path")
 
     sessionCmd.AddCommand(sessionAddCmd)
@@ -79,7 +78,7 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
 
     e := session.ConfigEntry{
         Name:     sessionAddName,
-        Alias:    sessionAddAlias,
+        Group:    sessionAddGroup,
         Path:     sessionAddPath,
         Worktree: sessionAddWorktree,
         Labels:   labels,
@@ -98,8 +97,7 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
 // --- get-config ---
 
 var (
-    sessionGetConfigName  string
-    sessionGetConfigAlias string
+    sessionGetConfigName string
 )
 
 var sessionGetConfigCmd = &cobra.Command{
@@ -110,10 +108,8 @@ var sessionGetConfigCmd = &cobra.Command{
 
 func init() {
     sessionGetConfigCmd.Flags().StringVar(&sessionGetConfigName, "name", "", "Session name (required)")
-    sessionGetConfigCmd.Flags().StringVar(&sessionGetConfigAlias, "alias", "", "Session alias (required)")
 
     _ = sessionGetConfigCmd.MarkFlagRequired("name")
-    _ = sessionGetConfigCmd.MarkFlagRequired("alias")
 
     sessionCmd.AddCommand(sessionGetConfigCmd)
 }
@@ -128,21 +124,19 @@ func runSessionGetConfig(_ *cobra.Command, _ []string) error {
         return err
     }
 
-    target := (session.ConfigEntry{Name: sessionGetConfigName, Alias: sessionGetConfigAlias}).DisplayName()
     for _, e := range cfg.Entries {
-        if e.DisplayName() == target {
+        if e.DisplayName() == sessionGetConfigName {
             fmt.Print(session.FormatBlock(e))
             return nil
         }
     }
-    return fmt.Errorf("session %q not found", target)
+    return fmt.Errorf("session %q not found", sessionGetConfigName)
 }
 
 // --- remove ---
 
 var (
     sessionRemoveName    string
-    sessionRemoveAlias   string
     sessionRemovePrivate bool
 )
 
@@ -155,11 +149,9 @@ var sessionRemoveCmd = &cobra.Command{
 
 func init() {
     sessionRemoveCmd.Flags().StringVar(&sessionRemoveName, "name", "", "Session name (required)")
-    sessionRemoveCmd.Flags().StringVar(&sessionRemoveAlias, "alias", "", "Session alias (required)")
     sessionRemoveCmd.Flags().BoolVar(&sessionRemovePrivate, "private", false, "Target private.toml instead of sessions.toml")
 
     _ = sessionRemoveCmd.MarkFlagRequired("name")
-    _ = sessionRemoveCmd.MarkFlagRequired("alias")
 
     sessionCmd.AddCommand(sessionRemoveCmd)
 }
@@ -170,13 +162,11 @@ func runSessionRemove(_ *cobra.Command, _ []string) error {
         return err
     }
 
-    dn := session.ConfigEntry{Name: sessionRemoveName, Alias: sessionRemoveAlias}.DisplayName()
-
-    if err := session.RemoveEntry(path, sessionRemoveName, sessionRemoveAlias); err != nil {
+    if err := session.RemoveEntry(path, sessionRemoveName); err != nil {
         return err
     }
 
-    fmt.Printf("Removed session %q from %s\n", dn, filepath.Base(path))
+    fmt.Printf("Removed session %q from %s\n", sessionRemoveName, filepath.Base(path))
     return nil
 }
 

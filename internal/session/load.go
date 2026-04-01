@@ -21,7 +21,7 @@ type SessionsConfig struct {
 }
 
 // LoadConfigSessions loads sessions.toml then private.toml from configDir.
-// Missing files are silently ignored. Invalid entries (missing name/alias/path)
+// Missing files are silently ignored. Invalid entries (missing name/path)
 // are skipped with a message to stderr. Duplicate DisplayNames: last entry wins.
 func LoadConfigSessions(configDir string) (SessionsConfig, error) {
     var cfg SessionsConfig
@@ -39,8 +39,8 @@ func LoadConfigSessions(configDir string) (SessionsConfig, error) {
             return cfg, fmt.Errorf("load %s: %w", name, err)
         }
         for _, e := range f.Sessions {
-            if e.Name == "" || e.Alias == "" || e.Path == "" {
-                fmt.Fprintf(os.Stderr, "demux: skipping session with missing name/alias/path in %s\n", name)
+            if e.Name == "" || e.Path == "" {
+                fmt.Fprintf(os.Stderr, "demux: skipping session with missing name/path in %s\n", name)
                 continue
             }
             dn := e.DisplayName()

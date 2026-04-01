@@ -49,7 +49,9 @@ func FormatBlock(e ConfigEntry) string {
     var sb strings.Builder
     sb.WriteString("\n[[session]]\n")
     sb.WriteString(fmt.Sprintf("name  = %s\n", tomlQuote(e.Name)))
-    sb.WriteString(fmt.Sprintf("alias = %s\n", tomlQuote(e.Alias)))
+    if e.Group != "" {
+        sb.WriteString(fmt.Sprintf("group = %s\n", tomlQuote(e.Group)))
+    }
     sb.WriteString(fmt.Sprintf("path  = %s\n", tomlQuote(e.Path)))
     if e.Worktree {
         sb.WriteString("worktree = true\n")
@@ -86,9 +88,9 @@ func loadRawEntries(path string) ([]ConfigEntry, error) {
     return f.Sessions, nil
 }
 
-// RemoveEntry removes the [[session]] block matching both name and alias from path.
+// RemoveEntry removes the [[session]] block matching name from path.
 // Returns an error if the file does not exist or the entry is not found.
-func RemoveEntry(path, name, alias string) error {
+func RemoveEntry(path, name string) error {
     data, err := os.ReadFile(path)
     if err != nil {
         return fmt.Errorf("read %s: %w", filepath.Base(path), err)
@@ -98,13 +100,13 @@ func RemoveEntry(path, name, alias string) error {
 
     target := -1
     for i, b := range blocks {
-        if blockHasField(b, "name", name) && blockHasField(b, "alias", alias) {
+        if blockHasField(b, "name", name) {
             target = i
             break
         }
     }
     if target == -1 {
-        return fmt.Errorf("session %q (alias %q) not found in %s", name, alias, filepath.Base(path))
+        return fmt.Errorf("session %q not found in %s", name, filepath.Base(path))
     }
 
     blocks = append(blocks[:target], blocks[target+1:]...)

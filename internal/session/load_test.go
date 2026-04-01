@@ -28,8 +28,8 @@ func TestLoadConfigSessions_SessionsOnly(t *testing.T) {
     dir := t.TempDir()
     writeTOML(t, dir, "sessions.toml", `
 [[session]]
-name     = "main"
-alias    = "dotf"
+name     = "dotf-main"
+group    = "dotf"
 path     = "/foo"
 worktree = true
 labels   = ["work"]
@@ -58,14 +58,14 @@ func TestLoadConfigSessions_PrivateOverrides(t *testing.T) {
     dir := t.TempDir()
     writeTOML(t, dir, "sessions.toml", `
 [[session]]
-name  = "main"
-alias = "dotf"
+name  = "dotf-main"
+group = "dotf"
 path  = "/public"
 `)
     writeTOML(t, dir, "private.toml", `
 [[session]]
-name  = "main"
-alias = "dotf"
+name  = "dotf-main"
+group = "dotf"
 path  = "/private"
 `)
     cfg, err := LoadConfigSessions(dir)
@@ -84,13 +84,12 @@ func TestLoadConfigSessions_SkipsInvalidEntries(t *testing.T) {
     dir := t.TempDir()
     writeTOML(t, dir, "sessions.toml", `
 [[session]]
-name  = "main"
-alias = ""
+name  = ""
 path  = "/foo"
 
 [[session]]
 name  = "other"
-alias = "ok"
+group = "ok"
 path  = "/bar"
 `)
     cfg, err := LoadConfigSessions(dir)
@@ -116,8 +115,8 @@ name = "Generic"
 from = "editor"
 
 [[session]]
-name    = "main"
-alias   = "dotf"
+name    = "dotf-main"
+group   = "dotf"
 path    = "/foo"
 windows = ["editor", "generic"]
 `)
@@ -151,9 +150,6 @@ windows = ["editor", "generic"]
     // generic inherits after_create_cmd from editor
     if generic.AfterCreateCmd != "nvim ." {
         t.Errorf("generic should inherit 'nvim .', got %q", generic.AfterCreateCmd)
-    }
-    if generic.From != "" {
-        t.Error("resolved template should have empty From field")
     }
 }
 

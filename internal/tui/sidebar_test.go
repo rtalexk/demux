@@ -952,8 +952,9 @@ func TestVisibleSessions_FilterWorktree_NoRoot(t *testing.T) {
     if len(s.nodes) != 0 {
         t.Error("expected empty list when no worktree root resolvable")
     }
-    if s.filterHint == "" {
-        t.Error("expected filterHint to be set for no-root worktree filter")
+    out := stripANSI(s.Render(40, 10, false, "", ""))
+    if !strings.Contains(out, "no sessions in this worktree") {
+        t.Errorf("expected hint message in render output, got: %q", out)
     }
 }
 
@@ -1014,7 +1015,7 @@ func TestRenderSession_ShowsConfigIcon(t *testing.T) {
         ColorFgMuted:    lipgloss.Color("#9399b2"),
     }, config.ProcessesConfig{}, nil)
 
-    cfg := session.ConfigEntry{Name: "main", Alias: "dotf", Path: "/foo", Icon: "★"}
+    cfg := session.ConfigEntry{Name: "dotf-main", Group: "dotf", Path: "/foo", Icon: "★"}
     s := SidebarModel{
         sessions: []session.Session{
             {DisplayName: "dotf-main", IsLive: false, IsConfig: true, Config: &cfg},
@@ -1039,7 +1040,7 @@ func TestRenderSession_LiveConfigShowsTmuxIcon(t *testing.T) {
         ColorFgMuted:    lipgloss.Color("#9399b2"),
     }, config.ProcessesConfig{}, nil)
 
-    cfg := session.ConfigEntry{Name: "main", Alias: "dotf", Path: "/foo"}
+    cfg := session.ConfigEntry{Name: "dotf-main", Group: "dotf", Path: "/foo"}
     s := SidebarModel{
         sessions: []session.Session{
             {DisplayName: "dotf-main", IsLive: true, IsConfig: true, Config: &cfg},

@@ -10,27 +10,34 @@ import (
 func TestAppendEntry_CreatesFile(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
-    e := ConfigEntry{Name: "main", Alias: "myproj", Path: "/home/user/myproj"}
+    e := ConfigEntry{Name: "myproj-main", Group: "myproj", Path: "/home/user/myproj"}
     if err := AppendEntry(path, e); err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
+    // Round-trip: verify the stored data is correct.
+    cfg, err := LoadConfigSessions(dir)
+    if err != nil {
+        t.Fatalf("load back: %v", err)
+    }
+    if len(cfg.Entries) != 1 {
+        t.Fatalf("expected 1 entry, got %d", len(cfg.Entries))
+    }
+    got := cfg.Entries[0]
+    if got.Name != "myproj-main" {
+        t.Errorf("name: got %q, want %q", got.Name, "myproj-main")
+    }
+    if got.Group != "myproj" {
+        t.Errorf("group: got %q, want %q", got.Group, "myproj")
+    }
+    if got.Path != "/home/user/myproj" {
+        t.Errorf("path: got %q, want %q", got.Path, "/home/user/myproj")
+    }
+    // Zero-value optional fields should not be written to the file.
     data, err := os.ReadFile(path)
     if err != nil {
         t.Fatalf("read file: %v", err)
     }
     s := string(data)
-    if !strings.Contains(s, `[[session]]`) {
-        t.Error("missing [[session]] header")
-    }
-    if !strings.Contains(s, `name  = "main"`) {
-        t.Error("missing name field")
-    }
-    if !strings.Contains(s, `alias = "myproj"`) {
-        t.Error("missing alias field")
-    }
-    if !strings.Contains(s, `path  = "/home/user/myproj"`) {
-        t.Error("missing path field")
-    }
     if strings.Contains(s, "worktree") {
         t.Error("worktree=false should be omitted")
     }
@@ -47,25 +54,27 @@ func TestAppendEntry_CreatesFile(t *testing.T) {
 
 func TestAppendEntry_AppendsToExistingFile(t *testing.T) {
     dir := t.TempDir()
-    path := filepath.Join(dir, "sessions.toml")
     writeTOML(t, dir, "sessions.toml", `[[session]]
-name  = "existing"
-alias = "ex"
+name  = "ex-existing"
+group = "ex"
 path  = "/ex"
 `)
-    e := ConfigEntry{Name: "new", Alias: "nw", Path: "/new"}
-    if err := AppendEntry(path, e); err != nil {
+    e := ConfigEntry{Name: "nw-new", Group: "nw", Path: "/new"}
+    if err := AppendEntry(filepath.Join(dir, "sessions.toml"), e); err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
-    data, err := os.ReadFile(path)
+    cfg, err := LoadConfigSessions(dir)
     if err != nil {
-        t.Fatalf("read file: %v", err)
+        t.Fatalf("load back: %v", err)
     }
-    s := string(data)
-    if !strings.Contains(s, `name  = "existing"`) {
+    names := make(map[string]bool, len(cfg.Entries))
+    for _, entry := range cfg.Entries {
+        names[entry.Name] = true
+    }
+    if !names["ex-existing"] {
         t.Error("existing entry should be preserved")
     }
-    if !strings.Contains(s, `name  = "new"`) {
+    if !names["nw-new"] {
         t.Error("new entry should be appended")
     }
 }
@@ -74,11 +83,11 @@ func TestAppendEntry_RejectsDuplicate(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
     writeTOML(t, dir, "sessions.toml", `[[session]]
-name  = "main"
-alias = "myproj"
+name  = "myproj-main"
+group = "myproj"
 path  = "/foo"
 `)
-    e := ConfigEntry{Name: "main", Alias: "myproj", Path: "/bar"}
+    e := ConfigEntry{Name: "myproj-main", Group: "myproj", Path: "/bar"}
     err := AppendEntry(path, e)
     if err == nil {
         t.Error("expected duplicate error, got nil")
@@ -89,31 +98,33 @@ path  = "/foo"
 
 func TestAppendEntry_OptionalFields(t *testing.T) {
     dir := t.TempDir()
-    path := filepath.Join(dir, "sessions.toml")
     e := ConfigEntry{
-        Name:     "main",
-        Alias:    "myproj",
+        Name:     "myproj-main",
+        Group:    "myproj",
         Path:     "/home/user/myproj",
         Worktree: true,
         Labels:   []string{"work", "rust"},
         Icon:     "󰅩",
     }
-    if err := AppendEntry(path, e); err != nil {
+    if err := AppendEntry(filepath.Join(dir, "sessions.toml"), e); err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
-    data, err := os.ReadFile(path)
+    cfg, err := LoadConfigSessions(dir)
     if err != nil {
-        t.Fatalf("read file: %v", err)
+        t.Fatalf("load back: %v", err)
     }
-    s := string(data)
-    if !strings.Contains(s, "worktree = true") {
-        t.Error("worktree=true should be present")
+    if len(cfg.Entries) != 1 {
+        t.Fatalf("expected 1 entry, got %d", len(cfg.Entries))
     }
-    if !strings.Contains(s, `labels   = ["work", "rust"]`) {
-        t.Error("labels should be present")
+    got := cfg.Entries[0]
+    if !got.Worktree {
+        t.Error("expected Worktree=true")
     }
-    if !strings.Contains(s, `icon     = "󰅩"`) {
-        t.Error("icon should be present")
+    if len(got.Labels) != 2 || got.Labels[0] != "work" || got.Labels[1] != "rust" {
+        t.Errorf("expected labels [work rust], got %v", got.Labels)
+    }
+    if got.Icon != "󰅩" {
+        t.Errorf("expected icon 󰅩, got %q", got.Icon)
     }
 }
 
@@ -121,21 +132,13 @@ func TestAppendEntry_Windows(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
     e := ConfigEntry{
-        Name:    "main",
-        Alias:   "myproj",
+        Name:    "myproj-main",
+        Group:   "myproj",
         Path:    "/home/user/myproj",
         Windows: []string{"editor", "terminal"},
     }
     if err := AppendEntry(path, e); err != nil {
         t.Fatalf("unexpected error: %v", err)
-    }
-    data, err := os.ReadFile(path)
-    if err != nil {
-        t.Fatalf("read file: %v", err)
-    }
-    s := string(data)
-    if !strings.Contains(s, `windows  = ["editor", "terminal"]`) {
-        t.Errorf("windows field not serialized correctly, got:\n%s", s)
     }
     // round-trip: load back and verify
     entries, loadErr := LoadConfigSessions(dir)
@@ -155,16 +158,16 @@ func TestRemoveEntry_RemovesMatchingBlock(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
     writeTOML(t, dir, "sessions.toml", `[[session]]
-name  = "main"
-alias = "proj"
+name  = "proj-main"
+group = "proj"
 path  = "/proj"
 
 [[session]]
-name  = "other"
-alias = "oth"
+name  = "oth-other"
+group = "oth"
 path  = "/other"
 `)
-    if err := RemoveEntry(path, "main", "proj"); err != nil {
+    if err := RemoveEntry(path, "proj-main"); err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
     data, err := os.ReadFile(path)
@@ -172,10 +175,10 @@ path  = "/other"
         t.Fatalf("read file: %v", err)
     }
     s := string(data)
-    if strings.Contains(s, `alias = "proj"`) {
+    if strings.Contains(s, `name  = "proj-main"`) {
         t.Error("removed entry should not be present")
     }
-    if !strings.Contains(s, `alias = "oth"`) {
+    if !strings.Contains(s, `name  = "oth-other"`) {
         t.Error("other entry should be preserved")
     }
 }
@@ -184,11 +187,11 @@ func TestRemoveEntry_NotFound(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
     writeTOML(t, dir, "sessions.toml", `[[session]]
-name  = "main"
-alias = "proj"
+name  = "proj-main"
+group = "proj"
 path  = "/proj"
 `)
-    err := RemoveEntry(path, "main", "wrong-alias")
+    err := RemoveEntry(path, "wrong-name")
     if err == nil {
         t.Error("expected not-found error")
     }
@@ -196,7 +199,7 @@ path  = "/proj"
 
 func TestRemoveEntry_FileNotExist(t *testing.T) {
     path := filepath.Join(t.TempDir(), "missing.toml")
-    err := RemoveEntry(path, "main", "proj")
+    err := RemoveEntry(path, "proj-main")
     if err == nil {
         t.Error("expected error for missing file")
     }
@@ -206,11 +209,11 @@ func TestRemoveEntry_OnlyEntry(t *testing.T) {
     dir := t.TempDir()
     path := filepath.Join(dir, "sessions.toml")
     writeTOML(t, dir, "sessions.toml", `[[session]]
-name  = "main"
-alias = "proj"
+name  = "proj-main"
+group = "proj"
 path  = "/proj"
 `)
-    if err := RemoveEntry(path, "main", "proj"); err != nil {
+    if err := RemoveEntry(path, "proj-main"); err != nil {
         t.Fatalf("unexpected error: %v", err)
     }
     data, err := os.ReadFile(path)

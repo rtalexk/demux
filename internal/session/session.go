@@ -19,7 +19,7 @@ type ConfigEntry struct {
     Name     string   `toml:"name"`
     Path     string   `toml:"path"`
     Worktree bool     `toml:"worktree"`
-    Alias    string   `toml:"alias"`
+    Group    string   `toml:"group"`
     Labels   []string `toml:"labels"`
     Icon     string   `toml:"icon"`
     Windows  []string `toml:"windows"` // ordered list of window_template names
@@ -27,12 +27,12 @@ type ConfigEntry struct {
 
 // DisplayName returns the session identifier used in Tmux and in the TUI.
 func (e ConfigEntry) DisplayName() string {
-    return e.Alias + "-" + e.Name
+    return e.Name
 }
 
 // Session is the unified session type for the TUI sidebar.
 type Session struct {
-    DisplayName string              // <alias>-<name> or raw Tmux name
+    DisplayName string              // config name or raw Tmux name
     IsLive      bool                // currently running in Tmux
     IsConfig    bool                // has a config entry
     Panes       map[int][]tmux.Pane // populated when IsLive
