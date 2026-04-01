@@ -3,7 +3,6 @@ package cmd
 import (
     "fmt"
     "os"
-    "sync"
     "time"
 
     "github.com/mattn/go-isatty"
@@ -48,40 +47,6 @@ func (r procRow) Fields() []string {
     return base
 }
 
-type paneGitWork struct {
-    key     string // "session:windowIndex:paneIndex"
-    paneCWD string
-}
-
-// fetchGitForPanes fetches git info for each pane work item in parallel,
-// capped at gitConcurrencyCap concurrent goroutines (defined in sessions.go).
-// Returns a map of key -> git.Info (entry absent on error).
-func fetchGitForPanes(work []paneGitWork, timeoutMs int) map[string]git.Info {
-    results := make(map[string]git.Info, len(work))
-    if len(work) == 0 {
-        return results
-    }
-    var mu sync.Mutex
-    var wg sync.WaitGroup
-    sem := make(chan struct{}, gitConcurrencyCap)
-    for _, w := range work {
-        wg.Add(1)
-        w := w
-        go func() {
-            defer wg.Done()
-            sem <- struct{}{}
-            defer func() { <-sem }()
-            info, err := git.Fetch(w.paneCWD, timeoutMs)
-            if err == nil {
-                mu.Lock()
-                results[w.key] = info
-                mu.Unlock()
-            }
-        }()
-    }
-    wg.Wait()
-    return results
-}
 
 func runProcs(cmd *cobra.Command, _ []string) error {
     cfg := loadConfig()
@@ -118,7 +83,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
     }
 
     // Pre-fetch git info in parallel for all deviant panes.
-    var gitWork []paneGitWork
+    var gitWork []git.ConcurrentWork
     if procsGit {
         for sessionName, windows := range grouped {
             if procsSession != "" && sessionName != procsSession {
@@ -136,13 +101,13 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                     paneCWD := pane.CWD
                     if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
                         key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
-                        gitWork = append(gitWork, paneGitWork{key: key, paneCWD: paneCWD})
+                        gitWork = append(gitWork, git.ConcurrentWork{Key: key, Dir: paneCWD})
                     }
                 }
             }
         }
     }
-    gitResults := fetchGitForPanes(gitWork, cfg.Git.TimeoutMs)
+    gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
 
     var rows []format.Row
 
