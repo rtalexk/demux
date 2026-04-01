@@ -128,6 +128,10 @@ type StatusBarConfig struct {
     Show bool `toml:"show"`
 }
 
+type LogConfig struct {
+    Level string `toml:"level"` // off|error|warn|info|debug
+}
+
 type Config struct {
     RefreshIntervalMs int               `toml:"refresh_interval_ms"`
     IgnoredSessions   []string          `toml:"ignored_sessions"`
@@ -137,6 +141,7 @@ type Config struct {
     Sidebar           SidebarConfig     `toml:"sidebar"`
     ProcessList       ProcessListConfig `toml:"process_list"`
     StatusBar         StatusBarConfig   `toml:"status_bar"`
+    Log               LogConfig         `toml:"log"`
     Git               GitConfig         `toml:"git"`
     Theme             ThemeConfig       `toml:"theme"`
     PathAliases       []PathAlias       `toml:"path_aliases"`
@@ -159,6 +164,7 @@ func Default() Config {
             ShowLastSeen: true,
         },
         StatusBar: StatusBarConfig{Show: true},
+        Log:       LogConfig{Level: "warn"},
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,

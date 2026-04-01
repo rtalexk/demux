@@ -32,6 +32,9 @@ func TestDefaults(t *testing.T) {
     if cfg.Git.OnTimeout != "cached" {
         t.Errorf("expected cached, got %s", cfg.Git.OnTimeout)
     }
+    if cfg.Log.Level != "warn" {
+        t.Errorf("Log.Level default = %q, want \"warn\"", cfg.Log.Level)
+    }
 }
 
 func TestDefaults_IgnoredProcesses(t *testing.T) {
