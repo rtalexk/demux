@@ -133,24 +133,10 @@ func tick() tea.Cmd {
     })
 }
 
-// resolveWindowSpecs maps a session's window name list to tmux.WindowSpec
-// values by looking them up in the resolved template map. Unknown names are
-// logged to stderr and skipped.
-func resolveWindowSpecs(names []string, templates map[string]session.WindowTemplate) []tmux.WindowSpec {
-    if len(names) == 0 {
-        return nil
-    }
-    specs := make([]tmux.WindowSpec, 0, len(names))
-    for _, name := range names {
-        t, ok := templates[name]
-        if !ok {
-            fmt.Fprintf(os.Stderr, "demux: session references unknown window_template id %q\n", name)
-            continue
-        }
-        specs = append(specs, tmux.WindowSpec{
-            Name:           t.Name,
-            AfterCreateCmd: t.AfterCreateCmd,
-        })
+func resolveWindowSpecs(ids []string, templates map[string]session.WindowTemplate) []tmux.WindowSpec {
+    specs, unknown := session.ResolveWindowSpecs(ids, templates)
+    for _, id := range unknown {
+        fmt.Fprintf(os.Stderr, "demux: session references unknown window_template id %q\n", id)
     }
     return specs
 }
@@ -390,6 +376,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                         }
                         m.sidebar.ClearLaunchErr()
                         m.searchInput.ExitInsertMode()
+                        if m.popupMode {
+                            return m, tea.Quit
+                        }
                         return m, m.fetchPanes()
                     }
                     if err := tmux.SwitchClient(node.Session); err == nil {
@@ -539,7 +528,16 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                     m.sidebar.SetLaunchErr(err.Error())
                     return m, nil
                 }
+                if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
+                    if err := tmux.CreateSessionWindows(sess.DisplayName, specs); err != nil {
+                        m.statusMsg = "window setup failed: " + err.Error()
+                        m.statusExp = time.Now().Add(5 * time.Second)
+                    }
+                }
                 m.sidebar.ClearLaunchErr()
+                if m.popupMode {
+                    return m, tea.Quit
+                }
                 return m, m.fetchPanes()
             }
             target := m.sidebar.BestAlertTargetInSession(node.Session, m.cfg.Sidebar.SwitchFocus)
