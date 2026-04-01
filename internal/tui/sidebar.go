@@ -2,6 +2,7 @@ package tui
 
 import (
     "fmt"
+    "os"
     "path/filepath"
     "sort"
     "strings"
@@ -265,7 +266,13 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
         }
     }
     if sess.IsConfig && sess.Config != nil && sess.Config.Worktree {
-        return filepath.Dir(sess.Config.Path)
+        p := sess.Config.Path
+        // If p itself is the worktree root container (.bare/ lives here), return p.
+        // Otherwise p is a specific worktree inside a container, so its parent is the root.
+        if fi, err := os.Stat(filepath.Join(p, ".bare")); err == nil && fi.IsDir() {
+            return p
+        }
+        return filepath.Dir(p)
     }
     return ""
 }

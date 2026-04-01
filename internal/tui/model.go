@@ -813,7 +813,14 @@ func (m *Model) updateDetailFromSelection() {
         if isConfigOnly && sess.Config != nil {
             configPath = sess.Config.Path
             if sess.Config.Worktree && configPath != "" {
-                configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
+                // If configPath itself is the worktree root container (.bare/ lives here),
+                // show just the repo name. Otherwise show "worktree (repo)".
+                if fi, err := os.Stat(filepath.Join(configPath, ".bare")); err == nil && fi.IsDir() {
+                    bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
+                    configWorktree = bareStr + " (" + filepath.Base(configPath) + ")"
+                } else {
+                    configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
+                }
             }
         }
         m.detail = DetailModel{
