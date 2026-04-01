@@ -97,7 +97,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 
     sessionProcCount := map[string]int{}
     for sessionName, windows := range grouped {
-        primaryCWD := primaryCWDForSession(windows)
+        primaryCWD := tmux.PrimaryPaneCWD(windows[0])
         if primaryCWD == "" {
             continue
         }
@@ -119,7 +119,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
             if isIgnored(cfg, sessionName) {
                 continue
             }
-            if cwd := primaryCWDForSession(windows); cwd != "" {
+            if cwd := tmux.PrimaryPaneCWD(windows[0]); cwd != "" {
                 gitWork = append(gitWork, git.ConcurrentWork{Key: sessionName, Dir: cwd})
             }
         }
@@ -155,7 +155,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
         }
 
         if sessionListGit || sessionListGitOnly {
-            primaryCWD := primaryCWDForSession(windows)
+            primaryCWD := tmux.PrimaryPaneCWD(windows[0])
             if primaryCWD == "" {
                 row.branch = cfg.Git.FallbackDisplay
                 row.dirty = "—"
@@ -195,15 +195,3 @@ func isIgnored(cfg config.Config, name string) bool {
     return false
 }
 
-func primaryCWDForSession(windows map[int][]tmux.Pane) string {
-    panes, ok := windows[0]
-    if !ok || len(panes) == 0 {
-        return ""
-    }
-    for _, p := range panes {
-        if p.PaneIndex == 0 {
-            return p.CWD
-        }
-    }
-    return panes[0].CWD
-}

@@ -57,7 +57,7 @@ func runWindows(cmd *cobra.Command, _ []string) error {
         return fmt.Errorf("session %q not found", windowsSession)
     }
 
-    primaryCWD := primaryCWDForSession(windows)
+    primaryCWD := tmux.PrimaryPaneCWD(windows[0])
 
     database, err := openDB()
     if err != nil {
@@ -85,13 +85,13 @@ func runWindows(cmd *cobra.Command, _ []string) error {
     for wi, wPanes := range windows {
         gitCol := "—"
         if windowsGit {
-            winCWD := windowCWD(wPanes)
+            winCWD := tmux.PrimaryPaneCWD(wPanes)
             if winCWD != "" && !git.IsDescendant(winCWD, primaryCWD) && winCWD != primaryCWD {
                 info, err := git.Fetch(winCWD, cfg.Git.TimeoutMs)
                 if err != nil {
                     gitCol = cfg.Git.ErrorDisplay
                 } else {
-                    gitCol = "↪ " + info.Branch + " " + gitIndicators(info)
+                    gitCol = "↪ " + info.Branch + " " + git.Indicators(info)
                 }
             }
         }
@@ -113,28 +113,3 @@ func runWindows(cmd *cobra.Command, _ []string) error {
     return nil
 }
 
-func windowCWD(panes []tmux.Pane) string {
-    for _, p := range panes {
-        if p.PaneIndex == 0 {
-            return p.CWD
-        }
-    }
-    if len(panes) > 0 {
-        return panes[0].CWD
-    }
-    return ""
-}
-
-func gitIndicators(info git.Info) string {
-    var parts []string
-    if info.Ahead > 0 {
-        parts = append(parts, fmt.Sprintf("↑%d", info.Ahead))
-    }
-    if info.Behind > 0 {
-        parts = append(parts, fmt.Sprintf("↓%d", info.Behind))
-    }
-    if info.Dirty {
-        parts = append(parts, "*")
-    }
-    return strings.Join(parts, " ")
-}

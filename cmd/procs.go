@@ -91,7 +91,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
             if isIgnored(cfg, sessionName) {
                 continue
             }
-            primaryCWD := primaryCWDForSession(windows)
+            primaryCWD := tmux.PrimaryPaneCWD(windows[0])
             for wi, wPanes := range windows {
                 if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
                     continue
@@ -118,7 +118,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
             continue
         }
 
-        primaryCWD := primaryCWDForSession(windows)
+        primaryCWD := tmux.PrimaryPaneCWD(windows[0])
 
         for wi, wPanes := range windows {
             if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
@@ -132,7 +132,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                     key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
                     if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
                         if info, ok := gitResults[key]; ok {
-                            gitCol = "↪ " + info.Branch + " " + gitIndicators(info)
+                            gitCol = "↪ " + info.Branch + " " + git.Indicators(info)
                         } else {
                             gitCol = cfg.Git.ErrorDisplay
                         }

@@ -270,7 +270,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 info := m.gitInfo[sessionName]
                 info.Loading = true
                 m.gitInfo[sessionName] = info
-                primaryCWD := primaryCWDForPanes(windows)
+                primaryCWD := tmux.PrimaryPaneCWD(windows[0])
                 if primaryCWD != "" {
                     cmds = append(cmds, fetchGit(sessionName, primaryCWD, m.cfg.Git.TimeoutMs))
                 }
@@ -801,7 +801,7 @@ func (m *Model) updateDetailFromSelection() {
                 alertCount++
             }
         }
-        sessionCWD := primaryCWDForPanes(windows)
+        sessionCWD := tmux.PrimaryPaneCWD(windows[0])
         // count processes whose CWD is under the session's primary CWD
         procCount := 0
         if sessionCWD != "" {
@@ -871,7 +871,7 @@ func (m *Model) updateDetailFromSelection() {
             if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
                 windowAlert = a
             }
-            sessionCWD := primaryCWDForPanes(windows)
+            sessionCWD := tmux.PrimaryPaneCWD(windows[0])
             alertCount := 0
             for _, a := range m.alerts {
                 if strings.HasPrefix(a.Target, sess+":") {
@@ -1195,24 +1195,6 @@ func debounceSearch(gen int) tea.Cmd {
     }
 }
 
-func primaryCWDForPanes(windows map[int][]tmux.Pane) string {
-    panes, ok := windows[0]
-    if !ok || len(panes) == 0 {
-        // try first available window
-        for _, ps := range windows {
-            if len(ps) > 0 {
-                return ps[0].CWD
-            }
-        }
-        return ""
-    }
-    for _, p := range panes {
-        if p.PaneIndex == 0 {
-            return p.CWD
-        }
-    }
-    return panes[0].CWD
-}
 
 // Run launches the Bubbletea program.
 func Run(cfg config.Config, database *db.DB) error {
