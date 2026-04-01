@@ -3,7 +3,6 @@ package cmd
 import (
     "fmt"
     "os"
-    "time"
 
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/format"
@@ -171,9 +170,9 @@ func runProcs(cmd *cobra.Command, _ []string) error {
                         process:    p.Name,
                         pid:        fmt.Sprint(p.PID),
                         cpu:        fmt.Sprintf("%.1f%%", p.CPU),
-                        mem:        formatMem(p.MemRSS),
+                        mem:        format.Mem(p.MemRSS),
                         port:       portStr,
-                        up:         formatDuration(p.Uptime),
+                        up:         format.Duration(p.Uptime),
                         cwd:        paneCWD,
                         gitCol:     "—",
                         includeGit: procsGit,
@@ -188,23 +187,3 @@ func runProcs(cmd *cobra.Command, _ []string) error {
     return nil
 }
 
-func formatMem(bytes uint64) string {
-    mb := float64(bytes) / 1024 / 1024
-    return fmt.Sprintf("%.1fMB", mb)
-}
-
-func formatDuration(d time.Duration) string {
-    h := int(d.Hours())
-    m := int(d.Minutes()) % 60
-    s := int(d.Seconds()) % 60
-    switch {
-    case h >= 24:
-        return fmt.Sprintf("%dd%dh", h/24, h%24)
-    case h > 0:
-        return fmt.Sprintf("%dh%dm", h, m)
-    case m > 0:
-        return fmt.Sprintf("%dm", m)
-    default:
-        return fmt.Sprintf("%ds", s)
-    }
-}

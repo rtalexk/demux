@@ -3,7 +3,6 @@ package cmd
 import (
     "fmt"
     "os"
-    "time"
 
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/config"
@@ -119,16 +118,3 @@ func isTTY() bool {
     return isatty.IsTerminal(os.Stdout.Fd())
 }
 
-func formatAge(t time.Time) string {
-    d := time.Since(t)
-    switch {
-    case d < time.Minute:
-        return fmt.Sprintf("%ds ago", int(d.Seconds()))
-    case d < time.Hour:
-        return fmt.Sprintf("%dm ago", int(d.Minutes()))
-    case d < 24*time.Hour:
-        return fmt.Sprintf("%dh ago", int(d.Hours()))
-    default:
-        return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-    }
-}
