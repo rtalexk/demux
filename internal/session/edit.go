@@ -31,7 +31,7 @@ func AppendEntry(path string, e ConfigEntry) error {
     }
     defer f.Close()
 
-    if _, err = fmt.Fprint(f, formatBlock(e)); err != nil {
+    if _, err = fmt.Fprint(f, FormatBlock(e)); err != nil {
         return fmt.Errorf("write %s: %w", filepath.Base(path), err)
     }
     return nil
@@ -45,7 +45,7 @@ func tomlQuote(s string) string {
     return "\"" + s + "\""
 }
 
-func formatBlock(e ConfigEntry) string {
+func FormatBlock(e ConfigEntry) string {
     var sb strings.Builder
     sb.WriteString("\n[[session]]\n")
     sb.WriteString(fmt.Sprintf("name  = %s\n", tomlQuote(e.Name)))

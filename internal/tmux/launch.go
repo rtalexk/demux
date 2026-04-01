@@ -48,9 +48,12 @@ func CreateSessionWindows(sessionName string, windows []WindowSpec) error {
             if err := exec.Command("tmux", "new-window", "-t", sessionName, "-n", w.Name).Run(); err != nil {
                 return fmt.Errorf("tmux new-window %q: %w", w.Name, err)
             }
+            if err := exec.Command("tmux", "rename-window", "-t", fmt.Sprintf("%s:%d", sessionName, i), w.Name).Run(); err != nil {
+                return fmt.Errorf("tmux rename-window %q: %w", w.Name, err)
+            }
         }
         if w.AfterCreateCmd != "" {
-            target := sessionName + ":" + w.Name
+            target := fmt.Sprintf("%s:%d", sessionName, i)
             if err := exec.Command("tmux", "send-keys", "-t", target, w.AfterCreateCmd, "Enter").Run(); err != nil {
                 return fmt.Errorf("tmux send-keys %q: %w", w.Name, err)
             }

@@ -40,6 +40,20 @@ type Session struct {
     Config      *ConfigEntry        // populated when IsConfig
 }
 
+// ResolveWindowSpecs maps a list of window template ids to tmux.WindowSpec values.
+// It returns the resolved specs and a slice of ids that were not found.
+func ResolveWindowSpecs(ids []string, templates map[string]WindowTemplate) (specs []tmux.WindowSpec, unknown []string) {
+    for _, id := range ids {
+        t, ok := templates[id]
+        if !ok {
+            unknown = append(unknown, id)
+            continue
+        }
+        specs = append(specs, tmux.WindowSpec{Name: t.Name, AfterCreateCmd: t.AfterCreateCmd})
+    }
+    return specs, unknown
+}
+
 // Merge combines live Tmux panes and config entries into a unified []Session.
 // Match rule: Tmux session name must equal entry.DisplayName() exactly.
 func Merge(panes []tmux.Pane, entries []ConfigEntry) []Session {

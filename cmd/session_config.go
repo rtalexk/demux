@@ -2,11 +2,13 @@ package cmd
 
 import (
     "fmt"
+    "os"
     "path/filepath"
     "strings"
 
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/session"
+    "github.com/rtalex/demux/internal/tmux"
     "github.com/spf13/cobra"
 )
 
@@ -93,6 +95,49 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
     return nil
 }
 
+// --- get-config ---
+
+var (
+    sessionGetConfigName  string
+    sessionGetConfigAlias string
+)
+
+var sessionGetConfigCmd = &cobra.Command{
+    Use:   "get-config",
+    Short: "Print the config block for a session",
+    RunE:  runSessionGetConfig,
+}
+
+func init() {
+    sessionGetConfigCmd.Flags().StringVar(&sessionGetConfigName, "name", "", "Session name (required)")
+    sessionGetConfigCmd.Flags().StringVar(&sessionGetConfigAlias, "alias", "", "Session alias (required)")
+
+    _ = sessionGetConfigCmd.MarkFlagRequired("name")
+    _ = sessionGetConfigCmd.MarkFlagRequired("alias")
+
+    sessionCmd.AddCommand(sessionGetConfigCmd)
+}
+
+func runSessionGetConfig(_ *cobra.Command, _ []string) error {
+    cfgPath, err := config.DefaultPath()
+    if err != nil {
+        return fmt.Errorf("config dir: %w", err)
+    }
+    cfg, err := session.LoadConfigSessions(filepath.Dir(cfgPath))
+    if err != nil {
+        return err
+    }
+
+    target := (session.ConfigEntry{Name: sessionGetConfigName, Alias: sessionGetConfigAlias}).DisplayName()
+    for _, e := range cfg.Entries {
+        if e.DisplayName() == target {
+            fmt.Print(session.FormatBlock(e))
+            return nil
+        }
+    }
+    return fmt.Errorf("session %q not found", target)
+}
+
 // --- remove ---
 
 var (
@@ -132,6 +177,57 @@ func runSessionRemove(_ *cobra.Command, _ []string) error {
 
     fmt.Printf("Removed session %q from %s\n", dn, filepath.Base(path))
     return nil
+}
+
+// --- create-windows ---
+
+var (
+    sessionCreateWindowsSession string
+    sessionCreateWindowsIDs     string
+)
+
+var sessionCreateWindowsCmd = &cobra.Command{
+    Use:   "create-windows",
+    Short: "Create tmux windows for a session using window template ids",
+    RunE:  runSessionCreateWindows,
+}
+
+func init() {
+    sessionCreateWindowsCmd.Flags().StringVar(&sessionCreateWindowsSession, "session", "", "Tmux session name (required)")
+    sessionCreateWindowsCmd.Flags().StringVar(&sessionCreateWindowsIDs, "windows", "", "Comma-separated window template ids (required)")
+
+    _ = sessionCreateWindowsCmd.MarkFlagRequired("session")
+    _ = sessionCreateWindowsCmd.MarkFlagRequired("windows")
+
+    sessionCmd.AddCommand(sessionCreateWindowsCmd)
+}
+
+func runSessionCreateWindows(_ *cobra.Command, _ []string) error {
+    cfgPath, err := config.DefaultPath()
+    if err != nil {
+        return fmt.Errorf("config dir: %w", err)
+    }
+    cfg, err := session.LoadConfigSessions(filepath.Dir(cfgPath))
+    if err != nil {
+        return err
+    }
+
+    var ids []string
+    for _, id := range strings.Split(sessionCreateWindowsIDs, ",") {
+        if t := strings.TrimSpace(id); t != "" {
+            ids = append(ids, t)
+        }
+    }
+
+    specs, unknown := session.ResolveWindowSpecs(ids, cfg.WindowTemplates)
+    for _, id := range unknown {
+        fmt.Fprintf(os.Stderr, "demux: unknown window_template id %q (skipped)\n", id)
+    }
+    if len(specs) == 0 {
+        return fmt.Errorf("no valid window templates resolved from %q", sessionCreateWindowsIDs)
+    }
+
+    return tmux.CreateSessionWindows(sessionCreateWindowsSession, specs)
 }
 
 // --- helpers ---
