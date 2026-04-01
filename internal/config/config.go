@@ -149,7 +149,7 @@ type Config struct {
 
 func Default() Config {
     return Config{
-        RefreshIntervalMs: 3000,
+        RefreshIntervalMs: DefaultRefreshIntervalMs,
         IgnoredSessions:   []string{},
         IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
         DefaultFormat:     "text",
@@ -160,7 +160,7 @@ func Default() Config {
             SearchSort:  "score",
             Sort:        []string{"priority", "last_seen", "alphabetical"},
             SwitchFocus:  "severity",
-            Width:        35,
+            Width:        DefaultSidebarWidth,
             ShowLastSeen: true,
         },
         StatusBar: StatusBarConfig{Show: true},
@@ -168,7 +168,7 @@ func Default() Config {
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,
-            TimeoutMs:       500,
+            TimeoutMs:       DefaultGitTimeoutMs,
             OnTimeout:       "cached",
             FallbackDisplay: "—",
             ErrorDisplay:    "git err",

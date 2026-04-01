@@ -128,8 +128,8 @@ func (m Model) Init() tea.Cmd {
     return m.fetchPanes()
 }
 
-func tick() tea.Cmd {
-    return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+func tick(interval time.Duration) tea.Cmd {
+    return tea.Tick(interval, func(t time.Time) tea.Msg {
         return tickMsg(t)
     })
 }
@@ -241,7 +241,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         if time.Now().After(m.statusExp) {
             m.statusMsg = ""
         }
-        return m, tea.Batch(tick(), m.fetchPanes(), m.fetchAlerts())
+        return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchAlerts())
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
@@ -258,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
                 m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
             }
             m.ready = true
-            cmds = append(cmds, tick(), m.fetchAlerts())
+            cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchAlerts())
             // If startup focus landed on a window node, kick off an initial proc fetch.
             if node := m.sidebar.Selected(); node != nil {
                 m.procGen++

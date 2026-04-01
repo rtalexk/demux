@@ -29,7 +29,7 @@ func (c Config) Validate() []ValidationIssue {
     }
 
     // RefreshIntervalMs
-    if c.RefreshIntervalMs < 100 {
+    if c.RefreshIntervalMs < MinRefreshIntervalMs {
         add("error", "refresh_interval_ms", fmt.Sprintf("must be ≥ 100, got %d", c.RefreshIntervalMs))
     }
 
@@ -52,12 +52,12 @@ func (c Config) Validate() []ValidationIssue {
     }
 
     // Sidebar
-    if c.Sidebar.Width < 10 {
+    if c.Sidebar.Width < MinSidebarWidth {
         add("error", "sidebar.width", fmt.Sprintf("must be ≥ 10, got %d", c.Sidebar.Width))
     }
 
     // Git timeout
-    if c.Git.TimeoutMs > 0 && c.Git.TimeoutMs < 50 {
+    if c.Git.TimeoutMs > 0 && c.Git.TimeoutMs < MinGitTimeoutWarnMs {
         add("warn", "git.timeout_ms", fmt.Sprintf("very low timeout (%dms) may cause frequent git errors", c.Git.TimeoutMs))
     }
 
