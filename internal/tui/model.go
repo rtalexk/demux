@@ -345,6 +345,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
             return m, nil
         }
         pq := query.Parse(m.searchInput.Value())
+        for _, sess := range m.sidebar.sessions {
+            if !sess.IsLive {
+                pq.ExtraSessions = append(pq.ExtraSessions, sess.DisplayName)
+            }
+        }
         gen := m.searchGen
         return m, func() tea.Msg {
             result, err := query.Run(pq)

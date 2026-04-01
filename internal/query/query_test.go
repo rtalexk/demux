@@ -161,6 +161,56 @@ func TestParse_BareTag(t *testing.T) {
     }
 }
 
+func TestRun_ExtraSessions_Matched(t *testing.T) {
+    // Non-live (config-only) sessions passed via ExtraSessions must be fuzzy-matched.
+    panes := []tmux.Pane{
+        {Session: "work", WindowIndex: 0, WindowName: "main", PanePID: 100},
+    }
+    pq := query.Parse("dotf")
+    pq.ExtraSessions = []string{"dotf-main", "hf-main"}
+    result := query.RunWith(pq, panes, nil)
+
+    found := false
+    for _, sm := range result.Sessions {
+        if sm.Name == "dotf-main" {
+            found = true
+            break
+        }
+    }
+    if !found {
+        t.Error("expected 'dotf-main' from ExtraSessions to appear in results")
+    }
+    // live session should still be present
+    livefound := false
+    for _, sm := range result.Sessions {
+        if sm.Name == "work" {
+            livefound = true
+            break
+        }
+    }
+    _ = livefound // live session doesn't match "dotf", absence is fine
+}
+
+func TestRun_ExtraSessions_NoDuplicates(t *testing.T) {
+    // A session listed in both live panes and ExtraSessions must not be duplicated.
+    panes := []tmux.Pane{
+        {Session: "dotf-main", WindowIndex: 0, WindowName: "sh", PanePID: 100},
+    }
+    pq := query.Parse("dotf")
+    pq.ExtraSessions = []string{"dotf-main"}
+    result := query.RunWith(pq, panes, nil)
+
+    count := 0
+    for _, sm := range result.Sessions {
+        if sm.Name == "dotf-main" {
+            count++
+        }
+    }
+    if count != 1 {
+        t.Errorf("expected 'dotf-main' exactly once, got %d", count)
+    }
+}
+
 func TestRun_NonContiguousWindowIndices(t *testing.T) {
     // Windows 0 and 2 (index 1 was deleted) — winIdxOrder mapping must survive this.
     panes := []tmux.Pane{

@@ -15,9 +15,10 @@ const (
 )
 
 type ParsedQuery struct {
-    Raw   string
-    Scope QueryScope
-    Term  string
+    Raw          string
+    Scope        QueryScope
+    Term         string
+    ExtraSessions []string // non-live sessions to include in ScopeSession matching
 }
 
 type Result struct {
@@ -90,9 +91,14 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
 
     // session name matching
     if pq.Scope == ScopeSession {
-        names := make([]string, 0, len(sessions))
+        names := make([]string, 0, len(sessions)+len(pq.ExtraSessions))
         for name := range sessions {
             names = append(names, name)
+        }
+        for _, name := range pq.ExtraSessions {
+            if _, exists := sessions[name]; !exists {
+                names = append(names, name)
+            }
         }
         for _, m := range fuzzy.Find(pq.Term, names) {
             sm := ensure(m.Str)
