@@ -92,8 +92,8 @@ type Model struct {
     queryResult query.Result
     searchGen   int
 
-    configEntries []session.ConfigEntry
-    configDir     string
+    sessionsConfig session.SessionsConfig
+    configDir      string
 }
 
 func New(cfg config.Config, database *db.DB) Model {
@@ -109,7 +109,7 @@ func New(cfg config.Config, database *db.DB) Model {
     cfgPath, _ := config.DefaultPath()
     m.configDir = filepath.Dir(cfgPath)
     var loadErr error
-    m.configEntries, loadErr = session.LoadConfigSessions(m.configDir)
+    m.sessionsConfig, loadErr = session.LoadConfigSessions(m.configDir)
     if loadErr != nil {
         fmt.Fprintf(os.Stderr, "demux: failed to load config sessions from %s: %v\n", m.configDir, loadErr)
     }
@@ -131,6 +131,28 @@ func tick() tea.Cmd {
     return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
         return tickMsg(t)
     })
+}
+
+// resolveWindowSpecs maps a session's window name list to tmux.WindowSpec
+// values by looking them up in the resolved template map. Unknown names are
+// logged to stderr and skipped.
+func resolveWindowSpecs(names []string, templates map[string]session.WindowTemplate) []tmux.WindowSpec {
+    if len(names) == 0 {
+        return nil
+    }
+    specs := make([]tmux.WindowSpec, 0, len(names))
+    for _, name := range names {
+        t, ok := templates[name]
+        if !ok {
+            fmt.Fprintf(os.Stderr, "demux: session references unknown window_template id %q\n", name)
+            continue
+        }
+        specs = append(specs, tmux.WindowSpec{
+            Name:           t.Name,
+            AfterCreateCmd: t.AfterCreateCmd,
+        })
+    }
+    return specs
 }
 
 func (m Model) fetchPanes() tea.Cmd {
@@ -227,7 +249,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     case panesMsg:
         m.panes = msg.panes
         grouped := tmux.GroupBySessions(msg.panes)
-        merged := session.Merge(msg.panes, m.configEntries)
+        merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
         m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         var cmds []tea.Cmd
@@ -274,7 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, m.scheduleDelayedProcFetch()
     case alertsMsg:
         m.alerts = msg.alerts
-        merged := session.Merge(m.panes, m.configEntries)
+        merged := session.Merge(m.panes, m.sessionsConfig.Entries)
         m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
         if !m.startupFocusDone {
             m.startupFocusDone = true
@@ -299,7 +321,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
         return m, tea.Batch(cmds...)
     case gitResultMsg:
         m.gitInfo[msg.key] = msg.info
-        merged := session.Merge(m.panes, m.configEntries)
+        merged := session.Merge(m.panes, m.sessionsConfig.Entries)
         m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
         m.updateDetailFromSelection()
         return m, nil
@@ -354,6 +376,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                             m.sidebar.SetLaunchErr(err.Error())
                             m.searchInput.ExitInsertMode()
                             return m, nil
+                        }
+                        if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
+                            if err := tmux.CreateSessionWindows(sess.DisplayName, specs); err != nil {
+                                m.statusMsg = "window setup failed: " + err.Error()
+                                m.statusExp = time.Now().Add(5 * time.Second)
+                            }
                         }
                         m.sidebar.ClearLaunchErr()
                         m.searchInput.ExitInsertMode()

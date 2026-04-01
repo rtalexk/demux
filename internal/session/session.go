@@ -6,6 +6,14 @@ import (
     "github.com/rtalex/demux/internal/tmux"
 )
 
+// WindowTemplate defines a reusable window configuration in sessions.toml.
+type WindowTemplate struct {
+    ID             string `toml:"id"`
+    Name           string `toml:"name"`
+    AfterCreateCmd string `toml:"after_create_cmd"`
+    From           string `toml:"from"` // inherit by id from another template
+}
+
 // ConfigEntry is parsed from sessions.toml / private.toml.
 type ConfigEntry struct {
     Name     string   `toml:"name"`
@@ -14,6 +22,7 @@ type ConfigEntry struct {
     Alias    string   `toml:"alias"`
     Labels   []string `toml:"labels"`
     Icon     string   `toml:"icon"`
+    Windows  []string `toml:"windows"` // ordered list of window_template names
 }
 
 // DisplayName returns the session identifier used in Tmux and in the TUI.
