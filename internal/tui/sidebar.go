@@ -492,7 +492,7 @@ func sessionIcon(sess session.Session) string {
     var icon string
     if sess.IsConfig && sess.Config != nil && sess.Config.Icon != "" {
         icon = sess.Config.Icon
-    } else if sess.IsLive && !sess.IsConfig {
+    } else if sess.IsLive {
         icon = activeTheme.IconTmuxSession
     } else {
         icon = activeTheme.IconCfgSession

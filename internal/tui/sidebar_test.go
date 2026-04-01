@@ -1029,6 +1029,34 @@ func TestRenderSession_ShowsConfigIcon(t *testing.T) {
     }
 }
 
+func TestRenderSession_LiveConfigShowsTmuxIcon(t *testing.T) {
+    initStyles(Theme{
+        IconTmuxSession: "⊞",
+        IconCfgSession:  "⚙︎",
+        ColorSession:    lipgloss.Color("#89b4fa"),
+        ColorBorder:     lipgloss.Color("#313244"),
+        ColorSelected:   lipgloss.Color("#2a2a4a"),
+        ColorFgMuted:    lipgloss.Color("#9399b2"),
+    }, config.ProcessesConfig{}, nil)
+
+    cfg := session.ConfigEntry{Name: "main", Alias: "dotf", Path: "/foo"}
+    s := SidebarModel{
+        sessions: []session.Session{
+            {DisplayName: "dotf-main", IsLive: true, IsConfig: true, Config: &cfg},
+        },
+        filter: FilterAll,
+    }
+    s.rebuildNodes()
+    row := s.renderSession(s.nodes[0], false, false, 40)
+    plain := stripANSI(row)
+    if !strings.Contains(plain, "⊞") {
+        t.Errorf("expected Tmux icon ⊞ for live config session, got: %q", plain)
+    }
+    if strings.Contains(plain, "⚙︎") {
+        t.Errorf("expected no cfg icon ⚙︎ for live config session, got: %q", plain)
+    }
+}
+
 func TestRenderSession_ShowsLastSeen(t *testing.T) {
     initStyles(Theme{
         IconTmuxSession: "⊞",
