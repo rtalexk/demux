@@ -8,6 +8,7 @@ import (
     "github.com/mattn/go-isatty"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
+    demuxlog "github.com/rtalex/demux/internal/log"
     "github.com/rtalex/demux/internal/tui"
     "github.com/spf13/cobra"
 )
@@ -15,11 +16,42 @@ import (
 var formatFlag string
 var compactFlag bool
 var searchFlag bool
+var logLevelFlag string
 
 var rootCmd = &cobra.Command{
     Use:          "demux",
     Short:        "Monitor tmux sessions, processes, and alerts",
     SilenceUsage: true,
+    PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+        cfg := loadConfig()
+        levelStr := cfg.Log.Level
+        if logLevelFlag != "" {
+            levelStr = logLevelFlag
+        }
+        level, err := demuxlog.ParseLevel(levelStr)
+        if err != nil {
+            // Invalid level from config or flag — warn but continue with default.
+            fmt.Fprintf(os.Stderr, "demux: %v\n", err)
+            level = demuxlog.LevelWarn
+        }
+        logPath, err := demuxlog.DefaultPath()
+        if err != nil {
+            // Cannot determine home dir — disable logging silently.
+            return nil
+        }
+        closer, err := demuxlog.Open(logPath, level)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "demux: failed to open log file: %v\n", err)
+            return nil
+        }
+        // Register closer so the file is flushed/closed on exit.
+        // Cobra doesn't expose a post-run hook on root that fires for all children,
+        // so we use a finalizer via the cobra RunE pattern.
+        cmd.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
+            return closer.Close()
+        }
+        return nil
+    },
     RunE: func(cmd *cobra.Command, args []string) error {
         cfg := loadConfig()
         if compactFlag {
@@ -49,6 +81,7 @@ func Execute() {
 
 func init() {
     rootCmd.PersistentFlags().StringVar(&formatFlag, "format", "", "Output format: text|table|json")
+    rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "", "Log level: off|error|warn|info|debug (overrides config)")
     rootCmd.PersistentFlags().BoolVar(&compactFlag, "compact", false, "Launch in compact mode (sidebar + search only)")
     rootCmd.PersistentFlags().BoolVar(&searchFlag, "search", false, "Start with focus in the search input")
 }
