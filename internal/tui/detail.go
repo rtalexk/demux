@@ -5,6 +5,7 @@ import (
     "path/filepath"
     "strings"
 
+    "github.com/charmbracelet/lipgloss"
     "github.com/rtalex/demux/internal/config"
     "github.com/rtalex/demux/internal/db"
     "github.com/rtalex/demux/internal/format"
@@ -151,6 +152,9 @@ func (d DetailModel) renderSession() []string {
     }
     if d.gitInfo.Worktree != "" {
         lines = append(lines, row("worktree", worktreeValue(d.gitInfo)))
+    } else if d.gitInfo.IsWorktreeRoot {
+        bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
+        lines = append(lines, row("worktree", bareStr+" ("+filepath.Base(d.gitInfo.Dir)+")"))
     }
     if d.gitInfo.Branch != "" {
         branch := d.gitInfo.Branch
