@@ -601,7 +601,6 @@ func TestSetFilter_AllFiltersToggle(t *testing.T) {
         alerts:   map[string]db.Alert{},
         cfg:      config.Config{Sidebar: config.SidebarConfig{}},
         filter:   FilterTmux,
-        prevFilter: FilterTmux,
     }
     // Move cursor to "beta" (index 1 after rebuild).
     s.rebuildNodes()
@@ -641,7 +640,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
         cfg: config.Config{Sidebar: config.SidebarConfig{}},
     }
     s.SetFilter(FilterPriority, 10) // on
-    s.SetFilter(FilterPriority, 10) // off (toggles back to prevFilter = "")
+    s.SetFilter(FilterPriority, 10) // off (toggles back to FilterTmux)
     if s.ActiveFilter() == FilterPriority {
         t.Error("expected filter to toggle off")
     }

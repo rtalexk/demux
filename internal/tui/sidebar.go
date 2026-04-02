@@ -41,8 +41,7 @@ type SidebarModel struct {
     gitInfo     map[string]git.Info
     cfg         config.Config
     filter      SidebarFilter
-    prevFilter  SidebarFilter
-    prevSession string // selected session before last filter switch; restored on toggle-back
+    prevSession string // selected session before last filter switch; restored on toggle-off
     filterHint  string
     queryResult query.Result
     launchErr   string // shown inline when last launch attempt failed
@@ -60,8 +59,8 @@ func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gi
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
-// key again toggles back to the previous filter and restores the cursor to
-// the session that was selected before the filter was applied.
+// key again toggles back to FilterTmux (the default) and restores the cursor
+// to the session that was selected before the filter was applied.
 func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
     curSession := ""
     if node := s.Selected(); node != nil {
@@ -72,10 +71,9 @@ func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
     if f == s.filter {
         restoreSession = s.prevSession
         s.prevSession = curSession
-        f, s.prevFilter = s.prevFilter, s.filter
+        f = FilterTmux
     } else {
         s.prevSession = curSession
-        s.prevFilter = s.filter
     }
 
     s.filter = f
