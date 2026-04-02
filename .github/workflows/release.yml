@@ -1,7 +1,10 @@
 name: Release
 
 on:
+  pull_request:
+    types: [opened, synchronize]
   push:
+    branches: [main]
     tags:
       - 'v*'
 
@@ -9,8 +12,26 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test -cover -race ./...
+
+  goreleaser:
+    name: Build and Publish
+    needs: tests
     runs-on: macos-latest
+    if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,3 +47,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  check_brew:
+    name: Check Brew Tap
+    needs: goreleaser
+    runs-on: macos-latest
+    steps:
+      - name: Install with brew
+        run: brew install rtalexk/demux/demux
