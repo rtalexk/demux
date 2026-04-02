@@ -1,18 +1,80 @@
 # demux
 
-demux is a terminal dashboard built for tmux power users. It shows you
-what is running across all your sessions: processes, git branches, ports,
-and alerts, all without leaving the terminal.
+**demux** is a session manager and dashboard for tmux. It allows you to move fast across tmux sessions, shows you what is running across all your sessions: processes, git branches, ports, all without leaving the terminal.
+
+Configure your coding agent, or any other tool, to alert you when it needs attention.
 
 ![demux TUI](docs/assets/normal_view.png)
 
 ![demux compact mode](docs/assets/compact_view.png)
 
+## Motivation
+
+**TL;DR:** My entire workflow lives in the terminal. Each tmux session is a project or worktree. In this new era of agentic programming, nearly every session has a Claude instance running tasks for me, and keeping track of all of them became a real problem. demux is the result.
+
+<details>
+
+<summary>The longer, less exciting story</summary>
+
+For over a year I relied on [Sesh](https://github.com/joshmedeski/sesh). Simply fantastic. It covered everything I needed: fast, frictionless navigation between tmux sessions.
+
+Then everything changed when the agentic programming nation attacked. I adapted, leaned into AI for day-to-day work, and started running more tasks in parallel. But parallel work and ADHD are a terrible combination. I kept leaving Claude waiting on a response for hours at a time. Deeply inefficient.
+
+I looked at a few tools ([Conductor](https://www.conductor.build/), [LazyAgent](https://github.com/illegalstudio/lazyagent), [opensessions](https://github.com/ataraxy-labs/opensessions)), but none of them fit my setup or the way I work: fast session switching via Sesh, plus visibility into which session actually needs my attention, without UX disruption or UI bloating.
+
+I had already extended my personal CLI with commands to [manage git worktrees](https://github.com/rtalexk/dotfiles/tree/main/alx/cmd/worktree). I only discovered [Worktrunk](https://github.com/max-sixty/worktrunk) after the fact, and while my implementation is limited, it does what I need. I may switch eventually, but not any time soon.
+
+_opensessions_ came closest to what I was looking for, and its premise overlaps significantly with mine. But Sesh's UX is too deeply wired into my muscle memory. What I needed was Sesh, but with alerts and process information.
+
+Why not just configure Claude to send OS-level notifications? I hate notifications. Almost all of them are blocked on my phone, and only a handful are allowed on the desktop. They're disorganized, and they interrupt flow. What I actually want is: _tell me you need attention, and I'll get to you when I'm free._
+
+### How demux fits into my workflow
+
+When I pick up a ticket (Linear or GitHub issue):
+
+```bash
+alx wt add <name> [branch]
+# alx wt add user-signup feat/PROJ-32/add-user-signup
+```
+
+This assumes a repository structure like:
+
+```
+./my-node-app
+├── project.toml
+├── .env
+├── main/
+├── dev/
+├── feature-1/
+├── feature-2/
+└── user-signup/
+```
+
+Where `project.toml` looks like:
+
+```toml
+alias = "rem"
+on_create = "npm install"
+copy_files = [".env"]
+
+[demux]
+windows = ["editor", "shell"]
+```
+
+`alx wt add` reads that file, creates a worktree in the repo, spins up a tmux session named `<alias>-<worktree>` (e.g. `rem-user-signup`), copies any files listed in `copy_files`, runs the `on_create` command, and registers the session in demux's `private.toml` forwarding the `[demux]` block.
+
+Claude knows this workflow. It uses my CLI to take tickets independently with worktrees, opens PRs, and notifies me via `demux alert set ...`.
+
+demux will keep evolving as my workflow does. tmux and Neovim are constants ((Neo)?Vim for 15+ years, tmux for 5+). I don't expect to replace them any time soon.
+
+</details>
+
 ## Features
 
+- Jump fast across tmux sessions
 - Live sidebar of tmux sessions with git status (branch, dirty, ahead/behind)
 - Process list per session: CPU, memory, uptime, listening port, working directory
-- Alert system: set info/warn/error alerts on any window or pane
+- Alert system: set info/warn/error alerts on any window or pane, pluggable on any tool
 - Fuzzy search across sessions, windows, and processes
 - Compact popup mode for use in a tmux split or popup
 - Scriptable CLI: list sessions, procs, ports, alerts in text/table/json
