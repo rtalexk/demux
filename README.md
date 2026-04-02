@@ -25,8 +25,7 @@ and alerts, all without leaving the terminal.
 
 **Homebrew (macOS/Linux)**
 
-    brew tap rtalexk/demux
-    brew install demux
+    brew install rtalexk/demux/demux
 
 **Go**
 
@@ -45,42 +44,39 @@ Launch in compact mode (useful as a tmux popup):
 Set `DEMUX_POPUP=1` to make demux quit automatically after switching to a
 session. Pair this with a tmux popup binding:
 
-    bind-key D display-popup -w 40 -h 80% -E "DEMUX_POPUP=1 demux --compact"
+    bind-key K display-popup -E -w 80% -h 80% "DEMUX_POPUP=1 demux"
+    bind-key k display-popup -E -w 30% -h 80% "DEMUX_POPUP=1 demux --compact"
 
 Start with the search input focused:
 
     demux --search
 
-Generate a default config file:
-
-    demux config init > ~/.config/demux/demux.toml
-
 ## Key Bindings
 
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Move down / up |
-| `g` / `G` | Jump to top / bottom |
-| `J` / `K` | Jump down / up (large step) |
-| `h` | Focus sidebar |
-| `l` | Focus process list |
-| `enter` | Switch to session |
-| `o` | Open / attach to session |
-| `y` | Yank session name to clipboard |
-| `x` | Kill selected process |
-| `r` | Restart selected process |
-| `L` | View process log |
-| `R` | Force refresh |
-| `t` | Filter: tmux sessions only |
-| `a` | Filter: all sessions |
-| `c` | Filter: config sessions only |
-| `w` | Filter: worktree sessions only |
-| `!` | Filter: sessions with alerts |
-| `tab` / `shift+tab` | Cycle focus |
-| `[` / `]` | Collapse / expand process group |
-| `{` / `}` | Collapse / expand all groups |
-| `?` | Toggle help overlay |
-| `q` / `ctrl+c` | Quit |
+| Key                 | Action                          |
+| ------------------- | ------------------------------- |
+| `j` / `k`           | Move down / up                  |
+| `g` / `G`           | Jump to top / bottom            |
+| `J` / `K`           | Jump down / up (large step)     |
+| `h`                 | Focus sidebar                   |
+| `l`                 | Focus process list              |
+| `enter`             | Switch to session               |
+| `o`                 | Open / attach to session        |
+| `y`                 | Yank session name to clipboard  |
+| `x`                 | Kill selected process           |
+| `r`                 | Restart selected process        |
+| `L`                 | View process log                |
+| `R`                 | Force refresh                   |
+| `t`                 | Filter: tmux sessions only      |
+| `a`                 | Filter: all sessions            |
+| `c`                 | Filter: config sessions only    |
+| `w`                 | Filter: worktree sessions only  |
+| `!`                 | Filter: sessions with alerts    |
+| `tab` / `shift+tab` | Cycle focus                     |
+| `[` / `]`           | Collapse / expand process group |
+| `{` / `}`           | Collapse / expand all groups    |
+| `?`                 | Toggle help overlay             |
+| `q` / `ctrl+c`      | Quit                            |
 
 Press `?` inside the TUI for the full interactive reference.
 
@@ -177,6 +173,22 @@ Then paste the output into `~/.tmux.conf` and reload:
 
     tmux source ~/.tmux.conf
 
+This is my Tmux hooks configuration
+
+```tmux
+# Clears Demux alerts when switching between panes within the same window.
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+
+# Clears Demux alerts when switching windows (after-select-pane does not fire for window switches).
+set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+
+# Clears Demux alerts when switching sessions (after-select-window does not fire for session switches).
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+
+# Clears Demux alerts when switching back from another application.
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+```
+
 ### Tmux Status Bar
 
 Add a live alert summary to your tmux status bar:
@@ -185,6 +197,69 @@ Add a live alert summary to your tmux status bar:
 
 This outputs a colored count of active alerts (info, warn, error). When
 there are no alerts it shows a green indicator.
+
+### Claude
+
+I have the following configuration at `~/.claude/settings.json`. This will make Claude send demux alerts whenever it pauses for a permission prompt, waits for input, or finishes a task, so your tmux status line always reflects what Claude is doing in each pane.
+
+<details>
+
+<summary>Claude Notification settings</summary>
+
+```json
+    "Notification": [
+      {
+        "matcher": "permission_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting permission\" --level warn"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting input\" --level info"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task complete\" --level info"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"subagent complete\" --level info"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task failed\" --level error"
+          }
+        ]
+      }
+    ]
+```
+
+</details>
 
 ## CLI Reference
 
