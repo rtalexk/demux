@@ -87,31 +87,43 @@ demux will keep evolving as my workflow does. tmux and Neovim are constants ((Ne
 
 **Homebrew (macOS/Linux)**
 
-    brew install rtalexk/demux/demux
+```bash
+brew install rtalexk/demux/demux
+```
 
 **Go**
 
-    go install github.com/rtalexk/demux@latest
+```bash
+go install github.com/rtalexk/demux@latest
+```
 
 ## Quick Start
 
 Launch the TUI:
 
-    demux
+```bash
+demux
+```
 
 Launch in compact mode (useful as a tmux popup):
 
-    demux --compact
+```bash
+demux --compact
+```
 
 Set `DEMUX_POPUP=1` to make demux quit automatically after switching to a
 session. Pair this with a tmux popup binding:
 
-    bind-key K display-popup -E -w 80% -h 80% "DEMUX_POPUP=1 demux"
-    bind-key k display-popup -E -w 30% -h 80% "DEMUX_POPUP=1 demux --compact"
+```tmux
+bind-key K display-popup -E -w 80% -h 80% "DEMUX_POPUP=1 demux"
+bind-key k display-popup -E -w 30% -h 80% "DEMUX_POPUP=1 demux --compact"
+```
 
 Start with the search input focused:
 
-    demux --search
+```bash
+demux --search
+```
 
 ## Key Bindings
 
@@ -147,7 +159,9 @@ Press `?` inside the TUI for the full interactive reference.
 The default config path is `~/.config/demux/demux.toml`. Generate a
 commented starting point with:
 
-    demux config init > ~/.config/demux/demux.toml
+```bash
+demux config init > ~/.config/demux/demux.toml
+```
 
 The generated file is fully commented and covers all available options.
 
@@ -158,44 +172,52 @@ go in `~/.config/demux/private.toml`, which is gitignore-friendly.
 
 Add a session from the command line:
 
-    demux session config-add --name myproject --path ~/code/myproject
+```bash
+demux session config-add --name myproject --path ~/code/myproject
+```
 
 Or write it by hand:
 
-    [[session]]
-    name     = "myproject"          # must match the tmux session name
-    path     = "~/code/myproject"   # root directory of the session
-    group    = "work"               # optional group label in the sidebar
-    labels   = ["rust", "api"]      # optional tags
-    icon     = "⚙︎"                  # optional icon shown in the sidebar
-    worktree = false                # true if the path is a git worktree
-    windows  = ["editor", "term"]   # window templates to create on launch
+```toml
+[[session]]
+name     = "myproject"          # must match the tmux session name
+path     = "~/code/myproject"   # root directory of the session
+group    = "work"               # optional group label in the sidebar
+labels   = ["rust", "api"]      # optional tags
+icon     = "⚙︎"                  # optional icon shown in the sidebar
+worktree = false                # true if the path is a git worktree
+windows  = ["editor", "term"]   # window templates to create on launch
+```
 
 ### Window Templates
 
 Window templates let you define reusable tmux window layouts. They live in
 `sessions.toml` alongside your session entries.
 
-    [[window_templates]]
-    id               = "editor"         # referenced by [[session]].windows
-    name             = "editor"         # tmux window name
-    after_create_cmd = "nvim ."         # command to run after the window is created
+```toml
+[[window_templates]]
+id               = "editor"         # referenced by [[session]].windows
+name             = "editor"         # tmux window name
+after_create_cmd = "nvim ."         # command to run after the window is created
 
-    [[window_templates]]
-    id               = "term"
-    name             = "terminal"
-    after_create_cmd = ""
+[[window_templates]]
+id               = "term"
+name             = "terminal"
+after_create_cmd = ""
 
-    # inherit from another template and override fields
-    [[window_templates]]
-    id   = "server"
-    from = "term"                       # copies name and after_create_cmd from "term"
-    name = "server"
-    after_create_cmd = "cargo run"
+# inherit from another template and override fields
+[[window_templates]]
+id   = "server"
+from = "term"                       # copies name and after_create_cmd from "term"
+name = "server"
+after_create_cmd = "cargo run"
+```
 
 Create the windows for a session:
 
-    demux session create-windows --session myproject --windows editor,term,server
+```bash
+demux session create-windows --session myproject --windows editor,term,server
+```
 
 ### Path Aliases
 
@@ -203,17 +225,23 @@ Shorten verbose paths displayed in the TUI. The longest matching prefix wins.
 
 Before:
 
-    /Users/alex/code/myproject/src
+```
+/Users/alex/code/myproject/src
+```
 
 After (with the alias below):
 
-    ~/code/myproject/src
+```
+~/code/myproject/src
+```
 
 Config:
 
-    [[path_aliases]]
-    prefix  = "$HOME"   # supports environment variables
-    replace = "~"
+```toml
+[[path_aliases]]
+prefix  = "$HOME"   # supports environment variables
+replace = "~"
+```
 
 ### Theme
 
@@ -227,13 +255,17 @@ under the `[theme]` section of `demux.toml`.
 demux can automatically clear alerts when you navigate between panes,
 windows, or sessions. Print the hook configuration with:
 
-    demux hooks init --agent tmux
+```bash
+demux hooks init --agent tmux
+```
 
 > **Note:** The `--agent` flag will be renamed in a future version.
 
 Then paste the output into `~/.tmux.conf` and reload:
 
-    tmux source ~/.tmux.conf
+```bash
+tmux source ~/.tmux.conf
+```
 
 This is my Tmux hooks configuration
 
@@ -255,7 +287,9 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{sessio
 
 Add a live alert summary to your tmux status bar:
 
-    set -g status-right "#(demux status)"
+```tmux
+set -g status-right "#(demux status)"
+```
 
 This outputs a colored count of active alerts (info, warn, error). When
 there are no alerts it shows a green indicator.
@@ -268,111 +302,117 @@ I have the following configuration at `~/.claude/settings.json`. This will make 
 
 <summary>Claude Notification settings</summary>
 
-```json
+```jsonc
+{
+  "hooks": {
     "Notification": [
       {
         "matcher": "permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting permission\" --level warn"
-          }
-        ]
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting permission\" --level warn",
+          },
+        ],
       },
       {
         "matcher": "idle_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting input\" --level info"
-          }
-        ]
-      }
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting input\" --level info",
+          },
+        ],
+      },
     ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task complete\" --level info"
-          }
-        ]
-      }
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task complete\" --level info",
+          },
+        ],
+      },
     ],
     "SubagentStop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"subagent complete\" --level info"
-          }
-        ]
-      }
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"subagent complete\" --level info",
+          },
+        ],
+      },
     ],
     "StopFailure": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task failed\" --level error"
-          }
-        ]
-      }
-    ]
+            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task failed\" --level error",
+          },
+        ],
+      },
+    ],
+  },
+}
 ```
 
 </details>
 
 ## CLI Reference
 
-    demux                          # launch the TUI
-    demux --compact                # compact mode (sidebar + search only)
-    demux --search                 # start with search focused
-    demux --format text|table|json # output format for CLI commands
-    demux --log-level off|error|warn|info|debug
+```bash
+demux                          # launch the TUI
+demux --compact                # compact mode (sidebar + search only)
+demux --search                 # start with search focused
+demux --format text|table|json # output format for CLI commands
+demux --log-level off|error|warn|info|debug
 
-    demux session list             # list all tmux sessions
-    demux session list --git       # include git columns
-    demux session list --git-only  # session + git columns only
-    demux session config-add       --name <n> --path <p> [--group <g>] [--labels <l>] [--worktree] [--private]
-    demux session config-get       --name <n>
-    demux session config-remove    --name <n> [--private]
-    demux session create-windows   --session <n> --windows <ids>
+demux session list             # list all tmux sessions
+demux session list --git       # include git columns
+demux session list --git-only  # session + git columns only
+demux session config-add       --name <n> --path <p> [--group <g>] [--labels <l>] [--worktree] [--private]
+demux session config-get       --name <n>
+demux session config-remove    --name <n> [--private]
+demux session create-windows   --session <n> --windows <ids>
 
-    demux windows --session <n>    # list windows in a session
-    demux windows --session <n> --git
+demux windows --session <n>    # list windows in a session
+demux windows --session <n> --git
 
-    demux procs                    # list processes across all sessions
-    demux procs --session <n>      # filter to a session
-    demux procs --window <n:idx>   # filter to a window
-    demux procs --git              # include git column
+demux procs                    # list processes across all sessions
+demux procs --session <n>      # filter to a session
+demux procs --window <n:idx>   # filter to a window
+demux procs --git              # include git column
 
-    demux ports                    # list all TCP listening ports
+demux ports                    # list all TCP listening ports
 
-    demux alert list               # list active alerts
-    demux alert set   --target <session:window[.pane]> --reason <text> [--level info|warn|error]
-    demux alert remove --target <session:window[.pane]>
+demux alert list               # list active alerts
+demux alert set   --target <session:window[.pane]> --reason <text> [--level info|warn|error]
+demux alert remove --target <session:window[.pane]>
 
-    demux query <term>             # fuzzy search sessions, windows, processes
-    demux query <term> --session-name-only  # output session names only (for fzf)
+demux query <term>             # fuzzy search sessions, windows, processes
+demux query <term> --session-name-only  # output session names only (for fzf)
 
-    demux status                   # alert summary for tmux status bar
-    demux status --format json
+demux status                   # alert summary for tmux status bar
+demux status --format json
 
-    demux event pane_focus         # clear alerts for the focused pane (used by hooks)
+demux event pane_focus         # clear alerts for the focused pane (used by hooks)
 
-    demux config init              # print default config to stdout
-    demux hooks init --agent tmux|claude
+demux config init              # print default config to stdout
+demux hooks init --agent tmux|claude
+```
 
 ## Roadmap
 
+- **AI coding agent integration:** Surface the state of running AI agents
+  directly in the TUI.
 - **Sticky sidebar mode:** A persistent sidebar that retains its position
   and selection as you switch between sessions.
 - **Richer ports view:** Expand the `ports` command with process trees,
   protocol details, and per-session grouping.
 - **Richer session rows:** Show more at a glance on each sidebar row.
-- **AI coding agent integration:** Surface the state of running AI agents
-  directly in the TUI.
 - **Live config reload:** Pick up changes to `demux.toml` without
   restarting.
 - **Per-pane environment variables:** Inspect the environment of any pane
