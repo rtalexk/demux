@@ -384,6 +384,10 @@ Open an issue to report a bug or propose a feature. Pull requests are not
 being accepted yet; the project is still in its early stages. Starting a
 discussion first is the best way to get something considered.
 
+## Special thanks
+
+- [Sesh](https://github.com/joshmedeski/sesh), by Josh Medesky. Be sure to check it out and leave some ❤️
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
