@@ -79,13 +79,16 @@ type ThemeConfig struct {
     ColorAlertInfo   string `toml:"color_alert_info"`
     ColorAlertWarn   string `toml:"color_alert_warn"`
     ColorAlertError  string `toml:"color_alert_error"`
+    ColorAlertDefer  string `toml:"color_alert_defer"`
     ColorAlertInfoBg  string `toml:"color_alert_info_bg"`
     ColorAlertWarnBg  string `toml:"color_alert_warn_bg"`
     ColorAlertErrorBg string `toml:"color_alert_error_bg"`
+    ColorAlertDeferBg string `toml:"color_alert_defer_bg"`
 
     IconAlertInfo  string `toml:"icon_alert_info"`
     IconAlertWarn  string `toml:"icon_alert_warn"`
     IconAlertError string `toml:"icon_alert_error"`
+    IconAlertDefer string `toml:"icon_alert_defer"`
 
     IconTmuxSession string `toml:"icon_tmux_session"`
     IconCfgSession  string `toml:"icon_cfg_session"`
@@ -208,13 +211,16 @@ func Default() Config {
             ColorAlertInfo:   "#89b4fa",
             ColorAlertWarn:   "#f9e2af",
             ColorAlertError:  "#f38ba8",
+            ColorAlertDefer:  "#b4befe",
             ColorAlertInfoBg:  "#1a2a4d",
             ColorAlertWarnBg:  "#3d3500",
             ColorAlertErrorBg: "#3d1020",
+            ColorAlertDeferBg: "#1e1e2e",
 
             IconAlertInfo:  "ℹ️",
             IconAlertWarn:  "⚠️",
             IconAlertError: "🚨",
+            IconAlertDefer: "🔖",
 
             IconTmuxSession: "⊞",
             IconCfgSession:  "⚙︎",
