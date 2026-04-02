@@ -87,15 +87,17 @@ const tmuxHooksSnippet = `# demux tmux hooks
 #   parent window.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Clears alerts when switching between panes within the same window.
-set-hook -g after-select-pane      "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+# Clears Demux alerts when switching between panes within the same window.
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
-# Clears alerts when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window    "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+# Clears Demux alerts when switching windows (after-select-pane does not fire for window switches).
+set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
-# Clears alerts when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index}'"
+# Clears Demux alerts when switching sessions (after-select-window does not fire for session switches).
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
+# Clears Demux alerts when switching back from another application.
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
