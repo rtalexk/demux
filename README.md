@@ -24,7 +24,7 @@ I looked at a few tools ([Conductor](https://www.conductor.build/), [LazyAgent](
 
 I had already extended my personal CLI with commands to [manage git worktrees](https://github.com/rtalexk/dotfiles/tree/main/alx/cmd/worktree). I only discovered [Worktrunk](https://github.com/max-sixty/worktrunk) after the fact, and while my implementation is limited, it does what I need. I may switch eventually, but not any time soon.
 
-_opensessions_ came closest to what I was looking for, and its premise overlaps significantly with mine. But Sesh's UX is too deeply wired into my muscle memory. What I needed was Sesh, but with alerts and process information.
+_opensessions_ came closest to what I was looking for, and its premise overlaps significantly with mine. But Sesh's UX is too deeply wired into my muscle memory, and I was already mid-implementation anyway. What I needed was Sesh, but with alerts and process information.
 
 Why not just configure Claude to send OS-level notifications? I hate notifications. Almost all of them are blocked on my phone, and only a handful are allowed on the desktop. They're disorganized, and they interrupt flow. What I actually want is: _tell me you need attention, and I'll get to you when I'm free._
 
