@@ -1174,3 +1174,23 @@ func TestFormatAge(t *testing.T) {
         })
     }
 }
+
+func TestAlertSeverity(t *testing.T) {
+    tests := []struct {
+        level string
+        want  int
+    }{
+        {"defer", 0},
+        {"info", 1},
+        {"warn", 2},
+        {"error", 3},
+        {"unknown", 0},
+    }
+    for _, tt := range tests {
+        t.Run(tt.level, func(t *testing.T) {
+            if got := alertSeverity(tt.level); got != tt.want {
+                t.Errorf("alertSeverity(%q) = %d, want %d", tt.level, got, tt.want)
+            }
+        })
+    }
+}

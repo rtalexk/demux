@@ -100,10 +100,12 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 func alertSeverity(level string) int {
     switch level {
     case "error":
-        return 2
+        return 3
     case "warn":
+        return 2
+    case "info":
         return 1
-    default:
+    default: // "defer" and unknown values
         return 0
     }
 }
