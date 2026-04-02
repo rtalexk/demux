@@ -31,7 +31,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                             return m, nil
                         }
                         if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
-                            if err := tmux.CreateSessionWindows(sess.DisplayName, specs); err != nil {
+                            if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
                                 m.statusMsg = "window setup failed: " + err.Error()
                                 m.statusExp = time.Now().Add(5 * time.Second)
                             }
@@ -191,7 +191,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
                     return m, nil
                 }
                 if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
-                    if err := tmux.CreateSessionWindows(sess.DisplayName, specs); err != nil {
+                    if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
                         m.statusMsg = "window setup failed: " + err.Error()
                         m.statusExp = time.Now().Add(5 * time.Second)
                     }

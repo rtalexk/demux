@@ -203,6 +203,14 @@ func runSessionCreateWindows(_ *cobra.Command, _ []string) error {
         return err
     }
 
+    var sessionPath string
+    for _, e := range cfg.Entries {
+        if e.DisplayName() == sessionCreateWindowsSession {
+            sessionPath = e.Path
+            break
+        }
+    }
+
     var ids []string
     for _, id := range strings.Split(sessionCreateWindowsIDs, ",") {
         if t := strings.TrimSpace(id); t != "" {
@@ -218,7 +226,7 @@ func runSessionCreateWindows(_ *cobra.Command, _ []string) error {
         return fmt.Errorf("no valid window templates resolved from %q", sessionCreateWindowsIDs)
     }
 
-    return tmux.CreateSessionWindows(sessionCreateWindowsSession, specs)
+    return tmux.CreateSessionWindows(sessionCreateWindowsSession, sessionPath, specs)
 }
 
 // --- helpers ---
