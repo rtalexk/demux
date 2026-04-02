@@ -132,6 +132,10 @@ type LogConfig struct {
     Level string `toml:"level"` // off|error|warn|info|debug
 }
 
+type AlertsConfig struct {
+    DeferDefaultReason string `toml:"defer_default_reason"`
+}
+
 type Config struct {
     RefreshIntervalMs int               `toml:"refresh_interval_ms"`
     IgnoredSessions   []string          `toml:"ignored_sessions"`
@@ -142,6 +146,7 @@ type Config struct {
     ProcessList       ProcessListConfig `toml:"process_list"`
     StatusBar         StatusBarConfig   `toml:"status_bar"`
     Log               LogConfig         `toml:"log"`
+    Alerts            AlertsConfig      `toml:"alerts"`
     Git               GitConfig         `toml:"git"`
     Theme             ThemeConfig       `toml:"theme"`
     PathAliases       []PathAlias       `toml:"path_aliases"`
@@ -165,6 +170,9 @@ func Default() Config {
         },
         StatusBar: StatusBarConfig{Show: true},
         Log:       LogConfig{Level: "warn"},
+        Alerts: AlertsConfig{
+            DeferDefaultReason: "Come back",
+        },
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,
