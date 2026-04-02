@@ -5,12 +5,12 @@ before:
     - go mod tidy
 
 builds:
-  - binary: demux
+  - id: linux-windows
+    binary: demux
     env:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
     goarch:
       - amd64
@@ -18,6 +18,16 @@ builds:
     ignore:
       - goos: windows
         goarch: arm64
+
+  - id: darwin
+    binary: demux
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
 
 archives:
   - formats: [tar.gz]
