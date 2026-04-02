@@ -23,6 +23,7 @@ const (
     LevelInfo  AlertLevel = "info"
     LevelWarn  AlertLevel = "warn"
     LevelError AlertLevel = "error"
+    LevelDefer AlertLevel = "defer"
 )
 
 type Alert struct {
