@@ -42,8 +42,8 @@ func TestHelpSection_TotalWidth(t *testing.T) {
 
 func TestHelpRender_AllSectionHeaders(t *testing.T) {
     initStyles(Theme{}, config.ProcessesConfig{}, nil)
-    out := stripANSI(HelpModel{}.Render())
-    for _, section := range []string{"Global", "Sidebar", "Filters", "Process list"} {
+    out := stripANSI(HelpModel{}.Render(0))
+    for _, section := range []string{"Global", "Navigation", "Sidebar", "Filters", "Process list"} {
         if !strings.Contains(out, section) {
             t.Errorf("expected section %q in help output", section)
         }
@@ -52,7 +52,7 @@ func TestHelpRender_AllSectionHeaders(t *testing.T) {
 
 func TestHelpRender_KeyBindings(t *testing.T) {
     initStyles(Theme{}, config.ProcessesConfig{}, nil)
-    out := stripANSI(HelpModel{}.Render())
+    out := stripANSI(HelpModel{}.Render(0))
     for _, want := range []string{
         "h / l",   // corrected focus keys (was 1/2)
         "ctrl+u",  // clear filter

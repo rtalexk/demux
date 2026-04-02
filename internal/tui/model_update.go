@@ -22,9 +22,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     // Delegate to overlay handlers first
     if m.showHelp {
         if msg, ok := msg.(tea.KeyMsg); ok {
-            if key.Matches(msg, keys.Esc) || key.Matches(msg, keys.Help) || msg.String() == "q" {
+            switch {
+            case key.Matches(msg, keys.Esc), key.Matches(msg, keys.Help), msg.String() == "q":
                 m.showHelp = false
-                return m, nil
+            case key.Matches(msg, keys.Up):
+                m.help.ScrollUp()
+            case key.Matches(msg, keys.Down):
+                m.help.ScrollDown(m.height)
             }
         }
         return m, nil

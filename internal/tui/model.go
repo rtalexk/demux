@@ -232,7 +232,7 @@ func (m Model) View() string {
     }
 
     if m.showHelp {
-        return overlayCenter(m.help.Render(), full, m.width, m.height)
+        return overlayCenter(m.help.Render(m.height), full, m.width, m.height)
     }
     if m.showYank {
         return overlayCenter(m.yank.Render(), full, m.width, m.height)
@@ -294,7 +294,7 @@ func (m Model) compactView() string {
     }
 
     if m.showHelp {
-        return overlayCenter(m.help.Render(), full, m.width, m.height)
+        return overlayCenter(m.help.Render(m.height), full, m.width, m.height)
     }
     if m.showYank {
         return overlayCenter(m.yank.Render(), full, m.width, m.height)
