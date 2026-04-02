@@ -5,9 +5,9 @@ import (
     "testing"
     "time"
 
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 // ── overlayCenter ─────────────────────────────────────────────────────────────

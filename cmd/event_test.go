@@ -3,7 +3,7 @@ package cmd
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/db"
+    "github.com/rtalexk/demux/internal/db"
 )
 
 func TestWindowTargetFromPane_WithPane(t *testing.T) {

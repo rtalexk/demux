@@ -4,11 +4,11 @@ import (
     "strings"
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/git"
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/git"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 // buildNodes constructs a ProcListNode slice for use in tests.

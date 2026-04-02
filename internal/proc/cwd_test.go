@@ -4,7 +4,7 @@ import (
     "os"
     "testing"
 
-    "github.com/rtalex/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/proc"
 )
 
 func TestCWDCurrentProcess(t *testing.T) {

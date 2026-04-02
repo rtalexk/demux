@@ -3,7 +3,7 @@ package git_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/git"
+    "github.com/rtalexk/demux/internal/git"
 )
 
 func TestFetchConcurrent_empty(t *testing.T) {

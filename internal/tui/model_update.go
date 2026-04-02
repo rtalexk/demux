@@ -10,12 +10,12 @@ import (
     "github.com/charmbracelet/bubbles/key"
     tea "github.com/charmbracelet/bubbletea"
     "github.com/charmbracelet/lipgloss"
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/git"
-    demuxlog "github.com/rtalex/demux/internal/log"
-    "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/session"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/git"
+    demuxlog "github.com/rtalexk/demux/internal/log"
+    "github.com/rtalexk/demux/internal/query"
+    "github.com/rtalexk/demux/internal/session"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

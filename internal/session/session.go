@@ -3,7 +3,7 @@ package session
 import (
     "time"
 
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 // WindowTemplate defines a reusable window configuration in sessions.toml.

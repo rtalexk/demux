@@ -1,4 +1,4 @@
-module github.com/rtalex/demux
+module github.com/rtalexk/demux
 
 go 1.26.1
 

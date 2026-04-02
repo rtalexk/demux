@@ -7,7 +7,7 @@ import (
     "testing"
     "time"
 
-    "github.com/rtalex/demux/internal/db"
+    "github.com/rtalexk/demux/internal/db"
 )
 
 func openTestDB(t *testing.T) *db.DB {

@@ -5,7 +5,7 @@ import (
     "testing"
 
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 func TestCompactView_OmitsProcList(t *testing.T) {

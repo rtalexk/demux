@@ -3,7 +3,7 @@ package format
 import (
     "strings"
 
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 // ShortenPath replaces the longest matching prefix in path with its alias.

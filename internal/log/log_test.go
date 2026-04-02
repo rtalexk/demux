@@ -5,7 +5,7 @@ import (
     "strings"
     "testing"
 
-    demuxlog "github.com/rtalex/demux/internal/log"
+    demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
 func TestLevels(t *testing.T) {

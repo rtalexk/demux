@@ -3,7 +3,7 @@ package config_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 func TestValidate_defaults_clean(t *testing.T) {

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/rtalex/demux/cmd"
+import "github.com/rtalexk/demux/cmd"
 
 func main() {
     cmd.Execute()

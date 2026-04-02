@@ -3,7 +3,7 @@ package tmux_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func TestParsePanes(t *testing.T) {

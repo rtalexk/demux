@@ -1,8 +1,8 @@
 package query
 
 import (
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/tmux"
     "github.com/sahilm/fuzzy"
 )
 

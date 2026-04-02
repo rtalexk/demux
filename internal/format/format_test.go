@@ -4,7 +4,7 @@ import (
     "strings"
     "testing"
 
-    "github.com/rtalex/demux/internal/format"
+    "github.com/rtalexk/demux/internal/format"
 )
 
 type row struct{ A, B string }

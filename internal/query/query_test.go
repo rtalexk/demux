@@ -3,9 +3,9 @@ package query_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/query"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func TestParse(t *testing.T) {

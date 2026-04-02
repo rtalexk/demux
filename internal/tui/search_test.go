@@ -4,7 +4,7 @@ import (
     "strings"
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 func initSearchStyles() {

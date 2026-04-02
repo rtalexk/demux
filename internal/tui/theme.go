@@ -2,7 +2,7 @@ package tui
 
 import (
     "github.com/charmbracelet/lipgloss"
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 // Theme holds all colour values used across the TUI.

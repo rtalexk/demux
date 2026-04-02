@@ -4,9 +4,9 @@ import (
     "fmt"
     "sort"
 
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func sortPanes(panes []tmux.Pane) []tmux.Pane {

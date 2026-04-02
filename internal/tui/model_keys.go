@@ -6,8 +6,8 @@ import (
 
     "github.com/charmbracelet/bubbles/key"
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/query"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

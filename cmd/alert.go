@@ -3,7 +3,7 @@ package cmd
 import (
     "fmt"
 
-    "github.com/rtalex/demux/internal/format"
+    "github.com/rtalexk/demux/internal/format"
     "github.com/spf13/cobra"
 )
 

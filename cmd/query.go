@@ -4,8 +4,8 @@ import (
     "fmt"
     "sort"
 
-    "github.com/rtalex/demux/internal/format"
-    "github.com/rtalex/demux/internal/query"
+    "github.com/rtalexk/demux/internal/format"
+    "github.com/rtalexk/demux/internal/query"
     "github.com/spf13/cobra"
 )
 

@@ -11,14 +11,14 @@ import (
     "github.com/charmbracelet/lipgloss"
     xansi "github.com/charmbracelet/x/ansi"
     runewidth "github.com/mattn/go-runewidth"
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/git"
-    demuxlog "github.com/rtalex/demux/internal/log"
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/session"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/git"
+    demuxlog "github.com/rtalexk/demux/internal/log"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/query"
+    "github.com/rtalexk/demux/internal/session"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 type panel int

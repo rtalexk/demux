@@ -6,7 +6,7 @@ import (
     "strings"
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 func containsStr(s []string, v string) bool {

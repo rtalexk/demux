@@ -3,7 +3,7 @@ package cmd
 import (
     "strings"
 
-    "github.com/rtalex/demux/internal/db"
+    "github.com/rtalexk/demux/internal/db"
     "github.com/spf13/cobra"
 )
 

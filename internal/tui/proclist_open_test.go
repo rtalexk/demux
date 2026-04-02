@@ -3,7 +3,7 @@ package tui
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func makeTestProcListWithNodes(nodes []ProcListNode) ProcListModel {

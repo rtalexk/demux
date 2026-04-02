@@ -3,8 +3,8 @@ package format_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/format"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/format"
 )
 
 func TestShortenPath_NoAliases(t *testing.T) {

@@ -4,11 +4,11 @@ import (
     "time"
 
     tea "github.com/charmbracelet/bubbletea"
-    "github.com/rtalex/demux/internal/git"
-    demuxlog "github.com/rtalex/demux/internal/log"
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/session"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/git"
+    demuxlog "github.com/rtalexk/demux/internal/log"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/session"
+    "github.com/rtalexk/demux/internal/tmux"
 )
 
 func tick(interval time.Duration) tea.Cmd {

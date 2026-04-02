@@ -5,10 +5,10 @@ import (
     "os"
 
     "github.com/mattn/go-isatty"
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/db"
-    demuxlog "github.com/rtalex/demux/internal/log"
-    "github.com/rtalex/demux/internal/tui"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/db"
+    demuxlog "github.com/rtalexk/demux/internal/log"
+    "github.com/rtalexk/demux/internal/tui"
     "github.com/spf13/cobra"
 )
 

@@ -6,9 +6,9 @@ import (
     "path/filepath"
     "strings"
 
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/session"
-    "github.com/rtalex/demux/internal/tmux"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/session"
+    "github.com/rtalexk/demux/internal/tmux"
     "github.com/spf13/cobra"
 )
 

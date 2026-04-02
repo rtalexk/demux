@@ -4,7 +4,7 @@ import (
     "os"
     "testing"
 
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 func TestNew_PopupMode_Enabled(t *testing.T) {

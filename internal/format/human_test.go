@@ -4,7 +4,7 @@ import (
     "testing"
     "time"
 
-    "github.com/rtalex/demux/internal/format"
+    "github.com/rtalexk/demux/internal/format"
 )
 
 func TestAge(t *testing.T) {

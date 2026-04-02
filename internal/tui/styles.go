@@ -2,7 +2,7 @@ package tui
 
 import (
     "github.com/charmbracelet/lipgloss"
-    "github.com/rtalex/demux/internal/config"
+    "github.com/rtalexk/demux/internal/config"
 )
 
 // activeTheme is set once at startup by initStyles.

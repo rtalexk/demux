@@ -9,11 +9,11 @@ import (
     "time"
 
     "github.com/charmbracelet/lipgloss"
-    "github.com/rtalex/demux/internal/config"
-    "github.com/rtalex/demux/internal/db"
-    "github.com/rtalex/demux/internal/git"
-    "github.com/rtalex/demux/internal/query"
-    "github.com/rtalex/demux/internal/session"
+    "github.com/rtalexk/demux/internal/config"
+    "github.com/rtalexk/demux/internal/db"
+    "github.com/rtalexk/demux/internal/git"
+    "github.com/rtalexk/demux/internal/query"
+    "github.com/rtalexk/demux/internal/session"
 )
 
 // SidebarFilter determines which sessions are visible in the sidebar.

@@ -6,9 +6,9 @@ import (
     "time"
 
     "github.com/charmbracelet/lipgloss"
-    "github.com/rtalex/demux/internal/format"
-    "github.com/rtalex/demux/internal/proc"
-    "github.com/rtalex/demux/internal/query"
+    "github.com/rtalexk/demux/internal/format"
+    "github.com/rtalexk/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/query"
 )
 
 func (p ProcListModel) Render(width, height int, focused bool, title string) string {

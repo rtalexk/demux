@@ -3,7 +3,7 @@ package proc_test
 import (
     "testing"
 
-    "github.com/rtalex/demux/internal/proc"
+    "github.com/rtalexk/demux/internal/proc"
 )
 
 func TestParseLsofPorts(t *testing.T) {

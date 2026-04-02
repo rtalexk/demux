@@ -4,7 +4,7 @@ import (
     "strings"
     "testing"
 
-    "github.com/rtalex/demux/internal/git"
+    "github.com/rtalexk/demux/internal/git"
 )
 
 func TestDetailRender_clipsContentToHeight(t *testing.T) {
