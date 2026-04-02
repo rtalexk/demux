@@ -5,16 +5,6 @@ import (
     "testing"
 )
 
-func TestResolveAgent_Claude(t *testing.T) {
-    def, err := resolveAgent("claude")
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-    if def.snippet != claudeHooksSnippet {
-        t.Errorf("snippet mismatch")
-    }
-}
-
 func TestResolveAgent_Unknown(t *testing.T) {
     _, err := resolveAgent("aider")
     if err == nil {
@@ -23,9 +13,6 @@ func TestResolveAgent_Unknown(t *testing.T) {
     msg := err.Error()
     if !strings.Contains(msg, "aider") {
         t.Errorf("error should mention the bad value, got: %s", msg)
-    }
-    if !strings.Contains(msg, "claude") {
-        t.Errorf("error should list supported agents, got: %s", msg)
     }
     if !strings.Contains(msg, "tmux") {
         t.Errorf("error should list tmux as supported agent, got: %s", msg)

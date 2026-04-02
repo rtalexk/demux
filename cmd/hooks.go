@@ -10,7 +10,7 @@ import (
     "github.com/spf13/cobra"
 )
 
-var hooksInitAgent string
+var hooksInitTool string
 
 var hooksCmd = &cobra.Command{
     Use:   "hooks",
@@ -20,14 +20,13 @@ var hooksCmd = &cobra.Command{
 var hooksInitCmd = &cobra.Command{
     Use:   "init",
     Short: "Print hook configuration for an AI agent",
-    Long: `Prints a configuration snippet for the specified AI agent.
+    Long: `Prints a configuration snippet for the specified tool.
 
-Supported agents: claude, tmux
+Supported tools: tmux
 
-For --agent claude, prints a JSON snippet to add to ~/.claude/settings.json.
-For --agent tmux, prints hook lines to add to ~/.tmux.conf.`,
+For --tool tmux, prints hook lines to add to ~/.tmux.conf.`,
     RunE: func(cmd *cobra.Command, args []string) error {
-        def, err := resolveAgent(hooksInitAgent)
+        def, err := resolveAgent(hooksInitTool)
         if err != nil {
             return err
         }
@@ -41,8 +40,7 @@ type agentDef struct {
 }
 
 var agentDefs = map[string]agentDef{
-    "tmux":   {snippet: tmuxHooksSnippet},
-    "claude": {snippet: claudeHooksSnippet},
+    "tmux": {snippet: tmuxHooksSnippet},
 }
 
 func resolveAgent(name string) (agentDef, error) {
@@ -54,7 +52,7 @@ func resolveAgent(name string) (agentDef, error) {
         supported = append(supported, k)
     }
     sort.Strings(supported)
-    return agentDef{}, fmt.Errorf("unknown agent %q: supported agents: %s", name, strings.Join(supported, ", "))
+    return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
 }
 
 // tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
@@ -101,15 +99,9 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{sessio
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
-const claudeHooksSnippet = `# Claude Code hooks for demux
-# ──────────────────────────────────────────────────────────────────────────────
-# No Claude Code hooks are configured yet.
-# ──────────────────────────────────────────────────────────────────────────────
-`
-
 func init() {
-    hooksInitCmd.Flags().StringVar(&hooksInitAgent, "agent", "", "AI agent to configure (required): claude, tmux")
-    hooksInitCmd.MarkFlagRequired("agent")
+    hooksInitCmd.Flags().StringVar(&hooksInitTool, "tool", "", "Tool to configure (required): tmux")
+    hooksInitCmd.MarkFlagRequired("tool")
     hooksCmd.AddCommand(hooksInitCmd)
     rootCmd.AddCommand(hooksCmd)
 }
