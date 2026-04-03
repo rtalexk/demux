@@ -44,10 +44,14 @@ type ProcListModel struct {
     collapsedPIDs   map[int32]bool // persists collapse state across SetWindowData calls
     pendingSeekKey  string         // node identity to restore cursor after next rebuild
     inSessionMode   bool           // true when displaying all windows of a session
+    sessionAlert    *db.Alert
     cfg             config.Config
     searchQuery     query.ParsedQuery
     queryResult     query.Result
 }
+
+// TODO: single-window mode (SetWindowData) must be removed — selecting individual
+// windows from the sidebar is no longer a feature.
 
 // SetWindowData rebuilds the node list from pre-fetched data.
 // procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched),
@@ -56,6 +60,7 @@ type ProcListModel struct {
 func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, alertMap map[string]db.Alert, cfg config.Config) {
     p.cfg = cfg
     p.inSessionMode = false
+    p.sessionAlert = nil
     grouped := tmux.GroupBySessions(panes)
     windows := grouped[session]
     p.primaryCWD = tmux.PrimaryPaneCWD(windows[0])
@@ -196,6 +201,12 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
     sessionChanged := session != p.curSession || p.curWindow != -1
     p.curSession = session
     p.curWindow = -1
+    p.sessionAlert = nil
+    if alertMap != nil {
+        if a, ok := alertMap[session]; ok {
+            p.sessionAlert = &a
+        }
+    }
     p.nodes = nil
     if sessionChanged {
         p.cursor = 0

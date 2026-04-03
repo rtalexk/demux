@@ -24,6 +24,10 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
         rightTitle = " " + format.ShortenPath(p.primaryCWD, p.cfg.PathAliases) + " "
     }
 
+    if p.sessionAlert != nil {
+        title += paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Reason)
+    }
+
     if len(p.nodes) == 0 {
         hint := "Select a window with Enter"
         inner := noSelectionStyle.Render(hint)

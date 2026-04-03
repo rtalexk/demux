@@ -1437,6 +1437,52 @@ func TestSetSessionData_SetsWindowAlert(t *testing.T) {
     }
 }
 
+func TestSetSessionData_StoresSessionAlert(t *testing.T) {
+    a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "needs attention"}
+    alertMap := map[string]db.Alert{"s": a}
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
+    )
+    if m.sessionAlert == nil {
+        t.Fatal("expected sessionAlert to be set")
+    }
+    if m.sessionAlert.Reason != "needs attention" {
+        t.Errorf("unexpected reason: %q", m.sessionAlert.Reason)
+    }
+}
+
+func TestSetSessionData_ClearsSessionAlertWhenAbsent(t *testing.T) {
+    a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "old alert"}
+    alertMap := map[string]db.Alert{"s": a}
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
+    )
+    // second call with no session-level alert — field must be cleared
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+    )
+    if m.sessionAlert != nil {
+        t.Errorf("expected sessionAlert to be nil, got %+v", m.sessionAlert)
+    }
+}
+
+func TestSetSessionData_SessionAlertRenderedInTitle(t *testing.T) {
+    a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "needs attention"}
+    alertMap := map[string]db.Alert{"s": a}
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
+    )
+    rendered := m.Render(80, 20, false, " [l] s ")
+    topLine := strings.SplitN(rendered, "\n", 2)[0]
+    plain := stripANSI(topLine)
+    if !strings.Contains(plain, "needs attention") {
+        t.Errorf("expected alert reason in top border, got: %q", plain)
+    }
+}
+
 func TestSetSessionData_ResetsCursorOnSessionChange(t *testing.T) {
     var m ProcListModel
     m.SetSessionData(buildSessionPanes(), "s",
