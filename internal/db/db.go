@@ -19,7 +19,11 @@ func Open(path string) (*DB, error) {
 			return nil, fmt.Errorf("db dir: %w", err)
 		}
 	}
-	sqldb, err := sql.Open("sqlite", path)
+	dsn := path
+	if path != ":memory:" {
+		dsn = path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	}
+	sqldb, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
