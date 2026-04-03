@@ -1,73 +1,73 @@
 package cmd
 
 import (
-    "fmt"
-    "os"
-    "os/exec"
-    "sort"
-    "strings"
+	"fmt"
+	"os"
+	"os/exec"
+	"sort"
+	"strings"
 
-    "github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 )
 
 var hooksInitTool string
 
 var hooksCmd = &cobra.Command{
-    Use:   "hooks",
-    Short: "AI agent hook utilities",
+	Use:   "hooks",
+	Short: "AI agent hook utilities",
 }
 
 var hooksInitCmd = &cobra.Command{
-    Use:   "init",
-    Short: "Print hook configuration for an AI agent",
-    Long: `Prints a configuration snippet for the specified tool.
+	Use:   "init",
+	Short: "Print hook configuration for an AI agent",
+	Long: `Prints a configuration snippet for the specified tool.
 
 Supported tools: tmux
 
 For --tool tmux, prints hook lines to add to ~/.tmux.conf.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        def, err := resolveAgent(hooksInitTool)
-        if err != nil {
-            return err
-        }
-        fmt.Print(def.snippet)
-        return nil
-    },
+	RunE: func(cmd *cobra.Command, args []string) error {
+		def, err := resolveAgent(hooksInitTool)
+		if err != nil {
+			return err
+		}
+		fmt.Print(def.snippet)
+		return nil
+	},
 }
 
 type agentDef struct {
-    snippet string
+	snippet string
 }
 
 var agentDefs = map[string]agentDef{
-    "tmux": {snippet: tmuxHooksSnippet},
+	"tmux": {snippet: tmuxHooksSnippet},
 }
 
 func resolveAgent(name string) (agentDef, error) {
-    if def, ok := agentDefs[name]; ok {
-        return def, nil
-    }
-    supported := make([]string, 0, len(agentDefs))
-    for k := range agentDefs {
-        supported = append(supported, k)
-    }
-    sort.Strings(supported)
-    return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
+	if def, ok := agentDefs[name]; ok {
+		return def, nil
+	}
+	supported := make([]string, 0, len(agentDefs))
+	for k := range agentDefs {
+		supported = append(supported, k)
+	}
+	sort.Strings(supported)
+	return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
 }
 
 // tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
 // It uses $TMUX_PANE (set by tmux at process start) so the result always refers
 // to the pane where the agent was launched, not the currently focused pane.
 func tmuxPaneTarget() (string, error) {
-    args := []string{"display-message", "-p", "#S:#I.#P"}
-    if pane := os.Getenv("TMUX_PANE"); pane != "" {
-        args = []string{"display-message", "-t", pane, "-p", "#S:#I.#P"}
-    }
-    out, err := exec.Command("tmux", args...).Output()
-    if err != nil {
-        return "", fmt.Errorf("get tmux pane target: %w", err)
-    }
-    return strings.TrimSpace(string(out)), nil
+	args := []string{"display-message", "-p", "#S:#I.#P"}
+	if pane := os.Getenv("TMUX_PANE"); pane != "" {
+		args = []string{"display-message", "-t", pane, "-p", "#S:#I.#P"}
+	}
+	out, err := exec.Command("tmux", args...).Output()
+	if err != nil {
+		return "", fmt.Errorf("get tmux pane target: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 const tmuxHooksSnippet = `# demux tmux hooks
@@ -100,8 +100,8 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{sessio
 `
 
 func init() {
-    hooksInitCmd.Flags().StringVar(&hooksInitTool, "tool", "", "Tool to configure (required): tmux")
-    hooksInitCmd.MarkFlagRequired("tool")
-    hooksCmd.AddCommand(hooksInitCmd)
-    rootCmd.AddCommand(hooksCmd)
+	hooksInitCmd.Flags().StringVar(&hooksInitTool, "tool", "", "Tool to configure (required): tmux")
+	hooksInitCmd.MarkFlagRequired("tool")
+	hooksCmd.AddCommand(hooksInitCmd)
+	rootCmd.AddCommand(hooksCmd)
 }
