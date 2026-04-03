@@ -42,6 +42,8 @@ func (d *DB) AlertSet(target, reason, level string) error {
             reason     = excluded.reason,
             level      = excluded.level,
             created_at = excluded.created_at
+        WHERE (CASE excluded.level WHEN 'error' THEN 3 WHEN 'warn' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
+            >= (CASE alerts.level WHEN 'error' THEN 3 WHEN 'warn' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
     `, target, reason, level)
     return err
 }
