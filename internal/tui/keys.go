@@ -59,7 +59,7 @@ var keys = keyMap{
 	FilterAll:      key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "all")),
 	FilterConfig:   key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "config")),
 	FilterWorktree: key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "worktree")),
-	Open:           key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open/attach")),
+	Open:           key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o/ctrl+o", "open/attach")),
 	AlertFilter:    key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "alert filter")),
 	Expand:         key.NewBinding(key.WithKeys("]")),
 	Collapse:       key.NewBinding(key.WithKeys("[")),
