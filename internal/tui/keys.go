@@ -32,6 +32,7 @@ type keyMap struct {
     Collapse      key.Binding
     ExpandAll     key.Binding
     CollapseAll   key.Binding
+    Defer         key.Binding
 }
 
 var keys = keyMap{
@@ -64,4 +65,5 @@ var keys = keyMap{
     Collapse:      key.NewBinding(key.WithKeys("[")),
     ExpandAll:     key.NewBinding(key.WithKeys("}")),
     CollapseAll:   key.NewBinding(key.WithKeys("{")),
+    Defer:         key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "defer")),
 }
