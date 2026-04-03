@@ -27,6 +27,7 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	sqldb.SetMaxOpenConns(1)
 	d := &DB{sql: sqldb}
 	if err := d.migrate(); err != nil {
 		return nil, err
