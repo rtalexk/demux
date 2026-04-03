@@ -1468,6 +1468,21 @@ func TestSetSessionData_ClearsSessionAlertWhenAbsent(t *testing.T) {
     }
 }
 
+func TestSetSessionData_SessionAlertRenderedInTitle(t *testing.T) {
+    a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "needs attention"}
+    alertMap := map[string]db.Alert{"s": a}
+    var m ProcListModel
+    m.SetSessionData(buildSessionPanes(), "s",
+        nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
+    )
+    rendered := m.Render(80, 20, false, " [l] s ")
+    topLine := strings.SplitN(rendered, "\n", 2)[0]
+    plain := stripANSI(topLine)
+    if !strings.Contains(plain, "needs attention") {
+        t.Errorf("expected alert reason in top border, got: %q", plain)
+    }
+}
+
 func TestSetSessionData_ResetsCursorOnSessionChange(t *testing.T) {
     var m ProcListModel
     m.SetSessionData(buildSessionPanes(), "s",
