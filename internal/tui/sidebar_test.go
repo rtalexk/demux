@@ -528,6 +528,32 @@ func TestRebuildNodes_PrioritySort_SeverityBeatsRecency(t *testing.T) {
     }
 }
 
+// TestRebuildNodes_PrioritySort_TiebreakerIgnoresLowerLevelAlert is the
+// regression test for the bug where a session with [warn (old), defer (new)]
+// sorted before a session with [warn (recent)] because the defer timestamp was
+// used as the tiebreaker instead of restricting to the matching severity.
+func TestRebuildNodes_PrioritySort_TiebreakerIgnoresLowerLevelAlert(t *testing.T) {
+    // hf has a warn (9m) and a newer defer (11s). dm has a warn (7m).
+    // Both highest severities are equal (warn). Tiebreaker must compare only
+    // the warn timestamps: dm's warn (7m) is more recent, so dm sorts first.
+    now := time.Now()
+    s := SidebarModel{
+        sessions: makeSessions("hf-add-to-home-screen", "dm-main"),
+        alerts: map[string]db.Alert{
+            "hf-add-to-home-screen:0.1": {Target: "hf-add-to-home-screen:0.1", Level: "warn", CreatedAt: now.Add(-9 * time.Minute)},
+            "hf-add-to-home-screen":     {Target: "hf-add-to-home-screen", Level: "defer", CreatedAt: now.Add(-11 * time.Second)},
+            "dm-main:0.1":               {Target: "dm-main:0.1", Level: "warn", CreatedAt: now.Add(-7 * time.Minute)},
+        },
+    }
+    s.rebuildNodes()
+    if len(s.nodes) < 2 {
+        t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+    }
+    if s.nodes[0].Session != "dm-main" {
+        t.Errorf("expected dm-main (newer warn) first, got %q", s.nodes[0].Session)
+    }
+}
+
 // --- Alert filter ---
 
 func TestRebuildNodes_LastSeenSort(t *testing.T) {

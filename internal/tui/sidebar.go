@@ -125,6 +125,20 @@ func (s *SidebarModel) newestSessionAlert(sess string) time.Time {
     return newest
 }
 
+// newestAlertAtSeverity returns the most recent CreatedAt among alerts for a
+// session whose alertSeverity equals sv, or zero time if none match.
+func (s *SidebarModel) newestAlertAtSeverity(sess string, sv int) time.Time {
+    var newest time.Time
+    for target, a := range s.alerts {
+        if strings.HasPrefix(target, sess+":") || target == sess {
+            if alertSeverity(a.Level) == sv && a.CreatedAt.After(newest) {
+                newest = a.CreatedAt
+            }
+        }
+    }
+    return newest
+}
+
 // highestSessionAlertSeverity returns the maximum alertSeverity value across
 // all alerts belonging to the session, or -1 if the session has no alerts.
 func (s *SidebarModel) highestSessionAlertSeverity(sess string) int {
@@ -311,8 +325,8 @@ func (s *SidebarModel) rebuildNodes() {
                     if svi != svj {
                         return svi > svj
                     }
-                    ti := s.newestSessionAlert(si.DisplayName)
-                    tj := s.newestSessionAlert(sj.DisplayName)
+                    ti := s.newestAlertAtSeverity(si.DisplayName, svi)
+                    tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
                     if !ti.Equal(tj) {
                         return ti.After(tj)
                     }
