@@ -580,11 +580,14 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if maxName < 4 {
         maxName = 4
     }
-    nameRunes := []rune(node.Session)
-    if len(nameRunes) > maxName {
-        nameRunes = append(nameRunes[:maxName-1], '…')
+    nameStr := node.Session
+    if runewidth.StringWidth(nameStr) > maxName {
+        runes := []rune(nameStr)
+        for runewidth.StringWidth(string(runes)) > maxName-1 {
+            runes = runes[:len(runes)-1]
+        }
+        nameStr = string(runes) + "…"
     }
-    nameStr := string(nameRunes)
 
     const gap = " " // 1-space gap between focus indicator and icon
     if selected && focused {
