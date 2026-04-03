@@ -25,7 +25,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     }
 
     if p.sessionAlert != nil {
-        title += " " + paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Reason)
+        title += paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Reason)
     }
 
     if len(p.nodes) == 0 {
