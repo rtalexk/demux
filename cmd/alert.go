@@ -118,7 +118,7 @@ func init() {
     // alert set flags
     alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Target: session:window or session:window.pane (required)")
     alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text")
-    alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error")
+    alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error|defer")
     alertSetCmd.MarkFlagRequired("target")
 
     // alert remove flags
