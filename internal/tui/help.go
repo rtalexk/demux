@@ -77,7 +77,7 @@ func (h HelpModel) buildLines() []string {
 		helpNavLine("Tab/Shift+Tab", " cycles (wraps).  ", "g/G", " jumps."),
 		"",
 		helpSection("Sidebar"),
-		helpKV(7, "Enter", "expand session / select window"),
+		helpKV(7, "Enter", "select window"),
 		helpKV(7, "o", "attach to session / window"),
 		helpKV(7, "Esc", "back to session level"),
 		helpKV(7, keys.Defer.Help().Key, keys.Defer.Help().Desc),
