@@ -1,197 +1,195 @@
 package cmd
 
 import (
-    "fmt"
-    "os"
-    "strings"
+	"fmt"
+	"os"
+	"strings"
 
-    "github.com/mattn/go-isatty"
-    "github.com/rtalexk/demux/internal/config"
-    "github.com/rtalexk/demux/internal/db"
-    "github.com/rtalexk/demux/internal/format"
-    "github.com/rtalexk/demux/internal/git"
-    demuxlog "github.com/rtalexk/demux/internal/log"
-    "github.com/rtalexk/demux/internal/proc"
-    "github.com/rtalexk/demux/internal/tmux"
-    "github.com/spf13/cobra"
+	"github.com/mattn/go-isatty"
+	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/format"
+	"github.com/rtalexk/demux/internal/git"
+	demuxlog "github.com/rtalexk/demux/internal/log"
+	"github.com/rtalexk/demux/internal/proc"
+	"github.com/rtalexk/demux/internal/tmux"
+	"github.com/spf13/cobra"
 )
 
 var (
-    sessionListGit     bool
-    sessionListGitOnly bool
+	sessionListGit     bool
+	sessionListGitOnly bool
 )
 
 var sessionListCmd = &cobra.Command{
-    Use:   "list",
-    Short: "List all tmux sessions",
-    RunE:  runSessions,
+	Use:   "list",
+	Short: "List all tmux sessions",
+	RunE:  runSessions,
 }
 
 func init() {
-    sessionCmd.AddCommand(sessionListCmd)
-    sessionListCmd.Flags().BoolVar(&sessionListGit, "git", false, "Include git columns")
-    sessionListCmd.Flags().BoolVar(&sessionListGitOnly, "git-only", false, "Show only session + git columns")
+	sessionCmd.AddCommand(sessionListCmd)
+	sessionListCmd.Flags().BoolVar(&sessionListGit, "git", false, "Include git columns")
+	sessionListCmd.Flags().BoolVar(&sessionListGitOnly, "git-only", false, "Show only session + git columns")
 }
 
 type sessionRow struct {
-    session, windows, procs, alerts, status string
-    branch, dirty, ahead, behind            string
-    includeGit, gitOnly                     bool
+	session, windows, procs, alerts, status string
+	branch, dirty, ahead, behind            string
+	includeGit, gitOnly                     bool
 }
 
 func (r sessionRow) Fields() []string {
-    base := []string{r.session, r.windows, r.procs, r.alerts, r.status}
-    gitCols := []string{r.branch, r.dirty, r.ahead, r.behind}
-    if r.gitOnly {
-        return append([]string{r.session}, gitCols...)
-    }
-    if r.includeGit {
-        return append(base, gitCols...)
-    }
-    return base
+	base := []string{r.session, r.windows, r.procs, r.alerts, r.status}
+	gitCols := []string{r.branch, r.dirty, r.ahead, r.behind}
+	if r.gitOnly {
+		return append([]string{r.session}, gitCols...)
+	}
+	if r.includeGit {
+		return append(base, gitCols...)
+	}
+	return base
 }
 
-
 func runSessions(cmd *cobra.Command, _ []string) error {
-    cfg := loadConfig()
+	cfg := loadConfig()
 
-    panes, err := tmux.ListPanes()
-    if err != nil {
-        return fmt.Errorf("tmux not available: %w", err)
-    }
-    grouped := tmux.GroupBySessions(panes)
+	panes, err := tmux.ListPanes()
+	if err != nil {
+		return fmt.Errorf("tmux not available: %w", err)
+	}
+	grouped := tmux.GroupBySessions(panes)
 
-    database, err := openDB()
-    if err != nil {
-        return err
-    }
-    defer database.Close()
-    alerts, err := database.AlertList()
-    if err != nil {
-        demuxlog.Warn("failed to list alerts", "err", err)
-    }
+	database, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer database.Close()
+	alerts, err := database.AlertList()
+	if err != nil {
+		demuxlog.Warn("failed to list alerts", "err", err)
+	}
 
-    alertsBySession := map[string][]db.Alert{}
-    for _, a := range alerts {
-        parts := strings.SplitN(a.Target, ":", 2)
-        if len(parts) > 0 {
-            alertsBySession[parts[0]] = append(alertsBySession[parts[0]], a)
-        }
-    }
+	alertsBySession := map[string][]db.Alert{}
+	for _, a := range alerts {
+		parts := strings.SplitN(a.Target, ":", 2)
+		if len(parts) > 0 {
+			alertsBySession[parts[0]] = append(alertsBySession[parts[0]], a)
+		}
+	}
 
-    headers := []string{"SESSION", "WINDOWS", "PROCS", "ALERTS", "STATUS"}
-    if sessionListGitOnly {
-        headers = []string{"SESSION", "BRANCH", "DIRTY", "AHEAD", "BEHIND"}
-    } else if sessionListGit {
-        headers = append(headers, "BRANCH", "DIRTY", "AHEAD", "BEHIND")
-    }
+	headers := []string{"SESSION", "WINDOWS", "PROCS", "ALERTS", "STATUS"}
+	if sessionListGitOnly {
+		headers = []string{"SESSION", "BRANCH", "DIRTY", "AHEAD", "BEHIND"}
+	} else if sessionListGit {
+		headers = append(headers, "BRANCH", "DIRTY", "AHEAD", "BEHIND")
+	}
 
-    allProcs, err := proc.Snapshot()
-    if err != nil {
-        demuxlog.Warn("proc snapshot failed", "err", err)
-    }
-    cwdByPID, err := proc.CWDAll()
-    if err != nil {
-        demuxlog.Warn("cwd fetch failed", "err", err)
-    }
+	allProcs, err := proc.Snapshot()
+	if err != nil {
+		demuxlog.Warn("proc snapshot failed", "err", err)
+	}
+	cwdByPID, err := proc.CWDAll()
+	if err != nil {
+		demuxlog.Warn("cwd fetch failed", "err", err)
+	}
 
-    sessionProcCount := map[string]int{}
-    for sessionName, windows := range grouped {
-        primaryCWD := tmux.PrimaryPaneCWD(windows[0])
-        if primaryCWD == "" {
-            continue
-        }
-        for _, p := range allProcs {
-            cwd, ok := cwdByPID[p.PID]
-            if !ok {
-                continue
-            }
-            if cwd == primaryCWD || git.IsDescendant(cwd, primaryCWD) {
-                sessionProcCount[sessionName]++
-            }
-        }
-    }
+	sessionProcCount := map[string]int{}
+	for sessionName, windows := range grouped {
+		primaryCWD := tmux.PrimaryPaneCWD(windows[0])
+		if primaryCWD == "" {
+			continue
+		}
+		for _, p := range allProcs {
+			cwd, ok := cwdByPID[p.PID]
+			if !ok {
+				continue
+			}
+			if cwd == primaryCWD || git.IsDescendant(cwd, primaryCWD) {
+				sessionProcCount[sessionName]++
+			}
+		}
+	}
 
-    // Pre-fetch git info in parallel for all non-ignored sessions.
-    var gitWork []git.ConcurrentWork
-    if sessionListGit || sessionListGitOnly {
-        for sessionName, windows := range grouped {
-            if isIgnored(cfg, sessionName) {
-                continue
-            }
-            if cwd := tmux.PrimaryPaneCWD(windows[0]); cwd != "" {
-                gitWork = append(gitWork, git.ConcurrentWork{Key: sessionName, Dir: cwd})
-            }
-        }
-    }
-    gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
+	// Pre-fetch git info in parallel for all non-ignored sessions.
+	var gitWork []git.ConcurrentWork
+	if sessionListGit || sessionListGitOnly {
+		for sessionName, windows := range grouped {
+			if isIgnored(cfg, sessionName) {
+				continue
+			}
+			if cwd := tmux.PrimaryPaneCWD(windows[0]); cwd != "" {
+				gitWork = append(gitWork, git.ConcurrentWork{Key: sessionName, Dir: cwd})
+			}
+		}
+	}
+	gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
 
-    var rows []format.Row
-    for sessionName, windows := range grouped {
-        if isIgnored(cfg, sessionName) {
-            continue
-        }
-        sessionAlerts := alertsBySession[sessionName]
-        status := "ok"
-        for _, a := range sessionAlerts {
-            switch a.Level {
-            case "error":
-                status = "error"
-            case "warn":
-                if status != "error" {
-                    status = "warn"
-                }
-            }
-        }
+	var rows []format.Row
+	for sessionName, windows := range grouped {
+		if isIgnored(cfg, sessionName) {
+			continue
+		}
+		sessionAlerts := alertsBySession[sessionName]
+		status := "ok"
+		for _, a := range sessionAlerts {
+			switch a.Level {
+			case "error":
+				status = "error"
+			case "warn":
+				if status != "error" {
+					status = "warn"
+				}
+			}
+		}
 
-        row := sessionRow{
-            session:    sessionName,
-            windows:    fmt.Sprint(len(windows)),
-            procs:      fmt.Sprint(sessionProcCount[sessionName]),
-            alerts:     fmt.Sprint(len(sessionAlerts)),
-            status:     status,
-            includeGit: sessionListGit,
-            gitOnly:    sessionListGitOnly,
-        }
+		row := sessionRow{
+			session:    sessionName,
+			windows:    fmt.Sprint(len(windows)),
+			procs:      fmt.Sprint(sessionProcCount[sessionName]),
+			alerts:     fmt.Sprint(len(sessionAlerts)),
+			status:     status,
+			includeGit: sessionListGit,
+			gitOnly:    sessionListGitOnly,
+		}
 
-        if sessionListGit || sessionListGitOnly {
-            primaryCWD := tmux.PrimaryPaneCWD(windows[0])
-            if primaryCWD == "" {
-                row.branch = cfg.Git.FallbackDisplay
-                row.dirty = "—"
-                row.ahead = "—"
-                row.behind = "—"
-            } else if info, ok := gitResults[sessionName]; ok {
-                row.branch = info.Branch
-                if info.Dirty {
-                    row.dirty = "yes"
-                } else {
-                    row.dirty = "no"
-                }
-                row.ahead = fmt.Sprint(info.Ahead)
-                row.behind = fmt.Sprint(info.Behind)
-            } else {
-                row.branch = cfg.Git.ErrorDisplay
-                row.dirty = "—"
-                row.ahead = "—"
-                row.behind = "—"
-            }
-        }
+		if sessionListGit || sessionListGitOnly {
+			primaryCWD := tmux.PrimaryPaneCWD(windows[0])
+			if primaryCWD == "" {
+				row.branch = cfg.Git.FallbackDisplay
+				row.dirty = "—"
+				row.ahead = "—"
+				row.behind = "—"
+			} else if info, ok := gitResults[sessionName]; ok {
+				row.branch = info.Branch
+				if info.Dirty {
+					row.dirty = "yes"
+				} else {
+					row.dirty = "no"
+				}
+				row.ahead = fmt.Sprint(info.Ahead)
+				row.behind = fmt.Sprint(info.Behind)
+			} else {
+				row.branch = cfg.Git.ErrorDisplay
+				row.dirty = "—"
+				row.ahead = "—"
+				row.behind = "—"
+			}
+		}
 
-        rows = append(rows, row)
-    }
+		rows = append(rows, row)
+	}
 
-    isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
-    fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))
-    return nil
+	isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
+	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))
+	return nil
 }
 
 func isIgnored(cfg config.Config, name string) bool {
-    for _, s := range cfg.IgnoredSessions {
-        if s == name {
-            return true
-        }
-    }
-    return false
+	for _, s := range cfg.IgnoredSessions {
+		if s == name {
+			return true
+		}
+	}
+	return false
 }
-

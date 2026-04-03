@@ -1,23 +1,23 @@
 package cmd
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/spf13/cobra"
+	"github.com/spf13/cobra"
 )
 
 var configCmd = &cobra.Command{
-    Use:   "config",
-    Short: "Config-related subcommands",
+	Use:   "config",
+	Short: "Config-related subcommands",
 }
 
 var configInitCmd = &cobra.Command{
-    Use:   "init",
-    Short: "Print an example config file with defaults",
-    RunE: func(cmd *cobra.Command, args []string) error {
-        fmt.Print(defaultConfigTOML)
-        return nil
-    },
+	Use:   "init",
+	Short: "Print an example config file with defaults",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Print(defaultConfigTOML)
+		return nil
+	},
 }
 
 const defaultConfigTOML = `# demux configuration
@@ -188,6 +188,6 @@ shells = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
 `
 
 func init() {
-    configCmd.AddCommand(configInitCmd)
-    rootCmd.AddCommand(configCmd)
+	configCmd.AddCommand(configInitCmd)
+	rootCmd.AddCommand(configCmd)
 }
