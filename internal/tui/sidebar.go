@@ -9,6 +9,7 @@ import (
     "time"
 
     "github.com/charmbracelet/lipgloss"
+    runewidth "github.com/mattn/go-runewidth"
     "github.com/rtalexk/demux/internal/config"
     "github.com/rtalexk/demux/internal/db"
     "github.com/rtalexk/demux/internal/git"
@@ -100,10 +101,12 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 func alertSeverity(level string) int {
     switch level {
     case "error":
-        return 2
+        return 3
     case "warn":
+        return 2
+    case "info":
         return 1
-    default:
+    default: // "defer" and unknown values
         return 0
     }
 }
@@ -465,10 +468,11 @@ func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width
 
 // alignedRow builds a single sidebar line with the name on the left and
 // indicators right-aligned to availWidth. Both name and indicators are
-// measured by rune count after stripping ANSI codes.
+// measured by display-column width (runewidth) after stripping ANSI codes,
+// so multi-column glyphs (e.g. emoji) are accounted for correctly.
 func alignedRow(name, indicators string, availWidth int) string {
-    nameW := len([]rune(stripANSI(name)))
-    indW := len([]rune(stripANSI(indicators)))
+    nameW := runewidth.StringWidth(stripANSI(name))
+    indW := runewidth.StringWidth(stripANSI(indicators))
     pad := availWidth - nameW - indW
     if pad < 1 {
         pad = 1
@@ -559,7 +563,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if sess := s.FindSession(node.Session); sess != nil {
         iconPrefix = sessionIcon(*sess) + " "
     }
-    iconW := len([]rune(stripANSI(iconPrefix)))
+    iconW := runewidth.StringWidth(stripANSI(iconPrefix))
 
     // Row format: [focus(1)] [gap(2)] [icon(iconW)] [name+indicators(availW)]
     // Box content = width-2. Selected rows append trail(2), so body must fill
@@ -568,7 +572,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if availW < 4 {
         availW = 4
     }
-    indW := len([]rune(stripANSI(indicators)))
+    indW := runewidth.StringWidth(stripANSI(indicators))
     maxName := availW - indW
     if indW > 0 {
         maxName-- // alignedRow enforces pad>=1 separator; reserve it so truncation doesn't overflow
@@ -576,15 +580,18 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if maxName < 4 {
         maxName = 4
     }
-    nameRunes := []rune(node.Session)
-    if len(nameRunes) > maxName {
-        nameRunes = append(nameRunes[:maxName-1], '…')
+    nameStr := node.Session
+    if runewidth.StringWidth(nameStr) > maxName {
+        runes := []rune(nameStr)
+        for runewidth.StringWidth(string(runes)) > maxName-1 {
+            runes = runes[:len(runes)-1]
+        }
+        nameStr = string(runes) + "…"
     }
-    nameStr := string(nameRunes)
 
     const gap = " " // 1-space gap between focus indicator and icon
     if selected && focused {
-        pad := availW - len([]rune(nameStr)) - indW
+        pad := availW - runewidth.StringWidth(nameStr) - indW
         if pad < 0 {
             pad = 0
         }
@@ -593,7 +600,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
         return indicator + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
     }
     if selected {
-        pad := availW - len([]rune(nameStr)) - indW
+        pad := availW - runewidth.StringWidth(nameStr) - indW
         if pad < 0 {
             pad = 0
         }

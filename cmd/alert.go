@@ -48,6 +48,17 @@ var alertSetCmd = &cobra.Command{
         }
         defer d.Close()
 
+        if alertReason == "" {
+            if alertLevel == "defer" {
+                alertReason = loadConfig().Alerts.DeferDefaultReason
+                if alertReason == "" {
+                    return fmt.Errorf("--reason is required (alerts.defer_default_reason is not set)")
+                }
+            } else {
+                return fmt.Errorf("--reason is required")
+            }
+        }
+
         if err := d.AlertSet(alertSetTarget, alertReason, alertLevel); err != nil {
             return fmt.Errorf("alert set: %w", err)
         }
@@ -106,10 +117,9 @@ func runAlertList(cmd *cobra.Command, args []string) error {
 func init() {
     // alert set flags
     alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Target: session:window or session:window.pane (required)")
-    alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text (required)")
-    alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error")
+    alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text")
+    alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error|defer")
     alertSetCmd.MarkFlagRequired("target")
-    alertSetCmd.MarkFlagRequired("reason")
 
     // alert remove flags
     alertRemoveCmd.Flags().StringVar(&alertRemoveTarget, "target", "", "Target: session:window or session:window.pane (required)")

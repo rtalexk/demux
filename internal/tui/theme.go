@@ -37,13 +37,16 @@ type Theme struct {
     ColorAlertInfo   lipgloss.Color
     ColorAlertWarn   lipgloss.Color
     ColorAlertError  lipgloss.Color
+    ColorAlertDefer  lipgloss.Color
     ColorAlertInfoBg  lipgloss.Color
     ColorAlertWarnBg  lipgloss.Color
     ColorAlertErrorBg lipgloss.Color
+    ColorAlertDeferBg lipgloss.Color
 
     IconAlertInfo  string
     IconAlertWarn  string
     IconAlertError string
+    IconAlertDefer string
 
     IconTmuxSession string
     IconCfgSession  string
@@ -88,13 +91,16 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
         ColorAlertInfo:   lipgloss.Color(tc.ColorAlertInfo),
         ColorAlertWarn:   lipgloss.Color(tc.ColorAlertWarn),
         ColorAlertError:  lipgloss.Color(tc.ColorAlertError),
+        ColorAlertDefer:  lipgloss.Color(tc.ColorAlertDefer),
         ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
         ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
         ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
+        ColorAlertDeferBg: lipgloss.Color(tc.ColorAlertDeferBg),
 
         IconAlertInfo:  tc.IconAlertInfo,
         IconAlertWarn:  tc.IconAlertWarn,
         IconAlertError: tc.IconAlertError,
+        IconAlertDefer: tc.IconAlertDefer,
 
         IconTmuxSession: tc.IconTmuxSession,
         IconCfgSession:  tc.IconCfgSession,

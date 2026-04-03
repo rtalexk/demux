@@ -109,6 +109,11 @@ error_display = "git err"
 # Enable pull-request info in the detail panel
 enabled = false
 
+
+[alerts]
+# Default reason text used when setting a defer alert without --reason
+defer_default_reason = "Come back"
+
 # ---------------------------------------------------------------------------
 # Theme (Catppuccin Mocha)
 # ---------------------------------------------------------------------------
@@ -143,6 +148,12 @@ color_git_ahead  = "#a6e3a1"
 icon_alert_info  = "ℹ️"
 icon_alert_warn  = "⚠️"
 icon_alert_error = "🚨"
+icon_alert_defer  = "🔖"
+color_alert_info_bg  = "#1a2a4d"
+color_alert_warn_bg  = "#3d3500"
+color_alert_error_bg = "#3d1020"
+color_alert_defer    = "#b4befe"
+color_alert_defer_bg = "#1e1e2e"
 
 # Session source icons
 icon_tmux_session = "⊞"

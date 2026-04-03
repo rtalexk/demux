@@ -6,6 +6,8 @@ import (
 
     "github.com/charmbracelet/bubbles/key"
     tea "github.com/charmbracelet/bubbletea"
+    "github.com/rtalexk/demux/internal/db"
+    demuxlog "github.com/rtalexk/demux/internal/log"
     "github.com/rtalexk/demux/internal/query"
     "github.com/rtalexk/demux/internal/tmux"
 )
@@ -216,6 +218,10 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         }
     case key.Matches(msg, keys.Esc):
         m.sidebar.MoveToSessionLevel()
+    case key.Matches(msg, keys.Defer):
+        if node := m.sidebar.Selected(); node != nil {
+            return m, m.toggleDeferAlert(node.Session)
+        }
     }
     // Populate proc list: session overview for all nodes.
     var cmd tea.Cmd
@@ -337,4 +343,32 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
     m.updateDetailFromSelection()
     return m, nil
+}
+
+func (m Model) toggleDeferAlert(target string) tea.Cmd {
+    var hasDefer bool
+    for _, a := range m.alerts {
+        if a.Target == target && a.Level == db.LevelDefer {
+            hasDefer = true
+            break
+        }
+    }
+    reason := m.cfg.Alerts.DeferDefaultReason
+    d := m.db
+    return func() tea.Msg {
+        if hasDefer {
+            if err := d.AlertRemove(target); err != nil {
+                demuxlog.Warn("defer remove failed", "err", err)
+            }
+        } else {
+            if err := d.AlertSet(target, reason, db.LevelDefer); err != nil {
+                demuxlog.Warn("defer set failed", "err", err)
+            }
+        }
+        alerts, err := d.AlertList()
+        if err != nil {
+            demuxlog.Warn("fetch alerts after defer toggle failed", "err", err)
+        }
+        return alertsMsg{alerts: alerts}
+    }
 }

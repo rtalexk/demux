@@ -80,6 +80,7 @@ func (h HelpModel) buildLines() []string {
         helpKV(7, "Enter", "expand session / select window"),
         helpKV(7, "o", "attach to session / window"),
         helpKV(7, "Esc", "back to session level"),
+        helpKV(7, keys.Defer.Help().Key, keys.Defer.Help().Desc),
         "",
         helpSection("Filters"),
         helpKV(3, "t", "tmux sessions only (default)"),

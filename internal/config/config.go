@@ -79,13 +79,16 @@ type ThemeConfig struct {
     ColorAlertInfo   string `toml:"color_alert_info"`
     ColorAlertWarn   string `toml:"color_alert_warn"`
     ColorAlertError  string `toml:"color_alert_error"`
+    ColorAlertDefer  string `toml:"color_alert_defer"`
     ColorAlertInfoBg  string `toml:"color_alert_info_bg"`
     ColorAlertWarnBg  string `toml:"color_alert_warn_bg"`
     ColorAlertErrorBg string `toml:"color_alert_error_bg"`
+    ColorAlertDeferBg string `toml:"color_alert_defer_bg"`
 
     IconAlertInfo  string `toml:"icon_alert_info"`
     IconAlertWarn  string `toml:"icon_alert_warn"`
     IconAlertError string `toml:"icon_alert_error"`
+    IconAlertDefer string `toml:"icon_alert_defer"`
 
     IconTmuxSession string `toml:"icon_tmux_session"`
     IconCfgSession  string `toml:"icon_cfg_session"`
@@ -132,6 +135,10 @@ type LogConfig struct {
     Level string `toml:"level"` // off|error|warn|info|debug
 }
 
+type AlertsConfig struct {
+    DeferDefaultReason string `toml:"defer_default_reason"`
+}
+
 type Config struct {
     RefreshIntervalMs int               `toml:"refresh_interval_ms"`
     IgnoredSessions   []string          `toml:"ignored_sessions"`
@@ -142,6 +149,7 @@ type Config struct {
     ProcessList       ProcessListConfig `toml:"process_list"`
     StatusBar         StatusBarConfig   `toml:"status_bar"`
     Log               LogConfig         `toml:"log"`
+    Alerts            AlertsConfig      `toml:"alerts"`
     Git               GitConfig         `toml:"git"`
     Theme             ThemeConfig       `toml:"theme"`
     PathAliases       []PathAlias       `toml:"path_aliases"`
@@ -165,6 +173,9 @@ func Default() Config {
         },
         StatusBar: StatusBarConfig{Show: true},
         Log:       LogConfig{Level: "warn"},
+        Alerts: AlertsConfig{
+            DeferDefaultReason: "Come back",
+        },
         Git: GitConfig{
             Enabled:         true,
             ShowSpinner:     true,
@@ -200,13 +211,16 @@ func Default() Config {
             ColorAlertInfo:   "#89b4fa",
             ColorAlertWarn:   "#f9e2af",
             ColorAlertError:  "#f38ba8",
+            ColorAlertDefer:  "#b4befe",
             ColorAlertInfoBg:  "#1a2a4d",
             ColorAlertWarnBg:  "#3d3500",
             ColorAlertErrorBg: "#3d1020",
+            ColorAlertDeferBg: "#1e1e2e",
 
             IconAlertInfo:  "ℹ️",
             IconAlertWarn:  "⚠️",
             IconAlertError: "🚨",
+            IconAlertDefer: "🔖",
 
             IconTmuxSession: "⊞",
             IconCfgSession:  "⚙︎",

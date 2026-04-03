@@ -129,6 +129,8 @@ func alertIcon(level string) string {
         return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Render(activeTheme.IconAlertWarn)
     case "error":
         return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Render(activeTheme.IconAlertError)
+    case "defer":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDefer).Render(activeTheme.IconAlertDefer)
     }
     return ""
 }
@@ -142,6 +144,8 @@ func alertIconOnBG(level string, bg lipgloss.Color) string {
         return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Background(bg).Render(activeTheme.IconAlertWarn)
     case "error":
         return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Background(bg).Render(activeTheme.IconAlertError)
+    case "defer":
+        return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDefer).Background(bg).Render(activeTheme.IconAlertDefer)
     }
     return ""
 }
@@ -156,6 +160,8 @@ func alertBadge(level, reason string) string {
         fg, bg = activeTheme.ColorAlertWarn, activeTheme.ColorAlertWarnBg
     case "error":
         fg, bg = activeTheme.ColorAlertError, activeTheme.ColorAlertErrorBg
+    case "defer":
+        fg, bg = activeTheme.ColorAlertDefer, activeTheme.ColorAlertDeferBg
     default:
         return reason
     }
