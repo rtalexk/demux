@@ -22,35 +22,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "enter":
 			if msg.String() == "enter" {
-				if node := m.sidebar.Selected(); node != nil {
-					sess := m.sidebar.FindSession(node.Session)
-					if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
-						if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
-							m.statusMsg = "launch failed: " + err.Error()
-							m.statusExp = time.Now().Add(5 * time.Second)
-							m.sidebar.SetLaunchErr(err.Error())
-							m.searchInput.ExitInsertMode()
-							return m, nil
-						}
-						if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
-							if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
-								m.statusMsg = "window setup failed: " + err.Error()
-								m.statusExp = time.Now().Add(5 * time.Second)
-							}
-						}
-						m.sidebar.ClearLaunchErr()
-						m.searchInput.ExitInsertMode()
-						if m.popupMode {
-							return m, tea.Quit
-						}
-						return m, m.fetchPanes()
-					}
-					if err := tmux.SwitchClient(node.Session); err == nil {
-						if m.popupMode {
-							return m, tea.Quit
-						}
-					}
-				}
+				m, cmd := m.openSidebarSelected()
+				m.searchInput.ExitInsertMode()
+				return m, cmd
 			}
 			m.searchInput.ExitInsertMode()
 			return m, nil
@@ -72,6 +46,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.scheduleProcFetch()
 			}
 			return m, nil
+		case "ctrl+o":
+			m, cmd := m.openSidebarSelected()
+			return m, cmd
 		default:
 			var cmd tea.Cmd
 			prevVal := m.searchInput.Value()
@@ -371,4 +348,37 @@ func (m Model) toggleDeferAlert(target string) tea.Cmd {
 		}
 		return alertsMsg{alerts: alerts}
 	}
+}
+
+func (m Model) openSidebarSelected() (Model, tea.Cmd) {
+	node := m.sidebar.Selected()
+	if node == nil {
+		return m, nil
+	}
+	sess := m.sidebar.FindSession(node.Session)
+	if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
+		if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+			m.statusMsg = "launch failed: " + err.Error()
+			m.statusExp = time.Now().Add(5 * time.Second)
+			m.sidebar.SetLaunchErr(err.Error())
+			return m, nil
+		}
+		if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
+			if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
+				m.statusMsg = "window setup failed: " + err.Error()
+				m.statusExp = time.Now().Add(5 * time.Second)
+			}
+		}
+		m.sidebar.ClearLaunchErr()
+		if m.popupMode {
+			return m, tea.Quit
+		}
+		return m, m.fetchPanes()
+	}
+	if err := tmux.SwitchClient(node.Session); err == nil {
+		if m.popupMode {
+			return m, tea.Quit
+		}
+	}
+	return m, nil
 }
