@@ -201,10 +201,11 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
     sessionChanged := session != p.curSession || p.curWindow != -1
     p.curSession = session
     p.curWindow = -1
-    if a, ok := alertMap[session]; ok {
-        p.sessionAlert = &a
-    } else {
-        p.sessionAlert = nil
+    p.sessionAlert = nil
+    if alertMap != nil {
+        if a, ok := alertMap[session]; ok {
+            p.sessionAlert = &a
+        }
     }
     p.nodes = nil
     if sessionChanged {
