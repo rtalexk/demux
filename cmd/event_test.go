@@ -78,3 +78,41 @@ func TestPaneFocusNoAlertsIsNoop(t *testing.T) {
         t.Fatalf("unexpected error on empty db: %v", err)
     }
 }
+
+func TestApplyPaneFocusClearsSessionLevel(t *testing.T) {
+    d, err := db.Open(":memory:")
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer d.Close()
+
+    if err := d.AlertSet("main", "come back", "defer"); err != nil {
+        t.Fatalf("seed: %v", err)
+    }
+    if err := d.AlertSet("main:0", "window alert", "info"); err != nil {
+        t.Fatalf("seed: %v", err)
+    }
+    if err := d.AlertSet("main:0.0", "pane alert", "warn"); err != nil {
+        t.Fatalf("seed: %v", err)
+    }
+
+    seeded, err := d.AlertList()
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(seeded) != 3 {
+        t.Fatalf("expected 3 seeded alerts, got %d", len(seeded))
+    }
+
+    if err := applyPaneFocus(d, "main:0.0"); err != nil {
+        t.Fatal(err)
+    }
+
+    alerts, err := d.AlertList()
+    if err != nil {
+        t.Fatal(err)
+    }
+    if len(alerts) != 0 {
+        t.Errorf("expected 0 alerts after pane_focus, got %d: %+v", len(alerts), alerts)
+    }
+}
