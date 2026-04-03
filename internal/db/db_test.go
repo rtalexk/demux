@@ -59,6 +59,24 @@ func TestAlertSetReplacesExisting(t *testing.T) {
     }
 }
 
+func TestAlertSetDoesNotDowngrade(t *testing.T) {
+    d := openTestDB(t)
+
+    d.AlertSet("s:1", "reason 1", "error")
+    d.AlertSet("s:1", "reason 2", "defer")
+
+    alerts, _ := d.AlertList()
+    if len(alerts) != 1 {
+        t.Fatalf("expected 1, got %d", len(alerts))
+    }
+    if alerts[0].Level != "error" {
+        t.Errorf("expected level=error to be preserved, got %s", alerts[0].Level)
+    }
+    if alerts[0].Reason != "reason 1" {
+        t.Errorf("expected reason to be preserved, got %s", alerts[0].Reason)
+    }
+}
+
 func TestAlertRemove(t *testing.T) {
     d := openTestDB(t)
 
