@@ -383,39 +383,40 @@ func (s *SidebarModel) rebuildNodes() {
 	}
 }
 
-func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle string) string {
-	visibleRows := height - 2
-	if visibleRows < 1 {
-		visibleRows = 1
+// sidebarViewport computes adjusted offset, content row budget, and scroll hints.
+// Pure function — safe to call from the read-only View/Render method.
+func sidebarViewport(cursor, offset, visibleRows, nodeCount int) (adjOffset, contentRows int, hasAbove, hasBelow bool) {
+	if cursor < offset {
+		offset = cursor
 	}
-
-	// compute display offset without mutating (Bubbletea passes model by value in View)
-	offset := s.offset
-	if s.cursor < offset {
-		offset = s.cursor
-	}
-	if s.cursor >= offset+visibleRows {
-		offset = s.cursor - visibleRows + 1
+	if cursor >= offset+visibleRows {
+		offset = cursor - visibleRows + 1
 	}
 	if offset < 0 {
 		offset = 0
 	}
-
-	hasAbove := offset > 0
-
-	// each hint costs one row; deduct ▲ first, then check ▼ against the
-	// reduced budget so hasBelow is accurate when scrolled down.
-	contentRows := visibleRows
+	hasAbove = offset > 0
+	contentRows = visibleRows
 	if hasAbove {
 		contentRows--
 	}
-	hasBelow := offset+contentRows < len(s.nodes)
+	hasBelow = offset+contentRows < nodeCount
 	if hasBelow {
 		contentRows--
 	}
 	if contentRows < 1 {
 		contentRows = 1
 	}
+	return offset, contentRows, hasAbove, hasBelow
+}
+
+func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle string) string {
+	visibleRows := height - 2
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes))
 
 	// inner content width (border takes 2)
 	innerW := width - 2
