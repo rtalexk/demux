@@ -420,29 +420,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool, innerW int) 
 	}
 
 	// line 1: [indicator]name  pid:N  :port
-	var line1 string
-	if selected {
-		plain := indent + collapsePrefix + pr.FriendlyName()
-		if pr.PID > 0 {
-			plain += fmt.Sprintf("  pid:%d", pr.PID)
-		}
-		if node.Port > 0 {
-			plain += fmt.Sprintf("  :%d", node.Port)
-		}
-		padCount := innerW - len([]rune(plain))
-		if padCount < 0 {
-			padCount = 0
-		}
-		line1 = selectedBG.Render(plain + strings.Repeat(" ", padCount))
-	} else {
-		line1 = treeConnectorStyle.Render(indent) + procNameStyle(pr, node.Depth).Render(collapsePrefix+pr.FriendlyName())
-		if pr.PID > 0 {
-			line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
-		}
-		if node.Port > 0 {
-			line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
-		}
-	}
+	line1 := p.renderProcLine1(node, selected, innerW, indent, collapsePrefix)
 
 	// line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children
 	statsIndent := treeConnectorStyle.Render(node.StatPrefix) + "  "
@@ -462,6 +440,32 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool, innerW int) 
 		l("up:") + v(formatProcDuration(pr.Uptime))
 
 	return line1 + "\n" + line2
+}
+
+func (p ProcListModel) renderProcLine1(node ProcListNode, selected bool, innerW int, indent, collapsePrefix string) string {
+	pr := node.Proc
+	if selected {
+		plain := indent + collapsePrefix + pr.FriendlyName()
+		if pr.PID > 0 {
+			plain += fmt.Sprintf("  pid:%d", pr.PID)
+		}
+		if node.Port > 0 {
+			plain += fmt.Sprintf("  :%d", node.Port)
+		}
+		padCount := innerW - len([]rune(plain))
+		if padCount < 0 {
+			padCount = 0
+		}
+		return selectedBG.Render(plain + strings.Repeat(" ", padCount))
+	}
+	line1 := treeConnectorStyle.Render(indent) + procNameStyle(pr, node.Depth).Render(collapsePrefix+pr.FriendlyName())
+	if pr.PID > 0 {
+		line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
+	}
+	if node.Port > 0 {
+		line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
+	}
+	return line1
 }
 
 func formatProcDuration(d time.Duration) string {
