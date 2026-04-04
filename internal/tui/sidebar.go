@@ -326,26 +326,44 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
     return ""
 }
 
+// comparePriority compares two sessions by alert priority.
+// Returns -1 if si sorts before sj, 1 if sj sorts before si, 0 if equal.
+func (s *SidebarModel) comparePriority(si, sj session.Session) int {
+    svi := s.highestSessionAlertSeverity(si.DisplayName)
+    svj := s.highestSessionAlertSeverity(sj.DisplayName)
+    hasI := svi >= 0
+    hasJ := svj >= 0
+    if hasI != hasJ {
+        if hasI {
+            return -1
+        }
+        return 1
+    }
+    if hasI && hasJ {
+        if svi != svj {
+            if svi > svj {
+                return -1
+            }
+            return 1
+        }
+        ti := s.newestAlertAtSeverity(si.DisplayName, svi)
+        tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
+        if !ti.Equal(tj) {
+            if ti.After(tj) {
+                return -1
+            }
+            return 1
+        }
+    }
+    return 0
+}
+
 func (s *SidebarModel) sessionSortLess(si, sj session.Session, sortKeys []string) bool {
     for _, k := range sortKeys {
         switch k {
         case "priority":
-            svi := s.highestSessionAlertSeverity(si.DisplayName)
-            svj := s.highestSessionAlertSeverity(sj.DisplayName)
-            hasI := svi >= 0
-            hasJ := svj >= 0
-            if hasI != hasJ {
-                return hasI
-            }
-            if hasI && hasJ {
-                if svi != svj {
-                    return svi > svj
-                }
-                ti := s.newestAlertAtSeverity(si.DisplayName, svi)
-                tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
-                if !ti.Equal(tj) {
-                    return ti.After(tj)
-                }
+            if cmp := s.comparePriority(si, sj); cmp != 0 {
+                return cmp < 0
             }
         case "last_seen":
             if !si.Activity.Equal(sj.Activity) {
@@ -455,6 +473,39 @@ func sidebarViewport(cursor, offset, visibleRows, nodeCount int) (adjOffset, con
     return offset, contentRows, hasAbove, hasBelow
 }
 
+// emptyHintText returns the hint text to display when the sidebar has no nodes.
+func (s SidebarModel) emptyHintText() string {
+    switch {
+    case s.filterHint != "":
+        return s.filterHint
+    case s.filter == FilterPriority:
+        return "no alerts"
+    case s.queryResult.Sessions != nil:
+        return "no results"
+    default:
+        return "no sessions"
+    }
+}
+
+// buildNodeLines builds the list of rendered node lines for the sidebar content area.
+func (s SidebarModel) buildNodeLines(offset, contentRows int, hasAbove, hasBelow, focused bool, width int, centeredHint func(string) string) []string {
+    var lines []string
+    if hasAbove {
+        lines = append(lines, centeredHint("▲ more"))
+    }
+    end := offset + contentRows
+    if end > len(s.nodes) {
+        end = len(s.nodes)
+    }
+    for i := offset; i < end; i++ {
+        lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
+    }
+    if hasBelow {
+        lines = append(lines, centeredHint("▼ more"))
+    }
+    return lines
+}
+
 func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle string) string {
     visibleRows := height - 2
     if visibleRows < 1 {
@@ -475,32 +526,9 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 
     var lines []string
     if len(s.nodes) == 0 {
-        var hintText string
-        switch {
-        case s.filterHint != "":
-            hintText = s.filterHint
-        case s.filter == FilterPriority:
-            hintText = "no alerts"
-        case s.queryResult.Sessions != nil:
-            hintText = "no results"
-        default:
-            hintText = "no sessions"
-        }
-        lines = append(lines, centeredHint(hintText))
+        lines = append(lines, centeredHint(s.emptyHintText()))
     } else {
-        if hasAbove {
-            lines = append(lines, centeredHint("▲ more"))
-        }
-        end := offset + contentRows
-        if end > len(s.nodes) {
-            end = len(s.nodes)
-        }
-        for i := offset; i < end; i++ {
-            lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
-        }
-        if hasBelow {
-            lines = append(lines, centeredHint("▼ more"))
-        }
+        lines = s.buildNodeLines(offset, contentRows, hasAbove, hasBelow, focused, width, centeredHint)
     }
 
     inner := strings.Join(lines, "\n")
@@ -569,47 +597,74 @@ func sessionIcon(sess session.Session) string {
     return sessionIconStyle.Render(icon)
 }
 
-// sessionIndicators assembles the right-side indicator string for a sidebar row.
-func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
-    var indParts []string
-    if info, ok := s.gitInfo[node.Session]; ok {
-        if selected && focused {
-            if ind := compactGitIndicatorsOnBG(info, activeTheme.ColorSelected); ind != "" {
-                indParts = append(indParts, ind)
-            }
-        } else {
-            if ind := compactGitIndicators(info); ind != "" {
-                indParts = append(indParts, ind)
-            }
-        }
+// gitIndicator returns the rendered git status indicator for a sidebar row, or "".
+func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) string {
+    info, ok := s.gitInfo[node.Session]
+    if !ok {
+        return ""
     }
-    var bestSessionAlert *db.Alert
+    if selected && focused {
+        return compactGitIndicatorsOnBG(info, activeTheme.ColorSelected)
+    }
+    return compactGitIndicators(info)
+}
+
+// alertIndicator returns the rendered alert icon for a sidebar row, or "".
+// bestAlertForNode returns the highest-severity (then newest) alert for a sidebar
+// node's session, or nil if the session has no alerts.
+func (s SidebarModel) bestAlertForNode(session string) *db.Alert {
+    var best *db.Alert
+    prefix := session + ":"
     for target, a := range s.alerts {
-        if !strings.HasPrefix(target, node.Session+":") && target != node.Session {
+        if !strings.HasPrefix(target, prefix) && target != session {
             continue
         }
         a := a
-        if bestSessionAlert == nil || alertSeverity(a.Level) > alertSeverity(bestSessionAlert.Level) ||
-            (alertSeverity(a.Level) == alertSeverity(bestSessionAlert.Level) && a.CreatedAt.After(bestSessionAlert.CreatedAt)) {
-            bestSessionAlert = &a
+        if best == nil || isBetterAlert(a, *best, "severity") {
+            best = &a
         }
     }
-    if bestSessionAlert != nil {
-        if selected && focused {
-            indParts = append(indParts, alertIconOnBG(bestSessionAlert.Level, activeTheme.ColorSelected))
-        } else {
-            indParts = append(indParts, alertIcon(bestSessionAlert.Level))
-        }
+    return best
+}
+
+func (s SidebarModel) alertIndicator(node SidebarNode, selected, focused bool) string {
+    best := s.bestAlertForNode(node.Session)
+    if best == nil {
+        return ""
     }
-    if s.cfg.Sidebar.ShowLastSeen {
-        if sess := s.FindSession(node.Session); sess != nil && !sess.Activity.IsZero() {
-            age := formatAge(sess.Activity, time.Now())
-            if selected && focused {
-                indParts = append(indParts, hintStyle.Background(activeTheme.ColorSelected).Render(age))
-            } else {
-                indParts = append(indParts, hintStyle.Render(age))
-            }
-        }
+    if selected && focused {
+        return alertIconOnBG(best.Level, activeTheme.ColorSelected)
+    }
+    return alertIcon(best.Level)
+}
+
+// lastSeenIndicator returns the rendered last-seen age string for a sidebar row, or "".
+func (s SidebarModel) lastSeenIndicator(node SidebarNode, selected, focused bool) string {
+    if !s.cfg.Sidebar.ShowLastSeen {
+        return ""
+    }
+    sess := s.FindSession(node.Session)
+    if sess == nil || sess.Activity.IsZero() {
+        return ""
+    }
+    age := formatAge(sess.Activity, time.Now())
+    if selected && focused {
+        return hintStyle.Background(activeTheme.ColorSelected).Render(age)
+    }
+    return hintStyle.Render(age)
+}
+
+// sessionIndicators assembles the right-side indicator string for a sidebar row.
+func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
+    var indParts []string
+    if ind := s.gitIndicator(node, selected, focused); ind != "" {
+        indParts = append(indParts, ind)
+    }
+    if ind := s.alertIndicator(node, selected, focused); ind != "" {
+        indParts = append(indParts, ind)
+    }
+    if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
+        indParts = append(indParts, ind)
     }
     if selected && focused {
         sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
