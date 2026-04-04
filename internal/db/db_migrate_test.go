@@ -71,7 +71,10 @@ func TestMigrate_UpgradeV1ToV2(t *testing.T) {
 }
 
 func TestAlertUpgradeToSticky(t *testing.T) {
-    d, _ := Open(":memory:")
+    d, err := Open(":memory:")
+    if err != nil {
+        t.Fatalf("open: %v", err)
+    }
     defer d.Close()
 
     d.AlertSet("main", "r", LevelDefer, false)
@@ -82,10 +85,18 @@ func TestAlertUpgradeToSticky(t *testing.T) {
     if a == nil || !a.Sticky {
         t.Error("expected sticky after upgrade")
     }
+
+    // no-op when target does not exist
+    if err := d.AlertUpgradeToSticky("nonexistent"); err != nil {
+        t.Errorf("UpgradeToSticky on missing target: %v", err)
+    }
 }
 
 func TestAlertRemoveIfNotSticky(t *testing.T) {
-    d, _ := Open(":memory:")
+    d, err := Open(":memory:")
+    if err != nil {
+        t.Fatalf("open: %v", err)
+    }
     defer d.Close()
 
     // non-sticky: should be removed
@@ -102,6 +113,11 @@ func TestAlertRemoveIfNotSticky(t *testing.T) {
     a, _ = d.AlertByTarget("main")
     if a == nil {
         t.Error("expected sticky alert to survive")
+    }
+
+    // no-op when target does not exist
+    if err := d.AlertRemoveIfNotSticky("nonexistent"); err != nil {
+        t.Errorf("RemoveIfNotSticky on missing target: %v", err)
     }
 }
 
