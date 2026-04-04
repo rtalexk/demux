@@ -26,9 +26,9 @@ func helpSection(name string) string {
 	return prefix + label + suffix
 }
 
-// helpKV formats a keybinding line: key column padded to keyW, description grayed.
-func helpKV(keyW int, k, description string) string {
-	return fmt.Sprintf("  %-*s ", keyW, k) + helpDescStyle.Render(description)
+// helpKV formats a keybinding line: key column padded to keyW, then gap spaces, then description grayed.
+func helpKV(keyW, gap int, k, description string) string {
+	return fmt.Sprintf("  %-*s", keyW, k) + strings.Repeat(" ", gap) + helpDescStyle.Render(description)
 }
 
 
@@ -84,8 +84,12 @@ func (h HelpModel) buildLines() []string {
 		}
 		lines = append(lines, helpSection(sec))
 		w := keyW[sec]
+		gap := 2
+		if sec == "Navigation" {
+			gap = 0
+		}
 		for _, e := range sections[sec] {
-			lines = append(lines, helpKV(w, e.k, e.desc))
+			lines = append(lines, helpKV(w, gap, e.k, e.desc))
 		}
 	}
 	return lines
