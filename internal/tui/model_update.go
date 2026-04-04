@@ -13,6 +13,7 @@ import (
     "github.com/rtalexk/demux/internal/db"
     "github.com/rtalexk/demux/internal/git"
     demuxlog "github.com/rtalexk/demux/internal/log"
+    "github.com/rtalexk/demux/internal/proc"
     "github.com/rtalexk/demux/internal/query"
     "github.com/rtalexk/demux/internal/session"
     "github.com/rtalexk/demux/internal/tmux"
@@ -260,31 +261,11 @@ func (m *Model) pruneStaleAlerts() tea.Cmd {
     if len(m.panes) == 0 {
         return nil
     }
-    // Build lookup sets for every live target granularity.
-    paneTargets := make(map[string]bool, len(m.panes))
-    winTargets := make(map[string]bool)
-    sesTargets := make(map[string]bool)
-    for _, p := range m.panes {
-        paneTargets[fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)] = true
-        winTargets[fmt.Sprintf("%s:%d", p.Session, p.WindowIndex)] = true
-        sesTargets[p.Session] = true
-    }
-
+    paneTargets, winTargets, sesTargets := buildTargetSets(m.panes)
     var stale []string
     for _, a := range m.alerts {
-        switch {
-        case strings.Contains(a.Target, "."):
-            if !paneTargets[a.Target] {
-                stale = append(stale, a.Target)
-            }
-        case strings.Contains(a.Target, ":"):
-            if !winTargets[a.Target] {
-                stale = append(stale, a.Target)
-            }
-        default:
-            if !sesTargets[a.Target] {
-                stale = append(stale, a.Target)
-            }
+        if isStaleAlert(a.Target, paneTargets, winTargets, sesTargets) {
+            stale = append(stale, a.Target)
         }
     }
     if len(stale) == 0 {
@@ -300,6 +281,31 @@ func (m *Model) pruneStaleAlerts() tea.Cmd {
             demuxlog.Warn("fetch alerts failed", "err", err)
         }
         return alertsMsg{alerts: alerts}
+    }
+}
+
+// buildTargetSets constructs lookup maps for every live pane, window and session target.
+func buildTargetSets(panes []tmux.Pane) (paneTargets, winTargets, sesTargets map[string]bool) {
+    paneTargets = make(map[string]bool, len(panes))
+    winTargets = make(map[string]bool)
+    sesTargets = make(map[string]bool)
+    for _, p := range panes {
+        paneTargets[fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)] = true
+        winTargets[fmt.Sprintf("%s:%d", p.Session, p.WindowIndex)] = true
+        sesTargets[p.Session] = true
+    }
+    return paneTargets, winTargets, sesTargets
+}
+
+// isStaleAlert reports whether the given alert target is absent from the live target sets.
+func isStaleAlert(target string, paneTargets, winTargets, sesTargets map[string]bool) bool {
+    switch {
+    case strings.Contains(target, "."):
+        return !paneTargets[target]
+    case strings.Contains(target, ":"):
+        return !winTargets[target]
+    default:
+        return !sesTargets[target]
     }
 }
 
@@ -338,47 +344,14 @@ func (m *Model) updateDetailFromSelection() {
 func (m *Model) detailForSidebarNode(node SidebarNode) DetailModel {
     grouped := tmux.GroupBySessions(m.panes)
     windows := grouped[node.Session]
-    alertCount := 0
-    for _, a := range m.alerts {
-        if strings.HasPrefix(a.Target, node.Session+":") {
-            alertCount++
-        }
-    }
     sessionCWD := tmux.PrimaryPaneCWD(windows[0])
-    // count processes whose CWD is under the session's primary CWD
-    procCount := 0
-    if sessionCWD != "" {
-        for _, pr := range m.procs {
-            cwd := m.cwdMap[pr.PID]
-            if cwd == "" {
-                continue
-            }
-            if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
-                procCount++
-            }
-        }
-    }
     paneCount := 0
     for _, wp := range windows {
         paneCount += len(wp)
     }
     sess := m.sidebar.FindSession(node.Session)
     isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
-    configPath := ""
-    configWorktree := ""
-    if isConfigOnly && sess.Config != nil {
-        configPath = sess.Config.Path
-        if sess.Config.Worktree && configPath != "" {
-            // If configPath itself is the worktree root container (.bare/ lives here),
-            // show just the repo name. Otherwise show "worktree (repo)".
-            if fi, err := os.Stat(filepath.Join(configPath, ".bare")); err == nil && fi.IsDir() {
-                bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
-                configWorktree = bareStr + " (" + filepath.Base(configPath) + ")"
-            } else {
-                configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
-            }
-        }
-    }
+    configPath, configWorktree := configOnlyFields(sess, isConfigOnly)
     return DetailModel{
         cfg:            m.cfg,
         selType:        DetailSession,
@@ -390,9 +363,61 @@ func (m *Model) detailForSidebarNode(node SidebarNode) DetailModel {
         gitInfo:        m.gitInfo[node.Session],
         winCount:       len(windows),
         paneCount:      paneCount,
-        procCount:      procCount,
-        alertCount:     alertCount,
+        procCount:      countProcsUnderCWD(m.procs, m.cwdMap, sessionCWD),
+        alertCount:     countSessionAlerts(m.alerts, node.Session),
     }
+}
+
+// countSessionAlerts returns the number of alerts whose target is within sessionName.
+func countSessionAlerts(alerts []db.Alert, sessionName string) int {
+    count := 0
+    prefix := sessionName + ":"
+    for _, a := range alerts {
+        if strings.HasPrefix(a.Target, prefix) {
+            count++
+        }
+    }
+    return count
+}
+
+// countProcsUnderCWD counts processes whose working directory is sessionCWD or a descendant.
+func countProcsUnderCWD(procs []proc.Process, cwdMap map[int32]string, sessionCWD string) int {
+    if sessionCWD == "" {
+        return 0
+    }
+    count := 0
+    for _, pr := range procs {
+        cwd := cwdMap[pr.PID]
+        if cwd == "" {
+            continue
+        }
+        if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+            count++
+        }
+    }
+    return count
+}
+
+// configOnlyFields extracts the configPath and configWorktree display string for a
+// config-only session. Returns empty strings when isConfigOnly is false or the
+// session has no Config.
+func configOnlyFields(sess *session.Session, isConfigOnly bool) (configPath, configWorktree string) {
+    if !isConfigOnly || sess == nil || sess.Config == nil {
+        return "", ""
+    }
+    configPath = sess.Config.Path
+    if !sess.Config.Worktree || configPath == "" {
+        return configPath, ""
+    }
+    // If configPath itself is the worktree root container (.bare/ lives here),
+    // show just the repo name. Otherwise show "worktree (repo)".
+    if fi, err := os.Stat(filepath.Join(configPath, ".bare")); err == nil && fi.IsDir() {
+        bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
+        configWorktree = bareStr + " (" + filepath.Base(configPath) + ")"
+    } else {
+        configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
+    }
+    return configPath, configWorktree
 }
 
 func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
