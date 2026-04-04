@@ -46,7 +46,11 @@ func (d *DB) migrate() error {
     }
 
     if version < 1 {
-        if _, err := d.sql.Exec(`
+        tx, err := d.sql.Begin()
+        if err != nil {
+            return fmt.Errorf("begin v1: %w", err)
+        }
+        if _, err := tx.Exec(`
             CREATE TABLE IF NOT EXISTS alerts (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 target     TEXT NOT NULL UNIQUE,
@@ -55,20 +59,34 @@ func (d *DB) migrate() error {
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         `); err != nil {
+            tx.Rollback()
             return fmt.Errorf("migrate v1: %w", err)
         }
-        if _, err := d.sql.Exec(`PRAGMA user_version = 1`); err != nil {
+        if _, err := tx.Exec(`PRAGMA user_version = 1`); err != nil {
+            tx.Rollback()
             return fmt.Errorf("set version 1: %w", err)
+        }
+        if err := tx.Commit(); err != nil {
+            return fmt.Errorf("commit v1: %w", err)
         }
         version = 1
     }
 
     if version < 2 {
-        if _, err := d.sql.Exec(`ALTER TABLE alerts ADD COLUMN sticky BOOLEAN NOT NULL DEFAULT 0`); err != nil {
+        tx, err := d.sql.Begin()
+        if err != nil {
+            return fmt.Errorf("begin v2: %w", err)
+        }
+        if _, err := tx.Exec(`ALTER TABLE alerts ADD COLUMN sticky BOOLEAN NOT NULL DEFAULT 0`); err != nil {
+            tx.Rollback()
             return fmt.Errorf("migrate v2: %w", err)
         }
-        if _, err := d.sql.Exec(`PRAGMA user_version = 2`); err != nil {
+        if _, err := tx.Exec(`PRAGMA user_version = 2`); err != nil {
+            tx.Rollback()
             return fmt.Errorf("set version 2: %w", err)
+        }
+        if err := tx.Commit(); err != nil {
+            return fmt.Errorf("commit v2: %w", err)
         }
     }
 
