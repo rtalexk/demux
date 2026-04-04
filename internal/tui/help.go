@@ -9,6 +9,9 @@ const (
 	helpContentWidth = 44
 	// helpOverhead is the number of rows consumed by the overlay border and padding.
 	helpOverhead = 4 // border top+bottom (2) + padding top+bottom (2)
+	// helpWideKeyThreshold is the key-column width above which the gap between
+	// key and description is reduced to 0 (the section already looks wide enough).
+	helpWideKeyThreshold = 20
 )
 
 type HelpModel struct {
@@ -26,25 +29,11 @@ func helpSection(name string) string {
 	return prefix + label + suffix
 }
 
-// helpKV formats a keybinding line: key column padded to keyW, description grayed.
-func helpKV(keyW int, k, description string) string {
-	return fmt.Sprintf("  %-*s", keyW, k) + helpDescStyle.Render(description)
+// helpKV formats a keybinding line: key column padded to keyW, then gap spaces, then description grayed.
+func helpKV(keyW, gap int, k, description string) string {
+	return fmt.Sprintf("  %-*s", keyW, k) + strings.Repeat(" ", gap) + helpDescStyle.Render(description)
 }
 
-// helpNavLine builds a Navigation prose line. Even-indexed parts (key tokens) render
-// in normal color; odd-indexed parts (separators / trailing description) are grayed.
-func helpNavLine(parts ...string) string {
-	var b strings.Builder
-	b.WriteString("  ")
-	for i, p := range parts {
-		if i%2 == 0 {
-			b.WriteString(p)
-		} else {
-			b.WriteString(helpDescStyle.Render(p))
-		}
-	}
-	return b.String()
-}
 
 func (h *HelpModel) ScrollUp() {
 	if h.scrollOffset > 0 {
@@ -62,43 +51,51 @@ func (h *HelpModel) ScrollDown(availH int) {
 }
 
 func (h HelpModel) buildLines() []string {
-	return []string{
-		helpSection("Global"),
-		helpKV(8, "h / l", "focus sidebar / process list"),
-		helpKV(8, "y", "yank menu"),
-		helpKV(8, "f", "filter"),
-		helpKV(8, "ctrl+u", "clear filter"),
-		helpKV(8, "R", "force refresh"),
-		helpKV(8, "?", "toggle help"),
-		helpKV(8, "q", "quit"),
-		"",
-		helpSection("Navigation"),
-		helpNavLine("j/k", " · ", "ctrl+j/n", " · ", "ctrl+k/p", " navigate."),
-		helpNavLine("Tab/Shift+Tab", " cycles (wraps).  ", "g/G", " jumps."),
-		"",
-		helpSection("Sidebar"),
-		helpKV(7, "Enter", "select window"),
-		helpKV(11, "o / ctrl+o", "attach to session / window"),
-		helpKV(7, "Esc", "back to session level"),
-		helpKV(7, keys.Defer.Help().Key, keys.Defer.Help().Desc),
-		"",
-		helpSection("Filters"),
-		helpKV(3, "t", "tmux sessions only (default)"),
-		helpKV(3, "a", "all sessions (tmux + config)"),
-		helpKV(3, "c", "config sessions only"),
-		helpKV(3, "w", "sessions in current worktree"),
-		helpKV(3, "!", "alert filter"),
-		"",
-		helpSection("Process list"),
-		helpKV(7, "J / K", "jump to next/prev pane"),
-		helpKV(7, "] / [", "expand / collapse group"),
-		helpKV(7, "} / {", "expand / collapse all"),
-		helpKV(7, "Enter", "attach to session:window"),
-		helpKV(11, "o / ctrl+o", "attach to pane"),
-		helpKV(7, "x", "kill process"),
-		helpKV(7, "r", "restart process"),
-		helpKV(7, "L", "open log popup"),
+	defs := allKeyDefs()
+
+	// Group by section, preserving first-appearance order.
+	type entry struct{ k, desc string }
+	sections := map[string][]entry{}
+	var sectionOrder []string
+	seen := map[string]bool{}
+	for _, d := range defs {
+		if d.Help().Key == "" {
+			continue
+		}
+		sec := d.section
+		if !seen[sec] {
+			seen[sec] = true
+			sectionOrder = append(sectionOrder, sec)
+		}
+		sections[sec] = append(sections[sec], entry{d.Help().Key, d.Help().Desc})
 	}
+
+	// Compute max key width per section for alignment.
+	keyW := map[string]int{}
+	for sec, entries := range sections {
+		for _, e := range entries {
+			if len(e.k) > keyW[sec] {
+				keyW[sec] = len(e.k)
+			}
+		}
+	}
+
+	var lines []string
+	for i, sec := range sectionOrder {
+		if i > 0 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, helpSection(sec))
+		w := keyW[sec]
+		gap := 2
+		if w > helpWideKeyThreshold {
+			gap = 0
+		}
+		for _, e := range sections[sec] {
+			lines = append(lines, helpKV(w, gap, e.k, e.desc))
+		}
+	}
+	return lines
 }
 
 // Render returns the styled help overlay, clipped to maxH terminal rows.

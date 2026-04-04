@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/mattn/go-isatty"
+	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/rtalexk/demux/internal/git"
 	demuxlog "github.com/rtalexk/demux/internal/log"
@@ -46,6 +47,120 @@ func (r procRow) Fields() []string {
 	return base
 }
 
+func resolvePortMap(ports []proc.PortInfo) map[int32]int {
+	m := map[int32]int{}
+	for _, p := range ports {
+		m[p.PID] = p.Port
+	}
+	return m
+}
+
+// paneGitWork returns a git work item for a pane whose CWD diverges from the
+// session primary CWD, or nil if no extra fetch is needed.
+func paneGitWork(pane tmux.Pane, wi int, sessionName, primaryCWD string) *git.ConcurrentWork {
+	if !git.IsDescendant(pane.CWD, primaryCWD) && pane.CWD != primaryCWD {
+		k := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
+		return &git.ConcurrentWork{Key: k, Dir: pane.CWD}
+	}
+	return nil
+}
+
+// collectProcsGitWork builds the list of git fetch work items for panes whose
+// CWD diverges from the session primary CWD.
+func collectProcsGitWork(grouped map[string]map[int][]tmux.Pane, cfg config.Config, sessionFilter, windowFilter string) []git.ConcurrentWork {
+	var work []git.ConcurrentWork
+	for sessionName, windows := range grouped {
+		if sessionFilter != "" && sessionName != sessionFilter {
+			continue
+		}
+		if isIgnored(cfg, sessionName) {
+			continue
+		}
+		primaryCWD := tmux.PrimaryPaneCWD(windows[0])
+		for wi, wPanes := range windows {
+			if windowFilter != "" && fmt.Sprintf("%s:%d", sessionName, wi) != windowFilter {
+				continue
+			}
+			for _, pane := range wPanes {
+				if w := paneGitWork(pane, wi, sessionName, primaryCWD); w != nil {
+					work = append(work, *w)
+				}
+			}
+		}
+	}
+	return work
+}
+
+// resolvePaneGitCol returns the git column value for a single pane.
+func resolvePaneGitCol(pane tmux.Pane, wi int, sessionName, primaryCWD string, gitResults map[string]git.Info, cfg config.Config) string {
+	paneCWD := pane.CWD
+	if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
+		k := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
+		if info, ok := gitResults[k]; ok {
+			return "↪ " + info.Branch + " " + git.Indicators(info)
+		}
+		return cfg.Git.ErrorDisplay
+	}
+	return "—"
+}
+
+// buildPaneRows builds the pane header row plus one row per matching process.
+func buildPaneRows(pane tmux.Pane, wi int, sessionName string, allProcs []proc.Process, cwdByPID map[int32]string, portByPID map[int32]int, gitCol string, includeGit bool) []format.Row {
+	paneCWD := pane.CWD
+	rows := []format.Row{procRow{
+		session: sessionName, window: fmt.Sprint(wi),
+		pane: fmt.Sprint(pane.PaneIndex), process: "(pane)",
+		pid: "—", cpu: "—", mem: "—", port: "—", up: "—",
+		cwd: paneCWD, gitCol: gitCol, includeGit: includeGit,
+	}}
+	for _, p := range allProcs {
+		cwd, ok := cwdByPID[p.PID]
+		if !ok || cwd != paneCWD {
+			continue
+		}
+		portStr := "—"
+		if port, ok := portByPID[p.PID]; ok {
+			portStr = fmt.Sprintf(":%d", port)
+		}
+		rows = append(rows, procRow{
+			session: sessionName, window: fmt.Sprint(wi),
+			pane: fmt.Sprint(pane.PaneIndex), process: p.Name,
+			pid: fmt.Sprint(p.PID), cpu: fmt.Sprintf("%.1f%%", p.CPU),
+			mem: format.Mem(p.MemRSS), port: portStr,
+			up: format.Duration(p.Uptime), cwd: paneCWD,
+			gitCol: "—", includeGit: includeGit,
+		})
+	}
+	return rows
+}
+
+// buildProcRows builds the display rows for all panes and their processes.
+func buildProcRows(grouped map[string]map[int][]tmux.Pane, allProcs []proc.Process, cwdByPID map[int32]string, portByPID map[int32]int, gitResults map[string]git.Info, cfg config.Config, sessionFilter, windowFilter string, includeGit bool) []format.Row {
+	var rows []format.Row
+	for sessionName, windows := range grouped {
+		if sessionFilter != "" && sessionName != sessionFilter {
+			continue
+		}
+		if isIgnored(cfg, sessionName) {
+			continue
+		}
+		primaryCWD := tmux.PrimaryPaneCWD(windows[0])
+		for wi, wPanes := range windows {
+			if windowFilter != "" && fmt.Sprintf("%s:%d", sessionName, wi) != windowFilter {
+				continue
+			}
+			for _, pane := range wPanes {
+				gitCol := "—"
+				if includeGit {
+					gitCol = resolvePaneGitCol(pane, wi, sessionName, primaryCWD, gitResults, cfg)
+				}
+				rows = append(rows, buildPaneRows(pane, wi, sessionName, allProcs, cwdByPID, portByPID, gitCol, includeGit)...)
+			}
+		}
+	}
+	return rows
+}
+
 func runProcs(cmd *cobra.Command, _ []string) error {
 	cfg := loadConfig()
 
@@ -68,10 +183,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		demuxlog.Warn("port list failed", "err", err)
 	}
-	portByPID := map[int32]int{}
-	for _, p := range ports {
-		portByPID[p.PID] = p.Port
-	}
+	portByPID := resolvePortMap(ports)
 
 	grouped := tmux.GroupBySessions(allPanes)
 
@@ -83,103 +195,11 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 	// Pre-fetch git info in parallel for all deviant panes.
 	var gitWork []git.ConcurrentWork
 	if procsGit {
-		for sessionName, windows := range grouped {
-			if procsSession != "" && sessionName != procsSession {
-				continue
-			}
-			if isIgnored(cfg, sessionName) {
-				continue
-			}
-			primaryCWD := tmux.PrimaryPaneCWD(windows[0])
-			for wi, wPanes := range windows {
-				if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
-					continue
-				}
-				for _, pane := range wPanes {
-					paneCWD := pane.CWD
-					if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
-						key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
-						gitWork = append(gitWork, git.ConcurrentWork{Key: key, Dir: paneCWD})
-					}
-				}
-			}
-		}
+		gitWork = collectProcsGitWork(grouped, cfg, procsSession, procsWindow)
 	}
 	gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
 
-	var rows []format.Row
-
-	for sessionName, windows := range grouped {
-		if procsSession != "" && sessionName != procsSession {
-			continue
-		}
-		if isIgnored(cfg, sessionName) {
-			continue
-		}
-
-		primaryCWD := tmux.PrimaryPaneCWD(windows[0])
-
-		for wi, wPanes := range windows {
-			if procsWindow != "" && fmt.Sprintf("%s:%d", sessionName, wi) != procsWindow {
-				continue
-			}
-
-			for _, pane := range wPanes {
-				paneCWD := pane.CWD
-				gitCol := "—"
-				if procsGit {
-					key := fmt.Sprintf("%s:%d:%d", sessionName, wi, pane.PaneIndex)
-					if !git.IsDescendant(paneCWD, primaryCWD) && paneCWD != primaryCWD {
-						if info, ok := gitResults[key]; ok {
-							gitCol = "↪ " + info.Branch + " " + git.Indicators(info)
-						} else {
-							gitCol = cfg.Git.ErrorDisplay
-						}
-					}
-				}
-
-				rows = append(rows, procRow{
-					session:    sessionName,
-					window:     fmt.Sprint(wi),
-					pane:       fmt.Sprint(pane.PaneIndex),
-					process:    "(pane)",
-					pid:        "—",
-					cpu:        "—",
-					mem:        "—",
-					port:       "—",
-					up:         "—",
-					cwd:        paneCWD,
-					gitCol:     gitCol,
-					includeGit: procsGit,
-				})
-
-				for _, p := range allProcs {
-					cwd, ok := cwdByPID[p.PID]
-					if !ok || cwd != paneCWD {
-						continue
-					}
-					portStr := "—"
-					if port, ok := portByPID[p.PID]; ok {
-						portStr = fmt.Sprintf(":%d", port)
-					}
-					rows = append(rows, procRow{
-						session:    sessionName,
-						window:     fmt.Sprint(wi),
-						pane:       fmt.Sprint(pane.PaneIndex),
-						process:    p.Name,
-						pid:        fmt.Sprint(p.PID),
-						cpu:        fmt.Sprintf("%.1f%%", p.CPU),
-						mem:        format.Mem(p.MemRSS),
-						port:       portStr,
-						up:         format.Duration(p.Uptime),
-						cwd:        paneCWD,
-						gitCol:     "—",
-						includeGit: procsGit,
-					})
-				}
-			}
-		}
-	}
+	rows := buildProcRows(grouped, allProcs, cwdByPID, portByPID, gitResults, cfg, procsSession, procsWindow, procsGit)
 
 	isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
 	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))

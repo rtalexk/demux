@@ -1220,3 +1220,39 @@ func TestAlertSeverity(t *testing.T) {
 		})
 	}
 }
+
+func TestSidebarViewport(t *testing.T) {
+	tests := []struct {
+		name        string
+		cursor      int
+		offset      int
+		visRows     int
+		nodeCount   int
+		wantOffset  int
+		wantContent int
+		wantAbove   bool
+		wantBelow   bool
+	}{
+		{"all fit", 0, 0, 10, 5, 0, 10, false, false},
+		{"scroll below", 0, 0, 5, 10, 0, 4, false, true},
+		{"cursor before offset", 2, 5, 10, 10, 2, 9, true, false},
+		{"cursor past viewport", 8, 0, 5, 10, 4, 3, true, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotOffset, gotContent, gotAbove, gotBelow := sidebarViewport(tt.cursor, tt.offset, tt.visRows, tt.nodeCount)
+			if gotOffset != tt.wantOffset {
+				t.Errorf("offset: got %d, want %d", gotOffset, tt.wantOffset)
+			}
+			if gotContent != tt.wantContent {
+				t.Errorf("contentRows: got %d, want %d", gotContent, tt.wantContent)
+			}
+			if gotAbove != tt.wantAbove {
+				t.Errorf("hasAbove: got %v, want %v", gotAbove, tt.wantAbove)
+			}
+			if gotBelow != tt.wantBelow {
+				t.Errorf("hasBelow: got %v, want %v", gotBelow, tt.wantBelow)
+			}
+		})
+	}
+}
