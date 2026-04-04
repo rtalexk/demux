@@ -131,17 +131,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 		sessionAlerts := alertsBySession[sessionName]
-		status := "ok"
-		for _, a := range sessionAlerts {
-			switch a.Level {
-			case "error":
-				status = "error"
-			case "warn":
-				if status != "error" {
-					status = "warn"
-				}
-			}
-		}
+		status := resolveSessionStatus(sessionAlerts)
 
 		row := sessionRow{
 			session:    sessionName,
@@ -192,4 +182,19 @@ func isIgnored(cfg config.Config, name string) bool {
 		}
 	}
 	return false
+}
+
+func resolveSessionStatus(alerts []db.Alert) string {
+	status := "ok"
+	for _, a := range alerts {
+		switch a.Level {
+		case "error":
+			status = "error"
+		case "warn":
+			if status != "error" {
+				status = "warn"
+			}
+		}
+	}
+	return status
 }
