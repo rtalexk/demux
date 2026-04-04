@@ -333,30 +333,37 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 	}
 
 	if selected {
-		left := label + stripANSI(alertSuffix)
-		if pathStr != "" && innerW > 0 {
-			rightW := len([]rune(pathStr))
-			padCount := innerW - len([]rune(left)) - rightW
-			if padCount < 1 {
-				padCount = 1
-			}
-			return selectedBG.Render(left + strings.Repeat(" ", padCount) + pathStr)
+		return p.renderWindowHeaderSelected(node, label, alertSuffix, pathStr, innerW)
+	}
+	return p.renderWindowHeaderUnselected(node, label, alertSuffix, pathStr, innerW)
+}
+
+func (p ProcListModel) renderWindowHeaderSelected(node ProcListNode, label, alertSuffix, pathStr string, innerW int) string {
+	left := label + stripANSI(alertSuffix)
+	if pathStr != "" && innerW > 0 {
+		rightW := len([]rune(pathStr))
+		padCount := innerW - len([]rune(left)) - rightW
+		if padCount < 1 {
+			padCount = 1
 		}
-		if pathStr != "" {
-			content := left + "  " + pathStr
-			padCount := innerW - len([]rune(content))
-			if padCount < 0 {
-				padCount = 0
-			}
-			return selectedBG.Render(content + strings.Repeat(" ", padCount))
-		}
-		padCount := innerW - len([]rune(left))
+		return selectedBG.Render(left + strings.Repeat(" ", padCount) + pathStr)
+	}
+	if pathStr != "" {
+		content := left + "  " + pathStr
+		padCount := innerW - len([]rune(content))
 		if padCount < 0 {
 			padCount = 0
 		}
-		return selectedBG.Render(left + strings.Repeat(" ", padCount))
+		return selectedBG.Render(content + strings.Repeat(" ", padCount))
 	}
+	padCount := innerW - len([]rune(left))
+	if padCount < 0 {
+		padCount = 0
+	}
+	return selectedBG.Render(left + strings.Repeat(" ", padCount))
+}
 
+func (p ProcListModel) renderWindowHeaderUnselected(node ProcListNode, label, alertSuffix, pathStr string, innerW int) string {
 	if pathStr == "" || innerW <= 0 {
 		out := windowHeaderStyle.Render(label) + alertSuffix
 		if pathStr != "" {
