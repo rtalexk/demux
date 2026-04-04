@@ -487,8 +487,8 @@ func (s SidebarModel) emptyHintText() string {
     }
 }
 
-// buildNodeLines builds the list of rendered node lines for the sidebar content area.
-func (s SidebarModel) buildNodeLines(offset, contentRows int, hasAbove, hasBelow, focused bool, width int, centeredHint func(string) string) []string {
+// buildSidebarLines builds the list of rendered node lines for the sidebar content area.
+func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBelow, focused bool, width int, centeredHint func(string) string) []string {
     var lines []string
     if hasAbove {
         lines = append(lines, centeredHint("▲ more"))
@@ -528,7 +528,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
     if len(s.nodes) == 0 {
         lines = append(lines, centeredHint(s.emptyHintText()))
     } else {
-        lines = s.buildNodeLines(offset, contentRows, hasAbove, hasBelow, focused, width, centeredHint)
+        lines = s.buildSidebarLines(offset, contentRows, hasAbove, hasBelow, focused, width, centeredHint)
     }
 
     inner := strings.Join(lines, "\n")

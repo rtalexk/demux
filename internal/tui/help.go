@@ -9,6 +9,9 @@ const (
 	helpContentWidth = 44
 	// helpOverhead is the number of rows consumed by the overlay border and padding.
 	helpOverhead = 4 // border top+bottom (2) + padding top+bottom (2)
+	// helpWideKeyThreshold is the key-column width above which the gap between
+	// key and description is reduced to 0 (the section already looks wide enough).
+	helpWideKeyThreshold = 20
 )
 
 type HelpModel struct {
@@ -85,7 +88,7 @@ func (h HelpModel) buildLines() []string {
 		lines = append(lines, helpSection(sec))
 		w := keyW[sec]
 		gap := 2
-		if sec == "Navigation" {
+		if w > helpWideKeyThreshold {
 			gap = 0
 		}
 		for _, e := range sections[sec] {

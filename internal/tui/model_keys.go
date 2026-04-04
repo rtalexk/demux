@@ -13,6 +13,11 @@ import (
     "github.com/rtalexk/demux/internal/tmux"
 )
 
+const (
+    dirDown = 1
+    dirUp   = -1
+)
+
 // resolveFilterKey maps a key message to a SidebarFilter.
 // Returns (filter, true) if the key matches a filter binding, ("", false) otherwise.
 func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
@@ -130,9 +135,9 @@ func (m Model) handleSearchInsertKey(msg tea.KeyMsg) (Model, tea.Cmd) {
         m.searchInput.ExitInsertMode()
         return m, nil
     case "ctrl+j", "ctrl+n":
-        return m.navigateSidebarInSearch(1)
+        return m.navigateSidebarInSearch(dirDown)
     case "ctrl+k", "ctrl+p":
-        return m.navigateSidebarInSearch(-1)
+        return m.navigateSidebarInSearch(dirUp)
     case "ctrl+o":
         return m.openSidebarSelected()
     default:
