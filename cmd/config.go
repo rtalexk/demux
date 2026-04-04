@@ -154,6 +154,9 @@ color_alert_warn_bg  = "#3d3500"
 color_alert_error_bg = "#3d1020"
 color_alert_defer    = "#b4befe"
 color_alert_defer_bg = "#1e1e2e"
+icon_alert_defer_sticky     = "🔖"
+color_alert_defer_sticky    = "#b4befe"
+color_alert_defer_sticky_bg = "#1e1e2e"
 
 # Session source icons
 icon_tmux_session = "⊞"
