@@ -46,6 +46,14 @@ func (r procRow) Fields() []string {
 	return base
 }
 
+func resolvePortMap(ports []proc.PortInfo) map[int32]int {
+	m := map[int32]int{}
+	for _, p := range ports {
+		m[p.PID] = p.Port
+	}
+	return m
+}
+
 func runProcs(cmd *cobra.Command, _ []string) error {
 	cfg := loadConfig()
 
@@ -68,10 +76,7 @@ func runProcs(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		demuxlog.Warn("port list failed", "err", err)
 	}
-	portByPID := map[int32]int{}
-	for _, p := range ports {
-		portByPID[p.PID] = p.Port
-	}
+	portByPID := resolvePortMap(ports)
 
 	grouped := tmux.GroupBySessions(allPanes)
 
