@@ -53,28 +53,49 @@ type ProcListModel struct {
 // TODO: single-window mode (SetWindowData) must be removed — selecting individual
 // windows from the sidebar is no longer a feature.
 
+// paneDirectChildren returns the immediate child processes for a pane.
+// When PanePID is set it reads directly from the tree; otherwise it falls
+// back to scanning procs by CWD.
+func paneDirectChildren(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process) []proc.Process {
+    if pane.PanePID != 0 {
+        return tree[pane.PanePID]
+    }
+    paneCWD := pane.CWD
+    var children []proc.Process
+    for _, pr := range procs {
+        cwd, ok := cwdMap[pr.PID]
+        if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
+            continue
+        }
+        children = append(children, pr)
+    }
+    return children
+}
+
+// depth1Meta computes collapse metadata for a depth-1 process node and
+// updates collapsedPIDs with a default-collapsed entry when first seen.
+func depth1Meta(pr proc.Process, tree map[int32][]proc.Process, collapsedPIDs map[int32]bool) (hasChildren bool, aggCPU float64, aggMem uint64, collapsed bool) {
+    for _, child := range tree[pr.PID] {
+        if !containsStr(activeIgnoredProcs, strings.ToLower(child.FriendlyName())) {
+            hasChildren = true
+            break
+        }
+    }
+    aggCPU, aggMem = aggStats(pr, tree)
+    if _, ok := collapsedPIDs[pr.PID]; !ok {
+        collapsedPIDs[pr.PID] = true
+    }
+    collapsed = collapsedPIDs[pr.PID]
+    return
+}
+
 // buildProcNodesForPane builds ProcListNode entries for a single pane.
 // It collects direct children of the pane's shell process (or CWD-matched
 // processes when PanePID is 0) and recurses into their subtrees, applying
 // the same collapse/aggregate logic used by SetWindowData and SetSessionData.
 func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, alertMap map[string]db.Alert, collapsedPIDs map[int32]bool, primaryCWD string) []ProcListNode {
-    paneCWD := pane.CWD
-
-    // Determine direct children of the pane's shell process.
+    children := paneDirectChildren(pane, procs, cwdMap, tree)
     seen := make(map[int32]bool)
-    var children []proc.Process
-    if pane.PanePID != 0 {
-        children = tree[pane.PanePID]
-    } else {
-        for _, pr := range procs {
-            cwd, ok := cwdMap[pr.PID]
-            if !ok || (cwd != paneCWD && !git.IsDescendant(cwd, paneCWD)) {
-                continue
-            }
-            children = append(children, pr)
-        }
-    }
-
     var nodes []ProcListNode
     var addProc func(pr proc.Process, depth int)
     addProc = func(pr proc.Process, depth int) {
@@ -83,30 +104,18 @@ func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int3
         }
         seen[pr.PID] = true
         if containsStr(activeIgnoredProcs, strings.ToLower(pr.FriendlyName())) {
-            // skip shell — promote its children to the same depth
             for _, child := range tree[pr.PID] {
                 addProc(child, depth)
             }
             return
         }
 
-        // For depth-1 nodes: compute collapse metadata.
         var hasChildren bool
         var aggCPU float64
         var aggMem uint64
         var collapsed bool
         if depth == 1 {
-            for _, child := range tree[pr.PID] {
-                if !containsStr(activeIgnoredProcs, strings.ToLower(child.FriendlyName())) {
-                    hasChildren = true
-                    break
-                }
-            }
-            aggCPU, aggMem = aggStats(pr, tree)
-            if _, ok := collapsedPIDs[pr.PID]; !ok {
-                collapsedPIDs[pr.PID] = true
-            }
-            collapsed = collapsedPIDs[pr.PID]
+            hasChildren, aggCPU, aggMem, collapsed = depth1Meta(pr, tree, collapsedPIDs)
         }
 
         nodes = append(nodes, ProcListNode{
@@ -130,6 +139,45 @@ func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int3
         addProc(pr, 1)
     }
     return nodes
+}
+
+// paneAlertFromMap looks up the alert for a single pane from alertMap.
+// The key format is "session:windowIndex.paneIndex". Returns nil when not found.
+func paneAlertFromMap(alertMap map[string]db.Alert, pane tmux.Pane) *db.Alert {
+    if alertMap == nil {
+        return nil
+    }
+    key := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+    if a, ok := alertMap[key]; ok {
+        return &a
+    }
+    return nil
+}
+
+// appendPaneNodes appends a pane header node and its process nodes to p.nodes.
+// displayPane may differ from pane (e.g. CWD suppressed when it matches winCWD).
+// An idle placeholder is inserted when no process nodes are added.
+func (p *ProcListModel) appendPaneNodes(pane tmux.Pane, displayPane tmux.Pane, winCWD string, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, gitInfo map[string]git.Info, alertMap map[string]db.Alert) {
+    paneCWD := pane.CWD
+    gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+    info := gitInfo[gitKey]
+    deviant := winCWD != "" && !git.IsDescendant(paneCWD, winCWD) && paneCWD != winCWD
+
+    headerIdx := len(p.nodes)
+    p.nodes = append(p.nodes, ProcListNode{
+        IsPaneHeader: true,
+        Pane:         displayPane,
+        GitDeviant:   deviant,
+        GitInfo:      info,
+        Alert:        paneAlertFromMap(alertMap, pane),
+    })
+
+    procNodes := buildProcNodesForPane(pane, procs, cwdMap, tree, alertMap, p.collapsedPIDs, winCWD)
+    p.nodes = append(p.nodes, procNodes...)
+
+    if len(p.nodes) == headerIdx+1 {
+        p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
+    }
 }
 
 // SetWindowData rebuilds the node list from pre-fetched data.
@@ -162,34 +210,7 @@ func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowI
     }
 
     for _, pane := range sortPanes(wPanes) {
-        paneCWD := pane.CWD
-        gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-        info := gitInfo[gitKey]
-        deviant := p.primaryCWD != "" && !git.IsDescendant(paneCWD, p.primaryCWD) && paneCWD != p.primaryCWD
-
-        headerIdx := len(p.nodes)
-        var paneAlert *db.Alert
-        if alertMap != nil {
-            paneKey := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-            if a, ok := alertMap[paneKey]; ok {
-                paneAlert = &a
-            }
-        }
-        p.nodes = append(p.nodes, ProcListNode{
-            IsPaneHeader: true,
-            Pane:         pane,
-            GitDeviant:   deviant,
-            GitInfo:      info,
-            Alert:        paneAlert,
-        })
-
-        procNodes := buildProcNodesForPane(pane, procs, cwdMap, tree, alertMap, p.collapsedPIDs, p.primaryCWD)
-        p.nodes = append(p.nodes, procNodes...)
-
-        if len(p.nodes) == headerIdx+1 {
-            // no children were added — insert an idle placeholder at process depth
-            p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
-        }
+        p.appendPaneNodes(pane, pane, p.primaryCWD, procs, cwdMap, tree, gitInfo, alertMap)
     }
     assignTreePrefixes(p.nodes)
     p.applyPendingSeek()
@@ -244,55 +265,34 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
     }
 
     for _, wi := range winIdxs {
-        wPanes := sortPanes(windows[wi])
-        if len(wPanes) == 0 {
-            continue
-        }
-        winCWD := wPanes[0].CWD
-
-        p.nodes = append(p.nodes, ProcListNode{
-            IsWindowHeader: true,
-            Pane:           wPanes[0],
-            Alert:          windowAlertFromMap(alertMap, session, wi),
-        })
-
-        for _, pane := range wPanes {
-            paneCWD := pane.CWD
-            gitKey := fmt.Sprintf("%s:%d:%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-            info := gitInfo[gitKey]
-            deviant := winCWD != "" && !git.IsDescendant(paneCWD, winCWD) && paneCWD != winCWD
-
-            displayPane := pane
-            if paneCWD == winCWD {
-                displayPane.CWD = ""
-            }
-
-            headerIdx := len(p.nodes)
-            var paneAlert *db.Alert
-            if alertMap != nil {
-                paneKey := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-                if a, ok := alertMap[paneKey]; ok {
-                    paneAlert = &a
-                }
-            }
-            p.nodes = append(p.nodes, ProcListNode{
-                IsPaneHeader: true,
-                Pane:         displayPane,
-                GitDeviant:   deviant,
-                GitInfo:      info,
-                Alert:        paneAlert,
-            })
-
-            procNodes := buildProcNodesForPane(pane, procs, cwdMap, tree, alertMap, p.collapsedPIDs, winCWD)
-            p.nodes = append(p.nodes, procNodes...)
-
-            if len(p.nodes) == headerIdx+1 {
-                p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
-            }
-        }
+        p.appendWindowNodes(windows[wi], session, wi, procs, cwdMap, tree, gitInfo, alertMap)
     }
     assignTreePrefixes(p.nodes)
     p.applyPendingSeek()
+}
+
+// appendWindowNodes appends a window header and all of its panes' nodes to p.nodes.
+// It is a no-op when the window has no panes.
+func (p *ProcListModel) appendWindowNodes(wPanes []tmux.Pane, session string, wi int, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, gitInfo map[string]git.Info, alertMap map[string]db.Alert) {
+    wPanes = sortPanes(wPanes)
+    if len(wPanes) == 0 {
+        return
+    }
+    winCWD := wPanes[0].CWD
+
+    p.nodes = append(p.nodes, ProcListNode{
+        IsWindowHeader: true,
+        Pane:           wPanes[0],
+        Alert:          windowAlertFromMap(alertMap, session, wi),
+    })
+
+    for _, pane := range wPanes {
+        displayPane := pane
+        if pane.CWD == winCWD {
+            displayPane.CWD = ""
+        }
+        p.appendPaneNodes(pane, displayPane, winCWD, procs, cwdMap, tree, gitInfo, alertMap)
+    }
 }
 
 // CurrentWindow returns the session name and window index currently displayed.
