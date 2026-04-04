@@ -32,59 +32,7 @@ func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.searchInput.IsInsert() {
-		sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
-		if sidebarVisibleRows < 1 {
-			sidebarVisibleRows = 1
-		}
-		m.sidebar.visibleRows = sidebarVisibleRows
-		switch msg.String() {
-		case "esc", "enter":
-			if msg.String() == "enter" {
-				m, cmd := m.openSidebarSelected()
-				m.searchInput.ExitInsertMode()
-				return m, cmd
-			}
-			m.searchInput.ExitInsertMode()
-			return m, nil
-		case "ctrl+j", "ctrl+n":
-			m.sidebar.CursorDown()
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-				m.procGen++
-				m.updateDetailFromSelection()
-				return m, m.scheduleProcFetch()
-			}
-			return m, nil
-		case "ctrl+k", "ctrl+p":
-			m.sidebar.CursorUp()
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-				m.procGen++
-				m.updateDetailFromSelection()
-				return m, m.scheduleProcFetch()
-			}
-			return m, nil
-		case "ctrl+o":
-			m, cmd := m.openSidebarSelected()
-			return m, cmd
-		default:
-			var cmd tea.Cmd
-			prevVal := m.searchInput.Value()
-			m.searchInput, cmd = m.searchInput.Update(msg)
-			if m.searchInput.Value() != prevVal {
-				if m.searchInput.Value() == "" {
-					// Input cleared: reset immediately without waiting for debounce.
-					m.queryResult = query.Result{}
-					m.sidebar.SetSearchResult(query.Result{})
-					m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
-					m.searchGen++ // cancel any in-flight query
-					return m, cmd
-				}
-				m.searchGen++
-				return m, tea.Batch(cmd, debounceSearch(m.searchGen))
-			}
-			return m, cmd
-		}
+		return m.handleSearchInsertKey(msg)
 	}
 
 	switch {
@@ -139,6 +87,63 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleProcListKey(msg)
 	}
 	return m, nil
+}
+
+// handleSearchInsertKey handles key events when the search input is in insert mode.
+// Returns the updated model and command.
+func (m Model) handleSearchInsertKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+    sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
+    if sidebarVisibleRows < 1 {
+        sidebarVisibleRows = 1
+    }
+    m.sidebar.visibleRows = sidebarVisibleRows
+    switch msg.String() {
+    case "esc", "enter":
+        if msg.String() == "enter" {
+            m, cmd := m.openSidebarSelected()
+            m.searchInput.ExitInsertMode()
+            return m, cmd
+        }
+        m.searchInput.ExitInsertMode()
+        return m, nil
+    case "ctrl+j", "ctrl+n":
+        m.sidebar.CursorDown()
+        if node := m.sidebar.Selected(); node != nil {
+            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            m.procGen++
+            m.updateDetailFromSelection()
+            return m, m.scheduleProcFetch()
+        }
+        return m, nil
+    case "ctrl+k", "ctrl+p":
+        m.sidebar.CursorUp()
+        if node := m.sidebar.Selected(); node != nil {
+            m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+            m.procGen++
+            m.updateDetailFromSelection()
+            return m, m.scheduleProcFetch()
+        }
+        return m, nil
+    case "ctrl+o":
+        m, cmd := m.openSidebarSelected()
+        return m, cmd
+    default:
+        var cmd tea.Cmd
+        prevVal := m.searchInput.Value()
+        m.searchInput, cmd = m.searchInput.Update(msg)
+        if m.searchInput.Value() != prevVal {
+            if m.searchInput.Value() == "" {
+                m.queryResult = query.Result{}
+                m.sidebar.SetSearchResult(query.Result{})
+                m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
+                m.searchGen++
+                return m, cmd
+            }
+            m.searchGen++
+            return m, tea.Batch(cmd, debounceSearch(m.searchGen))
+        }
+        return m, cmd
+    }
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
