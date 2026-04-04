@@ -74,7 +74,7 @@ var keys = keyMap{
     GotoBottom: keyDef{key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")), "Navigation", 4},
 
     // Sidebar
-    Enter: keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "select window")), "Sidebar", 1},
+    Enter: keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "attach to session")), "Sidebar", 1},
     Open:  keyDef{key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o / ctrl+o", "attach to session / window")), "Sidebar", 2},
     Esc:   keyDef{key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back to session level")), "Sidebar", 3},
     Defer: keyDef{key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "defer")), "Sidebar", 4},
@@ -96,7 +96,7 @@ var keys = keyMap{
     ExpandCollapseAll: keyDef{key.NewBinding(key.WithHelp("} / {", "expand / collapse all")), "Process list", 3},
     ExpandAll:         keyDef{key.NewBinding(key.WithKeys("}"), key.WithHelp("}", "expand all")), "", 0},
     CollapseAll:       keyDef{key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "collapse all")), "", 0},
-    ProcEnter:         keyDef{key.NewBinding(key.WithHelp("Enter", "attach to session:window")), "Process list", 4},
+    ProcEnter:         keyDef{key.NewBinding(key.WithHelp("Enter", "toggle expand / collapse")), "Process list", 4},
     ProcOpen:          keyDef{key.NewBinding(key.WithHelp("o / ctrl+o", "attach to pane")), "Process list", 5},
     Kill:              keyDef{key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "kill process")), "Process list", 6},
     Restart:           keyDef{key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restart process")), "Process list", 7},
