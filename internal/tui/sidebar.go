@@ -292,6 +292,38 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
     return ""
 }
 
+func (s *SidebarModel) sessionSortLess(si, sj session.Session, sortKeys []string) bool {
+    for _, k := range sortKeys {
+        switch k {
+        case "priority":
+            svi := s.highestSessionAlertSeverity(si.DisplayName)
+            svj := s.highestSessionAlertSeverity(sj.DisplayName)
+            hasI := svi >= 0
+            hasJ := svj >= 0
+            if hasI != hasJ {
+                return hasI
+            }
+            if hasI && hasJ {
+                if svi != svj {
+                    return svi > svj
+                }
+                ti := s.newestAlertAtSeverity(si.DisplayName, svi)
+                tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
+                if !ti.Equal(tj) {
+                    return ti.After(tj)
+                }
+            }
+        case "last_seen":
+            if !si.Activity.Equal(sj.Activity) {
+                return si.Activity.After(sj.Activity)
+            }
+        case "alphabetical":
+            return si.DisplayName < sj.DisplayName
+        }
+    }
+    return false
+}
+
 func (s *SidebarModel) rebuildNodes() {
     var curSession string
     if s.cursor >= 0 && s.cursor < len(s.nodes) {
@@ -310,36 +342,7 @@ func (s *SidebarModel) rebuildNodes() {
         sortKeys = []string{"priority", "last_seen", "alphabetical"}
     }
     sort.Slice(visible, func(i, j int) bool {
-        si, sj := visible[i], visible[j]
-        for _, key := range sortKeys {
-            switch key {
-            case "priority":
-                svi := s.highestSessionAlertSeverity(si.DisplayName)
-                svj := s.highestSessionAlertSeverity(sj.DisplayName)
-                hasI := svi >= 0
-                hasJ := svj >= 0
-                if hasI != hasJ {
-                    return hasI
-                }
-                if hasI && hasJ {
-                    if svi != svj {
-                        return svi > svj
-                    }
-                    ti := s.newestAlertAtSeverity(si.DisplayName, svi)
-                    tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
-                    if !ti.Equal(tj) {
-                        return ti.After(tj)
-                    }
-                }
-            case "last_seen":
-                if !si.Activity.Equal(sj.Activity) {
-                    return si.Activity.After(sj.Activity)
-                }
-            case "alphabetical":
-                return si.DisplayName < sj.DisplayName
-            }
-        }
-        return false
+        return s.sessionSortLess(visible[i], visible[j], sortKeys)
     })
 
     for _, sess := range visible {
