@@ -70,6 +70,41 @@ func TestMigrate_UpgradeV1ToV2(t *testing.T) {
     inner.Close()
 }
 
+func TestAlertUpgradeToSticky(t *testing.T) {
+    d, _ := Open(":memory:")
+    defer d.Close()
+
+    d.AlertSet("main", "r", LevelDefer, false)
+    if err := d.AlertUpgradeToSticky("main"); err != nil {
+        t.Fatalf("UpgradeToSticky: %v", err)
+    }
+    a, _ := d.AlertByTarget("main")
+    if a == nil || !a.Sticky {
+        t.Error("expected sticky after upgrade")
+    }
+}
+
+func TestAlertRemoveIfNotSticky(t *testing.T) {
+    d, _ := Open(":memory:")
+    defer d.Close()
+
+    // non-sticky: should be removed
+    d.AlertSet("main", "r", LevelDefer, false)
+    d.AlertRemoveIfNotSticky("main")
+    a, _ := d.AlertByTarget("main")
+    if a != nil {
+        t.Error("expected non-sticky alert to be removed")
+    }
+
+    // sticky: should survive
+    d.AlertSet("main", "r", LevelDefer, true)
+    d.AlertRemoveIfNotSticky("main")
+    a, _ = d.AlertByTarget("main")
+    if a == nil {
+        t.Error("expected sticky alert to survive")
+    }
+}
+
 func TestAlertSticky_RoundTrip(t *testing.T) {
     d, err := Open(":memory:")
     if err != nil {

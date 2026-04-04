@@ -55,6 +55,18 @@ func (d *DB) AlertRemove(target string) error {
     return err
 }
 
+// AlertUpgradeToSticky sets sticky=true on an existing alert. No-op if target has no alert.
+func (d *DB) AlertUpgradeToSticky(target string) error {
+    _, err := d.sql.Exec(`UPDATE alerts SET sticky = 1 WHERE target = ?`, target)
+    return err
+}
+
+// AlertRemoveIfNotSticky removes an alert only if sticky=false. Silent no-op if sticky or not found.
+func (d *DB) AlertRemoveIfNotSticky(target string) error {
+    _, err := d.sql.Exec(`DELETE FROM alerts WHERE target = ? AND sticky = 0`, target)
+    return err
+}
+
 func (d *DB) AlertList() ([]Alert, error) {
     rows, err := d.sql.Query(`
         SELECT id, target, reason, level, sticky, created_at
