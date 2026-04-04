@@ -112,6 +112,39 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 		}
 	}
 
+	allLines := p.buildNodeLines(focused, innerW, searchActive, dimStyle, paneHasMatch, windowHasMatch)
+
+	maxRows := height - 2
+	if maxRows < 1 {
+		maxRows = 1
+	}
+
+	// Safety clamps (read-only): handle cases where the viewport shrank since
+	// the last clampOffset call (e.g. detail pane expanding after selection change).
+	offset := p.offset
+	if p.cursor < offset {
+		offset = p.cursor
+	}
+	for offset < p.cursor && !procCursorVisible(p.nodes, p.cursor, offset, maxRows) {
+		offset++
+	}
+
+	visible, hasAbove, hasBelow := computeViewport(allLines, p.cursor, offset, maxRows)
+
+	var resultLines []string
+	if hasAbove {
+		resultLines = append(resultLines, hintStyle.Render("▲ more"))
+	}
+	resultLines = append(resultLines, visible...)
+	if hasBelow {
+		resultLines = append(resultLines, hintStyle.Render("▼ more"))
+	}
+
+	inner := strings.Join(resultLines, "\n")
+	return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+}
+
+func (p ProcListModel) buildNodeLines(focused bool, innerW int, searchActive bool, dimStyle lipgloss.Style, paneHasMatch map[string]bool, windowHasMatch map[int]bool) []renderedLine {
 	var allLines []renderedLine
 	for i, node := range p.nodes {
 		selected := focused && i == p.cursor
@@ -179,35 +212,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 		}
 		allLines = append(allLines, renderedLine{nodeIdx: i, text: line})
 	}
-
-	maxRows := height - 2
-	if maxRows < 1 {
-		maxRows = 1
-	}
-
-	// Safety clamps (read-only): handle cases where the viewport shrank since
-	// the last clampOffset call (e.g. detail pane expanding after selection change).
-	offset := p.offset
-	if p.cursor < offset {
-		offset = p.cursor
-	}
-	for offset < p.cursor && !procCursorVisible(p.nodes, p.cursor, offset, maxRows) {
-		offset++
-	}
-
-	visible, hasAbove, hasBelow := computeViewport(allLines, p.cursor, offset, maxRows)
-
-	var resultLines []string
-	if hasAbove {
-		resultLines = append(resultLines, hintStyle.Render("▲ more"))
-	}
-	resultLines = append(resultLines, visible...)
-	if hasBelow {
-		resultLines = append(resultLines, hintStyle.Render("▼ more"))
-	}
-
-	inner := strings.Join(resultLines, "\n")
-	return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+	return allLines
 }
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
