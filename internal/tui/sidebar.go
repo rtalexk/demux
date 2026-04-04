@@ -153,6 +153,20 @@ func (s *SidebarModel) highestSessionAlertSeverity(sess string) int {
     return best
 }
 
+// isBetterAlert reports whether candidate should replace current as the "best"
+// alert for a session under the given priority strategy.
+func isBetterAlert(candidate, current db.Alert, priority string) bool {
+    switch priority {
+    case "newest":
+        return candidate.CreatedAt.After(current.CreatedAt)
+    case "oldest":
+        return candidate.CreatedAt.Before(current.CreatedAt)
+    default: // "severity" and unknown values
+        return alertSeverity(candidate.Level) > alertSeverity(current.Level) ||
+            (alertSeverity(candidate.Level) == alertSeverity(current.Level) && candidate.CreatedAt.After(current.CreatedAt))
+    }
+}
+
 // BestAlertTargetInSession returns the tmux target string of the best alert
 // in the given session according to the session_switch_focus setting.
 // Returns "" for "default" priority or when the session has no alerts.
@@ -172,20 +186,8 @@ func (s *SidebarModel) BestAlertTargetInSession(sess, priority string) string {
             best = &a
             continue
         }
-        switch priority {
-        case "newest":
-            if a.CreatedAt.After(best.CreatedAt) {
-                best = &a
-            }
-        case "oldest":
-            if a.CreatedAt.Before(best.CreatedAt) {
-                best = &a
-            }
-        default: // "severity" and unknown values
-            if alertSeverity(a.Level) > alertSeverity(best.Level) ||
-                (alertSeverity(a.Level) == alertSeverity(best.Level) && a.CreatedAt.After(best.CreatedAt)) {
-                best = &a
-            }
+        if isBetterAlert(a, *best, priority) {
+            best = &a
         }
     }
     if best == nil {
@@ -196,73 +198,105 @@ func (s *SidebarModel) BestAlertTargetInSession(sess, priority string) string {
 
 // visibleSessions returns sessions matching the current filter with IgnoredSessions removed.
 // For FilterWorktree with no resolvable root, returns nil and sets s.filterHint.
-func (s *SidebarModel) visibleSessions() []session.Session {
-    ignore := func(name string) bool {
-        for _, ig := range s.cfg.IgnoredSessions {
-            if ig == name {
-                return true
-            }
+// isIgnoredSession reports whether the named session is in the ignore list.
+func (s *SidebarModel) isIgnoredSession(name string) bool {
+    for _, ig := range s.cfg.IgnoredSessions {
+        if ig == name {
+            return true
         }
-        return false
     }
+    return false
+}
 
+// worktreeRootRef resolves the worktree root for the session currently under
+// the cursor, returning "" when no root can be determined.
+func (s *SidebarModel) worktreeRootRef() string {
+    var curDisplayName string
+    if s.cursor >= 0 && s.cursor < len(s.nodes) {
+        curDisplayName = s.nodes[s.cursor].Session
+    }
+    for _, sess := range s.sessions {
+        if sess.DisplayName == curDisplayName {
+            return s.sessionWorktreeRoot(sess)
+        }
+    }
+    return ""
+}
+
+// matchesWorktreeFilter reports whether sess belongs to the same worktree root.
+func (s *SidebarModel) matchesWorktreeFilter(sess session.Session, rootRef string) bool {
+    r := s.sessionWorktreeRoot(sess)
+    return r != "" && r == rootRef
+}
+
+// filterAll returns all non-ignored sessions.
+func (s *SidebarModel) filterAll() []session.Session {
     var out []session.Session
+    for _, sess := range s.sessions {
+        if !s.isIgnoredSession(sess.DisplayName) {
+            out = append(out, sess)
+        }
+    }
+    return out
+}
 
+// filterConfig returns non-ignored config sessions.
+func (s *SidebarModel) filterConfig() []session.Session {
+    var out []session.Session
+    for _, sess := range s.sessions {
+        if sess.IsConfig && !s.isIgnoredSession(sess.DisplayName) {
+            out = append(out, sess)
+        }
+    }
+    return out
+}
+
+// filterPriority returns non-ignored live sessions that have at least one alert.
+func (s *SidebarModel) filterPriority() []session.Session {
+    var out []session.Session
+    for _, sess := range s.sessions {
+        if sess.IsLive && !s.newestSessionAlert(sess.DisplayName).IsZero() && !s.isIgnoredSession(sess.DisplayName) {
+            out = append(out, sess)
+        }
+    }
+    return out
+}
+
+// filterTmux returns non-ignored live sessions.
+func (s *SidebarModel) filterTmux() []session.Session {
+    var out []session.Session
+    for _, sess := range s.sessions {
+        if sess.IsLive && !s.isIgnoredSession(sess.DisplayName) {
+            out = append(out, sess)
+        }
+    }
+    return out
+}
+
+func (s *SidebarModel) visibleSessions() []session.Session {
     switch s.filter {
     case FilterAll:
-        for _, sess := range s.sessions {
-            if !ignore(sess.DisplayName) {
-                out = append(out, sess)
-            }
-        }
-
+        return s.filterAll()
     case FilterConfig:
-        for _, sess := range s.sessions {
-            if sess.IsConfig && !ignore(sess.DisplayName) {
-                out = append(out, sess)
-            }
-        }
-
+        return s.filterConfig()
     case FilterPriority:
-        for _, sess := range s.sessions {
-            if sess.IsLive && !s.newestSessionAlert(sess.DisplayName).IsZero() && !ignore(sess.DisplayName) {
-                out = append(out, sess)
-            }
-        }
-
+        return s.filterPriority()
     case FilterWorktree:
-        var curDisplayName string
-        if s.cursor >= 0 && s.cursor < len(s.nodes) {
-            curDisplayName = s.nodes[s.cursor].Session
-        }
-        var rootRef string
-        for _, sess := range s.sessions {
-            if sess.DisplayName == curDisplayName {
-                rootRef = s.sessionWorktreeRoot(sess)
-                break
-            }
-        }
+        rootRef := s.worktreeRootRef()
         if rootRef == "" {
             s.filterHint = "no sessions in this worktree"
             return nil
         }
+        var out []session.Session
         for _, sess := range s.sessions {
-            if !ignore(sess.DisplayName) {
-                if r := s.sessionWorktreeRoot(sess); r != "" && r == rootRef {
-                    out = append(out, sess)
-                }
-            }
-        }
-
-    default: // FilterTmux and unknown values
-        for _, sess := range s.sessions {
-            if sess.IsLive && !ignore(sess.DisplayName) {
+            if !s.isIgnoredSession(sess.DisplayName) && s.matchesWorktreeFilter(sess, rootRef) {
                 out = append(out, sess)
             }
         }
+        return out
+    default: // FilterTmux and unknown values
+        return s.filterTmux()
     }
-
-    return out
 }
 
 // sessionWorktreeRoot returns the worktree root path for a session, or "".
@@ -324,6 +358,44 @@ func (s *SidebarModel) sessionSortLess(si, sj session.Session, sortKeys []string
     return false
 }
 
+// applySearchFilter narrows s.nodes to the query result set and optionally
+// re-sorts by score, mutating s.nodes in place.
+func (s *SidebarModel) applySearchFilter() {
+    if s.queryResult.Sessions == nil {
+        return
+    }
+    matchSet := make(map[string]query.SessionMatch, len(s.queryResult.Sessions))
+    for _, sm := range s.queryResult.Sessions {
+        matchSet[sm.Name] = sm
+    }
+    filtered := s.nodes[:0:0]
+    for _, node := range s.nodes {
+        if _, ok := matchSet[node.Session]; ok {
+            filtered = append(filtered, node)
+        }
+    }
+    s.nodes = filtered
+    if s.cfg.Sidebar.SearchSort == "score" {
+        sort.SliceStable(s.nodes, func(i, j int) bool {
+            return matchSet[s.nodes[i].Session].Score > matchSet[s.nodes[j].Session].Score
+        })
+    }
+}
+
+// restoreCursor repositions s.cursor to curSession, defaulting to 0.
+func (s *SidebarModel) restoreCursor(curSession string) {
+    for i, n := range s.nodes {
+        if n.Session == curSession {
+            s.cursor = i
+            return
+        }
+    }
+    s.cursor = 0
+    if s.cursor >= len(s.nodes) {
+        s.cursor = max(0, len(s.nodes)-1)
+    }
+}
+
 func (s *SidebarModel) rebuildNodes() {
     var curSession string
     if s.cursor >= 0 && s.cursor < len(s.nodes) {
@@ -349,38 +421,8 @@ func (s *SidebarModel) rebuildNodes() {
         s.nodes = append(s.nodes, SidebarNode{Session: sess.DisplayName})
     }
 
-    // Apply search filter (score-sort overrides cfg sort).
-    if s.queryResult.Sessions != nil {
-        matchSet := make(map[string]query.SessionMatch, len(s.queryResult.Sessions))
-        for _, sm := range s.queryResult.Sessions {
-            matchSet[sm.Name] = sm
-        }
-        filtered := s.nodes[:0:0]
-        for _, node := range s.nodes {
-            if _, ok := matchSet[node.Session]; ok {
-                filtered = append(filtered, node)
-            }
-        }
-        s.nodes = filtered
-
-        if s.cfg.Sidebar.SearchSort == "score" {
-            sort.SliceStable(s.nodes, func(i, j int) bool {
-                return matchSet[s.nodes[i].Session].Score > matchSet[s.nodes[j].Session].Score
-            })
-        }
-    }
-
-    found := false
-    for i, n := range s.nodes {
-        if n.Session == curSession {
-            s.cursor = i
-            found = true
-            break
-        }
-    }
-    if !found {
-        s.cursor = 0
-    }
+    s.applySearchFilter()
+    s.restoreCursor(curSession)
     if s.cursor >= len(s.nodes) {
         s.cursor = max(0, len(s.nodes)-1)
     }
@@ -576,6 +618,36 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
     return strings.Join(indParts, " ")
 }
 
+// truncateSessionName truncates name to fit within maxName display columns,
+// appending "…" when truncation is needed.
+func truncateSessionName(name string, maxName int) string {
+    if runewidth.StringWidth(name) <= maxName {
+        return name
+    }
+    runes := []rune(name)
+    for runewidth.StringWidth(string(runes)) > maxName-1 {
+        runes = runes[:len(runes)-1]
+    }
+    return string(runes) + "…"
+}
+
+// renderSelectedRow renders a sidebar row that is currently selected.
+// When focused is true the row is highlighted with background colour and a trail.
+func renderSelectedRow(iconPrefix, nameStr, indicators string, availW, indW int, focused bool) string {
+    const gap = " "
+    pad := availW - runewidth.StringWidth(nameStr) - indW
+    if pad < 0 {
+        pad = 0
+    }
+    if focused {
+        indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
+        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
+        return indicatorGlyph + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+    }
+    indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
+    return indicatorGlyph + gap + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+}
+
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
     indicators := s.sessionIndicators(node, selected, focused)
 
@@ -601,32 +673,11 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
     if maxName < 4 {
         maxName = 4
     }
-    nameStr := node.Session
-    if runewidth.StringWidth(nameStr) > maxName {
-        runes := []rune(nameStr)
-        for runewidth.StringWidth(string(runes)) > maxName-1 {
-            runes = runes[:len(runes)-1]
-        }
-        nameStr = string(runes) + "…"
-    }
+    nameStr := truncateSessionName(node.Session, maxName)
 
     const gap = " " // 1-space gap between focus indicator and icon
-    if selected && focused {
-        pad := availW - runewidth.StringWidth(nameStr) - indW
-        if pad < 0 {
-            pad = 0
-        }
-        indicator := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
-        trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-        return indicator + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
-    }
     if selected {
-        pad := availW - runewidth.StringWidth(nameStr) - indW
-        if pad < 0 {
-            pad = 0
-        }
-        indicator := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-        return indicator + gap + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+        return renderSelectedRow(iconPrefix, nameStr, indicators, availW, indW, focused)
     }
     text := alignedRow(nameStr, indicators, availW)
     return " " + gap + iconPrefix + sessionStyle.Render(text)
