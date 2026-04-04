@@ -28,7 +28,7 @@ func helpSection(name string) string {
 
 // helpKV formats a keybinding line: key column padded to keyW, description grayed.
 func helpKV(keyW int, k, description string) string {
-	return fmt.Sprintf("  %-*s", keyW, k) + helpDescStyle.Render(description)
+	return fmt.Sprintf("  %-*s  ", keyW, k) + helpDescStyle.Render(description)
 }
 
 
