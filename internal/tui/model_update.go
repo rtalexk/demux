@@ -23,11 +23,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.showHelp {
 		if msg, ok := msg.(tea.KeyMsg); ok {
 			switch {
-			case key.Matches(msg, keys.Esc), key.Matches(msg, keys.Help), msg.String() == "q":
+			case key.Matches(msg, keys.Esc.Binding), key.Matches(msg, keys.Help.Binding), msg.String() == "q":
 				m.showHelp = false
-			case key.Matches(msg, keys.Up):
+			case key.Matches(msg, keys.Up.Binding):
 				m.help.ScrollUp()
-			case key.Matches(msg, keys.Down):
+			case key.Matches(msg, keys.Down.Binding):
 				m.help.ScrollDown(m.height)
 			}
 		}
@@ -406,11 +406,11 @@ func (m *Model) updateDetailFromSelection() {
 func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if key.Matches(msg, keys.Esc) || msg.String() == "q" {
+		if key.Matches(msg, keys.Esc.Binding) || msg.String() == "q" {
 			m.showYank = false
 			return m, nil
 		}
-		if key.Matches(msg, keys.Enter) {
+		if key.Matches(msg, keys.Enter.Binding) {
 			val := m.yank.SelectedValue()
 			CopyToClipboard(val)
 			m.showYank = false

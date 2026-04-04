@@ -16,15 +16,15 @@ import (
 // Returns (filter, true) if the key matches a filter binding, ("", false) otherwise.
 func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
     switch {
-    case key.Matches(msg, keys.AlertFilter):
+    case key.Matches(msg, keys.AlertFilter.Binding):
         return FilterPriority, true
-    case key.Matches(msg, keys.FilterTmux):
+    case key.Matches(msg, keys.FilterTmux.Binding):
         return FilterTmux, true
-    case key.Matches(msg, keys.FilterAll):
+    case key.Matches(msg, keys.FilterAll.Binding):
         return FilterAll, true
-    case key.Matches(msg, keys.FilterConfig):
+    case key.Matches(msg, keys.FilterConfig.Binding):
         return FilterConfig, true
-    case key.Matches(msg, keys.FilterWorktree):
+    case key.Matches(msg, keys.FilterWorktree.Binding):
         return FilterWorktree, true
     }
     return "", false
@@ -88,24 +88,24 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
-	case key.Matches(msg, keys.Quit):
+	case key.Matches(msg, keys.Quit.Binding):
 		return m, tea.Quit
-	case key.Matches(msg, keys.FocusSidebar):
+	case key.Matches(msg, keys.FocusSidebar.Binding):
 		m.focus = panelSidebar
 		m.updateDetailFromSelection()
-	case key.Matches(msg, keys.FocusProcList):
+	case key.Matches(msg, keys.FocusProcList.Binding):
 		// compact mode: FocusProcList is a no-op; panelSidebar is the only panel
 		if m.cfg.Mode != "compact" {
 			m.focus = panelProcList
 		}
 		// updateDetailFromSelection gates on m.focus, so safe to call unconditionally
 		m.updateDetailFromSelection()
-	case key.Matches(msg, keys.Help):
+	case key.Matches(msg, keys.Help.Binding):
 		m.showHelp = !m.showHelp
-	case key.Matches(msg, keys.Yank):
+	case key.Matches(msg, keys.Yank.Binding):
 		m.populateYankFields()
 		m.showYank = true
-	case key.Matches(msg, keys.Refresh):
+	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
 	default:
@@ -149,19 +149,19 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.sidebar.visibleRows = sidebarVisibleRows
 
 	switch {
-	case key.Matches(msg, keys.Up):
+	case key.Matches(msg, keys.Up.Binding):
 		m.sidebar.MoveUp(sidebarVisibleRows)
-	case key.Matches(msg, keys.Down):
+	case key.Matches(msg, keys.Down.Binding):
 		m.sidebar.MoveDown(sidebarVisibleRows)
-	case key.Matches(msg, keys.Tab):
+	case key.Matches(msg, keys.Tab.Binding):
 		m.sidebar.TabNextSession(sidebarVisibleRows)
-	case key.Matches(msg, keys.ShiftTab):
+	case key.Matches(msg, keys.ShiftTab.Binding):
 		m.sidebar.TabPrevSession(sidebarVisibleRows)
-	case key.Matches(msg, keys.GotoTop):
+	case key.Matches(msg, keys.GotoTop.Binding):
 		m.sidebar.GotoTop(sidebarVisibleRows)
-	case key.Matches(msg, keys.GotoBottom):
+	case key.Matches(msg, keys.GotoBottom.Binding):
 		m.sidebar.GotoBottom(sidebarVisibleRows)
-	case key.Matches(msg, keys.Enter), key.Matches(msg, keys.Open):
+	case key.Matches(msg, keys.Enter.Binding), key.Matches(msg, keys.Open.Binding):
 		if node := m.sidebar.Selected(); node != nil {
 			sess := m.sidebar.FindSession(node.Session)
 			if sess != nil && !sess.IsLive && sess.IsConfig && sess.Config != nil {
@@ -195,9 +195,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		}
-	case key.Matches(msg, keys.Esc):
+	case key.Matches(msg, keys.Esc.Binding):
 		m.sidebar.MoveToSessionLevel()
-	case key.Matches(msg, keys.Defer):
+	case key.Matches(msg, keys.Defer.Binding):
 		if node := m.sidebar.Selected(); node != nil {
 			return m, m.toggleDeferAlert(node.Session)
 		}
@@ -231,21 +231,21 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	procH := contentH - detailH
 
 	switch {
-	case key.Matches(msg, keys.Up):
+	case key.Matches(msg, keys.Up.Binding):
 		m.procList.MoveUp()
-	case key.Matches(msg, keys.Down):
+	case key.Matches(msg, keys.Down.Binding):
 		m.procList.MoveDown()
-	case key.Matches(msg, keys.Tab):
+	case key.Matches(msg, keys.Tab.Binding):
 		m.procList.TabNext()
-	case key.Matches(msg, keys.JumpUp):
+	case key.Matches(msg, keys.JumpUp.Binding):
 		m.procList.JumpToPrevPane()
-	case key.Matches(msg, keys.JumpDown):
+	case key.Matches(msg, keys.JumpDown.Binding):
 		m.procList.JumpToNextPane()
-	case key.Matches(msg, keys.GotoTop):
+	case key.Matches(msg, keys.GotoTop.Binding):
 		m.procList.GotoTop()
-	case key.Matches(msg, keys.GotoBottom):
+	case key.Matches(msg, keys.GotoBottom.Binding):
 		m.procList.GotoBottom()
-	case key.Matches(msg, keys.Enter):
+	case key.Matches(msg, keys.Enter.Binding):
 		if m.procList.ToggleCollapse() {
 			// Rebuild immediately with current data. The nil guard is defensive: if the
 			// sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
@@ -257,7 +257,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateDetailFromSelection()
 			return m, m.scheduleDelayedProcFetch()
 		}
-	case key.Matches(msg, keys.Expand):
+	case key.Matches(msg, keys.Expand.Binding):
 		if m.procList.Expand() {
 			if node := m.sidebar.Selected(); node != nil {
 				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
@@ -267,7 +267,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateDetailFromSelection()
 			return m, m.scheduleDelayedProcFetch()
 		}
-	case key.Matches(msg, keys.Collapse):
+	case key.Matches(msg, keys.Collapse.Binding):
 		if m.procList.Collapse() {
 			if node := m.sidebar.Selected(); node != nil {
 				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
@@ -277,7 +277,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateDetailFromSelection()
 			return m, m.scheduleDelayedProcFetch()
 		}
-	case key.Matches(msg, keys.ExpandAll):
+	case key.Matches(msg, keys.ExpandAll.Binding):
 		if m.procList.ExpandAll() {
 			if node := m.sidebar.Selected(); node != nil {
 				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
@@ -287,7 +287,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateDetailFromSelection()
 			return m, m.scheduleDelayedProcFetch()
 		}
-	case key.Matches(msg, keys.CollapseAll):
+	case key.Matches(msg, keys.CollapseAll.Binding):
 		if m.procList.CollapseAll() {
 			if node := m.sidebar.Selected(); node != nil {
 				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
@@ -297,7 +297,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.updateDetailFromSelection()
 			return m, m.scheduleDelayedProcFetch()
 		}
-	case key.Matches(msg, keys.Open):
+	case key.Matches(msg, keys.Open.Binding):
 		var target string
 		if pane := m.procList.SelectedPane(); pane != nil {
 			target = fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
@@ -310,13 +310,13 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		}
-	case key.Matches(msg, keys.Esc):
+	case key.Matches(msg, keys.Esc.Binding):
 		m.focus = panelSidebar
-	case key.Matches(msg, keys.Kill):
+	case key.Matches(msg, keys.Kill.Binding):
 		// TODO: confirmation prompt
-	case key.Matches(msg, keys.Restart):
+	case key.Matches(msg, keys.Restart.Binding):
 		// TODO: restart via tmux send-keys Up Enter
-	case key.Matches(msg, keys.Log):
+	case key.Matches(msg, keys.Log.Binding):
 		// TODO: tmux popup with scrollback
 	}
 	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
