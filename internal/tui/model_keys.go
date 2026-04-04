@@ -159,7 +159,7 @@ func (m Model) handleSearchInputUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 }
 
 // launchConfigSession creates a new tmux session from a config-only session entry.
-// Returns (model, cmd, true) if the session was launched (or failed to launch).
+// Returns the updated model and a command (nil on launch failure, fetchPanes or tea.Quit on success).
 func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
     if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
         m.statusMsg = "launch failed: " + err.Error()
@@ -218,8 +218,8 @@ func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 }
 
 // sidebarCursorMove handles cursor-movement keys in the sidebar.
-// Returns true if the key was consumed.
-func (m *Model) sidebarCursorMove(msg tea.KeyMsg, rows int) bool {
+// Returns the updated model and true if the key was consumed.
+func (m Model) sidebarCursorMove(msg tea.KeyMsg, rows int) (Model, bool) {
     switch {
     case key.Matches(msg, keys.Up.Binding):
         m.sidebar.MoveUp(rows)
@@ -234,9 +234,9 @@ func (m *Model) sidebarCursorMove(msg tea.KeyMsg, rows int) bool {
     case key.Matches(msg, keys.GotoBottom.Binding):
         m.sidebar.GotoBottom(rows)
     default:
-        return false
+        return m, false
     }
-    return true
+    return m, true
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -246,8 +246,8 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     }
     m.sidebar.visibleRows = sidebarVisibleRows
 
-    if m.sidebarCursorMove(msg, sidebarVisibleRows) {
-        return m.sidebarNavUpdate()
+    if nm, ok := m.sidebarCursorMove(msg, sidebarVisibleRows); ok {
+        return nm.sidebarNavUpdate()
     }
     switch {
     case key.Matches(msg, keys.Enter.Binding), key.Matches(msg, keys.Open.Binding):
@@ -300,7 +300,7 @@ func (m Model) afterCollapse(procH int) (Model, tea.Cmd) {
 
 // handleProcListNav handles navigation key cases in the proc list.
 // Returns (model, cmd, true) if the key was handled, or (m, nil, false) if not.
-func (m Model) handleProcListNav(msg tea.KeyMsg, procH int) (Model, tea.Cmd, bool) {
+func (m Model) handleProcListNav(msg tea.KeyMsg) (Model, tea.Cmd, bool) {
     switch {
     case key.Matches(msg, keys.Up.Binding):
         m.procList.MoveUp()
@@ -370,7 +370,7 @@ func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     procH, _ := m.procListDimensions()
 
-    if nm, cmd, ok := m.handleProcListNav(msg, procH); ok {
+    if nm, cmd, ok := m.handleProcListNav(msg); ok {
         nm.procList.clampOffset(procH - 2)
         nm.updateDetailFromSelection()
         return nm, cmd
