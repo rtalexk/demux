@@ -213,115 +213,102 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	contentH := m.height - 1
-	innerW := m.width - m.cfg.Sidebar.Width - 2
-	if innerW < 1 {
-		innerW = 1
-	}
-	detailContent := m.detail.ContentLines(innerW)
-	detailH := detailContent + 2
-	if detailH < 4 {
-		detailH = 4
-	}
-	maxDetailH := contentH - 4
-	if detailH > maxDetailH {
-		detailH = maxDetailH
-	}
-	procH := contentH - detailH
+// procListDimensions computes procH and detailH for the current model state.
+func (m Model) procListDimensions() (procH, detailH int) {
+    contentH := m.height - 1
+    innerW := m.width - m.cfg.Sidebar.Width - 2
+    if innerW < 1 {
+        innerW = 1
+    }
+    detailContent := m.detail.ContentLines(innerW)
+    detailH = detailContent + 2
+    if detailH < 4 {
+        detailH = 4
+    }
+    maxDetailH := contentH - 4
+    if detailH > maxDetailH {
+        detailH = maxDetailH
+    }
+    procH = contentH - detailH
+    return procH, detailH
+}
 
-	switch {
-	case key.Matches(msg, keys.Up.Binding):
-		m.procList.MoveUp()
-	case key.Matches(msg, keys.Down.Binding):
-		m.procList.MoveDown()
-	case key.Matches(msg, keys.Tab.Binding):
-		m.procList.TabNext()
-	case key.Matches(msg, keys.JumpUp.Binding):
-		m.procList.JumpToPrevPane()
-	case key.Matches(msg, keys.JumpDown.Binding):
-		m.procList.JumpToNextPane()
-	case key.Matches(msg, keys.GotoTop.Binding):
-		m.procList.GotoTop()
-	case key.Matches(msg, keys.GotoBottom.Binding):
-		m.procList.GotoBottom()
-	case key.Matches(msg, keys.Enter.Binding):
-		if m.procList.ToggleCollapse() {
-			// Rebuild immediately with current data. The nil guard is defensive: if the
-			// sidebar selection is lost between refreshes, the next poll cycle rebuilds instead.
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			}
-			m.procGen++
-			m.procList.clampOffset(procH - 2)
-			m.updateDetailFromSelection()
-			return m, m.scheduleDelayedProcFetch()
-		}
-	case key.Matches(msg, keys.Expand.Binding):
-		if m.procList.Expand() {
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			}
-			m.procGen++
-			m.procList.clampOffset(procH - 2)
-			m.updateDetailFromSelection()
-			return m, m.scheduleDelayedProcFetch()
-		}
-	case key.Matches(msg, keys.Collapse.Binding):
-		if m.procList.Collapse() {
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			}
-			m.procGen++
-			m.procList.clampOffset(procH - 2)
-			m.updateDetailFromSelection()
-			return m, m.scheduleDelayedProcFetch()
-		}
-	case key.Matches(msg, keys.ExpandAll.Binding):
-		if m.procList.ExpandAll() {
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			}
-			m.procGen++
-			m.procList.clampOffset(procH - 2)
-			m.updateDetailFromSelection()
-			return m, m.scheduleDelayedProcFetch()
-		}
-	case key.Matches(msg, keys.CollapseAll.Binding):
-		if m.procList.CollapseAll() {
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			}
-			m.procGen++
-			m.procList.clampOffset(procH - 2)
-			m.updateDetailFromSelection()
-			return m, m.scheduleDelayedProcFetch()
-		}
-	case key.Matches(msg, keys.Open.Binding):
-		var target string
-		if pane := m.procList.SelectedPane(); pane != nil {
-			target = fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-		} else if node := m.sidebar.Selected(); node != nil {
-			target = node.Session
-		}
-		if target != "" {
-			tmux.SwitchClient(target)
-			if m.popupMode {
-				return m, tea.Quit
-			}
-		}
-	case key.Matches(msg, keys.Esc.Binding):
-		m.focus = panelSidebar
-	case key.Matches(msg, keys.Kill.Binding):
-		// TODO: confirmation prompt
-	case key.Matches(msg, keys.Restart.Binding):
-		// TODO: restart via tmux send-keys Up Enter
-	case key.Matches(msg, keys.Log.Binding):
-		// TODO: tmux popup with scrollback
-	}
-	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
-	m.updateDetailFromSelection()
-	return m, nil
+// afterCollapse performs the shared post-toggle update after an expand/collapse operation:
+// rebuilds proc data for the current selection, clamps viewport, updates detail,
+// and schedules a delayed proc fetch.
+func (m Model) afterCollapse(procH int) (Model, tea.Cmd) {
+    if node := m.sidebar.Selected(); node != nil {
+        m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+    }
+    m.procGen++
+    m.procList.clampOffset(procH - 2)
+    m.updateDetailFromSelection()
+    return m, m.scheduleDelayedProcFetch()
+}
+
+func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+    procH, _ := m.procListDimensions()
+
+    switch {
+    case key.Matches(msg, keys.Up.Binding):
+        m.procList.MoveUp()
+    case key.Matches(msg, keys.Down.Binding):
+        m.procList.MoveDown()
+    case key.Matches(msg, keys.Tab.Binding):
+        m.procList.TabNext()
+    case key.Matches(msg, keys.JumpUp.Binding):
+        m.procList.JumpToPrevPane()
+    case key.Matches(msg, keys.JumpDown.Binding):
+        m.procList.JumpToNextPane()
+    case key.Matches(msg, keys.GotoTop.Binding):
+        m.procList.GotoTop()
+    case key.Matches(msg, keys.GotoBottom.Binding):
+        m.procList.GotoBottom()
+    case key.Matches(msg, keys.Enter.Binding):
+        if m.procList.ToggleCollapse() {
+            return m.afterCollapse(procH)
+        }
+    case key.Matches(msg, keys.Expand.Binding):
+        if m.procList.Expand() {
+            return m.afterCollapse(procH)
+        }
+    case key.Matches(msg, keys.Collapse.Binding):
+        if m.procList.Collapse() {
+            return m.afterCollapse(procH)
+        }
+    case key.Matches(msg, keys.ExpandAll.Binding):
+        if m.procList.ExpandAll() {
+            return m.afterCollapse(procH)
+        }
+    case key.Matches(msg, keys.CollapseAll.Binding):
+        if m.procList.CollapseAll() {
+            return m.afterCollapse(procH)
+        }
+    case key.Matches(msg, keys.Open.Binding):
+        var target string
+        if pane := m.procList.SelectedPane(); pane != nil {
+            target = fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+        } else if node := m.sidebar.Selected(); node != nil {
+            target = node.Session
+        }
+        if target != "" {
+            tmux.SwitchClient(target)
+            if m.popupMode {
+                return m, tea.Quit
+            }
+        }
+    case key.Matches(msg, keys.Esc.Binding):
+        m.focus = panelSidebar
+    case key.Matches(msg, keys.Kill.Binding):
+        // TODO: confirmation prompt
+    case key.Matches(msg, keys.Restart.Binding):
+        // TODO: restart via tmux send-keys Up Enter
+    case key.Matches(msg, keys.Log.Binding):
+        // TODO: tmux popup with scrollback
+    }
+    m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
+    m.updateDetailFromSelection()
+    return m, nil
 }
 
 func (m Model) toggleDeferAlert(target string) tea.Cmd {
