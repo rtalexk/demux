@@ -11,6 +11,62 @@ import (
 	"github.com/rtalexk/demux/internal/query"
 )
 
+// renderedLine pairs a node index with its rendered text, used to build the
+// full line list before viewport selection.
+type renderedLine struct {
+	nodeIdx int
+	text    string
+}
+
+// computeViewport selects the visible slice of allLines given cursor position,
+// scroll offset, and available row count. Returns visible texts and scroll hints.
+// Pure function — safe to call from read-only View/Render methods.
+func computeViewport(lines []renderedLine, cursor, offset, maxRows int) (visible []string, hasAbove, hasBelow bool) {
+	if len(lines) == 0 {
+		return nil, false, false
+	}
+	hasAbove = offset > 0
+	contentRows := maxRows
+	if hasAbove {
+		contentRows--
+	}
+	// First pass: check if content overflows to determine hasBelow.
+	rowCount := 0
+	for _, rl := range lines {
+		if rl.nodeIdx < offset {
+			continue
+		}
+		entryRows := strings.Count(rl.text, "\n") + 1
+		if rowCount+entryRows > contentRows {
+			hasBelow = true
+			break
+		}
+		rowCount += entryRows
+	}
+	// If hasBelow, shrink contentRows by one more for the ▼ hint.
+	if hasBelow {
+		contentRows = maxRows
+		if hasAbove {
+			contentRows--
+		}
+		contentRows-- // for ▼ hint
+	}
+	// Second pass: build visible with the final contentRows.
+	rowCount = 0
+	for _, rl := range lines {
+		if rl.nodeIdx < offset {
+			continue
+		}
+		entryRows := strings.Count(rl.text, "\n") + 1
+		if rowCount+entryRows > contentRows {
+			break
+		}
+		visible = append(visible, rl.text)
+		rowCount += entryRows
+	}
+	return visible, hasAbove, hasBelow
+}
+
 func (p ProcListModel) Render(width, height int, focused bool, title string) string {
 	border := procBorderInactive
 	if focused {
@@ -35,11 +91,6 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 	}
 
 	// build the full rendered line list, tracking node index
-	type renderedLine struct {
-		nodeIdx int
-		text    string
-	}
-
 	searchActive := p.searchQuery.Term != "" &&
 		p.searchQuery.Scope != query.ScopeSession &&
 		len(p.queryResult.Sessions) > 0
@@ -144,53 +195,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 		offset++
 	}
 
-	// determine scroll hints based on node-level offset
-	hasAbove := offset > 0
-	hasBelow := false // determined after we know how many fit
-	contentRows := maxRows
-	if hasAbove {
-		contentRows--
-	}
-	// tentatively check hasBelow: collect rows from offset
-	rowCount := 0
-	var visible []string
-	startIdx := 0
-	for i, rl := range allLines {
-		if rl.nodeIdx < offset {
-			continue
-		}
-		if startIdx == 0 {
-			startIdx = i
-		}
-		entryRows := strings.Count(rl.text, "\n") + 1
-		if rowCount+entryRows > contentRows {
-			hasBelow = true
-			break
-		}
-		visible = append(visible, rl.text)
-		rowCount += entryRows
-	}
-	// if hasBelow discovered, shrink contentRows by 1 and rebuild visible
-	if hasBelow {
-		contentRows = maxRows
-		if hasAbove {
-			contentRows--
-		}
-		contentRows-- // for ▼ hint
-		rowCount = 0
-		visible = visible[:0]
-		for _, rl := range allLines {
-			if rl.nodeIdx < offset {
-				continue
-			}
-			entryRows := strings.Count(rl.text, "\n") + 1
-			if rowCount+entryRows > contentRows {
-				break
-			}
-			visible = append(visible, rl.text)
-			rowCount += entryRows
-		}
-	}
+	visible, hasAbove, hasBelow := computeViewport(allLines, p.cursor, offset, maxRows)
 
 	var resultLines []string
 	if hasAbove {
