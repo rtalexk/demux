@@ -232,45 +232,52 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 	}
 
 	if selected {
-		left := label + stripANSI(alertSuffix)
-		rightPart := pathStr + gitSuffix
-		if rightPart != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
-			rightW := len([]rune(rightPart))
-			padCount := innerW - len([]rune(left)) - rightW
-			if padCount < 1 {
-				padCount = 1
-			}
-			return selectedBG.Render(left + strings.Repeat(" ", padCount) + rightPart)
+		return p.renderPaneHeaderSelected(node, label, alertSuffix, pathStr, gitSuffix, innerW, hasIdle)
+	}
+	return p.renderPaneHeaderUnselected(node, label, alertSuffix, pathStr, gitSuffix, innerW)
+}
+
+func (p ProcListModel) renderPaneHeaderSelected(node ProcListNode, label, alertSuffix, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
+	left := label + stripANSI(alertSuffix)
+	rightPart := pathStr + gitSuffix
+	if rightPart != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
+		rightW := len([]rune(rightPart))
+		padCount := innerW - len([]rune(left)) - rightW
+		if padCount < 1 {
+			padCount = 1
 		}
-		if rightPart != "" {
-			content := left + "  " + rightPart
-			padCount := innerW - len([]rune(content))
-			if padCount < 0 {
-				padCount = 0
-			}
-			return selectedBG.Render(content + strings.Repeat(" ", padCount))
-		}
-		if hasIdle {
-			// Render "label  idle" inline, then fill the remaining width with
-			// the selected background so the row doesn't wrap.
-			const idleVisualW = 6 // len("  idle")
-			padCount := innerW - len([]rune(left)) - idleVisualW
-			if padCount < 0 {
-				padCount = 0
-			}
-			idleRendered := paneIdleStyle.Background(activeTheme.ColorSelected).Render("idle")
-			return selectedBG.Render(left) +
-				selectedBG.Render("  ") +
-				idleRendered +
-				selectedBG.Render(strings.Repeat(" ", padCount))
-		}
-		padCount := innerW - len([]rune(left))
+		return selectedBG.Render(left + strings.Repeat(" ", padCount) + rightPart)
+	}
+	if rightPart != "" {
+		content := left + "  " + rightPart
+		padCount := innerW - len([]rune(content))
 		if padCount < 0 {
 			padCount = 0
 		}
-		return selectedBG.Render(left + strings.Repeat(" ", padCount))
+		return selectedBG.Render(content + strings.Repeat(" ", padCount))
 	}
+	if hasIdle {
+		// Render "label  idle" inline, then fill the remaining width with
+		// the selected background so the row doesn't wrap.
+		const idleVisualW = 6 // len("  idle")
+		padCount := innerW - len([]rune(left)) - idleVisualW
+		if padCount < 0 {
+			padCount = 0
+		}
+		idleRendered := paneIdleStyle.Background(activeTheme.ColorSelected).Render("idle")
+		return selectedBG.Render(left) +
+			selectedBG.Render("  ") +
+			idleRendered +
+			selectedBG.Render(strings.Repeat(" ", padCount))
+	}
+	padCount := innerW - len([]rune(left))
+	if padCount < 0 {
+		padCount = 0
+	}
+	return selectedBG.Render(left + strings.Repeat(" ", padCount))
+}
 
+func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, alertSuffix, pathStr, gitSuffix string, innerW int) string {
 	rightPart := pathStr + gitSuffix
 	if rightPart == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
 		out := paneHeaderStyle.Render(label) + alertSuffix
