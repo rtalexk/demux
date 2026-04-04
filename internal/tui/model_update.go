@@ -19,152 +19,198 @@ import (
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Delegate to overlay handlers first
-	if m.showHelp {
-		if msg, ok := msg.(tea.KeyMsg); ok {
-			switch {
-			case key.Matches(msg, keys.Esc.Binding), key.Matches(msg, keys.Help.Binding), msg.String() == "q":
-				m.showHelp = false
-			case key.Matches(msg, keys.Up.Binding):
-				m.help.ScrollUp()
-			case key.Matches(msg, keys.Down.Binding):
-				m.help.ScrollDown(m.height)
-			}
-		}
-		return m, nil
-	}
-	if m.showYank {
-		return m.updateYank(msg)
-	}
+    if overlay, cmd, handled := m.handleOverlays(msg); handled {
+        return overlay, cmd
+    }
+    return m.handleMsg(msg)
+}
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		return m.handleKey(msg)
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		return m, nil
-	case tickMsg:
-		m.pulse = !m.pulse
-		m.spinnerFrame++
-		if time.Now().After(m.statusExp) {
-			m.statusMsg = ""
-		}
-		return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchAlerts())
-	case panesMsg:
-		m.panes = msg.panes
-		grouped := tmux.GroupBySessions(msg.panes)
-		merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
-		m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
-		m.updateDetailFromSelection()
-		var cmds []tea.Cmd
-		if !m.ready {
-			// First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
-			m.currentSession = msg.currentSession
-			switch m.cfg.Sidebar.FocusOnOpen {
-			case "current_session", "first_session":
-				visibleRows := max(1, m.height-1-2-searchBoxH)
-				m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
-			}
-			m.ready = true
-			cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchAlerts())
-			// If startup focus landed on a window node, kick off an initial proc fetch.
-			if node := m.sidebar.Selected(); node != nil {
-				m.procGen++
-				cmds = append(cmds, m.scheduleProcFetch())
-			}
-		}
-		if m.cfg.Git.Enabled {
-			for sessionName, windows := range grouped {
-				info := m.gitInfo[sessionName]
-				info.Loading = true
-				m.gitInfo[sessionName] = info
-				primaryCWD := tmux.PrimaryPaneCWD(windows[0])
-				if primaryCWD != "" {
-					cmds = append(cmds, fetchGit(sessionName, primaryCWD, m.cfg.Git.TimeoutMs))
-				}
-			}
-		}
-		return m, tea.Batch(cmds...)
-	case procDataMsg:
-		if msg.gen != m.procGen {
-			// Stale result from a previously selected window — discard.
-			return m, nil
-		}
-		m.procs = msg.procs
-		m.cwdMap = msg.cwdMap
-		if node := m.sidebar.Selected(); node != nil {
-			m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-		}
-		m.updateDetailFromSelection()
-		// Self-schedule next poll in 2s for the selected window.
-		return m, m.scheduleDelayedProcFetch()
-	case alertsMsg:
-		m.alerts = msg.alerts
-		merged := session.Merge(m.panes, m.sessionsConfig.Entries)
-		m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
-		if !m.startupFocusDone {
-			m.startupFocusDone = true
-			visibleRows := max(1, m.height-1-2-searchBoxH)
-			if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
-				m.sidebar.FocusFirstAlertSession(visibleRows)
-			}
-			if m.cfg.Sidebar.FocusSearchOnOpen {
-				m.searchInput.EnterInsertMode()
-			}
-		}
-		m.updateDetailFromSelection()
-		// If startup focus landed on a window node, kick off an initial proc fetch.
-		var cmds []tea.Cmd
-		if node := m.sidebar.Selected(); node != nil {
-			m.procGen++
-			cmds = append(cmds, m.scheduleProcFetch())
-		}
-		if pruneCmd := m.pruneStaleAlerts(); pruneCmd != nil {
-			cmds = append(cmds, pruneCmd)
-		}
-		return m, tea.Batch(cmds...)
-	case gitResultMsg:
-		m.gitInfo[msg.key] = msg.info
-		merged := session.Merge(m.panes, m.sessionsConfig.Entries)
-		m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
-		m.updateDetailFromSelection()
-		return m, nil
-	case queryResultMsg:
-		if msg.gen == m.searchGen {
-			m.queryResult = msg.result
-			m.sidebar.SetSearchResult(msg.result)
-			m.procList.SetSearchQuery(query.Parse(m.searchInput.Value()), msg.result)
-			if node := m.sidebar.Selected(); node != nil {
-				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-				m.procGen++
-				m.updateDetailFromSelection()
-				return m, m.scheduleProcFetch()
-			} else {
-				m.procList.Reset()
-			}
-		}
-		return m, nil
-	case searchDebounceMsg:
-		if msg.gen != m.searchGen {
-			return m, nil
-		}
-		pq := query.Parse(m.searchInput.Value())
-		for _, sess := range m.sidebar.sessions {
-			if !sess.IsLive {
-				pq.ExtraSessions = append(pq.ExtraSessions, sess.DisplayName)
-			}
-		}
-		gen := m.searchGen
-		return m, func() tea.Msg {
-			result, err := query.Run(pq)
-			if err != nil {
-				return queryResultMsg{gen: gen}
-			}
-			return queryResultMsg{result: result, gen: gen}
-		}
-	}
-	return m, nil
+func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        return m.handleKey(msg)
+    case tea.WindowSizeMsg:
+        m.width = msg.Width
+        m.height = msg.Height
+        return m, nil
+    case tickMsg:
+        return m.handleTickMsg(msg)
+    case panesMsg:
+        return m.handlePanesMsg(msg)
+    case procDataMsg:
+        return m.handleProcDataMsg(msg)
+    case alertsMsg:
+        return m.handleAlertsMsg(msg)
+    case gitResultMsg:
+        return m.handleGitResultMsg(msg)
+    case queryResultMsg:
+        return m.handleQueryResultMsg(msg)
+    case searchDebounceMsg:
+        return m.handleSearchDebounceMsg(msg)
+    }
+    return m, nil
+}
+
+// handleOverlays routes messages to full-screen overlay handlers.
+// Returns (model, cmd, true) if the message was consumed by an overlay.
+func (m Model) handleOverlays(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+    if m.showHelp {
+        mo, cmd := m.handleHelpOverlay(msg)
+        return mo, cmd, true
+    }
+    if m.showYank {
+        mo, cmd := m.updateYank(msg)
+        return mo, cmd, true
+    }
+    return m, nil, false
+}
+
+func (m Model) handleGitResultMsg(msg gitResultMsg) (Model, tea.Cmd) {
+    m.gitInfo[msg.key] = msg.info
+    merged := session.Merge(m.panes, m.sessionsConfig.Entries)
+    m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
+    m.updateDetailFromSelection()
+    return m, nil
+}
+
+func (m Model) handleHelpOverlay(msg tea.Msg) (tea.Model, tea.Cmd) {
+    if keyMsg, ok := msg.(tea.KeyMsg); ok {
+        switch {
+        case key.Matches(keyMsg, keys.Esc.Binding), key.Matches(keyMsg, keys.Help.Binding), keyMsg.String() == "q":
+            m.showHelp = false
+        case key.Matches(keyMsg, keys.Up.Binding):
+            m.help.ScrollUp()
+        case key.Matches(keyMsg, keys.Down.Binding):
+            m.help.ScrollDown(m.height)
+        }
+    }
+    return m, nil
+}
+
+func (m Model) handleTickMsg(msg tickMsg) (Model, tea.Cmd) {
+    _ = msg
+    m.pulse = !m.pulse
+    m.spinnerFrame++
+    if time.Now().After(m.statusExp) {
+        m.statusMsg = ""
+    }
+    return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchAlerts())
+}
+
+func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
+    if msg.gen != m.searchGen {
+        return m, nil
+    }
+    m.queryResult = msg.result
+    m.sidebar.SetSearchResult(msg.result)
+    m.procList.SetSearchQuery(query.Parse(m.searchInput.Value()), msg.result)
+    if node := m.sidebar.Selected(); node != nil {
+        m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+        m.procGen++
+        m.updateDetailFromSelection()
+        return m, m.scheduleProcFetch()
+    }
+    m.procList.Reset()
+    return m, nil
+}
+
+func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
+    m.panes = msg.panes
+    grouped := tmux.GroupBySessions(msg.panes)
+    merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
+    m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
+    m.updateDetailFromSelection()
+    var cmds []tea.Cmd
+    if !m.ready {
+        // First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
+        m.currentSession = msg.currentSession
+        switch m.cfg.Sidebar.FocusOnOpen {
+        case "current_session", "first_session":
+            visibleRows := max(1, m.height-1-2-searchBoxH)
+            m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
+        }
+        m.ready = true
+        cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchAlerts())
+        // If startup focus landed on a window node, kick off an initial proc fetch.
+        if node := m.sidebar.Selected(); node != nil {
+            m.procGen++
+            cmds = append(cmds, m.scheduleProcFetch())
+        }
+    }
+    if m.cfg.Git.Enabled {
+        for sessionName, windows := range grouped {
+            info := m.gitInfo[sessionName]
+            info.Loading = true
+            m.gitInfo[sessionName] = info
+            primaryCWD := tmux.PrimaryPaneCWD(windows[0])
+            if primaryCWD != "" {
+                cmds = append(cmds, fetchGit(sessionName, primaryCWD, m.cfg.Git.TimeoutMs))
+            }
+        }
+    }
+    return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
+    if msg.gen != m.procGen {
+        // Stale result from a previously selected window — discard.
+        return m, nil
+    }
+    m.procs = msg.procs
+    m.cwdMap = msg.cwdMap
+    if node := m.sidebar.Selected(); node != nil {
+        m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+    }
+    m.updateDetailFromSelection()
+    // Self-schedule next poll in 2s for the selected window.
+    return m, m.scheduleDelayedProcFetch()
+}
+
+func (m Model) handleAlertsMsg(msg alertsMsg) (Model, tea.Cmd) {
+    m.alerts = msg.alerts
+    merged := session.Merge(m.panes, m.sessionsConfig.Entries)
+    m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
+    if !m.startupFocusDone {
+        m.startupFocusDone = true
+        visibleRows := max(1, m.height-1-2-searchBoxH)
+        if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
+            m.sidebar.FocusFirstAlertSession(visibleRows)
+        }
+        if m.cfg.Sidebar.FocusSearchOnOpen {
+            m.searchInput.EnterInsertMode()
+        }
+    }
+    m.updateDetailFromSelection()
+    // If startup focus landed on a window node, kick off an initial proc fetch.
+    var cmds []tea.Cmd
+    if node := m.sidebar.Selected(); node != nil {
+        m.procGen++
+        cmds = append(cmds, m.scheduleProcFetch())
+    }
+    if pruneCmd := m.pruneStaleAlerts(); pruneCmd != nil {
+        cmds = append(cmds, pruneCmd)
+    }
+    return m, tea.Batch(cmds...)
+}
+
+func (m Model) handleSearchDebounceMsg(msg searchDebounceMsg) (Model, tea.Cmd) {
+    if msg.gen != m.searchGen {
+        return m, nil
+    }
+    pq := query.Parse(m.searchInput.Value())
+    for _, sess := range m.sidebar.sessions {
+        if !sess.IsLive {
+            pq.ExtraSessions = append(pq.ExtraSessions, sess.DisplayName)
+        }
+    }
+    gen := m.searchGen
+    return m, func() tea.Msg {
+        result, err := query.Run(pq)
+        if err != nil {
+            return queryResultMsg{gen: gen}
+        }
+        return queryResultMsg{result: result, gen: gen}
+    }
 }
 
 func (m *Model) populateYankFields() {
