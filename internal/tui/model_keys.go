@@ -420,7 +420,7 @@ func (m Model) toggleDeferAlert(target string) tea.Cmd {
                 demuxlog.Warn("defer remove failed", "err", err)
             }
         } else {
-            if err := d.AlertSet(target, reason, db.LevelDefer); err != nil {
+            if err := d.AlertSet(target, reason, db.LevelDefer, false); err != nil {
                 demuxlog.Warn("defer set failed", "err", err)
             }
         }

@@ -69,3 +69,34 @@ func TestMigrate_UpgradeV1ToV2(t *testing.T) {
     }
     inner.Close()
 }
+
+func TestAlertSticky_RoundTrip(t *testing.T) {
+    d, err := Open(":memory:")
+    if err != nil {
+        t.Fatalf("open: %v", err)
+    }
+    defer d.Close()
+
+    if err := d.AlertSet("main", "Come back", LevelDefer, true); err != nil {
+        t.Fatalf("AlertSet: %v", err)
+    }
+
+    a, err := d.AlertByTarget("main")
+    if err != nil {
+        t.Fatalf("AlertByTarget: %v", err)
+    }
+    if a == nil {
+        t.Fatal("expected alert, got nil")
+    }
+    if !a.Sticky {
+        t.Error("expected Sticky=true")
+    }
+
+    alerts, err := d.AlertList()
+    if err != nil {
+        t.Fatalf("AlertList: %v", err)
+    }
+    if len(alerts) != 1 || !alerts[0].Sticky {
+        t.Error("AlertList: expected sticky alert")
+    }
+}

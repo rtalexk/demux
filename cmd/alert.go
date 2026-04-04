@@ -59,7 +59,7 @@ var alertSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := d.AlertSet(alertSetTarget, alertReason, alertLevel); err != nil {
+		if err := d.AlertSet(alertSetTarget, alertReason, alertLevel, false); err != nil {
 			return fmt.Errorf("alert set: %w", err)
 		}
 		fmt.Printf("Alert set for %s\n", alertSetTarget)

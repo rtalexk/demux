@@ -38,10 +38,10 @@ func TestPaneFocusClearsAlertsIncludingSticky(t *testing.T) {
 	}
 	defer d.Close()
 
-	if err := d.AlertSet("work:2.3", "Claude finished", "info"); err != nil {
+	if err := d.AlertSet("work:2.3", "Claude finished", "info", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.AlertSet("work:2", "needs attention", "warn"); err != nil {
+	if err := d.AlertSet("work:2", "needs attention", "warn", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -86,13 +86,13 @@ func TestApplyPaneFocusClearsSessionLevel(t *testing.T) {
 	}
 	defer d.Close()
 
-	if err := d.AlertSet("main", "come back", "defer"); err != nil {
+	if err := d.AlertSet("main", "come back", "defer", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if err := d.AlertSet("main:0", "window alert", "info"); err != nil {
+	if err := d.AlertSet("main:0", "window alert", "info", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if err := d.AlertSet("main:0.0", "pane alert", "warn"); err != nil {
+	if err := d.AlertSet("main:0.0", "pane alert", "warn", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 
