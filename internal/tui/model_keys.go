@@ -12,6 +12,24 @@ import (
 	"github.com/rtalexk/demux/internal/tmux"
 )
 
+// resolveFilterKey maps a key message to a SidebarFilter.
+// Returns (filter, true) if the key matches a filter binding, ("", false) otherwise.
+func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
+    switch {
+    case key.Matches(msg, keys.AlertFilter):
+        return FilterPriority, true
+    case key.Matches(msg, keys.FilterTmux):
+        return FilterTmux, true
+    case key.Matches(msg, keys.FilterAll):
+        return FilterAll, true
+    case key.Matches(msg, keys.FilterConfig):
+        return FilterConfig, true
+    case key.Matches(msg, keys.FilterWorktree):
+        return FilterWorktree, true
+    }
+    return "", false
+}
+
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.searchInput.IsInsert() {
 		sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
@@ -90,34 +108,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refresh):
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
-	case key.Matches(msg, keys.AlertFilter),
-		key.Matches(msg, keys.FilterTmux),
-		key.Matches(msg, keys.FilterAll),
-		key.Matches(msg, keys.FilterConfig),
-		key.Matches(msg, keys.FilterWorktree):
-
-		sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
-		if sidebarVisibleRows < 1 {
-			sidebarVisibleRows = 1
-		}
-		var newFilter SidebarFilter
-		switch {
-		case key.Matches(msg, keys.AlertFilter):
-			newFilter = FilterPriority
-		case key.Matches(msg, keys.FilterTmux):
-			newFilter = FilterTmux
-		case key.Matches(msg, keys.FilterAll):
-			newFilter = FilterAll
-		case key.Matches(msg, keys.FilterConfig):
-			newFilter = FilterConfig
-		case key.Matches(msg, keys.FilterWorktree):
-			newFilter = FilterWorktree
-		}
-		m.sidebar.SetFilter(newFilter, sidebarVisibleRows)
-		if node := m.sidebar.Selected(); node != nil {
-			m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
-			m.updateDetailFromSelection()
-		}
 	default:
 		if msg.String() == "f" {
 			m.searchInput.EnterInsertMode()
@@ -129,6 +119,18 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.sidebar.SetSearchResult(query.Result{})
 			m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
 			m.searchGen++
+			return m, nil
+		}
+		if newFilter, ok := resolveFilterKey(msg); ok {
+			sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
+			if sidebarVisibleRows < 1 {
+				sidebarVisibleRows = 1
+			}
+			m.sidebar.SetFilter(newFilter, sidebarVisibleRows)
+			if node := m.sidebar.Selected(); node != nil {
+				m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+				m.updateDetailFromSelection()
+			}
 			return m, nil
 		}
 		if m.focus == panelSidebar {
