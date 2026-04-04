@@ -318,66 +318,9 @@ func (m *Model) updateDetailFromSelection() {
             m.detail = DetailModel{}
             return
         }
-        grouped := tmux.GroupBySessions(m.panes)
-        windows := grouped[node.Session]
-        alertCount := 0
-        for _, a := range m.alerts {
-            if strings.HasPrefix(a.Target, node.Session+":") {
-                alertCount++
-            }
-        }
-        sessionCWD := tmux.PrimaryPaneCWD(windows[0])
-        // count processes whose CWD is under the session's primary CWD
-        procCount := 0
-        if sessionCWD != "" {
-            for _, pr := range m.procs {
-                cwd := m.cwdMap[pr.PID]
-                if cwd == "" {
-                    continue
-                }
-                if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
-                    procCount++
-                }
-            }
-        }
-        paneCount := 0
-        for _, wp := range windows {
-            paneCount += len(wp)
-        }
-        sess := m.sidebar.FindSession(node.Session)
-        isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
-        configPath := ""
-        configWorktree := ""
-        if isConfigOnly && sess.Config != nil {
-            configPath = sess.Config.Path
-            if sess.Config.Worktree && configPath != "" {
-                // If configPath itself is the worktree root container (.bare/ lives here),
-                // show just the repo name. Otherwise show "worktree (repo)".
-                if fi, err := os.Stat(filepath.Join(configPath, ".bare")); err == nil && fi.IsDir() {
-                    bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
-                    configWorktree = bareStr + " (" + filepath.Base(configPath) + ")"
-                } else {
-                    configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
-                }
-            }
-        }
-        m.detail = DetailModel{
-            cfg:            m.cfg,
-            selType:        DetailSession,
-            session:        node.Session,
-            sessionCWD:     sessionCWD,
-            isConfigOnly:   isConfigOnly,
-            configPath:     configPath,
-            configWorktree: configWorktree,
-            gitInfo:        m.gitInfo[node.Session],
-            winCount:       len(windows),
-            paneCount:      paneCount,
-            procCount:      procCount,
-            alertCount:     alertCount,
-        }
+        m.detail = m.detailForSidebarNode(*node)
         return
     }
-    // panelProcList focus
     if m.focus == panelProcList {
         selNode := m.procList.SelectedNode()
         if selNode == nil || selNode.IsPaneHeader {
@@ -385,66 +328,134 @@ func (m *Model) updateDetailFromSelection() {
             return
         }
         if selNode.IsWindowHeader {
-            sess := selNode.Pane.Session
-            winIdx := selNode.Pane.WindowIndex
-            grouped := tmux.GroupBySessions(m.panes)
-            windows := grouped[sess]
-            wPanes := windows[winIdx]
-            gitKey := fmt.Sprintf("%s:%d", sess, winIdx)
-            var windowAlert *db.Alert
-            target := fmt.Sprintf("%s:%d", sess, winIdx)
-            if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
-                windowAlert = a
-            }
-            sessionCWD := tmux.PrimaryPaneCWD(windows[0])
-            alertCount := 0
-            for _, a := range m.alerts {
-                if strings.HasPrefix(a.Target, sess+":") {
-                    alertCount++
-                }
-            }
-            procCount := 0
-            if sessionCWD != "" {
-                for _, pr := range m.procs {
-                    cwd := m.cwdMap[pr.PID]
-                    if cwd == "" {
-                        continue
-                    }
-                    if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
-                        procCount++
-                    }
-                }
-            }
-            m.detail = DetailModel{
-                cfg:         m.cfg,
-                selType:     DetailWindow,
-                session:     sess,
-                sessionCWD:  sessionCWD,
-                gitInfo:     m.gitInfo[sess],
-                winCount:    len(windows),
-                procCount:   procCount,
-                alertCount:  alertCount,
-                windowIndex: winIdx,
-                windowPanes: wPanes,
-                windowGit:   m.gitInfo[gitKey],
-                windowAlert: windowAlert,
-            }
+            m.detail = m.detailForWindowNode(*selNode)
             return
         }
-        pr := selNode.Proc
-        cwd := m.cwdMap[pr.PID]
-        portStr := ""
-        if selNode.Port > 0 {
-            portStr = fmt.Sprintf("%d", selNode.Port)
+        m.detail = m.detailForProcNode(*selNode)
+    }
+}
+
+func (m *Model) detailForSidebarNode(node SidebarNode) DetailModel {
+    grouped := tmux.GroupBySessions(m.panes)
+    windows := grouped[node.Session]
+    alertCount := 0
+    for _, a := range m.alerts {
+        if strings.HasPrefix(a.Target, node.Session+":") {
+            alertCount++
         }
-        m.detail = DetailModel{
-            cfg:      m.cfg,
-            selType:  DetailProc,
-            proc:     pr,
-            procGit:  m.gitInfo[cwd],
-            procPort: portStr,
-            procCWD:  cwd,
+    }
+    sessionCWD := tmux.PrimaryPaneCWD(windows[0])
+    // count processes whose CWD is under the session's primary CWD
+    procCount := 0
+    if sessionCWD != "" {
+        for _, pr := range m.procs {
+            cwd := m.cwdMap[pr.PID]
+            if cwd == "" {
+                continue
+            }
+            if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+                procCount++
+            }
         }
+    }
+    paneCount := 0
+    for _, wp := range windows {
+        paneCount += len(wp)
+    }
+    sess := m.sidebar.FindSession(node.Session)
+    isConfigOnly := sess != nil && !sess.IsLive && sess.IsConfig
+    configPath := ""
+    configWorktree := ""
+    if isConfigOnly && sess.Config != nil {
+        configPath = sess.Config.Path
+        if sess.Config.Worktree && configPath != "" {
+            // If configPath itself is the worktree root container (.bare/ lives here),
+            // show just the repo name. Otherwise show "worktree (repo)".
+            if fi, err := os.Stat(filepath.Join(configPath, ".bare")); err == nil && fi.IsDir() {
+                bareStr := lipgloss.NewStyle().Italic(true).Render("_bare_")
+                configWorktree = bareStr + " (" + filepath.Base(configPath) + ")"
+            } else {
+                configWorktree = filepath.Base(configPath) + " (" + filepath.Base(filepath.Dir(configPath)) + ")"
+            }
+        }
+    }
+    return DetailModel{
+        cfg:            m.cfg,
+        selType:        DetailSession,
+        session:        node.Session,
+        sessionCWD:     sessionCWD,
+        isConfigOnly:   isConfigOnly,
+        configPath:     configPath,
+        configWorktree: configWorktree,
+        gitInfo:        m.gitInfo[node.Session],
+        winCount:       len(windows),
+        paneCount:      paneCount,
+        procCount:      procCount,
+        alertCount:     alertCount,
+    }
+}
+
+func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
+    sess := node.Pane.Session
+    winIdx := node.Pane.WindowIndex
+    grouped := tmux.GroupBySessions(m.panes)
+    windows := grouped[sess]
+    wPanes := windows[winIdx]
+    gitKey := fmt.Sprintf("%s:%d", sess, winIdx)
+    var windowAlert *db.Alert
+    target := fmt.Sprintf("%s:%d", sess, winIdx)
+    if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
+        windowAlert = a
+    }
+    sessionCWD := tmux.PrimaryPaneCWD(windows[0])
+    alertCount := 0
+    for _, a := range m.alerts {
+        if strings.HasPrefix(a.Target, sess+":") {
+            alertCount++
+        }
+    }
+    procCount := 0
+    if sessionCWD != "" {
+        for _, pr := range m.procs {
+            cwd := m.cwdMap[pr.PID]
+            if cwd == "" {
+                continue
+            }
+            if cwd == sessionCWD || git.IsDescendant(cwd, sessionCWD) {
+                procCount++
+            }
+        }
+    }
+    return DetailModel{
+        cfg:         m.cfg,
+        selType:     DetailWindow,
+        session:     sess,
+        sessionCWD:  sessionCWD,
+        gitInfo:     m.gitInfo[sess],
+        winCount:    len(windows),
+        procCount:   procCount,
+        alertCount:  alertCount,
+        windowIndex: winIdx,
+        windowPanes: wPanes,
+        windowGit:   m.gitInfo[gitKey],
+        windowAlert: windowAlert,
+    }
+}
+
+func (m *Model) detailForProcNode(node ProcListNode) DetailModel {
+    pr := node.Proc
+    cwd := m.cwdMap[pr.PID]
+    portStr := ""
+    if node.Port > 0 {
+        portStr = fmt.Sprintf("%d", node.Port)
+    }
+    return DetailModel{
+        cfg:      m.cfg,
+        selType:  DetailProc,
+        proc:     pr,
+        procGit:  m.gitInfo[cwd],
+        procPort: portStr,
+        procCWD:  cwd,
     }
 }
 
