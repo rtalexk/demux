@@ -48,6 +48,7 @@ type keyMap struct {
     ExpandAll           keyDef
     CollapseAll         keyDef
     Defer               keyDef
+    DeferSticky         keyDef
     ProcEnter           keyDef // display-only: Enter for process list
     ProcOpen            keyDef // display-only: o/ctrl+o for process list
 }
@@ -77,7 +78,8 @@ var keys = keyMap{
     Enter: keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "attach to session")), "Sidebar", 1},
     Open:  keyDef{key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o / ctrl+o", "attach to session / window")), "Sidebar", 2},
     Esc:   keyDef{key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back to session level")), "Sidebar", 3},
-    Defer: keyDef{key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "defer")), "Sidebar", 4},
+    Defer:       keyDef{key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "defer")), "Sidebar", 4},
+    DeferSticky: keyDef{key.NewBinding(key.WithKeys("D"), key.WithHelp("D", "defer (sticky)")), "Sidebar", 5},
 
     // Filters
     FilterTmux:     keyDef{key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tmux sessions only (default)")), "Filters", 1},
@@ -113,7 +115,7 @@ func allKeyDefs() []keyDef {
         // Navigation
         keys.Navigate, keys.Tab, keys.GotoTop, keys.GotoBottom,
         // Sidebar
-        keys.Enter, keys.Open, keys.Esc, keys.Defer,
+        keys.Enter, keys.Open, keys.Esc, keys.Defer, keys.DeferSticky,
         // Filters
         keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.AlertFilter,
         // Process list

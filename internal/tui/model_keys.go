@@ -266,6 +266,10 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
         if node := m.sidebar.Selected(); node != nil {
             return m, m.toggleDeferAlert(node.Session)
         }
+    case key.Matches(msg, keys.DeferSticky.Binding):
+        if node := m.sidebar.Selected(); node != nil {
+            return m, m.toggleStickyDeferAlert(node.Session)
+        }
     }
     return m.sidebarNavUpdate()
 }
@@ -405,12 +409,17 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) toggleDeferAlert(target string) tea.Cmd {
-    var hasDefer bool
+    var hasDefer, isSticky bool
     for _, a := range m.alerts {
         if a.Target == target && a.Level == db.LevelDefer {
             hasDefer = true
+            isSticky = a.Sticky
             break
         }
+    }
+    if isSticky {
+        // 'd' does not remove sticky defers; use 'D' instead
+        return nil
     }
     reason := m.cfg.Alerts.DeferDefaultReason
     d := m.db
@@ -427,6 +436,47 @@ func (m Model) toggleDeferAlert(target string) tea.Cmd {
         alerts, err := d.AlertList()
         if err != nil {
             demuxlog.Warn("fetch alerts after defer toggle failed", "err", err)
+        }
+        return alertsMsg{alerts: alerts}
+    }
+}
+
+func (m Model) toggleStickyDeferAlert(target string) tea.Cmd {
+    var hasDefer, isSticky bool
+    for _, a := range m.alerts {
+        if a.Target == target && a.Level == db.LevelDefer {
+            hasDefer = true
+            isSticky = a.Sticky
+            break
+        }
+    }
+    // Severity check: if a higher-severity non-defer alert exists, no-op.
+    for _, a := range m.alerts {
+        if a.Target == target && a.Level != db.LevelDefer {
+            return nil
+        }
+    }
+    reason := m.cfg.Alerts.DeferDefaultReason
+    d := m.db
+    return func() tea.Msg {
+        var opErr error
+        switch {
+        case isSticky:
+            // Toggle off: remove sticky defer
+            opErr = d.AlertRemove(target)
+        case hasDefer:
+            // Upgrade existing non-sticky defer to sticky
+            opErr = d.AlertUpgradeToSticky(target)
+        default:
+            // Create new sticky defer
+            opErr = d.AlertSet(target, reason, db.LevelDefer, true)
+        }
+        if opErr != nil {
+            demuxlog.Warn("sticky defer toggle failed", "err", opErr)
+        }
+        alerts, err := d.AlertList()
+        if err != nil {
+            demuxlog.Warn("fetch alerts after sticky defer toggle failed", "err", err)
         }
         return alertsMsg{alerts: alerts}
     }
