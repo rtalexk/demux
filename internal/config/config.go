@@ -76,19 +76,22 @@ type ThemeConfig struct {
 	ColorGitBehind string `toml:"color_git_behind"`
 	ColorGitAhead  string `toml:"color_git_ahead"`
 
-	ColorAlertInfo    string `toml:"color_alert_info"`
-	ColorAlertWarn    string `toml:"color_alert_warn"`
-	ColorAlertError   string `toml:"color_alert_error"`
-	ColorAlertDefer   string `toml:"color_alert_defer"`
-	ColorAlertInfoBg  string `toml:"color_alert_info_bg"`
-	ColorAlertWarnBg  string `toml:"color_alert_warn_bg"`
-	ColorAlertErrorBg string `toml:"color_alert_error_bg"`
-	ColorAlertDeferBg string `toml:"color_alert_defer_bg"`
+	ColorAlertInfo          string `toml:"color_alert_info"`
+	ColorAlertWarn          string `toml:"color_alert_warn"`
+	ColorAlertError         string `toml:"color_alert_error"`
+	ColorAlertDefer         string `toml:"color_alert_defer"`
+	ColorAlertInfoBg        string `toml:"color_alert_info_bg"`
+	ColorAlertWarnBg        string `toml:"color_alert_warn_bg"`
+	ColorAlertErrorBg       string `toml:"color_alert_error_bg"`
+	ColorAlertDeferBg       string `toml:"color_alert_defer_bg"`
+	ColorAlertDeferSticky   string `toml:"color_alert_defer_sticky"`
+	ColorAlertDeferStickyBg string `toml:"color_alert_defer_sticky_bg"`
 
-	IconAlertInfo  string `toml:"icon_alert_info"`
-	IconAlertWarn  string `toml:"icon_alert_warn"`
-	IconAlertError string `toml:"icon_alert_error"`
-	IconAlertDefer string `toml:"icon_alert_defer"`
+	IconAlertInfo        string `toml:"icon_alert_info"`
+	IconAlertWarn        string `toml:"icon_alert_warn"`
+	IconAlertError       string `toml:"icon_alert_error"`
+	IconAlertDefer       string `toml:"icon_alert_defer"`
+	IconAlertDeferSticky string `toml:"icon_alert_defer_sticky"`
 
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
@@ -208,19 +211,22 @@ func Default() Config {
 			ColorGitBehind: "#74c7ec",
 			ColorGitAhead:  "#a6e3a1",
 
-			ColorAlertInfo:    "#89b4fa",
-			ColorAlertWarn:    "#f9e2af",
-			ColorAlertError:   "#f38ba8",
-			ColorAlertDefer:   "#b4befe",
-			ColorAlertInfoBg:  "#1a2a4d",
-			ColorAlertWarnBg:  "#3d3500",
-			ColorAlertErrorBg: "#3d1020",
-			ColorAlertDeferBg: "#1e1e2e",
+			ColorAlertInfo:          "#89b4fa",
+			ColorAlertWarn:          "#f9e2af",
+			ColorAlertError:         "#f38ba8",
+			ColorAlertDefer:         "#b4befe",
+			ColorAlertInfoBg:        "#1a2a4d",
+			ColorAlertWarnBg:        "#3d3500",
+			ColorAlertErrorBg:       "#3d1020",
+			ColorAlertDeferBg:       "#1e1e2e",
+			ColorAlertDeferSticky:   "#b4befe",
+			ColorAlertDeferStickyBg: "#1e1e2e",
 
-			IconAlertInfo:  "ℹ️",
-			IconAlertWarn:  "⚠️",
-			IconAlertError: "🚨",
-			IconAlertDefer: "🔖",
+			IconAlertInfo:        "ℹ️",
+			IconAlertWarn:        "⚠️",
+			IconAlertError:       "🚨",
+			IconAlertDefer:       "🔖",
+			IconAlertDeferSticky: "🔖",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

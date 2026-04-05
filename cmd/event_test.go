@@ -38,10 +38,10 @@ func TestPaneFocusClearsAlertsIncludingSticky(t *testing.T) {
 	}
 	defer d.Close()
 
-	if err := d.AlertSet("work:2.3", "Claude finished", "info"); err != nil {
+	if err := d.AlertSet("work:2.3", "Claude finished", "info", false); err != nil {
 		t.Fatal(err)
 	}
-	if err := d.AlertSet("work:2", "needs attention", "warn"); err != nil {
+	if err := d.AlertSet("work:2", "needs attention", "warn", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -67,6 +67,32 @@ func TestPaneFocusClearsAlertsIncludingSticky(t *testing.T) {
 	}
 }
 
+func TestApplyPaneFocus_SkipsSticky(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	// Set a sticky defer on the pane target
+	d.AlertSet("myses:0.1", "Come back", db.LevelDefer, true)
+	// Set a non-sticky alert on the window
+	d.AlertSet("myses:0", "note", db.LevelInfo, false)
+
+	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
+		t.Fatalf("applyPaneFocus: %v", err)
+	}
+
+	// Sticky pane alert should survive
+	a, _ := d.AlertByTarget("myses:0.1")
+	if a == nil {
+		t.Error("sticky pane alert should not have been cleared")
+	}
+
+	// Non-sticky window alert should be gone
+	b, _ := d.AlertByTarget("myses:0")
+	if b != nil {
+		t.Error("non-sticky window alert should have been cleared")
+	}
+}
+
 func TestPaneFocusNoAlertsIsNoop(t *testing.T) {
 	d, err := db.Open(":memory:")
 	if err != nil {
@@ -86,13 +112,13 @@ func TestApplyPaneFocusClearsSessionLevel(t *testing.T) {
 	}
 	defer d.Close()
 
-	if err := d.AlertSet("main", "come back", "defer"); err != nil {
+	if err := d.AlertSet("main", "come back", "defer", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if err := d.AlertSet("main:0", "window alert", "info"); err != nil {
+	if err := d.AlertSet("main:0", "window alert", "info", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if err := d.AlertSet("main:0.0", "pane alert", "warn"); err != nil {
+	if err := d.AlertSet("main:0.0", "pane alert", "warn", false); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 

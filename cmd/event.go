@@ -38,13 +38,13 @@ var eventPaneFocusCmd = &cobra.Command{
 }
 
 func applyPaneFocus(d *db.DB, paneTarget string) error {
-	if err := d.AlertRemove(paneTarget); err != nil {
+	if err := d.AlertRemoveIfNotSticky(paneTarget); err != nil {
 		return err
 	}
-	if err := d.AlertRemove(windowTargetFromPane(paneTarget)); err != nil {
+	if err := d.AlertRemoveIfNotSticky(windowTargetFromPane(paneTarget)); err != nil {
 		return err
 	}
-	return d.AlertRemove(sessionTargetFromPane(paneTarget))
+	return d.AlertRemoveIfNotSticky(sessionTargetFromPane(paneTarget))
 }
 
 func windowTargetFromPane(paneTarget string) string {

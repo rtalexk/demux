@@ -23,7 +23,7 @@ func openTestDB(t *testing.T) *db.DB {
 func TestAlertSetAndList(t *testing.T) {
 	d := openTestDB(t)
 
-	err := d.AlertSet("feature-auth:2", "waiting for input", "info")
+	err := d.AlertSet("feature-auth:2", "waiting for input", "info", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,8 +47,8 @@ func TestAlertSetAndList(t *testing.T) {
 func TestAlertSetReplacesExisting(t *testing.T) {
 	d := openTestDB(t)
 
-	d.AlertSet("s:1", "reason 1", "info")
-	d.AlertSet("s:1", "reason 2", "error")
+	d.AlertSet("s:1", "reason 1", "info", false)
+	d.AlertSet("s:1", "reason 2", "error", false)
 
 	alerts, _ := d.AlertList()
 	if len(alerts) != 1 {
@@ -62,8 +62,8 @@ func TestAlertSetReplacesExisting(t *testing.T) {
 func TestAlertSetDoesNotDowngrade(t *testing.T) {
 	d := openTestDB(t)
 
-	d.AlertSet("s:1", "reason 1", "error")
-	d.AlertSet("s:1", "reason 2", "defer")
+	d.AlertSet("s:1", "reason 1", "error", false)
+	d.AlertSet("s:1", "reason 2", "defer", false)
 
 	alerts, _ := d.AlertList()
 	if len(alerts) != 1 {
@@ -80,7 +80,7 @@ func TestAlertSetDoesNotDowngrade(t *testing.T) {
 func TestAlertRemove(t *testing.T) {
 	d := openTestDB(t)
 
-	d.AlertSet("s:1", "r", "info")
+	d.AlertSet("s:1", "r", "info", false)
 	err := d.AlertRemove("s:1")
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestAlertRemove(t *testing.T) {
 func TestAlertCreatedAt(t *testing.T) {
 	d := openTestDB(t)
 	before := time.Now().UTC().Truncate(time.Second)
-	d.AlertSet("s:1", "r", "warn")
+	d.AlertSet("s:1", "r", "warn", false)
 	alerts, _ := d.AlertList()
 	if alerts[0].CreatedAt.Before(before) {
 		t.Error("created_at is before insert time")
@@ -147,7 +147,7 @@ func TestAlertByTarget(t *testing.T) {
 	}
 
 	// found
-	d.AlertSet("s:1", "reason", "warn")
+	d.AlertSet("s:1", "reason", "warn", false)
 	a, err = d.AlertByTarget("s:1")
 	if err != nil {
 		t.Fatal(err)

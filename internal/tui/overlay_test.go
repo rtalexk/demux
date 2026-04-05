@@ -116,7 +116,7 @@ func TestPruneStaleAlerts_NilWhenAllAlertsAreLive(t *testing.T) {
 
 func TestPruneStaleAlerts_PrunesStalePaneTarget(t *testing.T) {
 	m := newPruneTestModel(t)
-	m.db.AlertSet("gone:9.9", "r", "warn")
+	m.db.AlertSet("gone:9.9", "r", "warn", false)
 	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
 	alerts, _ := m.db.AlertList()
 	m.alerts = alerts
@@ -133,7 +133,7 @@ func TestPruneStaleAlerts_PrunesStalePaneTarget(t *testing.T) {
 
 func TestPruneStaleAlerts_PrunesStaleWindowTarget(t *testing.T) {
 	m := newPruneTestModel(t)
-	m.db.AlertSet("gone:9", "r", "warn")
+	m.db.AlertSet("gone:9", "r", "warn", false)
 	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
 	alerts, _ := m.db.AlertList()
 	m.alerts = alerts
@@ -150,7 +150,7 @@ func TestPruneStaleAlerts_PrunesStaleWindowTarget(t *testing.T) {
 
 func TestPruneStaleAlerts_PrunesStaleSessionTarget(t *testing.T) {
 	m := newPruneTestModel(t)
-	m.db.AlertSet("gone-session", "r", "warn")
+	m.db.AlertSet("gone-session", "r", "warn", false)
 	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
 	alerts, _ := m.db.AlertList()
 	m.alerts = alerts
@@ -167,8 +167,8 @@ func TestPruneStaleAlerts_PrunesStaleSessionTarget(t *testing.T) {
 
 func TestPruneStaleAlerts_PreservesLiveAlerts(t *testing.T) {
 	m := newPruneTestModel(t)
-	m.db.AlertSet("work:0.0", "live pane", "info")
-	m.db.AlertSet("gone:9.9", "stale pane", "warn")
+	m.db.AlertSet("work:0.0", "live pane", "info", false)
+	m.db.AlertSet("gone:9.9", "stale pane", "warn", false)
 	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
 	alerts, _ := m.db.AlertList()
 	m.alerts = alerts

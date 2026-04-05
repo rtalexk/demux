@@ -48,6 +48,10 @@ type Theme struct {
 	IconAlertError string
 	IconAlertDefer string
 
+	ColorAlertDeferSticky   lipgloss.Color
+	ColorAlertDeferStickyBg lipgloss.Color
+	IconAlertDeferSticky    string
+
 	IconTmuxSession string
 	IconCfgSession  string
 
@@ -101,6 +105,10 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 		IconAlertWarn:  tc.IconAlertWarn,
 		IconAlertError: tc.IconAlertError,
 		IconAlertDefer: tc.IconAlertDefer,
+
+		ColorAlertDeferSticky:   lipgloss.Color(tc.ColorAlertDeferSticky),
+		ColorAlertDeferStickyBg: lipgloss.Color(tc.ColorAlertDeferStickyBg),
+		IconAlertDeferSticky:    tc.IconAlertDeferSticky,
 
 		IconTmuxSession: tc.IconTmuxSession,
 		IconCfgSession:  tc.IconCfgSession,

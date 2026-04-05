@@ -99,7 +99,7 @@ func loadConfig() config.Config {
 	return cfg
 }
 
-func openDB() (*db.DB, error) {
+var openDB = func() (*db.DB, error) {
 	path, err := db.DefaultPath()
 	if err != nil {
 		return nil, err

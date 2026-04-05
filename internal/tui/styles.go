@@ -121,7 +121,10 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 }
 
 // alertIcon renders the configured icon for the given alert level, colored by theme.
-func alertIcon(level string) string {
+func alertIcon(level string, sticky bool) string {
+	if level == "defer" && sticky {
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDeferSticky).Render(activeTheme.IconAlertDeferSticky)
+	}
 	switch level {
 	case "info":
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Render(activeTheme.IconAlertInfo)
@@ -136,7 +139,10 @@ func alertIcon(level string) string {
 }
 
 // alertIconOnBG renders the configured icon with a background color applied.
-func alertIconOnBG(level string, bg lipgloss.Color) string {
+func alertIconOnBG(level string, sticky bool, bg lipgloss.Color) string {
+	if level == "defer" && sticky {
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDeferSticky).Background(bg).Render(activeTheme.IconAlertDeferSticky)
+	}
 	switch level {
 	case "info":
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Background(bg).Render(activeTheme.IconAlertInfo)
@@ -151,8 +157,12 @@ func alertIconOnBG(level string, bg lipgloss.Color) string {
 }
 
 // alertBadge renders the alert reason with a severity-based background color.
-func alertBadge(level, reason string) string {
+func alertBadge(level string, sticky bool, reason string) string {
 	var fg, bg lipgloss.Color
+	if level == "defer" && sticky {
+		fg, bg = activeTheme.ColorAlertDeferSticky, activeTheme.ColorAlertDeferStickyBg
+		return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
+	}
 	switch level {
 	case "info":
 		fg, bg = activeTheme.ColorAlertInfo, activeTheme.ColorAlertInfoBg

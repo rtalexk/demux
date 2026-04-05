@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/spf13/cobra"
@@ -12,17 +13,20 @@ var (
 	alertRemoveTarget string
 	alertReason       string
 	alertLevel        string
+	alertSticky       bool
+	alertRemoveForce  bool
 )
 
 type alertRow struct {
 	target  string
 	level   string
+	sticky  string
 	reason  string
 	created string
 }
 
 func (r alertRow) Fields() []string {
-	return []string{r.target, r.level, r.reason, r.created}
+	return []string{r.target, r.level, r.sticky, r.reason, r.created}
 }
 
 var alertCmd = &cobra.Command{
@@ -42,6 +46,10 @@ var alertSetCmd = &cobra.Command{
 	Use:   "set",
 	Short: "Set (create or replace) an alert",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if alertSticky && alertLevel != "defer" {
+			return fmt.Errorf("--sticky is only valid with --level defer")
+		}
+
 		d, err := openDB()
 		if err != nil {
 			return fmt.Errorf("open db: %w", err)
@@ -59,7 +67,7 @@ var alertSetCmd = &cobra.Command{
 			}
 		}
 
-		if err := d.AlertSet(alertSetTarget, alertReason, alertLevel); err != nil {
+		if err := d.AlertSet(alertSetTarget, alertReason, alertLevel, alertSticky); err != nil {
 			return fmt.Errorf("alert set: %w", err)
 		}
 		fmt.Printf("Alert set for %s\n", alertSetTarget)
@@ -77,6 +85,17 @@ var alertRemoveCmd = &cobra.Command{
 			return fmt.Errorf("open db: %w", err)
 		}
 		defer d.Close()
+
+		if !alertRemoveForce {
+			a, err := d.AlertByTarget(alertRemoveTarget)
+			if err != nil {
+				return fmt.Errorf("alert lookup: %w", err)
+			}
+			if a != nil && a.Sticky {
+				fmt.Fprintf(os.Stderr, "warning: alert on %q is sticky; use --force to remove it\n", alertRemoveTarget)
+				return nil
+			}
+		}
 
 		if err := d.AlertRemove(alertRemoveTarget); err != nil {
 			return fmt.Errorf("alert remove: %w", err)
@@ -98,12 +117,17 @@ func runAlertList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("alert list: %w", err)
 	}
 
-	headers := []string{"TARGET", "LEVEL", "REASON", "CREATED"}
+	headers := []string{"TARGET", "LEVEL", "STICKY", "REASON", "CREATED"}
 	rows := make([]format.Row, len(alerts))
 	for i, a := range alerts {
+		sticky := ""
+		if a.Sticky {
+			sticky = "yes"
+		}
 		rows[i] = alertRow{
 			target:  a.Target,
 			level:   a.Level,
+			sticky:  sticky,
 			reason:  a.Reason,
 			created: format.Age(a.CreatedAt),
 		}
@@ -119,10 +143,12 @@ func init() {
 	alertSetCmd.Flags().StringVar(&alertSetTarget, "target", "", "Target: session:window or session:window.pane (required)")
 	alertSetCmd.Flags().StringVar(&alertReason, "reason", "", "Alert reason text")
 	alertSetCmd.Flags().StringVar(&alertLevel, "level", "info", "Alert level: info|warn|error|defer")
+	alertSetCmd.Flags().BoolVar(&alertSticky, "sticky", false, "Mark alert as sticky (only valid with --level defer)")
 	alertSetCmd.MarkFlagRequired("target")
 
 	// alert remove flags
 	alertRemoveCmd.Flags().StringVar(&alertRemoveTarget, "target", "", "Target: session:window or session:window.pane (required)")
+	alertRemoveCmd.Flags().BoolVar(&alertRemoveForce, "force", false, "Remove even if the alert is sticky")
 	alertRemoveCmd.MarkFlagRequired("target")
 
 	// wire subcommands

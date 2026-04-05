@@ -31,20 +31,22 @@ type Alert struct {
 	Target    string
 	Reason    string
 	Level     AlertLevel
+	Sticky    bool
 	CreatedAt time.Time
 }
 
-func (d *DB) AlertSet(target, reason, level string) error {
+func (d *DB) AlertSet(target, reason, level string, sticky bool) error {
 	_, err := d.sql.Exec(`
-        INSERT INTO alerts (target, reason, level, created_at)
-        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        INSERT INTO alerts (target, reason, level, sticky, created_at)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(target) DO UPDATE SET
             reason     = excluded.reason,
             level      = excluded.level,
+            sticky     = excluded.sticky,
             created_at = excluded.created_at
         WHERE (CASE excluded.level WHEN 'error' THEN 3 WHEN 'warn' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
             >= (CASE alerts.level WHEN 'error' THEN 3 WHEN 'warn' THEN 2 WHEN 'info' THEN 1 ELSE 0 END)
-    `, target, reason, level)
+    `, target, reason, level, sticky)
 	return err
 }
 
@@ -53,9 +55,21 @@ func (d *DB) AlertRemove(target string) error {
 	return err
 }
 
+// AlertUpgradeToSticky sets sticky=true on an existing alert. No-op if target has no alert.
+func (d *DB) AlertUpgradeToSticky(target string) error {
+	_, err := d.sql.Exec(`UPDATE alerts SET sticky = 1 WHERE target = ?`, target)
+	return err
+}
+
+// AlertRemoveIfNotSticky removes an alert only if sticky=false. Silent no-op if sticky or not found.
+func (d *DB) AlertRemoveIfNotSticky(target string) error {
+	_, err := d.sql.Exec(`DELETE FROM alerts WHERE target = ? AND sticky = 0`, target)
+	return err
+}
+
 func (d *DB) AlertList() ([]Alert, error) {
 	rows, err := d.sql.Query(`
-        SELECT id, target, reason, level, created_at
+        SELECT id, target, reason, level, sticky, created_at
         FROM alerts ORDER BY created_at ASC
     `)
 	if err != nil {
@@ -67,7 +81,7 @@ func (d *DB) AlertList() ([]Alert, error) {
 	for rows.Next() {
 		var a Alert
 		var createdAt string
-		if err := rows.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &createdAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &a.Sticky, &createdAt); err != nil {
 			return nil, err
 		}
 		a.CreatedAt = parseTS(createdAt)
@@ -79,12 +93,12 @@ func (d *DB) AlertList() ([]Alert, error) {
 // AlertByTarget returns the alert for a target, or nil if not found.
 func (d *DB) AlertByTarget(target string) (*Alert, error) {
 	row := d.sql.QueryRow(`
-        SELECT id, target, reason, level, created_at
+        SELECT id, target, reason, level, sticky, created_at
         FROM alerts WHERE target = ?
     `, target)
 	var a Alert
 	var createdAt string
-	err := row.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &createdAt)
+	err := row.Scan(&a.ID, &a.Target, &a.Reason, &a.Level, &a.Sticky, &createdAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
