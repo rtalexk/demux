@@ -43,6 +43,10 @@ var alertSetCmd = &cobra.Command{
     Use:   "set",
     Short: "Set (create or replace) an alert",
     RunE: func(cmd *cobra.Command, args []string) error {
+        if alertSticky && alertLevel != "defer" {
+            return fmt.Errorf("--sticky is only valid with --level defer")
+        }
+
         d, err := openDB()
         if err != nil {
             return fmt.Errorf("open db: %w", err)
@@ -58,10 +62,6 @@ var alertSetCmd = &cobra.Command{
             } else {
                 return fmt.Errorf("--reason is required")
             }
-        }
-
-        if alertSticky && alertLevel != "defer" {
-            return fmt.Errorf("--sticky is only valid with --level defer")
         }
 
         if err := d.AlertSet(alertSetTarget, alertReason, alertLevel, alertSticky); err != nil {
