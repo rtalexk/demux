@@ -408,28 +408,39 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
     return m, nil
 }
 
+// deferAlertState summarizes a target's current alert for defer-toggle decisions.
+type deferAlertState struct {
+    hasDefer bool // target has a defer-level alert
+    isSticky bool // that defer alert is sticky
+    blocked  bool // target has a higher-severity (non-defer) alert
+}
+
+// deferStateFor scans m.alerts once and returns the defer state for target.
+func (m Model) deferStateFor(target string) deferAlertState {
+    var s deferAlertState
+    for _, a := range m.alerts {
+        if a.Target != target {
+            continue
+        }
+        if a.Level == db.LevelDefer {
+            s.hasDefer = true
+            s.isSticky = a.Sticky
+        } else {
+            s.blocked = true
+        }
+    }
+    return s
+}
+
 func (m Model) toggleDeferAlert(target string) tea.Cmd {
-    var hasDefer, isSticky bool
-    for _, a := range m.alerts {
-        if a.Target == target && a.Level == db.LevelDefer {
-            hasDefer = true
-            isSticky = a.Sticky
-            break
-        }
-    }
-    if isSticky {
-        // 'd' does not remove sticky defers; use 'D' instead
+    s := m.deferStateFor(target)
+    if s.isSticky || s.blocked {
         return nil
-    }
-    for _, a := range m.alerts {
-        if a.Target == target && a.Level != db.LevelDefer {
-            return nil
-        }
     }
     reason := m.cfg.Alerts.DeferDefaultReason
     d := m.db
     return func() tea.Msg {
-        if hasDefer {
+        if s.hasDefer {
             if err := d.AlertRemove(target); err != nil {
                 demuxlog.Warn("defer remove failed", "err", err)
             }
@@ -447,29 +458,19 @@ func (m Model) toggleDeferAlert(target string) tea.Cmd {
 }
 
 func (m Model) toggleStickyDeferAlert(target string) tea.Cmd {
-    var hasDefer, isSticky bool
-    for _, a := range m.alerts {
-        if a.Target == target && a.Level == db.LevelDefer {
-            hasDefer = true
-            isSticky = a.Sticky
-            break
-        }
-    }
-    // Severity check: if a higher-severity non-defer alert exists, no-op.
-    for _, a := range m.alerts {
-        if a.Target == target && a.Level != db.LevelDefer {
-            return nil
-        }
+    s := m.deferStateFor(target)
+    if s.blocked {
+        return nil
     }
     reason := m.cfg.Alerts.DeferDefaultReason
     d := m.db
     return func() tea.Msg {
         var opErr error
         switch {
-        case isSticky:
+        case s.isSticky:
             // Toggle off: remove sticky defer
             opErr = d.AlertRemove(target)
-        case hasDefer:
+        case s.hasDefer:
             // Upgrade existing non-sticky defer to sticky
             opErr = d.AlertUpgradeToSticky(target)
         default:
