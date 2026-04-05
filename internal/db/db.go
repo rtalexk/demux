@@ -77,10 +77,33 @@ func (d *DB) migrate() error {
         if err != nil {
             return fmt.Errorf("begin v2: %w", err)
         }
-        if _, err := tx.Exec(`ALTER TABLE alerts ADD COLUMN sticky BOOLEAN NOT NULL DEFAULT 0`); err != nil {
+
+        // Check if sticky column already exists (handles partial migrations).
+        rows, err := tx.Query(`PRAGMA table_info(alerts)`)
+        if err != nil {
             tx.Rollback()
-            return fmt.Errorf("migrate v2: %w", err)
+            return fmt.Errorf("table info v2: %w", err)
         }
+        var hasSticky bool
+        for rows.Next() {
+            var cid int
+            var name, typ string
+            var notNull int
+            var dfltVal sql.NullString
+            var pk int
+            if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltVal, &pk); err == nil && name == "sticky" {
+                hasSticky = true
+            }
+        }
+        rows.Close()
+
+        if !hasSticky {
+            if _, err := tx.Exec(`ALTER TABLE alerts ADD COLUMN sticky BOOLEAN NOT NULL DEFAULT 0`); err != nil {
+                tx.Rollback()
+                return fmt.Errorf("migrate v2: %w", err)
+            }
+        }
+
         if _, err := tx.Exec(`PRAGMA user_version = 2`); err != nil {
             tx.Rollback()
             return fmt.Errorf("set version 2: %w", err)
