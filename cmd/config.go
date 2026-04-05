@@ -146,24 +146,28 @@ color_git_ahead  = "#a6e3a1"
 
 # Alert icons
 icon_alert_info  = "ℹ️"
-icon_alert_warn  = "⚠️"
-icon_alert_error = "🚨"
-icon_alert_defer  = "🔖"
+color_alert_info  = "#89b4fa"
 color_alert_info_bg  = "#1a2a4d"
+
+icon_alert_warn  = "⚠️"
+color_alert_warn  = "#f9e2af"
 color_alert_warn_bg  = "#3d3500"
+
+icon_alert_error = "🚨"
+color_alert_error = "#f38ba8"
 color_alert_error_bg = "#3d1020"
+
+icon_alert_defer  = "🔖"
 color_alert_defer    = "#b4befe"
 color_alert_defer_bg = "#1e1e2e"
-icon_alert_defer_sticky     = "🔖"
+
+icon_alert_defer_sticky     = "📌"
 color_alert_defer_sticky    = "#b4befe"
 color_alert_defer_sticky_bg = "#1e1e2e"
 
 # Session source icons
 icon_tmux_session = "⊞"
 icon_cfg_session  = "⚙︎"
-color_alert_info  = "#89b4fa"
-color_alert_warn  = "#f9e2af"
-color_alert_error = "#f38ba8"
 
 # Semantic colours
 color_port     = "#a6e3a1"
