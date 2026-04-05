@@ -86,7 +86,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
     }
 
     if p.sessionAlert != nil {
-        title += paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Reason)
+        title += paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level, p.sessionAlert.Sticky) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Sticky, p.sessionAlert.Reason)
     }
 
     if len(p.nodes) == 0 {
@@ -258,7 +258,7 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
+        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level, node.Alert.Sticky) + " " + alertBadge(node.Alert.Level, node.Alert.Sticky, node.Alert.Reason)
     }
 
     pathStr := ""
@@ -367,7 +367,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
     alertSuffix := ""
     if node.Alert != nil {
-        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level) + " " + alertBadge(node.Alert.Level, node.Alert.Reason)
+        alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level, node.Alert.Sticky) + " " + alertBadge(node.Alert.Level, node.Alert.Sticky, node.Alert.Reason)
     }
 
     pathStr := ""

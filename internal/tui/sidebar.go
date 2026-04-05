@@ -633,9 +633,9 @@ func (s SidebarModel) alertIndicator(node SidebarNode, selected, focused bool) s
         return ""
     }
     if selected && focused {
-        return alertIconOnBG(best.Level, activeTheme.ColorSelected)
+        return alertIconOnBG(best.Level, best.Sticky, activeTheme.ColorSelected)
     }
-    return alertIcon(best.Level)
+    return alertIcon(best.Level, best.Sticky)
 }
 
 // lastSeenIndicator returns the rendered last-seen age string for a sidebar row, or "".
