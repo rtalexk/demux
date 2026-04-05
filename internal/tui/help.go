@@ -34,7 +34,6 @@ func helpKV(keyW, gap int, k, description string) string {
 	return fmt.Sprintf("  %-*s", keyW, k) + strings.Repeat(" ", gap) + helpDescStyle.Render(description)
 }
 
-
 func (h *HelpModel) ScrollUp() {
 	if h.scrollOffset > 0 {
 		h.scrollOffset--

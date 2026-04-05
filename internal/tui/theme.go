@@ -1,125 +1,125 @@
 package tui
 
 import (
-    "github.com/charmbracelet/lipgloss"
-    "github.com/rtalexk/demux/internal/config"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/rtalexk/demux/internal/config"
 )
 
 // Theme holds all colour values used across the TUI.
 type Theme struct {
-    // Structure & chrome
-    ColorBg       lipgloss.Color
-    ColorSurface  lipgloss.Color
-    ColorRaised   lipgloss.Color
-    ColorSelected lipgloss.Color
-    ColorBorder   lipgloss.Color
+	// Structure & chrome
+	ColorBg       lipgloss.Color
+	ColorSurface  lipgloss.Color
+	ColorRaised   lipgloss.Color
+	ColorSelected lipgloss.Color
+	ColorBorder   lipgloss.Color
 
-    // Text hierarchy
-    ColorFgPrimary lipgloss.Color
-    ColorFgSubtext lipgloss.Color
-    ColorFgMuted   lipgloss.Color
-    ColorFgDim     lipgloss.Color
-    ColorFgGhost   lipgloss.Color
+	// Text hierarchy
+	ColorFgPrimary lipgloss.Color
+	ColorFgSubtext lipgloss.Color
+	ColorFgMuted   lipgloss.Color
+	ColorFgDim     lipgloss.Color
+	ColorFgGhost   lipgloss.Color
 
-    // Process types
-    ColorSession    lipgloss.Color
-    ColorProcClaude lipgloss.Color
-    ColorProcServer lipgloss.Color
-    ColorProcEditor lipgloss.Color
-    ColorProcChild  lipgloss.Color
+	// Process types
+	ColorSession    lipgloss.Color
+	ColorProcClaude lipgloss.Color
+	ColorProcServer lipgloss.Color
+	ColorProcEditor lipgloss.Color
+	ColorProcChild  lipgloss.Color
 
-    // Git status
-    ColorGitDirty  lipgloss.Color
-    ColorGitBehind lipgloss.Color
-    ColorGitAhead  lipgloss.Color
+	// Git status
+	ColorGitDirty  lipgloss.Color
+	ColorGitBehind lipgloss.Color
+	ColorGitAhead  lipgloss.Color
 
-    // Alerts
-    ColorAlertInfo    lipgloss.Color
-    ColorAlertWarn    lipgloss.Color
-    ColorAlertError   lipgloss.Color
-    ColorAlertDefer   lipgloss.Color
-    ColorAlertInfoBg  lipgloss.Color
-    ColorAlertWarnBg  lipgloss.Color
-    ColorAlertErrorBg lipgloss.Color
-    ColorAlertDeferBg lipgloss.Color
+	// Alerts
+	ColorAlertInfo    lipgloss.Color
+	ColorAlertWarn    lipgloss.Color
+	ColorAlertError   lipgloss.Color
+	ColorAlertDefer   lipgloss.Color
+	ColorAlertInfoBg  lipgloss.Color
+	ColorAlertWarnBg  lipgloss.Color
+	ColorAlertErrorBg lipgloss.Color
+	ColorAlertDeferBg lipgloss.Color
 
-    IconAlertInfo  string
-    IconAlertWarn  string
-    IconAlertError string
-    IconAlertDefer string
+	IconAlertInfo  string
+	IconAlertWarn  string
+	IconAlertError string
+	IconAlertDefer string
 
-    ColorAlertDeferSticky   lipgloss.Color
-    ColorAlertDeferStickyBg lipgloss.Color
-    IconAlertDeferSticky    string
+	ColorAlertDeferSticky   lipgloss.Color
+	ColorAlertDeferStickyBg lipgloss.Color
+	IconAlertDeferSticky    string
 
-    IconTmuxSession string
-    IconCfgSession  string
+	IconTmuxSession string
+	IconCfgSession  string
 
-    // Semantic
-    ColorPort    lipgloss.Color
-    ColorPortBg  lipgloss.Color
-    ColorClean   lipgloss.Color
-    ColorCpuLow  lipgloss.Color
-    ColorCpuMed  lipgloss.Color
-    ColorCpuHigh lipgloss.Color
+	// Semantic
+	ColorPort    lipgloss.Color
+	ColorPortBg  lipgloss.Color
+	ColorClean   lipgloss.Color
+	ColorCpuLow  lipgloss.Color
+	ColorCpuMed  lipgloss.Color
+	ColorCpuHigh lipgloss.Color
 
-    // Search
-    ColorFgSearchHighlight lipgloss.Color
+	// Search
+	ColorFgSearchHighlight lipgloss.Color
 }
 
 // ThemeFromConfig builds a Theme directly from the config values.
 func ThemeFromConfig(tc config.ThemeConfig) Theme {
-    return Theme{
-        ColorBg:       lipgloss.Color(tc.ColorBg),
-        ColorSurface:  lipgloss.Color(tc.ColorSurface),
-        ColorRaised:   lipgloss.Color(tc.ColorRaised),
-        ColorSelected: lipgloss.Color(tc.ColorSelected),
-        ColorBorder:   lipgloss.Color(tc.ColorBorder),
+	return Theme{
+		ColorBg:       lipgloss.Color(tc.ColorBg),
+		ColorSurface:  lipgloss.Color(tc.ColorSurface),
+		ColorRaised:   lipgloss.Color(tc.ColorRaised),
+		ColorSelected: lipgloss.Color(tc.ColorSelected),
+		ColorBorder:   lipgloss.Color(tc.ColorBorder),
 
-        ColorFgPrimary: lipgloss.Color(tc.ColorFgPrimary),
-        ColorFgSubtext: lipgloss.Color(tc.ColorFgSubtext),
-        ColorFgMuted:   lipgloss.Color(tc.ColorFgMuted),
-        ColorFgDim:     lipgloss.Color(tc.ColorFgDim),
-        ColorFgGhost:   lipgloss.Color(tc.ColorFgGhost),
+		ColorFgPrimary: lipgloss.Color(tc.ColorFgPrimary),
+		ColorFgSubtext: lipgloss.Color(tc.ColorFgSubtext),
+		ColorFgMuted:   lipgloss.Color(tc.ColorFgMuted),
+		ColorFgDim:     lipgloss.Color(tc.ColorFgDim),
+		ColorFgGhost:   lipgloss.Color(tc.ColorFgGhost),
 
-        ColorSession:    lipgloss.Color(tc.ColorSession),
-        ColorProcClaude: lipgloss.Color(tc.ColorProcClaude),
-        ColorProcServer: lipgloss.Color(tc.ColorProcServer),
-        ColorProcEditor: lipgloss.Color(tc.ColorProcEditor),
-        ColorProcChild:  lipgloss.Color(tc.ColorProcChild),
+		ColorSession:    lipgloss.Color(tc.ColorSession),
+		ColorProcClaude: lipgloss.Color(tc.ColorProcClaude),
+		ColorProcServer: lipgloss.Color(tc.ColorProcServer),
+		ColorProcEditor: lipgloss.Color(tc.ColorProcEditor),
+		ColorProcChild:  lipgloss.Color(tc.ColorProcChild),
 
-        ColorGitDirty:  lipgloss.Color(tc.ColorGitDirty),
-        ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),
-        ColorGitAhead:  lipgloss.Color(tc.ColorGitAhead),
+		ColorGitDirty:  lipgloss.Color(tc.ColorGitDirty),
+		ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),
+		ColorGitAhead:  lipgloss.Color(tc.ColorGitAhead),
 
-        ColorAlertInfo:    lipgloss.Color(tc.ColorAlertInfo),
-        ColorAlertWarn:    lipgloss.Color(tc.ColorAlertWarn),
-        ColorAlertError:   lipgloss.Color(tc.ColorAlertError),
-        ColorAlertDefer:   lipgloss.Color(tc.ColorAlertDefer),
-        ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
-        ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
-        ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
-        ColorAlertDeferBg: lipgloss.Color(tc.ColorAlertDeferBg),
+		ColorAlertInfo:    lipgloss.Color(tc.ColorAlertInfo),
+		ColorAlertWarn:    lipgloss.Color(tc.ColorAlertWarn),
+		ColorAlertError:   lipgloss.Color(tc.ColorAlertError),
+		ColorAlertDefer:   lipgloss.Color(tc.ColorAlertDefer),
+		ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
+		ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
+		ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
+		ColorAlertDeferBg: lipgloss.Color(tc.ColorAlertDeferBg),
 
-        IconAlertInfo:  tc.IconAlertInfo,
-        IconAlertWarn:  tc.IconAlertWarn,
-        IconAlertError: tc.IconAlertError,
-        IconAlertDefer: tc.IconAlertDefer,
+		IconAlertInfo:  tc.IconAlertInfo,
+		IconAlertWarn:  tc.IconAlertWarn,
+		IconAlertError: tc.IconAlertError,
+		IconAlertDefer: tc.IconAlertDefer,
 
-        ColorAlertDeferSticky:   lipgloss.Color(tc.ColorAlertDeferSticky),
-        ColorAlertDeferStickyBg: lipgloss.Color(tc.ColorAlertDeferStickyBg),
-        IconAlertDeferSticky:    tc.IconAlertDeferSticky,
+		ColorAlertDeferSticky:   lipgloss.Color(tc.ColorAlertDeferSticky),
+		ColorAlertDeferStickyBg: lipgloss.Color(tc.ColorAlertDeferStickyBg),
+		IconAlertDeferSticky:    tc.IconAlertDeferSticky,
 
-        IconTmuxSession: tc.IconTmuxSession,
-        IconCfgSession:  tc.IconCfgSession,
+		IconTmuxSession: tc.IconTmuxSession,
+		IconCfgSession:  tc.IconCfgSession,
 
-        ColorPort:    lipgloss.Color(tc.ColorPort),
-        ColorPortBg:  lipgloss.Color(tc.ColorPortBg),
-        ColorClean:   lipgloss.Color(tc.ColorClean),
-        ColorCpuLow:  lipgloss.Color(tc.ColorCpuLow),
-        ColorCpuMed:  lipgloss.Color(tc.ColorCpuMed),
-        ColorCpuHigh: lipgloss.Color(tc.ColorCpuHigh),
+		ColorPort:    lipgloss.Color(tc.ColorPort),
+		ColorPortBg:  lipgloss.Color(tc.ColorPortBg),
+		ColorClean:   lipgloss.Color(tc.ColorClean),
+		ColorCpuLow:  lipgloss.Color(tc.ColorCpuLow),
+		ColorCpuMed:  lipgloss.Color(tc.ColorCpuMed),
+		ColorCpuHigh: lipgloss.Color(tc.ColorCpuHigh),
 
-        ColorFgSearchHighlight: lipgloss.Color(tc.ColorFgSearchHighlight),
-    }
+		ColorFgSearchHighlight: lipgloss.Color(tc.ColorFgSearchHighlight),
+	}
 }
