@@ -23,7 +23,7 @@ func tmuxCounter(style, icon string, count int) string {
 	return fmt.Sprintf("%s%s %d", style, icon, count)
 }
 
-func countAlertsByLevel(alerts []db.Alert) (infos, warns, errors int) {
+func countAlertsByLevel(alerts []db.Alert) (infos, warns, errors, defers int) {
 	for _, a := range alerts {
 		switch a.Level {
 		case "info":
@@ -32,39 +32,58 @@ func countAlertsByLevel(alerts []db.Alert) (infos, warns, errors int) {
 			warns++
 		case "error":
 			errors++
+		case "defer":
+			defers++
 		}
 	}
 	return
 }
 
-func tmuxStatusParts(infos, warns, errors int, cfg config.Config) string {
-	if infos == 0 && warns == 0 && errors == 0 {
+func tmuxStatusParts(infos, warns, errors, defers int, cfg config.Config) string {
+	if infos == 0 && warns == 0 && errors == 0 && defers == 0 {
 		return "#[fg=green]#[default]"
 	}
 	var parts []string
-	if infos > 0 {
-		parts = append(parts, tmuxCounter("#[fg=cyan]", cfg.Theme.IconAlertInfo, infos))
+	if errors > 0 {
+		parts = append(parts, tmuxCounter("#[fg=red,bold]", cfg.Theme.IconAlertError, errors))
 	}
 	if warns > 0 {
 		parts = append(parts, tmuxCounter("#[fg=yellow]", cfg.Theme.IconAlertWarn, warns))
 	}
-	if errors > 0 {
-		parts = append(parts, tmuxCounter("#[fg=red,bold]", cfg.Theme.IconAlertError, errors))
+	if infos > 0 {
+		parts = append(parts, tmuxCounter("#[fg=cyan]", cfg.Theme.IconAlertInfo, infos))
+	}
+	if defers > 0 {
+		parts = append(parts, tmuxCounter("#[fg=#b4befe]", cfg.Theme.IconAlertDefer, defers))
 	}
 	return strings.Join(parts, " ") + "#[default]"
 }
 
-func formatStatusOutput(fmtName string, infos, warns, errors int, cfg config.Config) string {
+func formatStatusOutput(fmtName string, infos, warns, errors, defers int, cfg config.Config) string {
 	switch fmtName {
 	case "tmux":
-		return tmuxStatusParts(infos, warns, errors, cfg)
+		return tmuxStatusParts(infos, warns, errors, defers, cfg)
 	case "json":
+		// defers intentionally omitted; JSON schema is stable and order is not meaningful.
 		return fmt.Sprintf(`{"infos":%d,"warns":%d,"errors":%d}`, infos, warns, errors)
 	default:
-		if infos == 0 && warns == 0 && errors == 0 {
+		if infos == 0 && warns == 0 && errors == 0 && defers == 0 {
 			return "ok"
 		}
-		return fmt.Sprintf("infos=%d warns=%d errors=%d", infos, warns, errors)
+		var parts []string
+		if errors > 0 {
+			parts = append(parts, fmt.Sprintf("errors=%d", errors))
+		}
+		if warns > 0 {
+			parts = append(parts, fmt.Sprintf("warns=%d", warns))
+		}
+		if infos > 0 {
+			parts = append(parts, fmt.Sprintf("infos=%d", infos))
+		}
+		if defers > 0 {
+			parts = append(parts, fmt.Sprintf("defers=%d", defers))
+		}
+		return strings.Join(parts, " ")
 	}
 }
 
@@ -80,7 +99,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	infos, warns, errors := countAlertsByLevel(alerts)
+	infos, warns, errors, defers := countAlertsByLevel(alerts)
 
 	cfg := loadConfig()
 
@@ -89,7 +108,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		fmtName = "tmux"
 	}
 
-	out := formatStatusOutput(fmtName, infos, warns, errors, cfg)
+	out := formatStatusOutput(fmtName, infos, warns, errors, defers, cfg)
 	if fmtName == "tmux" {
 		fmt.Print(out)
 	} else {
