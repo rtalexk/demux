@@ -264,6 +264,9 @@ func (m *Model) pruneStaleAlerts() tea.Cmd {
     paneTargets, winTargets, sesTargets := buildTargetSets(m.panes)
     var stale []string
     for _, a := range m.alerts {
+        if a.Sticky {
+            continue
+        }
         if isStaleAlert(a.Target, paneTargets, winTargets, sesTargets) {
             stale = append(stale, a.Target)
         }

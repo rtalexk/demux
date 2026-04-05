@@ -421,6 +421,11 @@ func (m Model) toggleDeferAlert(target string) tea.Cmd {
         // 'd' does not remove sticky defers; use 'D' instead
         return nil
     }
+    for _, a := range m.alerts {
+        if a.Target == target && a.Level != db.LevelDefer {
+            return nil
+        }
+    }
     reason := m.cfg.Alerts.DeferDefaultReason
     d := m.db
     return func() tea.Msg {
