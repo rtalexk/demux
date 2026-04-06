@@ -143,13 +143,13 @@ var (
 var sessionRemoveCmd = &cobra.Command{
 	Use:     "config-remove",
 	Aliases: []string{"config-rm"},
-	Short:   "Remove a session entry from sessions.toml (or private.toml with --private)",
+	Short:   "Remove a session entry (searches both files; --private targets only private.toml)",
 	RunE:    runSessionRemove,
 }
 
 func init() {
 	sessionRemoveCmd.Flags().StringVar(&sessionRemoveName, "name", "", "Session name (required)")
-	sessionRemoveCmd.Flags().BoolVar(&sessionRemovePrivate, "private", false, "Target private.toml instead of sessions.toml")
+	sessionRemoveCmd.Flags().BoolVar(&sessionRemovePrivate, "private", false, "Target private.toml only")
 
 	_ = sessionRemoveCmd.MarkFlagRequired("name")
 
@@ -157,17 +157,25 @@ func init() {
 }
 
 func runSessionRemove(_ *cobra.Command, _ []string) error {
-	path, err := sessionFilePath(sessionRemovePrivate)
-	if err != nil {
-		return err
+	candidates := []bool{false, true}
+	if sessionRemovePrivate {
+		candidates = []bool{true}
 	}
-
-	if err := session.RemoveEntry(path, sessionRemoveName); err != nil {
-		return err
+	for _, private := range candidates {
+		path, err := sessionFilePath(private)
+		if err != nil {
+			return err
+		}
+		err = session.RemoveEntry(path, sessionRemoveName)
+		if err == nil {
+			fmt.Printf("Removed session %q from %s\n", sessionRemoveName, filepath.Base(path))
+			return nil
+		}
+		if !session.IsNotFound(err) || sessionRemovePrivate {
+			return err
+		}
 	}
-
-	fmt.Printf("Removed session %q from %s\n", sessionRemoveName, filepath.Base(path))
-	return nil
+	return fmt.Errorf("session %q not found in sessions.toml or private.toml", sessionRemoveName)
 }
 
 // --- create-windows ---
