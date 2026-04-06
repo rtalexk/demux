@@ -3,13 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/mattn/go-isatty"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/rtalexk/demux/internal/git"
-	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
@@ -33,12 +31,12 @@ func init() {
 }
 
 type windowRow struct {
-	session, window, name, panes, procs, alerts, gitCol string
-	includeGit                                          bool
+	session, window, name, panes, procs, gitCol string
+	includeGit                                  bool
 }
 
 func (r windowRow) Fields() []string {
-	base := []string{r.session, r.window, r.name, r.panes, r.procs, r.alerts}
+	base := []string{r.session, r.window, r.name, r.panes, r.procs}
 	if r.includeGit {
 		return append(base, r.gitCol)
 	}
@@ -57,7 +55,7 @@ func resolveWindowGitCol(wPanes []tmux.Pane, primaryCWD string, cfg config.Confi
 	return "↪ " + info.Branch + " " + git.Indicators(info)
 }
 
-func buildWindowRows(windows map[int][]tmux.Pane, alertsByWindow map[string]int, primaryCWD string, cfg config.Config, session string, includeGit bool) []format.Row {
+func buildWindowRows(windows map[int][]tmux.Pane, primaryCWD string, cfg config.Config, session string, includeGit bool) []format.Row {
 	var rows []format.Row
 	for wi, wPanes := range windows {
 		gitCol := "—"
@@ -70,7 +68,6 @@ func buildWindowRows(windows map[int][]tmux.Pane, alertsByWindow map[string]int,
 			name:       wPanes[0].WindowName,
 			panes:      fmt.Sprint(len(wPanes)),
 			procs:      "—",
-			alerts:     fmt.Sprint(alertsByWindow[fmt.Sprint(wi)]),
 			gitCol:     gitCol,
 			includeGit: includeGit,
 		})
@@ -93,29 +90,12 @@ func runWindows(cmd *cobra.Command, _ []string) error {
 
 	primaryCWD := tmux.PrimaryPaneCWD(windows[0])
 
-	database, err := openDB()
-	if err != nil {
-		return err
-	}
-	defer database.Close()
-	alerts, err := database.AlertList()
-	if err != nil {
-		demuxlog.Warn("failed to list alerts", "err", err)
-	}
-	alertsByWindow := map[string]int{}
-	for _, a := range alerts {
-		parts := strings.SplitN(a.Target, ":", 2)
-		if len(parts) == 2 && parts[0] == windowsSession {
-			alertsByWindow[parts[1]]++
-		}
-	}
-
-	headers := []string{"SESSION", "WINDOW", "NAME", "PANES", "PROCS", "ALERTS"}
+	headers := []string{"SESSION", "WINDOW", "NAME", "PANES", "PROCS"}
 	if windowsGit {
 		headers = append(headers, "GIT")
 	}
 
-	rows := buildWindowRows(windows, alertsByWindow, primaryCWD, cfg, windowsSession, windowsGit)
+	rows := buildWindowRows(windows, primaryCWD, cfg, windowsSession, windowsGit)
 
 	isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
 	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))

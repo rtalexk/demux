@@ -16,7 +16,7 @@ var eventCmd = &cobra.Command{
 
 var eventPaneFocusCmd = &cobra.Command{
 	Use:   "pane_focus",
-	Short: "Clear alerts for the focused pane, its window, and its session",
+	Short: "Clear done states for the focused pane, its window, and its session",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := eventPaneFocusTarget
 		if target == "" {
@@ -38,17 +38,17 @@ var eventPaneFocusCmd = &cobra.Command{
 }
 
 func applyPaneFocus(d *db.DB, paneTarget string) error {
-	if err := d.AlertRemoveIfNotSticky(paneTarget); err != nil {
+	if err := d.StateDeleteIfDone(paneTarget); err != nil {
 		return err
 	}
-	if err := d.AlertRemoveIfNotSticky(windowTargetFromPane(paneTarget)); err != nil {
+	if err := d.StateDeleteIfDone(windowTargetFromPane(paneTarget)); err != nil {
 		return err
 	}
-	return d.AlertRemoveIfNotSticky(sessionTargetFromPane(paneTarget))
+	return d.StateDeleteIfDone(sessionTargetFromPane(paneTarget))
 }
 
 func windowTargetFromPane(paneTarget string) string {
-	if i := strings.LastIndex(paneTarget, "."); i != -1 {
+	if i := strings.LastIndex(paneTarget, ":"); i != -1 {
 		return paneTarget[:i]
 	}
 	return paneTarget
