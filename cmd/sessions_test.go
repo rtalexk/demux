@@ -11,18 +11,18 @@ import (
 func TestResolveSessionStatus(t *testing.T) {
 	tests := []struct {
 		name   string
-		alerts []db.Alert
+		states map[string]db.ToolState
 		want   string
 	}{
-		{"no alerts", nil, "ok"},
-		{"info only", []db.Alert{{Level: "info"}}, "ok"},
-		{"warn", []db.Alert{{Level: "warn"}}, "warn"},
-		{"error beats warn", []db.Alert{{Level: "warn"}, {Level: "error"}}, "error"},
-		{"error alone", []db.Alert{{Level: "error"}}, "error"},
+		{"no states", nil, "ok"},
+		{"working", map[string]db.ToolState{"s": {Value: db.StateWorking}}, "ok"},
+		{"waiting", map[string]db.ToolState{"s": {Value: db.StateWaiting}}, "waiting"},
+		{"error", map[string]db.ToolState{"s": {Value: db.StateError}}, "error"},
+		{"flagged", map[string]db.ToolState{"s": {Value: db.StateFlagged}}, "flagged"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveSessionStatus(tt.alerts); got != tt.want {
+			if got := resolveSessionStatus(tt.states); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})

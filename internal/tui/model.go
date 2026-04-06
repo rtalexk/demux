@@ -38,7 +38,7 @@ type panesMsg struct {
 	panes          []tmux.Pane
 	currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
 }
-type alertsMsg struct{ alerts []db.Alert }
+type statesMsg struct{ states []db.ToolState }
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
@@ -63,7 +63,7 @@ type Model struct {
 	height int
 
 	panes   []tmux.Pane
-	alerts  []db.Alert
+	states  []db.ToolState
 	gitInfo map[string]git.Info // keyed by session name
 	procs   []proc.Process
 	cwdMap  map[int32]string // PID -> CWD, pre-fetched async
@@ -123,7 +123,7 @@ func New(cfg config.Config, database *db.DB) Model {
 
 func (m Model) Init() tea.Cmd {
 	// Only fetch panes on startup — sidebar renders immediately.
-	// fetchAlerts, fetchProcs, and the tick are deferred until panesMsg arrives.
+	// fetchStates, fetchProcs, and the tick are deferred until panesMsg arrives.
 	return m.fetchPanes()
 }
 
@@ -272,9 +272,9 @@ func (m Model) buildStatusBar(width int) string {
 	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
 		statusBar = m.statusMsg
 	} else if m.cfg.Mode == "compact" {
-		statusBar = "  j/k:nav  Enter:open  !:alerts  ?:help  q:quit"
+		statusBar = "  j/k:nav  Enter:open  !:states  ?:help  q:quit"
 	} else if m.focus == panelSidebar {
-		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:alerts  ?:help  q:quit"
+		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:states  ?:help  q:quit"
 	} else {
 		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
 	}

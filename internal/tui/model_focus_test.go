@@ -2,7 +2,6 @@ package tui
 
 import (
 	"testing"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/config"
@@ -28,8 +27,8 @@ func applyPanesMsg(m Model, currentSession string) (Model, tea.Cmd) {
 	return updated.(Model), cmd
 }
 
-func applyAlertsMsg(m Model, alerts []db.Alert) (Model, tea.Cmd) {
-	updated, cmd := m.Update(alertsMsg{alerts: alerts})
+func applyStatesMsg(m Model, states []db.ToolState) (Model, tea.Cmd) {
+	updated, cmd := m.Update(statesMsg{states: states})
 	return updated.(Model), cmd
 }
 
@@ -37,20 +36,6 @@ func TestFocusOnOpen_CurrentSession(t *testing.T) {
 	m := focusTestModel("current_session")
 	m.height = 40
 	m, _ = applyPanesMsg(m, "beta")
-	node := m.sidebar.Selected()
-	if node == nil || node.Session != "beta" {
-		t.Errorf("expected session node beta, got %+v", node)
-	}
-}
-
-func TestFocusOnOpen_AlertSession(t *testing.T) {
-	m := focusTestModel("alert_session")
-	m.height = 40
-	m, _ = applyPanesMsg(m, "alpha")
-	alerts := []db.Alert{
-		{Target: "beta:0", Level: "warn", CreatedAt: time.Now()},
-	}
-	m, _ = applyAlertsMsg(m, alerts)
 	node := m.sidebar.Selected()
 	if node == nil || node.Session != "beta" {
 		t.Errorf("expected session node beta, got %+v", node)
@@ -74,7 +59,7 @@ func TestFocusSearchOnOpen_true(t *testing.T) {
 	m := New(cfg, database)
 	m.height = 40
 	m, _ = applyPanesMsg(m, "alpha")
-	m, _ = applyAlertsMsg(m, nil)
+	m, _ = applyStatesMsg(m, nil)
 	if !m.searchInput.IsInsert() {
 		t.Errorf("expected searchInput to be in insert mode when FocusSearchOnOpen = true")
 	}
@@ -87,7 +72,7 @@ func TestFocusSearchOnOpen_false(t *testing.T) {
 	m := New(cfg, database)
 	m.height = 40
 	m, _ = applyPanesMsg(m, "alpha")
-	m, _ = applyAlertsMsg(m, nil)
+	m, _ = applyStatesMsg(m, nil)
 	if m.searchInput.IsInsert() {
 		t.Errorf("expected searchInput to not be in insert mode when FocusSearchOnOpen = false")
 	}

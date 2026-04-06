@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
-	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
@@ -40,8 +39,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handlePanesMsg(msg)
 	case procDataMsg:
 		return m.handleProcDataMsg(msg)
-	case alertsMsg:
-		return m.handleAlertsMsg(msg)
+	case statesMsg:
+		return m.handleStatesMsg(msg)
 	case gitResultMsg:
 		return m.handleGitResultMsg(msg)
 	case queryResultMsg:
@@ -69,7 +68,7 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 func (m Model) handleGitResultMsg(msg gitResultMsg) (Model, tea.Cmd) {
 	m.gitInfo[msg.key] = msg.info
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
-	m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
+	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
 	m.updateDetailFromSelection()
 	return m, nil
 }
@@ -94,7 +93,7 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 	if time.Now().After(m.statusExp) {
 		m.statusMsg = ""
 	}
-	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchAlerts())
+	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates())
 }
 
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
@@ -105,7 +104,7 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	m.sidebar.SetSearchResult(msg.result)
 	m.procList.SetSearchQuery(query.Parse(m.searchInput.Value()), msg.result)
 	if node := m.sidebar.Selected(); node != nil {
-		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		m.updateDetailFromSelection()
 		return m, m.scheduleProcFetch()
@@ -118,11 +117,11 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.panes = msg.panes
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
-	m.sidebar.SetData(merged, m.alerts, m.gitInfo, m.cfg)
+	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
 	m.updateDetailFromSelection()
 	var cmds []tea.Cmd
 	if !m.ready {
-		// First load: sidebar is visible — kick off tick and alerts; procs are fetched on-demand
+		// First load: sidebar is visible — kick off tick and states; procs are fetched on-demand
 		m.currentSession = msg.currentSession
 		switch m.cfg.Sidebar.FocusOnOpen {
 		case "current_session", "first_session":
@@ -130,7 +129,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 			m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
 		}
 		m.ready = true
-		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchAlerts())
+		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates())
 		// If startup focus landed on a window node, kick off an initial proc fetch.
 		if node := m.sidebar.Selected(); node != nil {
 			m.procGen++
@@ -159,36 +158,28 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 	m.procs = msg.procs
 	m.cwdMap = msg.cwdMap
 	if node := m.sidebar.Selected(); node != nil {
-		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}
 	m.updateDetailFromSelection()
 	// Self-schedule next poll in 2s for the selected window.
 	return m, m.scheduleDelayedProcFetch()
 }
 
-func (m Model) handleAlertsMsg(msg alertsMsg) (Model, tea.Cmd) {
-	m.alerts = msg.alerts
+func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
+	m.states = msg.states
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
-	m.sidebar.SetData(merged, msg.alerts, m.gitInfo, m.cfg)
+	m.sidebar.SetData(merged, msg.states, m.gitInfo, m.cfg)
 	if !m.startupFocusDone {
 		m.startupFocusDone = true
-		visibleRows := max(1, m.height-1-2-searchBoxH)
-		if m.cfg.Sidebar.FocusOnOpen == "alert_session" {
-			m.sidebar.FocusFirstAlertSession(visibleRows)
-		}
 		if m.cfg.Sidebar.FocusSearchOnOpen {
 			m.searchInput.EnterInsertMode()
 		}
 	}
 	m.updateDetailFromSelection()
-	// If startup focus landed on a window node, kick off an initial proc fetch.
 	var cmds []tea.Cmd
 	if node := m.sidebar.Selected(); node != nil {
 		m.procGen++
 		cmds = append(cmds, m.scheduleProcFetch())
-	}
-	if pruneCmd := m.pruneStaleAlerts(); pruneCmd != nil {
-		cmds = append(cmds, pruneCmd)
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -254,70 +245,12 @@ func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 	}
 }
 
-// pruneStaleAlerts removes non-sticky alerts whose pane/window/session target no
-// longer appears in the current pane list. Returns a cmd that removes the stale
-// entries from the DB and re-fetches the alert list, or nil if nothing to prune.
-func (m *Model) pruneStaleAlerts() tea.Cmd {
-	if len(m.panes) == 0 {
-		return nil
+func (m *Model) stateMap() map[string]db.ToolState {
+	out := make(map[string]db.ToolState, len(m.states))
+	for _, s := range m.states {
+		out[s.Target] = s
 	}
-	paneTargets, winTargets, sesTargets := buildTargetSets(m.panes)
-	var stale []string
-	for _, a := range m.alerts {
-		if a.Sticky {
-			continue
-		}
-		if isStaleAlert(a.Target, paneTargets, winTargets, sesTargets) {
-			stale = append(stale, a.Target)
-		}
-	}
-	if len(stale) == 0 {
-		return nil
-	}
-	d := m.db
-	return func() tea.Msg {
-		for _, t := range stale {
-			d.AlertRemove(t)
-		}
-		alerts, err := d.AlertList()
-		if err != nil {
-			demuxlog.Warn("fetch alerts failed", "err", err)
-		}
-		return alertsMsg{alerts: alerts}
-	}
-}
-
-// buildTargetSets constructs lookup maps for every live pane, window and session target.
-func buildTargetSets(panes []tmux.Pane) (paneTargets, winTargets, sesTargets map[string]bool) {
-	paneTargets = make(map[string]bool, len(panes))
-	winTargets = make(map[string]bool)
-	sesTargets = make(map[string]bool)
-	for _, p := range panes {
-		paneTargets[fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)] = true
-		winTargets[fmt.Sprintf("%s:%d", p.Session, p.WindowIndex)] = true
-		sesTargets[p.Session] = true
-	}
-	return paneTargets, winTargets, sesTargets
-}
-
-// isStaleAlert reports whether the given alert target is absent from the live target sets.
-func isStaleAlert(target string, paneTargets, winTargets, sesTargets map[string]bool) bool {
-	switch {
-	case strings.Contains(target, "."):
-		return !paneTargets[target]
-	case strings.Contains(target, ":"):
-		return !winTargets[target]
-	default:
-		return !sesTargets[target]
-	}
-}
-
-func (m *Model) alertMap() map[string]db.Alert {
-	am := make(map[string]db.Alert, len(m.alerts))
-	for _, a := range m.alerts {
-		am[a.Target] = a
-	}
-	return am
+	return out
 }
 
 func (m *Model) updateDetailFromSelection() {
@@ -367,20 +300,21 @@ func (m *Model) detailForSidebarNode(node SidebarNode) DetailModel {
 		winCount:       len(windows),
 		paneCount:      paneCount,
 		procCount:      countProcsUnderCWD(m.procs, m.cwdMap, sessionCWD),
-		alertCount:     countSessionAlerts(m.alerts, node.Session),
+		sessionStates:  statesForSession(m.states, node.Session),
 	}
 }
 
-// countSessionAlerts returns the number of alerts whose target is within sessionName.
-func countSessionAlerts(alerts []db.Alert, sessionName string) int {
-	count := 0
-	prefix := sessionName + ":"
-	for _, a := range alerts {
-		if strings.HasPrefix(a.Target, prefix) {
-			count++
+// statesForSession returns all ToolState records whose Target matches or is prefixed by
+// "session:" (i.e. targets belonging to that session).
+func statesForSession(states []db.ToolState, session string) []db.ToolState {
+	prefix := session + ":"
+	var out []db.ToolState
+	for _, st := range states {
+		if st.Target == session || strings.HasPrefix(st.Target, prefix) {
+			out = append(out, st)
 		}
 	}
-	return count
+	return out
 }
 
 // countProcsUnderCWD counts processes whose working directory is sessionCWD or a descendant.
@@ -430,18 +364,7 @@ func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
 	windows := grouped[sess]
 	wPanes := windows[winIdx]
 	gitKey := fmt.Sprintf("%s:%d", sess, winIdx)
-	var windowAlert *db.Alert
-	target := fmt.Sprintf("%s:%d", sess, winIdx)
-	if a, err := m.db.AlertByTarget(target); err == nil && a != nil {
-		windowAlert = a
-	}
 	sessionCWD := tmux.PrimaryPaneCWD(windows[0])
-	alertCount := 0
-	for _, a := range m.alerts {
-		if strings.HasPrefix(a.Target, sess+":") {
-			alertCount++
-		}
-	}
 	procCount := 0
 	if sessionCWD != "" {
 		for _, pr := range m.procs {
@@ -462,11 +385,9 @@ func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
 		gitInfo:     m.gitInfo[sess],
 		winCount:    len(windows),
 		procCount:   procCount,
-		alertCount:  alertCount,
 		windowIndex: winIdx,
 		windowPanes: wPanes,
 		windowGit:   m.gitInfo[gitKey],
-		windowAlert: windowAlert,
 	}
 }
 

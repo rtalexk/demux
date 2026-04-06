@@ -36,13 +36,14 @@ func (m Model) fetchPanes() tea.Cmd {
 	}
 }
 
-func (m Model) fetchAlerts() tea.Cmd {
+func (m Model) fetchStates() tea.Cmd {
 	return func() tea.Msg {
-		alerts, err := m.db.AlertList()
+		states, err := m.db.StateList(0, "")
 		if err != nil {
-			demuxlog.Warn("fetch alerts failed", "err", err)
+			demuxlog.Warn("fetch states failed", "err", err)
+			return statesMsg{}
 		}
-		return alertsMsg{alerts: alerts}
+		return statesMsg{states: states}
 	}
 }
 

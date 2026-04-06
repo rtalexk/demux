@@ -38,7 +38,7 @@ type SidebarModel struct {
 	offset      int // viewport scroll offset
 	visibleRows int // last known visible row count; used by CursorDown/CursorUp
 	sessions    []session.Session
-	alerts      map[string]db.Alert
+	states      map[string]db.ToolState
 	gitInfo     map[string]git.Info
 	cfg         config.Config
 	filter      SidebarFilter
@@ -48,11 +48,11 @@ type SidebarModel struct {
 	launchErr   string // shown inline when last launch attempt failed
 }
 
-func (s *SidebarModel) SetData(sessions []session.Session, alerts []db.Alert, gitInfo map[string]git.Info, cfg config.Config) {
+func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
 	s.sessions = sessions
-	s.alerts = make(map[string]db.Alert, len(alerts))
-	for _, a := range alerts {
-		s.alerts[a.Target] = a
+	s.states = make(map[string]db.ToolState, len(states))
+	for _, st := range states {
+		s.states[st.Target] = st
 	}
 	s.gitInfo = gitInfo
 	s.cfg = cfg
@@ -97,104 +97,48 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 	return s.filter
 }
 
-// alertSeverity maps alert level to a numeric priority (higher = more severe).
-func alertSeverity(level string) int {
-	switch level {
-	case "error":
+// statePriority maps a StateValue to a numeric priority (higher = more urgent).
+func statePriority(value db.StateValue) int {
+	switch value {
+	case db.StateError:
+		return 4
+	case db.StateFlagged:
 		return 3
-	case "warn":
+	case db.StateWaiting:
 		return 2
-	case "info":
+	case db.StateWorking:
 		return 1
-	default: // "defer" and unknown values
+	default: // StateDone and idle
 		return 0
 	}
 }
 
-// newestSessionAlert returns the most recent alert CreatedAt for a session
-// (checking pane-level targets "session:window.pane"), or zero time if none.
-func (s *SidebarModel) newestSessionAlert(sess string) time.Time {
-	var newest time.Time
-	for target, a := range s.alerts {
-		if strings.HasPrefix(target, sess+":") || target == sess {
-			if a.CreatedAt.After(newest) {
-				newest = a.CreatedAt
-			}
+// stateForSession returns the highest-priority ToolState for the session, or nil if none.
+func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
+	prefix := sess + ":"
+	var best *db.ToolState
+	bestPri := -1
+	for target, st := range s.states {
+		if target != sess && !strings.HasPrefix(target, prefix) {
+			continue
 		}
-	}
-	return newest
-}
-
-// newestAlertAtSeverity returns the most recent CreatedAt among alerts for a
-// session whose alertSeverity equals sv, or zero time if none match.
-func (s *SidebarModel) newestAlertAtSeverity(sess string, sv int) time.Time {
-	var newest time.Time
-	for target, a := range s.alerts {
-		if strings.HasPrefix(target, sess+":") || target == sess {
-			if alertSeverity(a.Level) == sv && a.CreatedAt.After(newest) {
-				newest = a.CreatedAt
-			}
-		}
-	}
-	return newest
-}
-
-// highestSessionAlertSeverity returns the maximum alertSeverity value across
-// all alerts belonging to the session, or -1 if the session has no alerts.
-func (s *SidebarModel) highestSessionAlertSeverity(sess string) int {
-	best := -1
-	for target, a := range s.alerts {
-		if strings.HasPrefix(target, sess+":") || target == sess {
-			if sv := alertSeverity(a.Level); sv > best {
-				best = sv
-			}
+		pri := statePriority(st.Value)
+		if pri > bestPri {
+			bestPri = pri
+			st := st
+			best = &st
 		}
 	}
 	return best
 }
 
-// isBetterAlert reports whether candidate should replace current as the "best"
-// alert for a session under the given priority strategy.
-func isBetterAlert(candidate, current db.Alert, priority string) bool {
-	switch priority {
-	case "newest":
-		return candidate.CreatedAt.After(current.CreatedAt)
-	case "oldest":
-		return candidate.CreatedAt.Before(current.CreatedAt)
-	default: // "severity" and unknown values
-		return alertSeverity(candidate.Level) > alertSeverity(current.Level) ||
-			(alertSeverity(candidate.Level) == alertSeverity(current.Level) && candidate.CreatedAt.After(current.CreatedAt))
-	}
-}
 
-// BestAlertTargetInSession returns the tmux target string of the best alert
-// in the given session according to the session_switch_focus setting.
-// Returns "" for "default" priority or when the session has no alerts.
-// Unknown values fall back to "severity".
-func (s *SidebarModel) BestAlertTargetInSession(sess, priority string) string {
-	if priority == "default" {
-		return ""
-	}
-	prefix := sess + ":"
-	var best *db.Alert
-	for target, a := range s.alerts {
-		if target != sess && !strings.HasPrefix(target, prefix) {
-			continue
-		}
-		a := a
-		if best == nil {
-			best = &a
-			continue
-		}
-		if isBetterAlert(a, *best, priority) {
-			best = &a
-		}
-	}
-	if best == nil {
-		return ""
-	}
-	return best.Target
-}
+
+
+
+
+
+
 
 // visibleSessions returns sessions matching the current filter with IgnoredSessions removed.
 // For FilterWorktree with no resolvable root, returns nil and sets s.filterHint.
@@ -251,11 +195,24 @@ func (s *SidebarModel) filterConfig() []session.Session {
 	return out
 }
 
-// filterPriority returns non-ignored live sessions that have at least one alert.
+// filterPriority returns non-ignored live sessions that have an attention state
+// (waiting, error, flagged, or optionally working).
 func (s *SidebarModel) filterPriority() []session.Session {
 	var out []session.Session
 	for _, sess := range s.sessions {
-		if sess.IsLive && !s.newestSessionAlert(sess.DisplayName).IsZero() && !s.isIgnoredSession(sess.DisplayName) {
+		if !sess.IsLive || s.isIgnoredSession(sess.DisplayName) {
+			continue
+		}
+		st := s.stateForSession(sess.DisplayName)
+		if st == nil {
+			continue
+		}
+		pri := statePriority(st.Value)
+		threshold := 2 // waiting=2, error=4, flagged=3
+		if s.cfg.Tui.AttentionFilterIncludeWorking {
+			threshold = 1 // include working=1
+		}
+		if pri >= threshold {
 			out = append(out, sess)
 		}
 	}
@@ -326,34 +283,22 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
 	return ""
 }
 
-// comparePriority compares two sessions by alert priority.
+// comparePriority compares two sessions by state priority.
 // Returns -1 if si sorts before sj, 1 if sj sorts before si, 0 if equal.
 func (s *SidebarModel) comparePriority(si, sj session.Session) int {
-	svi := s.highestSessionAlertSeverity(si.DisplayName)
-	svj := s.highestSessionAlertSeverity(sj.DisplayName)
-	hasI := svi >= 0
-	hasJ := svj >= 0
-	if hasI != hasJ {
-		if hasI {
+	priI := -1
+	if stI := s.stateForSession(si.DisplayName); stI != nil {
+		priI = statePriority(stI.Value)
+	}
+	priJ := -1
+	if stJ := s.stateForSession(sj.DisplayName); stJ != nil {
+		priJ = statePriority(stJ.Value)
+	}
+	if priI != priJ {
+		if priI > priJ {
 			return -1
 		}
 		return 1
-	}
-	if hasI && hasJ {
-		if svi != svj {
-			if svi > svj {
-				return -1
-			}
-			return 1
-		}
-		ti := s.newestAlertAtSeverity(si.DisplayName, svi)
-		tj := s.newestAlertAtSeverity(sj.DisplayName, svj)
-		if !ti.Equal(tj) {
-			if ti.After(tj) {
-				return -1
-			}
-			return 1
-		}
 	}
 	return 0
 }
@@ -479,7 +424,7 @@ func (s SidebarModel) emptyHintText() string {
 	case s.filterHint != "":
 		return s.filterHint
 	case s.filter == FilterPriority:
-		return "no alerts"
+		return "no attention states"
 	case s.queryResult.Sessions != nil:
 		return "no results"
 	default:
@@ -609,33 +554,16 @@ func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) str
 	return compactGitIndicators(info)
 }
 
-// alertIndicator returns the rendered alert icon for a sidebar row, or "".
-// bestAlertForNode returns the highest-severity (then newest) alert for a sidebar
-// node's session, or nil if the session has no alerts.
-func (s SidebarModel) bestAlertForNode(session string) *db.Alert {
-	var best *db.Alert
-	prefix := session + ":"
-	for target, a := range s.alerts {
-		if !strings.HasPrefix(target, prefix) && target != session {
-			continue
-		}
-		a := a
-		if best == nil || isBetterAlert(a, *best, "severity") {
-			best = &a
-		}
-	}
-	return best
-}
-
-func (s SidebarModel) alertIndicator(node SidebarNode, selected, focused bool) string {
-	best := s.bestAlertForNode(node.Session)
-	if best == nil {
+// stateIndicator returns the rendered state icon for a sidebar row, or "".
+func (s SidebarModel) stateIndicator(node SidebarNode, selected, focused bool) string {
+	st := s.stateForSession(node.Session)
+	if st == nil || st.Value == db.StateDone {
 		return ""
 	}
 	if selected && focused {
-		return alertIconOnBG(best.Level, best.Sticky, activeTheme.ColorSelected)
+		return stateIconOnBG(st.Value, activeTheme.ColorSelected)
 	}
-	return alertIcon(best.Level, best.Sticky)
+	return stateIcon(st.Value)
 }
 
 // lastSeenIndicator returns the rendered last-seen age string for a sidebar row, or "".
@@ -660,7 +588,7 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	if ind := s.alertIndicator(node, selected, focused); ind != "" {
+	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
@@ -906,18 +834,7 @@ func (s *SidebarModel) FocusNode(sess string, visibleRows int) bool {
 	return false
 }
 
-// FocusFirstAlertSession positions the cursor on the first session node that has any alert.
-// Returns true if a matching node was found, false otherwise.
-func (s *SidebarModel) FocusFirstAlertSession(visibleRows int) bool {
-	for i, n := range s.nodes {
-		if !s.newestSessionAlert(n.Session).IsZero() {
-			s.cursor = i
-			s.clampViewport(visibleRows)
-			return true
-		}
-	}
-	return false
-}
+
 
 // SetSearchResult filters and optionally re-sorts the sidebar nodes by the
 // given query result. Passing an empty Result clears any active filter.

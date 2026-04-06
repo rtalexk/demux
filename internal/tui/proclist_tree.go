@@ -1,10 +1,8 @@
 package tui
 
 import (
-	"fmt"
 	"sort"
 
-	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/tmux"
 )
@@ -106,19 +104,7 @@ func containsStr(list []string, s string) bool {
 	return false
 }
 
-// windowAlertFromMap returns the window-level alert for a window from alertMap.
-// It checks only the exact window target ("session:N"); pane-level alerts
-// ("session:N.P") are not included so they appear only on their pane header.
-func windowAlertFromMap(alertMap map[string]db.Alert, session string, windowIndex int) *db.Alert {
-	if alertMap == nil {
-		return nil
-	}
-	exact := fmt.Sprintf("%s:%d", session, windowIndex)
-	if a, ok := alertMap[exact]; ok {
-		return &a
-	}
-	return nil
-}
+
 
 // isSelectable reports whether the cursor may land on n.
 func isSelectable(n ProcListNode) bool { return !n.IsIdle }

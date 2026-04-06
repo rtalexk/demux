@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/rtalexk/demux/internal/config"
-	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -486,7 +485,7 @@ func TestSetWindowData_CollapseHidesChildren(t *testing.T) {
 	m.SetWindowData(
 		[]tmux.Pane{pane}, "test", 0,
 		procs, map[int32]string{},
-		map[string]git.Info{}, nil, config.Config{},
+		map[string]git.Info{}, config.Config{},
 	)
 
 	// esbuild (depth-2 child of node) should NOT appear — parent collapsed by default
@@ -526,7 +525,7 @@ func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
 	m.SetWindowData(
 		[]tmux.Pane{pane}, "test", 0,
 		procs, map[int32]string{},
-		map[string]git.Info{}, nil, config.Config{},
+		map[string]git.Info{}, config.Config{},
 	)
 	// Simulate a toggle — expand PID 301.
 	m.collapsedPIDs[301] = false
@@ -534,7 +533,7 @@ func TestSetWindowData_ExpandedShowsChildren(t *testing.T) {
 	m.SetWindowData(
 		[]tmux.Pane{pane}, "test", 0,
 		procs, map[int32]string{},
-		map[string]git.Info{}, nil, config.Config{},
+		map[string]git.Info{}, config.Config{},
 	)
 
 	found := false
@@ -559,7 +558,7 @@ func TestSetWindowData_AggStats_SetOnCollapsedNode(t *testing.T) {
 	m.SetWindowData(
 		[]tmux.Pane{pane}, "test", 0,
 		procs, map[int32]string{},
-		map[string]git.Info{}, nil, config.Config{},
+		map[string]git.Info{}, config.Config{},
 	)
 
 	var nodeProc *ProcListNode
@@ -1283,55 +1282,6 @@ func TestRenderPaneHeader_RightAlign_Selected_ContainsLabelAndPath(t *testing.T)
 	}
 }
 
-// ---------- windowAlertFromMap ----------
-
-func TestWindowAlertFromMap_ReturnsNilForEmptyMap(t *testing.T) {
-	if windowAlertFromMap(nil, "s", 0) != nil {
-		t.Error("expected nil for nil map")
-	}
-	if windowAlertFromMap(map[string]db.Alert{}, "s", 0) != nil {
-		t.Error("expected nil for empty map")
-	}
-}
-
-func TestWindowAlertFromMap_ReturnsWindowLevelAlert(t *testing.T) {
-	a := db.Alert{Target: "s:0", Level: db.LevelInfo}
-	m := map[string]db.Alert{"s:0": a}
-	got := windowAlertFromMap(m, "s", 0)
-	if got == nil || got.Target != "s:0" {
-		t.Errorf("expected alert for s:0, got %v", got)
-	}
-}
-
-func TestWindowAlertFromMap_IgnoresPaneLevelAlert(t *testing.T) {
-	// Pane-level alerts (session:N.P) must NOT appear on window headers —
-	// they are displayed exclusively on their pane row to avoid duplication.
-	a := db.Alert{Target: "s:0.1", Level: db.LevelInfo}
-	m := map[string]db.Alert{"s:0.1": a}
-	if windowAlertFromMap(m, "s", 0) != nil {
-		t.Error("expected nil — pane-level alert s:0.1 must not appear on window 0 header")
-	}
-}
-
-func TestWindowAlertFromMap_ReturnsWindowAlertAlongsidePaneAlerts(t *testing.T) {
-	// A window-level alert coexists with pane alerts; only the window key is returned.
-	win := db.Alert{Target: "s:1", Level: db.LevelWarn}
-	pane := db.Alert{Target: "s:1.0", Level: db.LevelError}
-	m := map[string]db.Alert{"s:1": win, "s:1.0": pane}
-	got := windowAlertFromMap(m, "s", 1)
-	if got == nil || got.Target != "s:1" {
-		t.Errorf("expected window-level alert s:1, got %v", got)
-	}
-}
-
-func TestWindowAlertFromMap_IgnoresOtherWindows(t *testing.T) {
-	a := db.Alert{Target: "s:2", Level: db.LevelInfo}
-	m := map[string]db.Alert{"s:2": a}
-	if windowAlertFromMap(m, "s", 0) != nil {
-		t.Error("expected nil — window 2 alert should not match window 0")
-	}
-}
-
 // ---------- SetSessionData ----------
 
 func buildSessionPanes() []tmux.Pane {
@@ -1348,7 +1298,7 @@ func buildSessionPanes() []tmux.Pane {
 func TestSetSessionData_EmitsWindowHeaders(t *testing.T) {
 	var m ProcListModel
 	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	if !m.inSessionMode {
 		t.Error("expected inSessionMode=true after SetSessionData")
@@ -1370,7 +1320,7 @@ func TestSetSessionData_EmitsWindowHeaders(t *testing.T) {
 func TestSetSessionData_WindowsOrderedByIndex(t *testing.T) {
 	var m ProcListModel
 	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	var winHeaders []int
 	for _, n := range m.nodes {
@@ -1389,7 +1339,7 @@ func TestSetSessionData_WindowsOrderedByIndex(t *testing.T) {
 func TestSetSessionData_SuppressPaneCWDWhenMatchesWindowCWD(t *testing.T) {
 	var m ProcListModel
 	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	// pane 0 and pane 1 of window 0 both have CWD "/proj" == window CWD — should be suppressed
 	for _, n := range m.nodes {
@@ -1409,7 +1359,7 @@ func TestSetSessionData_ShowsPaneCWDWhenDivergent(t *testing.T) {
 	}
 	var m ProcListModel
 	m.SetSessionData(panes, "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	found := false
 	for _, n := range m.nodes {
@@ -1425,74 +1375,16 @@ func TestSetSessionData_ShowsPaneCWDWhenDivergent(t *testing.T) {
 	}
 }
 
-func TestSetSessionData_SetsWindowAlert(t *testing.T) {
-	a := db.Alert{Target: "s:0", Level: db.LevelInfo}
-	alertMap := map[string]db.Alert{"s:0": a}
-	var m ProcListModel
-	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
-	)
-	if m.nodes[0].Alert == nil {
-		t.Error("expected window header to carry alert")
-	}
-}
-
-func TestSetSessionData_StoresSessionAlert(t *testing.T) {
-	a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "needs attention"}
-	alertMap := map[string]db.Alert{"s": a}
-	var m ProcListModel
-	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
-	)
-	if m.sessionAlert == nil {
-		t.Fatal("expected sessionAlert to be set")
-	}
-	if m.sessionAlert.Reason != "needs attention" {
-		t.Errorf("unexpected reason: %q", m.sessionAlert.Reason)
-	}
-}
-
-func TestSetSessionData_ClearsSessionAlertWhenAbsent(t *testing.T) {
-	a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "old alert"}
-	alertMap := map[string]db.Alert{"s": a}
-	var m ProcListModel
-	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
-	)
-	// second call with no session-level alert — field must be cleared
-	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
-	)
-	if m.sessionAlert != nil {
-		t.Errorf("expected sessionAlert to be nil, got %+v", m.sessionAlert)
-	}
-}
-
-func TestSetSessionData_SessionAlertRenderedInTitle(t *testing.T) {
-	a := db.Alert{Target: "s", Level: db.LevelWarn, Reason: "needs attention"}
-	alertMap := map[string]db.Alert{"s": a}
-	var m ProcListModel
-	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, alertMap, config.Config{},
-	)
-	rendered := m.Render(80, 20, false, " [l] s ")
-	topLine := strings.SplitN(rendered, "\n", 2)[0]
-	plain := stripANSI(topLine)
-	if !strings.Contains(plain, "needs attention") {
-		t.Errorf("expected alert reason in top border, got: %q", plain)
-	}
-}
-
 func TestSetSessionData_ResetsCursorOnSessionChange(t *testing.T) {
 	var m ProcListModel
 	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	m.cursor = 3
 	m.offset = 2
 	// change to different session — should reset cursor and offset
 	m.SetSessionData(buildSessionPanes(), "other",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	if m.cursor != 0 || m.offset != 0 {
 		t.Errorf("expected cursor=0 offset=0 after session change, got cursor=%d offset=%d",
@@ -1504,13 +1396,13 @@ func TestSetSessionData_SetWindowDataClearsSessionMode(t *testing.T) {
 	pane := buildTestPane(100)
 	var m ProcListModel
 	m.SetSessionData(buildSessionPanes(), "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	if !m.inSessionMode {
 		t.Fatal("expected inSessionMode=true")
 	}
 	m.SetWindowData([]tmux.Pane{pane}, "test", 0,
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	if m.inSessionMode {
 		t.Error("expected inSessionMode=false after SetWindowData")
@@ -1526,7 +1418,7 @@ func TestRender_SessionMode_ContainsWindowHeader(t *testing.T) {
 	}
 	var m ProcListModel
 	m.SetSessionData(panes, "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	out := m.Render(80, 20, false, "procs")
 	plain := stripANSI(out)
@@ -1541,7 +1433,7 @@ func TestRender_SessionMode_PaneHeaderIndented(t *testing.T) {
 	}
 	var m ProcListModel
 	m.SetSessionData(panes, "s",
-		nil, map[int32]string{}, map[string]git.Info{}, nil, config.Config{},
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
 	)
 	out := m.Render(80, 20, false, "procs")
 	plain := stripANSI(out)

@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -38,13 +39,14 @@ type DetailModel struct {
 	winCount       int
 	paneCount      int
 	procCount      int
-	alertCount     int
+
+	// session states (non-idle states for the focused session)
+	sessionStates []db.ToolState
 
 	// window
 	windowIndex int
 	windowPanes []tmux.Pane
 	windowGit   git.Info
-	windowAlert *db.Alert
 
 	// proc
 	proc     proc.Process
@@ -135,6 +137,46 @@ func inlineStat(label, value string) string {
 	return detailLabelStyle.Width(0).Render(label+":") + " " + detailValueStyle.Render(value)
 }
 
+// renderStateSection builds detail lines for non-idle states of the focused session.
+// Returns nil when there are no states to show.
+func (d DetailModel) renderStateSection() []string {
+	var active []db.ToolState
+	for _, st := range d.sessionStates {
+		if st.Value != 0 && st.Value != db.StateDone {
+			active = append(active, st)
+		}
+	}
+	if len(active) == 0 {
+		return nil
+	}
+	// Sort by target for stable ordering.
+	sort.Slice(active, func(i, j int) bool { return active[i].Target < active[j].Target })
+	lines := []string{""}
+	for _, st := range active {
+		icon := stateIcon(st.Value)
+		target := st.Target
+		// Strip session prefix: "mysess:1:0" → "win1·p0"
+		if prefix := d.session + ":"; strings.HasPrefix(target, prefix) {
+			rest := target[len(prefix):]
+			parts := strings.SplitN(rest, ":", 2)
+			if len(parts) == 2 {
+				target = "win" + parts[0] + "·p" + parts[1]
+			}
+		}
+		tool := st.Tool
+		if tool == "" {
+			tool = "-"
+		}
+		stateStr := st.Value.String()
+		line := icon + "  " + tool + "  " + target + "  " + stateStr
+		lines = append(lines, line)
+		if st.Message != "" {
+			lines = append(lines, "   "+st.Message)
+		}
+	}
+	return lines
+}
+
 func (d DetailModel) renderSession() []string {
 	if d.isConfigOnly {
 		var lines []string
@@ -169,9 +211,11 @@ func (d DetailModel) renderSession() []string {
 		"",
 		inlineStat("windows", fmt.Sprint(d.winCount))+"   "+
 			inlineStat("panes", fmt.Sprint(d.paneCount))+"   "+
-			inlineStat("procs", fmt.Sprint(d.procCount))+"   "+
-			inlineStat("alerts", fmt.Sprint(d.alertCount)),
+			inlineStat("procs", fmt.Sprint(d.procCount)),
 	)
+	if stateLines := d.renderStateSection(); stateLines != nil {
+		lines = append(lines, stateLines...)
+	}
 	return lines
 }
 
@@ -195,8 +239,7 @@ func (d DetailModel) renderWindow() []string {
 	lines = append(lines,
 		"",
 		inlineStat("panes", fmt.Sprint(len(d.windowPanes)))+"   "+
-			inlineStat("procs", fmt.Sprint(d.procCount))+"   "+
-			inlineStat("alerts", fmt.Sprint(d.alertCount)),
+			inlineStat("procs", fmt.Sprint(d.procCount)),
 	)
 	return lines
 }
