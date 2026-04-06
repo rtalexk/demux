@@ -343,8 +343,8 @@ replace = "mydir"
 
 func TestDefaults_FocusOnOpen(t *testing.T) {
 	cfg := config.Default()
-	if cfg.Sidebar.FocusOnOpen != "alert_session" {
-		t.Errorf("expected default Sidebar.FocusOnOpen=\"alert_session\", got %q", cfg.Sidebar.FocusOnOpen)
+	if cfg.Sidebar.FocusOnOpen != "" {
+		t.Errorf("expected default Sidebar.FocusOnOpen=\"\", got %q", cfg.Sidebar.FocusOnOpen)
 	}
 }
 
@@ -352,13 +352,13 @@ func TestLoadFromFile_FocusOnOpen(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demux.toml")
 	os.WriteFile(path, []byte(`[sidebar]
-focus_on_open = "alert_window"`), 0644)
+focus_on_open = "current_session"`), 0644)
 	cfg, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Sidebar.FocusOnOpen != "alert_window" {
-		t.Errorf("expected \"alert_window\", got %q", cfg.Sidebar.FocusOnOpen)
+	if cfg.Sidebar.FocusOnOpen != "current_session" {
+		t.Errorf("expected \"current_session\", got %q", cfg.Sidebar.FocusOnOpen)
 	}
 }
 
