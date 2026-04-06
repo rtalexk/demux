@@ -157,19 +157,11 @@ func init() {
 }
 
 func runSessionRemove(_ *cobra.Command, _ []string) error {
+	candidates := []bool{false, true}
 	if sessionRemovePrivate {
-		path, err := sessionFilePath(true)
-		if err != nil {
-			return err
-		}
-		if err := session.RemoveEntry(path, sessionRemoveName); err != nil {
-			return err
-		}
-		fmt.Printf("Removed session %q from %s\n", sessionRemoveName, filepath.Base(path))
-		return nil
+		candidates = []bool{true}
 	}
-
-	for _, private := range []bool{false, true} {
+	for _, private := range candidates {
 		path, err := sessionFilePath(private)
 		if err != nil {
 			return err
@@ -179,10 +171,9 @@ func runSessionRemove(_ *cobra.Command, _ []string) error {
 			fmt.Printf("Removed session %q from %s\n", sessionRemoveName, filepath.Base(path))
 			return nil
 		}
-		if session.IsNotFound(err) {
-			continue
+		if !session.IsNotFound(err) || sessionRemovePrivate {
+			return err
 		}
-		return err
 	}
 	return fmt.Errorf("session %q not found in sessions.toml or private.toml", sessionRemoveName)
 }
