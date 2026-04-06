@@ -88,11 +88,25 @@ func loadRawEntries(path string) ([]ConfigEntry, error) {
 	return f.Sessions, nil
 }
 
+// errNotFound is returned by RemoveEntry when the named session does not exist in the file.
+type errNotFound struct{ msg string }
+
+func (e *errNotFound) Error() string { return e.msg }
+
+// IsNotFound reports whether err indicates the session was not found in the file.
+func IsNotFound(err error) bool {
+	var nf *errNotFound
+	return errors.As(err, &nf)
+}
+
 // RemoveEntry removes the [[session]] block matching name from path.
 // Returns an error if the file does not exist or the entry is not found.
 func RemoveEntry(path, name string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return &errNotFound{fmt.Sprintf("session %q not found in %s", name, filepath.Base(path))}
+		}
 		return fmt.Errorf("read %s: %w", filepath.Base(path), err)
 	}
 
@@ -106,7 +120,7 @@ func RemoveEntry(path, name string) error {
 		}
 	}
 	if target == -1 {
-		return fmt.Errorf("session %q not found in %s", name, filepath.Base(path))
+		return &errNotFound{fmt.Sprintf("session %q not found in %s", name, filepath.Base(path))}
 	}
 
 	blocks = append(blocks[:target], blocks[target+1:]...)
