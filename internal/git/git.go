@@ -65,7 +65,7 @@ func Fetch(dir string, timeoutMs int) (Info, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, "git", "-C", dir, "status", "--porcelain=v1", "-b").Output()
+	out, err := exec.CommandContext(ctx, "git", "--no-optional-locks", "-C", dir, "status", "--porcelain=v1", "-b").Output()
 	if err != nil {
 		info := Info{Dir: dir}
 		if fi, statErr := os.Stat(filepath.Join(dir, ".bare")); statErr == nil && fi.IsDir() {
