@@ -9,38 +9,38 @@ is happening in a pane rather than just that something needs attention.
 
 ## Removed and replaced CLI commands
 
-| Removed | Replaced by |
-|---|---|
-| `demux alert set` | `demux state set` |
-| `demux alert rm` | `demux state clear` |
-| `demux alert ls` | `demux state ls` |
+| Removed                     | Replaced by                             |
+| --------------------------- | --------------------------------------- |
+| `demux alert set`           | `demux state set`                       |
+| `demux alert rm`            | `demux state clear`                     |
+| `demux alert ls`            | `demux state ls`                        |
 | `--level info\|warn\|error` | `--state working\|waiting\|done\|error` |
-| `--level defer --sticky` | `--state flagged` |
-| `--reason` | `--message` |
+| `--level defer --sticky`    | `--state flagged`                       |
+| `--reason`                  | `--message`                             |
 
 ## Removed and replaced config
 
-| Removed | Replaced by |
-|---|---|
-| `[alerts]` config section | removed, no replacement |
-| `color_alert_*` theme tokens | `color_state_*` |
+| Removed                      | Replaced by             |
+| ---------------------------- | ----------------------- |
+| `[alerts]` config section    | removed, no replacement |
+| `color_alert_*` theme tokens | `color_state_*`         |
 
 Old `color_alert_*` keys in `demux.toml` are silently ignored; missing `color_state_*` keys
 fall back to defaults.
 
 ### New theme tokens
 
-| Token | Usage |
-|---|---|
-| `color_state_working` | `working` text |
+| Token                    | Usage                |
+| ------------------------ | -------------------- |
+| `color_state_working`    | `working` text       |
 | `color_state_working_bg` | `working` background |
-| `color_state_waiting` | `waiting` text |
+| `color_state_waiting`    | `waiting` text       |
 | `color_state_waiting_bg` | `waiting` background |
-| `color_state_done` | `done` text |
-| `color_state_done_bg` | `done` background |
-| `color_state_error` | `error` text |
-| `color_state_error_bg` | `error` background |
-| `color_state_flagged` | `flagged` text |
+| `color_state_done`       | `done` text          |
+| `color_state_done_bg`    | `done` background    |
+| `color_state_error`      | `error` text         |
+| `color_state_error_bg`   | `error` background   |
+| `color_state_flagged`    | `flagged` text       |
 | `color_state_flagged_bg` | `flagged` background |
 
 ### Removed tokens
@@ -60,10 +60,10 @@ demux state set --target "$TARGET" --state working --tool claude \
 
 ## TUI keybindings
 
-| Key | Action |
-|---|---|
+| Key | Action                                                                       |
+| --- | ---------------------------------------------------------------------------- |
 | `!` | Toggle attention filter (sessions with error/flagged/waiting/working states) |
-| `X` | Clear state for the currently selected session |
+| `X` | Clear state for the currently selected session                               |
 
 ### Attention filter
 
