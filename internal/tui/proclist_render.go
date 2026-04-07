@@ -269,11 +269,16 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 	st := p.stateForPane(node.Pane)
 	if selected {
 		stateStr := p.selectedStateIndicator(st)
-		contentW := innerW - len([]rune(stripANSI(stateStr)))
-		if contentW < 0 {
-			contentW = 0
+		if stateStr != "" {
+			stateVisW := len([]rune(stripANSI(stateStr)))
+			labelW := len([]rune(label))
+			padCount := innerW - labelW - stateVisW
+			if padCount < 0 {
+				padCount = 0
+			}
+			return selectedBG.Render(label) + stateStr + selectedBG.Render(strings.Repeat(" ", padCount))
 		}
-		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, contentW, hasIdle) + stateStr
+		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, innerW, hasIdle)
 	}
 	return p.renderPaneHeaderUnselected(node, label, pathStr, gitSuffix, innerW) + p.unselectedStateIndicator(st)
 }
@@ -386,11 +391,16 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 	st := p.stateForWindow(node.Pane.Session, node.Pane.WindowIndex)
 	if selected {
 		stateStr := p.selectedStateIndicator(st)
-		contentW := innerW - len([]rune(stripANSI(stateStr)))
-		if contentW < 0 {
-			contentW = 0
+		if stateStr != "" {
+			stateVisW := len([]rune(stripANSI(stateStr)))
+			labelW := len([]rune(label))
+			padCount := innerW - labelW - stateVisW
+			if padCount < 0 {
+				padCount = 0
+			}
+			return selectedBG.Render(label) + stateStr + selectedBG.Render(strings.Repeat(" ", padCount))
 		}
-		return p.renderWindowHeaderSelected(label, pathStr, contentW) + stateStr
+		return p.renderWindowHeaderSelected(label, pathStr, innerW)
 	}
 	return p.renderWindowHeaderUnselected(node, label, pathStr, innerW) + p.unselectedStateIndicator(st)
 }
