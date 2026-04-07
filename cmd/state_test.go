@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/rtalexk/demux/internal/db"
@@ -15,6 +16,7 @@ func TestStateSet_ToolWrite(t *testing.T) {
 	stateTool = "claude"
 	stateMessage = "running"
 	stateSource = "tool"
+	stateIfState = ""
 
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -33,6 +35,7 @@ func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
 	stateValue = "flagged"
 	stateTool = "claude"
 	stateSource = "tool"
+	stateIfState = ""
 
 	if err := applyStateSet(d); err == nil {
 		t.Fatal("expected error: flagged requires --source user")
@@ -141,5 +144,25 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	st, _ := d.StateByTarget("s:0.0")
 	if st == nil || st.Value != db.StateDone {
 		t.Errorf("expected done state, got: %+v", st)
+	}
+}
+
+func TestStateSet_IfState_InvalidValue(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	stateTarget = "s:0.0"
+	stateValue = "working"
+	stateTool = "claude"
+	stateSource = "tool"
+	stateForce = false
+	stateIfState = "bogus"
+
+	err := applyStateSet(d)
+	if err == nil {
+		t.Fatal("expected error for invalid --if-state value")
+	}
+	if !strings.Contains(err.Error(), "--if-state") {
+		t.Errorf("error should mention --if-state, got: %v", err)
 	}
 }
