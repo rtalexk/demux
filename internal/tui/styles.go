@@ -179,15 +179,16 @@ func stateBadge(value db.StateValue, msg string) string {
 }
 
 // paneStateIndicator returns the inline state text for a pane header row.
-// Returns "" when st is nil. Shows icon + message badge when a message is set,
-// or just the icon otherwise.
+// Returns "" when st is nil. Shows icon + message badge; falls back to the
+// state name when no custom message is set.
 func paneStateIndicator(st *db.ToolState) string {
 	if st == nil {
 		return ""
 	}
 	icon := stateIcon(st.Value)
-	if st.Message != "" {
-		return icon + " " + stateBadge(st.Value, st.Message)
+	msg := st.Message
+	if msg == "" {
+		msg = st.Value.String()
 	}
-	return icon
+	return icon + " " + stateBadge(st.Value, msg)
 }
