@@ -445,7 +445,11 @@ func (m Model) clearCurrentState(target string) tea.Cmd {
 // showClearConfirm opens the confirmation overlay for clearing the state of target.
 func (m Model) showClearConfirm(target string) Model {
 	st := activeStateFor(m.states, target)
-	body := "  target: " + target
+	maxTargetLen := m.width/2 - 12 // leave room for label + border + padding
+	if maxTargetLen < 20 {
+		maxTargetLen = 20
+	}
+	body := "  target: " + truncateTarget(target, maxTargetLen)
 	if st != nil {
 		body += "\n  state:  " + st.Value.String()
 		if st.Message != "" {
