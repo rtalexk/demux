@@ -85,3 +85,19 @@ func TestPaneFocusNoStatesIsNoop(t *testing.T) {
 		t.Fatalf("unexpected error on empty db: %v", err)
 	}
 }
+
+func TestPaneFocusClearsIdleStates(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("myses:0.1", "claude", db.StateIdle, "available", db.SourceTool, false, nil)
+
+	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
+		t.Fatal(err)
+	}
+
+	st, _ := d.StateByTarget("myses:0.1")
+	if st != nil {
+		t.Error("idle pane state should be cleared on focus")
+	}
+}

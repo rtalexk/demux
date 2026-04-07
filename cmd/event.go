@@ -38,13 +38,13 @@ var eventPaneFocusCmd = &cobra.Command{
 }
 
 func applyPaneFocus(d *db.DB, paneTarget string) error {
-	if err := d.StateDeleteIfDone(paneTarget); err != nil {
+	if err := d.StateDeleteIfResting(paneTarget); err != nil {
 		return err
 	}
-	if err := d.StateDeleteIfDone(windowTargetFromPane(paneTarget)); err != nil {
+	if err := d.StateDeleteIfResting(windowTargetFromPane(paneTarget)); err != nil {
 		return err
 	}
-	return d.StateDeleteIfDone(sessionTargetFromPane(paneTarget))
+	return d.StateDeleteIfResting(sessionTargetFromPane(paneTarget))
 }
 
 func windowTargetFromPane(paneTarget string) string {
