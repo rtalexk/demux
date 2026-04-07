@@ -58,7 +58,8 @@ width = 35
 # Show last-seen age indicator on each live session row (e.g. " 5s", "12m", " 3h", "14d")
 show_last_seen = true
 
-# Where to position the sidebar cursor on open: current_session | first_session
+# Where to position the sidebar cursor on open: current_session | first_session | state_session
+# state_session focuses the first session with a visible state (based on configured sort order)
 focus_on_open = "current_session"
 
 # Start with cursor in the search input (also available as --search flag)

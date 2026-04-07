@@ -815,6 +815,17 @@ func (s SidebarModel) SessionCount() int {
 	return len(s.nodes)
 }
 
+// FirstStateSession returns the display name of the first node (in sorted order)
+// that has a recorded state, or "" if none. Used by the state_session focus mode.
+func (s *SidebarModel) FirstStateSession() string {
+	for _, n := range s.nodes {
+		if s.stateForSession(n.Session) != nil {
+			return n.Session
+		}
+	}
+	return ""
+}
+
 // FocusNode positions the cursor on the session node matching sess.
 // Returns true if found, false otherwise.
 func (s *SidebarModel) FocusNode(sess string, visibleRows int) bool {

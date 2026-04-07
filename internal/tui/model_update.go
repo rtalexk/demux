@@ -151,7 +151,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 		// First load: sidebar is visible — kick off tick and states; procs are fetched on-demand
 		m.currentSession = msg.currentSession
 		switch m.cfg.Sidebar.FocusOnOpen {
-		case "current_session", "first_session":
+		case "current_session", "first_session", "state_session":
 			visibleRows := max(1, m.height-1-2-searchBoxH)
 			m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
 		}
@@ -261,8 +261,8 @@ func (m *Model) populateYankFields() {
 	}
 }
 
-// applyNonAlertFocusMode applies a non-alert focus mode to the sidebar.
-// Valid modes: current_session, first_session.
+// applyNonAlertFocusMode applies the configured focus_on_open mode to the sidebar.
+// Valid modes: current_session, first_session, state_session.
 // No-ops on empty or unrecognised mode.
 func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 	switch mode {
@@ -270,6 +270,10 @@ func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 		m.sidebar.FocusNode(m.currentSession, visibleRows)
 	case "first_session":
 		// cursor is already 0, which is always the first session — no-op
+	case "state_session":
+		if sess := m.sidebar.FirstStateSession(); sess != "" {
+			m.sidebar.FocusNode(sess, visibleRows)
+		}
 	}
 }
 

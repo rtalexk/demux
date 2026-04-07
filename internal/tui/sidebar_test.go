@@ -603,6 +603,60 @@ func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 	}
 }
 
+// --- FirstStateSession ---
+
+func TestFirstStateSession_ReturnsFirstWithState(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"gamma": {Target: "gamma", Value: db.StateWaiting},
+		},
+		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "gamma" {
+		t.Errorf("FirstStateSession() = %q, want %q", got, "gamma")
+	}
+}
+
+func TestFirstStateSession_PrioritySort(t *testing.T) {
+	// With priority sort, the session with the highest-priority state comes first.
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"alpha": {Target: "alpha", Value: db.StateIdle},
+			"beta":  {Target: "beta", Value: db.StateError},
+		},
+		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"priority", "alphabetical"}}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "beta" {
+		t.Errorf("FirstStateSession() = %q, want \"beta\" (error > idle)", got)
+	}
+}
+
+func TestFirstStateSession_NoneReturnsEmpty(t *testing.T) {
+	s := SidebarModel{
+		sessions: makeSessions("alpha", "beta"),
+		states:   map[string]db.ToolState{},
+		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "" {
+		t.Errorf("FirstStateSession() = %q, want empty string", got)
+	}
+}
+
 // --- FocusNode ---
 
 func TestFocusNode_SessionLevel(t *testing.T) {
