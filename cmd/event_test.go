@@ -34,8 +34,8 @@ func TestPaneFocusClearsDoneStates(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool, false)
-	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool, false)
+	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
+	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
 
 	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestPaneFocusDoesNotClearNonDone(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool, false)
+	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool, false, nil)
 	applyPaneFocus(d, "myses:0.1")
 
 	st, _ := d.StateByTarget("myses:0.1")
@@ -68,7 +68,7 @@ func TestPaneFocusDoesNotClearFlagged(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser, false)
+	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser, false, nil)
 	applyPaneFocus(d, "myses:0.1")
 
 	st, _ := d.StateByTarget("myses:0.1")

@@ -26,6 +26,7 @@ const (
 	StateDone    StateValue = 3
 	StateError   StateValue = 4
 	StateFlagged StateValue = 5
+	StateIdle    StateValue = 6
 )
 
 func (v StateValue) String() string {
@@ -40,6 +41,8 @@ func (v StateValue) String() string {
 		return "error"
 	case StateFlagged:
 		return "flagged"
+	case StateIdle:
+		return "idle"
 	default:
 		return "idle"
 	}
@@ -58,8 +61,10 @@ func ParseStateValue(s string) (StateValue, error) {
 		return StateError, nil
 	case "flagged":
 		return StateFlagged, nil
+	case "idle":
+		return StateIdle, nil
 	default:
-		return 0, fmt.Errorf("invalid state %q: must be working|waiting|done|error|flagged", s)
+		return 0, fmt.Errorf("invalid state %q: must be working|waiting|done|error|flagged|idle", s)
 	}
 }
 
@@ -94,11 +99,12 @@ type ToolState struct {
 
 // StateSet writes a state record for target, applying write-lock rules.
 // Returns ErrStateLocked (wrapped) if the write is rejected.
-func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource, force bool) error {
+func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource, force bool, ifState *StateValue) error {
 	tx, err := d.sql.Begin()
 	if err != nil {
 		return fmt.Errorf("begin StateSet: %w", err)
 	}
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
 
 	// Read current record within the transaction.
 	var current *ToolState
@@ -106,22 +112,30 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 	var cur ToolState
 	err = row.Scan(&cur.Tool, &cur.Value, &cur.Source)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		tx.Rollback()
 		return fmt.Errorf("read current state: %w", err)
 	}
 	if err == nil {
 		current = &cur
 	}
 
+	// Apply --if-state condition: bail out (no-op) if current state doesn't match.
+	if ifState != nil {
+		currentValue := StateValue(0)
+		if current != nil {
+			currentValue = current.Value
+		}
+		if currentValue != *ifState {
+			return tx.Rollback()
+		}
+	}
+
 	// Apply lock rules for tool writes (skipped when force=true).
 	if !force && source == SourceTool && current != nil {
 		switch current.Value {
 		case StateFlagged:
-			tx.Rollback()
 			return fmt.Errorf("%w (current: flagged, user-owned)", ErrStateLocked)
 		case StateWorking, StateWaiting, StateError:
 			if current.Tool != tool {
-				tx.Rollback()
 				return fmt.Errorf("%w (current: %s by %s)", ErrStateLocked, current.Value, current.Tool)
 			}
 		}
@@ -138,7 +152,6 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 			updated_at = excluded.updated_at
 	`, target, tool, int(value), message, int(source))
 	if err != nil {
-		tx.Rollback()
 		return fmt.Errorf("upsert state: %w", err)
 	}
 

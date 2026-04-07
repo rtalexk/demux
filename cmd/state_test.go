@@ -43,7 +43,7 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser, false)
+	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser, false, nil)
 
 	clearTarget = "s:0.0"
 	clearYes = false
@@ -66,7 +66,7 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool, false)
+	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool, false, nil)
 
 	clearTarget = "s:0.0"
 	clearYes = false

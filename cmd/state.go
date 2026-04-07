@@ -103,7 +103,7 @@ func applyStateSet(d *db.DB) error {
 		return fmt.Errorf("--state flagged requires --source user")
 	}
 
-	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce); err != nil {
+	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce, nil); err != nil {
 		if errors.Is(err, db.ErrStateLocked) {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
