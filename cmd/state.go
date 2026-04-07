@@ -45,7 +45,7 @@ func init() {
 			return applyStateSet(d)
 		},
 	}
-	stateSetCmd.Flags().StringVar(&stateTarget, "target", "", "Target: session:window:pane (required)")
+	stateSetCmd.Flags().StringVar(&stateTarget, "target", "", "Target: session:window.pane (required)")
 	stateSetCmd.Flags().StringVar(&stateValue, "state", "", "State: working|waiting|done|error|flagged (required)")
 	stateSetCmd.Flags().StringVar(&stateTool, "tool", "", "Tool name")
 	stateSetCmd.Flags().StringVar(&stateMessage, "message", "", "Human-readable detail")

@@ -429,7 +429,7 @@ func TestRebuildNodes_SessionWithStateSortsFirst(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
 		states: map[string]db.ToolState{
-			"beta:0:0": {Target: "beta:0:0", Value: db.StateWorking},
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 	}
 	s.rebuildNodes()
@@ -443,8 +443,8 @@ func TestRebuildNodes_HigherPriorityStateSortsFirst(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("dm-main", "vem-main"),
 		states: map[string]db.ToolState{
-			"dm-main:0:0":  {Target: "dm-main:0:0", Value: db.StateWorking},
-			"vem-main:0:0": {Target: "vem-main:0:0", Value: db.StateError},
+			"dm-main:0.0":  {Target: "dm-main:0.0", Value: db.StateWorking},
+			"vem-main:0.0": {Target: "vem-main:0.0", Value: db.StateError},
 		},
 	}
 	s.rebuildNodes()
@@ -507,7 +507,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
 		states: map[string]db.ToolState{
-			"beta:0:0": {Target: "beta:0:0", Value: db.StateWorking},
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -561,7 +561,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
 		states: map[string]db.ToolState{
-			"beta:0:0": {Target: "beta:0:0", Value: db.StateWorking},
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}

@@ -6,11 +6,11 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 )
 
-func TestWindowTargetFromPane_WithColon(t *testing.T) {
-	got := windowTargetFromPane("main:1:2")
+func TestWindowTargetFromPane_WithDot(t *testing.T) {
+	got := windowTargetFromPane("main:1.2")
 	want := "main:1"
 	if got != want {
-		t.Errorf("windowTargetFromPane(%q) = %q, want %q", "main:1:2", got, want)
+		t.Errorf("windowTargetFromPane(%q) = %q, want %q", "main:1.2", got, want)
 	}
 }
 
@@ -23,10 +23,10 @@ func TestWindowTargetFromPane_NoColon(t *testing.T) {
 }
 
 func TestSessionTargetFromPane(t *testing.T) {
-	got := sessionTargetFromPane("myses:0:1")
+	got := sessionTargetFromPane("myses:0.1")
 	want := "myses"
 	if got != want {
-		t.Errorf("sessionTargetFromPane(%q) = %q, want %q", "myses:0:1", got, want)
+		t.Errorf("sessionTargetFromPane(%q) = %q, want %q", "myses:0.1", got, want)
 	}
 }
 
@@ -34,14 +34,14 @@ func TestPaneFocusClearsDoneStates(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0:1", "claude", db.StateDone, "finished", db.SourceTool)
+	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool)
 	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool)
 
-	if err := applyPaneFocus(d, "myses:0:1"); err != nil {
+	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
 		t.Fatal(err)
 	}
 
-	st1, _ := d.StateByTarget("myses:0:1")
+	st1, _ := d.StateByTarget("myses:0.1")
 	if st1 != nil {
 		t.Error("done pane state should be cleared on focus")
 	}
@@ -55,10 +55,10 @@ func TestPaneFocusDoesNotClearNonDone(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0:1", "claude", db.StateError, "boom", db.SourceTool)
-	applyPaneFocus(d, "myses:0:1")
+	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool)
+	applyPaneFocus(d, "myses:0.1")
 
-	st, _ := d.StateByTarget("myses:0:1")
+	st, _ := d.StateByTarget("myses:0.1")
 	if st == nil {
 		t.Error("error state should survive pane focus")
 	}
@@ -68,10 +68,10 @@ func TestPaneFocusDoesNotClearFlagged(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0:1", "", db.StateFlagged, "come back", db.SourceUser)
-	applyPaneFocus(d, "myses:0:1")
+	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser)
+	applyPaneFocus(d, "myses:0.1")
 
-	st, _ := d.StateByTarget("myses:0:1")
+	st, _ := d.StateByTarget("myses:0.1")
 	if st == nil {
 		t.Error("flagged state should survive pane focus")
 	}
@@ -81,7 +81,7 @@ func TestPaneFocusNoStatesIsNoop(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	if err := applyPaneFocus(d, "work:2:3"); err != nil {
+	if err := applyPaneFocus(d, "work:2.3"); err != nil {
 		t.Fatalf("unexpected error on empty db: %v", err)
 	}
 }

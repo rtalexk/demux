@@ -10,7 +10,7 @@ func TestStateSet_ToolWrite(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0:0"
+	stateTarget = "s:0.0"
 	stateValue = "working"
 	stateTool = "claude"
 	stateMessage = "running"
@@ -19,7 +19,7 @@ func TestStateSet_ToolWrite(t *testing.T) {
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0:0")
+	st, _ := d.StateByTarget("s:0.0")
 	if st == nil || st.Value != db.StateWorking {
 		t.Errorf("expected working state, got: %+v", st)
 	}
@@ -29,7 +29,7 @@ func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0:0"
+	stateTarget = "s:0.0"
 	stateValue = "flagged"
 	stateTool = "claude"
 	stateSource = "tool"
@@ -43,9 +43,9 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "", db.StateFlagged, "note", db.SourceUser)
+	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser)
 
-	clearTarget = "s:0:0"
+	clearTarget = "s:0.0"
 	clearYes = false
 
 	if err := applyStateClear(d); err == nil {
@@ -56,7 +56,7 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	if err := applyStateClear(d); err != nil {
 		t.Fatalf("with --yes should succeed: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0:0")
+	st, _ := d.StateByTarget("s:0.0")
 	if st != nil {
 		t.Error("state should be cleared")
 	}
@@ -66,9 +66,9 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", db.StateError, "boom", db.SourceTool)
+	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool)
 
-	clearTarget = "s:0:0"
+	clearTarget = "s:0.0"
 	clearYes = false
 
 	if err := applyStateClear(d); err != nil {

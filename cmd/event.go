@@ -48,7 +48,7 @@ func applyPaneFocus(d *db.DB, paneTarget string) error {
 }
 
 func windowTargetFromPane(paneTarget string) string {
-	if i := strings.LastIndex(paneTarget, ":"); i != -1 {
+	if i := strings.LastIndex(paneTarget, "."); i != -1 {
 		return paneTarget[:i]
 	}
 	return paneTarget

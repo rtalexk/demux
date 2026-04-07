@@ -155,10 +155,10 @@ func (d DetailModel) renderStateSection() []string {
 	for _, st := range active {
 		icon := stateIcon(st.Value)
 		target := st.Target
-		// Strip session prefix: "mysess:1:0" → "win1·p0"
+		// Strip session prefix: "mysess:1.0" → "win1·p0"
 		if prefix := d.session + ":"; strings.HasPrefix(target, prefix) {
 			rest := target[len(prefix):]
-			parts := strings.SplitN(rest, ":", 2)
+			parts := strings.SplitN(rest, ".", 2)
 			if len(parts) == 2 {
 				target = "win" + parts[0] + "·p" + parts[1]
 			}
