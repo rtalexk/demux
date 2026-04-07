@@ -268,7 +268,12 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 
 	st := p.stateForPane(node.Pane)
 	if selected {
-		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, innerW, hasIdle) + p.selectedStateIndicator(st)
+		stateStr := p.selectedStateIndicator(st)
+		contentW := innerW - len([]rune(stripANSI(stateStr)))
+		if contentW < 0 {
+			contentW = 0
+		}
+		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, contentW, hasIdle) + stateStr
 	}
 	return p.renderPaneHeaderUnselected(node, label, pathStr, gitSuffix, innerW) + p.unselectedStateIndicator(st)
 }
@@ -380,7 +385,12 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 
 	st := p.stateForWindow(node.Pane.Session, node.Pane.WindowIndex)
 	if selected {
-		return p.renderWindowHeaderSelected(label, pathStr, innerW) + p.selectedStateIndicator(st)
+		stateStr := p.selectedStateIndicator(st)
+		contentW := innerW - len([]rune(stripANSI(stateStr)))
+		if contentW < 0 {
+			contentW = 0
+		}
+		return p.renderWindowHeaderSelected(label, pathStr, contentW) + stateStr
 	}
 	return p.renderWindowHeaderUnselected(node, label, pathStr, innerW) + p.unselectedStateIndicator(st)
 }
