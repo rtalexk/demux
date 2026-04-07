@@ -51,9 +51,14 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleOverlays routes messages to full-screen overlay handlers.
+// handleOverlays routes key messages to full-screen overlay handlers.
 // Returns (model, cmd, true) if the message was consumed by an overlay.
+// Non-key messages fall through so background updates (ticks, state fetches)
+// continue to run while an overlay is visible.
 func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
+	if _, isKey := msg.(tea.KeyMsg); !isKey {
+		return m, nil, false
+	}
 	if m.showHelp {
 		mo, cmd := m.handleHelpOverlay(msg)
 		return mo, cmd, true

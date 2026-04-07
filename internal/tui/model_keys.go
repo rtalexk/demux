@@ -256,6 +256,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.sidebar.MoveToSessionLevel()
 	case key.Matches(msg, keys.FlagState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
+			if st := m.sidebar.stateForSession(node.Session); st != nil && st.Value == db.StateFlagged {
+				return m, m.clearCurrentState(st.Target)
+			}
 			return m, m.flagCurrentState(node.Session)
 		}
 	case key.Matches(msg, keys.ClearState.Binding):
@@ -392,6 +395,13 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return nm, cmd
 	case key.Matches(msg, keys.Esc.Binding):
 		m.focus = panelSidebar
+	case key.Matches(msg, keys.FlagState.Binding):
+		if target := m.procListStateTarget(); target != "" {
+			if st := activeStateFor(m.states, target); st != nil && st.Value == db.StateFlagged {
+				return m, m.clearCurrentState(target)
+			}
+			return m, m.flagCurrentState(target)
+		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if target := m.procListStateTarget(); target != "" {
 			return m.showClearConfirm(target), nil
@@ -408,12 +418,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// flagCurrentState sets the flagged state for the given session target.
-func (m Model) flagCurrentState(sessionName string) tea.Cmd {
+// flagCurrentState sets the flagged state for the given target.
+func (m Model) flagCurrentState(target string) tea.Cmd {
 	d := m.db
 	msg := m.cfg.Tui.FlagDefaultMessage
 	return func() tea.Msg {
-		_ = d.StateSet(sessionName, "", db.StateFlagged, msg, db.SourceUser, false)
+		_ = d.StateSet(target, "", db.StateFlagged, msg, db.SourceUser, false)
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
