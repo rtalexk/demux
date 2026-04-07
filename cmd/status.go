@@ -19,32 +19,38 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 }
 
-func tmuxCounter(style, icon string, count int) string {
-	return fmt.Sprintf("%s%s %d", style, icon, count)
+func tmuxCounter(color, icon string, count int) string {
+	return fmt.Sprintf("#[fg=%s]%s %d", color, icon, count)
 }
 
-func countStatesByValue(states []db.ToolState) (waiting, errs int) {
+func countStatesByValue(states []db.ToolState) (waiting, errs, flagged int) {
 	for _, s := range states {
 		switch s.Value {
 		case db.StateWaiting:
 			waiting++
 		case db.StateError:
 			errs++
+		case db.StateFlagged:
+			flagged++
 		}
 	}
 	return
 }
 
-func tmuxStatusParts(waiting, errs int, cfg config.Config) string {
-	if waiting == 0 && errs == 0 {
-		return "#[fg=#a6e3a1]✔#[default]"
+func tmuxStatusParts(waiting, errs, flagged int, cfg config.Config) string {
+	th := cfg.Theme
+	if waiting == 0 && errs == 0 && flagged == 0 {
+		return fmt.Sprintf("#[fg=%s]%s#[default]", th.ColorStateDone, th.IconStateDone)
 	}
 	var parts []string
 	if errs > 0 {
-		parts = append(parts, tmuxCounter("#[fg=#f38ba8,bold]", "✗", errs))
+		parts = append(parts, tmuxCounter(th.ColorStateError+",bold", th.IconStateError, errs))
+	}
+	if flagged > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateFlagged, th.IconStateFlagged, flagged))
 	}
 	if waiting > 0 {
-		parts = append(parts, tmuxCounter("#[fg=#f9e2af]", "●", waiting))
+		parts = append(parts, tmuxCounter(th.ColorStateWaiting, th.IconStateWaiting, waiting))
 	}
 	return strings.Join(parts, " ") + "#[default]"
 }
@@ -60,7 +66,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("list states: %w", err)
 	}
-	waiting, errs := countStatesByValue(states)
+	waiting, errs, flagged := countStatesByValue(states)
 
 	cfg := loadConfig()
 
@@ -72,15 +78,18 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	var out string
 	switch fmtName {
 	case "tmux":
-		out = tmuxStatusParts(waiting, errs, cfg)
+		out = tmuxStatusParts(waiting, errs, flagged, cfg)
 		fmt.Print(out)
 	default:
-		if waiting == 0 && errs == 0 {
+		if waiting == 0 && errs == 0 && flagged == 0 {
 			out = "ok"
 		} else {
 			var parts []string
 			if errs > 0 {
 				parts = append(parts, fmt.Sprintf("errors=%d", errs))
+			}
+			if flagged > 0 {
+				parts = append(parts, fmt.Sprintf("flagged=%d", flagged))
 			}
 			if waiting > 0 {
 				parts = append(parts, fmt.Sprintf("waiting=%d", waiting))
