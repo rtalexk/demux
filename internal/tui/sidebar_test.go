@@ -751,6 +751,81 @@ func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
 	}
 }
 
+func TestFilterPriority_IncludesFlagged(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "flagged", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"flagged": {Target: "flagged", Value: db.StateFlagged},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	if len(s.nodes) != 1 || s.nodes[0].Session != "flagged" {
+		t.Errorf("FilterPriority must include Flagged sessions, got %v", s.nodes)
+	}
+}
+
+func TestFilterPriority_ExcludesDone(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "done-sess", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"done-sess": {Target: "done-sess", Value: db.StateDone},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	for _, n := range s.nodes {
+		if n.Session == "done-sess" {
+			t.Error("FilterPriority must NOT include Done sessions")
+		}
+	}
+}
+
+func TestFilterPriority_IncludesWorkingWhenFlagSet(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "working-sess", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{Tui: config.TuiConfig{AttentionFilterIncludeWorking: true}},
+	}
+	s.rebuildNodes()
+	if len(s.nodes) != 1 || s.nodes[0].Session != "working-sess" {
+		t.Errorf("FilterPriority with AttentionFilterIncludeWorking must include Working sessions, got %v", s.nodes)
+	}
+}
+
+func TestFilterPriority_ExcludesWorkingByDefault(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "working-sess", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	for _, n := range s.nodes {
+		if n.Session == "working-sess" {
+			t.Error("FilterPriority must NOT include Working sessions by default")
+		}
+	}
+}
+
 func TestVisibleSessions_FilterWorktree_NoRoot(t *testing.T) {
 	s := SidebarModel{
 		sessions: []session.Session{

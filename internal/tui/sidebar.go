@@ -201,13 +201,13 @@ func (s *SidebarModel) filterPriority() []session.Session {
 		if st == nil {
 			continue
 		}
-		pri := statePriority(st.Value)
-		threshold := 2 // waiting=2, error=4, flagged=3
-		if s.cfg.Tui.AttentionFilterIncludeWorking {
-			threshold = 1 // include working=1
-		}
-		if pri >= threshold {
+		switch st.Value {
+		case db.StateWaiting, db.StateError, db.StateFlagged:
 			out = append(out, sess)
+		case db.StateWorking:
+			if s.cfg.Tui.AttentionFilterIncludeWorking {
+				out = append(out, sess)
+			}
 		}
 	}
 	return out
@@ -551,7 +551,7 @@ func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) str
 // stateIndicator returns the rendered state icon for a sidebar row, or "".
 func (s SidebarModel) stateIndicator(node SidebarNode, selected, focused bool) string {
 	st := s.stateForSession(node.Session)
-	if st == nil || st.Value == db.StateDone {
+	if st == nil {
 		return ""
 	}
 	if selected && focused {
