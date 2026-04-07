@@ -16,8 +16,12 @@ func TestCountStatesByValue(t *testing.T) {
 		{Value: db.StateError},
 		{Value: db.StateFlagged},
 		{Value: db.StateFlagged},
+		{Value: db.StateDone},
+		{Value: db.StateDone},
+		{Value: db.StateDone},
+		{Value: db.StateIdle},
 	}
-	waiting, errs, flagged := countStatesByValue(states)
+	waiting, errs, flagged, done, idle := countStatesByValue(states)
 	if waiting != 2 {
 		t.Errorf("waiting: want 2, got %d", waiting)
 	}
@@ -27,11 +31,17 @@ func TestCountStatesByValue(t *testing.T) {
 	if flagged != 2 {
 		t.Errorf("flagged: want 2, got %d", flagged)
 	}
+	if done != 3 {
+		t.Errorf("done: want 3, got %d", done)
+	}
+	if idle != 1 {
+		t.Errorf("idle: want 1, got %d", idle)
+	}
 }
 
 func TestTmuxStatusParts_NoStates(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 0, 0, cfg)
+	out := tmuxStatusParts(0, 0, 0, 0, 0, cfg)
 	if !strings.Contains(out, cfg.Theme.IconStateDone) {
 		t.Errorf("expected done icon %q, got: %q", cfg.Theme.IconStateDone, out)
 	}
@@ -39,7 +49,7 @@ func TestTmuxStatusParts_NoStates(t *testing.T) {
 
 func TestTmuxStatusParts_OrderErrorFlaggedWaiting(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(1, 1, 1, cfg)
+	out := tmuxStatusParts(1, 1, 1, 0, 0, cfg)
 	errIdx := strings.Index(out, cfg.Theme.IconStateError)
 	flagIdx := strings.Index(out, cfg.Theme.IconStateFlagged)
 	waitIdx := strings.Index(out, cfg.Theme.IconStateWaiting)
@@ -53,7 +63,7 @@ func TestTmuxStatusParts_OrderErrorFlaggedWaiting(t *testing.T) {
 
 func TestTmuxStatusParts_WaitingOnly(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(2, 0, 0, cfg)
+	out := tmuxStatusParts(2, 0, 0, 0, 0, cfg)
 	if !strings.Contains(out, cfg.Theme.IconStateWaiting) {
 		t.Errorf("expected waiting icon: %q", out)
 	}
@@ -64,7 +74,7 @@ func TestTmuxStatusParts_WaitingOnly(t *testing.T) {
 
 func TestTmuxStatusParts_FlaggedOnly(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 0, 1, cfg)
+	out := tmuxStatusParts(0, 0, 1, 0, 0, cfg)
 	if !strings.Contains(out, cfg.Theme.IconStateFlagged) {
 		t.Errorf("expected flagged icon: %q", out)
 	}
@@ -75,7 +85,7 @@ func TestTmuxStatusParts_FlaggedOnly(t *testing.T) {
 
 func TestTmuxStatusParts_UsesThemeColors(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 1, 0, cfg)
+	out := tmuxStatusParts(0, 1, 0, 0, 0, cfg)
 	if !strings.Contains(out, cfg.Theme.ColorStateError) {
 		t.Errorf("expected error color %q in output: %q", cfg.Theme.ColorStateError, out)
 	}

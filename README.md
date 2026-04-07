@@ -679,7 +679,7 @@ Add a live state summary to your tmux status bar:
 set -g status-right "#(demux status)"
 ```
 
-This outputs a colored summary of active pane states. When all panes are idle it shows a green indicator. Counts for `error`, `flagged`, and `waiting` are shown when any are active.
+This outputs a colored summary of active pane states. When all panes are idle it shows a green indicator. Counts for `error`, `flagged`, `waiting`, `done`, and `idle` are shown when any are active.
 
 ### Claude Code
 
