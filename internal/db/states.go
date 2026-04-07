@@ -70,7 +70,9 @@ func (v StateValue) Priority() int {
 		return 2
 	case StateFlagged:
 		return 1
-	default: // StateWorking, StateIdle, unknown
+	case StateIdle:
+		return -1 // explicit idle loses to working when both present in a session
+	default: // StateWorking, unknown
 		return 0
 	}
 }
@@ -217,7 +219,6 @@ func (d *DB) StateDeleteIfResting(target string) error {
 	)
 	return err
 }
-
 
 // StateDeleteBySession removes all state records for the given session.
 // It matches targets equal to name (bare) or prefixed with "name:" (session:window).

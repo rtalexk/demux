@@ -11,7 +11,7 @@ func TestStateValue_Priority(t *testing.T) {
 	}{
 		{0, 0},            // implicit zero / unknown
 		{StateWorking, 0}, // in-progress but not urgent
-		{StateIdle, 0},
+		{StateIdle, -1},
 		{StateFlagged, 1},
 		{StateDone, 2},
 		{StateError, 3},

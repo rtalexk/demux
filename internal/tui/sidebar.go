@@ -97,18 +97,19 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 	return s.filter
 }
 
-
 // stateForSession returns the highest-priority ToolState for the session, or nil if none.
 func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 	prefix := sess + ":"
 	var best *db.ToolState
-	bestPri := -1
+	found := false
+	bestPri := 0
 	for target, st := range s.states {
 		if target != sess && !strings.HasPrefix(target, prefix) {
 			continue
 		}
 		pri := st.Value.Priority()
-		if pri > bestPri {
+		if !found || pri > bestPri {
+			found = true
 			bestPri = pri
 			st := st
 			best = &st
