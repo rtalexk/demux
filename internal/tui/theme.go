@@ -33,24 +33,26 @@ type Theme struct {
 	ColorGitBehind lipgloss.Color
 	ColorGitAhead  lipgloss.Color
 
-	// Alerts
-	ColorAlertInfo    lipgloss.Color
-	ColorAlertWarn    lipgloss.Color
-	ColorAlertError   lipgloss.Color
-	ColorAlertDefer   lipgloss.Color
-	ColorAlertInfoBg  lipgloss.Color
-	ColorAlertWarnBg  lipgloss.Color
-	ColorAlertErrorBg lipgloss.Color
-	ColorAlertDeferBg lipgloss.Color
+	// States
+	ColorStateWorking   lipgloss.Color
+	ColorStateWorkingBg lipgloss.Color
+	ColorStateWaiting   lipgloss.Color
+	ColorStateWaitingBg lipgloss.Color
+	ColorStateDone      lipgloss.Color
+	ColorStateDoneBg    lipgloss.Color
+	ColorStateError     lipgloss.Color
+	ColorStateErrorBg   lipgloss.Color
+	ColorStateFlagged   lipgloss.Color
+	ColorStateFlaggedBg lipgloss.Color
+	ColorStateIdle      lipgloss.Color
+	ColorStateIdleBg    lipgloss.Color
 
-	IconAlertInfo  string
-	IconAlertWarn  string
-	IconAlertError string
-	IconAlertDefer string
-
-	ColorAlertDeferSticky   lipgloss.Color
-	ColorAlertDeferStickyBg lipgloss.Color
-	IconAlertDeferSticky    string
+	IconStateWorking string
+	IconStateWaiting string
+	IconStateDone    string
+	IconStateError   string
+	IconStateFlagged string
+	IconStateIdle    string
 
 	IconTmuxSession string
 	IconCfgSession  string
@@ -92,23 +94,25 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 		ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),
 		ColorGitAhead:  lipgloss.Color(tc.ColorGitAhead),
 
-		ColorAlertInfo:    lipgloss.Color(tc.ColorAlertInfo),
-		ColorAlertWarn:    lipgloss.Color(tc.ColorAlertWarn),
-		ColorAlertError:   lipgloss.Color(tc.ColorAlertError),
-		ColorAlertDefer:   lipgloss.Color(tc.ColorAlertDefer),
-		ColorAlertInfoBg:  lipgloss.Color(tc.ColorAlertInfoBg),
-		ColorAlertWarnBg:  lipgloss.Color(tc.ColorAlertWarnBg),
-		ColorAlertErrorBg: lipgloss.Color(tc.ColorAlertErrorBg),
-		ColorAlertDeferBg: lipgloss.Color(tc.ColorAlertDeferBg),
+		ColorStateWorking:   lipgloss.Color(tc.ColorStateWorking),
+		ColorStateWorkingBg: lipgloss.Color(tc.ColorStateWorkingBg),
+		ColorStateWaiting:   lipgloss.Color(tc.ColorStateWaiting),
+		ColorStateWaitingBg: lipgloss.Color(tc.ColorStateWaitingBg),
+		ColorStateDone:      lipgloss.Color(tc.ColorStateDone),
+		ColorStateDoneBg:    lipgloss.Color(tc.ColorStateDoneBg),
+		ColorStateError:     lipgloss.Color(tc.ColorStateError),
+		ColorStateErrorBg:   lipgloss.Color(tc.ColorStateErrorBg),
+		ColorStateFlagged:   lipgloss.Color(tc.ColorStateFlagged),
+		ColorStateFlaggedBg: lipgloss.Color(tc.ColorStateFlaggedBg),
+		ColorStateIdle:      lipgloss.Color(tc.ColorStateIdle),
+		ColorStateIdleBg:    lipgloss.Color(tc.ColorStateIdleBg),
 
-		IconAlertInfo:  tc.IconAlertInfo,
-		IconAlertWarn:  tc.IconAlertWarn,
-		IconAlertError: tc.IconAlertError,
-		IconAlertDefer: tc.IconAlertDefer,
-
-		ColorAlertDeferSticky:   lipgloss.Color(tc.ColorAlertDeferSticky),
-		ColorAlertDeferStickyBg: lipgloss.Color(tc.ColorAlertDeferStickyBg),
-		IconAlertDeferSticky:    tc.IconAlertDeferSticky,
+		IconStateWorking: tc.IconStateWorking,
+		IconStateWaiting: tc.IconStateWaiting,
+		IconStateDone:    tc.IconStateDone,
+		IconStateError:   tc.IconStateError,
+		IconStateFlagged: tc.IconStateFlagged,
+		IconStateIdle:    tc.IconStateIdle,
 
 		IconTmuxSession: tc.IconTmuxSession,
 		IconCfgSession:  tc.IconCfgSession,

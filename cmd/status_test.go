@@ -8,83 +8,85 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 )
 
-func TestCountAlertsByLevel(t *testing.T) {
-	alerts := []db.Alert{
-		{Level: "info"},
-		{Level: "info"},
-		{Level: "warn"},
-		{Level: "error"},
-		{Level: "error"},
-		{Level: "error"},
-		{Level: "defer"},
+func TestCountStatesByValue(t *testing.T) {
+	states := []db.ToolState{
+		{Value: db.StateWorking},
+		{Value: db.StateWaiting},
+		{Value: db.StateWaiting},
+		{Value: db.StateError},
+		{Value: db.StateFlagged},
+		{Value: db.StateFlagged},
+		{Value: db.StateDone},
+		{Value: db.StateDone},
+		{Value: db.StateDone},
+		{Value: db.StateIdle},
 	}
-	infos, warns, errors, defers := countAlertsByLevel(alerts)
-	if infos != 2 {
-		t.Errorf("infos: want 2, got %d", infos)
+	waiting, errs, flagged, done, idle := countStatesByValue(states)
+	if waiting != 2 {
+		t.Errorf("waiting: want 2, got %d", waiting)
 	}
-	if warns != 1 {
-		t.Errorf("warns: want 1, got %d", warns)
+	if errs != 1 {
+		t.Errorf("errors: want 1, got %d", errs)
 	}
-	if errors != 3 {
-		t.Errorf("errors: want 3, got %d", errors)
+	if flagged != 2 {
+		t.Errorf("flagged: want 2, got %d", flagged)
 	}
-	if defers != 1 {
-		t.Errorf("defers: want 1, got %d", defers)
+	if done != 3 {
+		t.Errorf("done: want 3, got %d", done)
 	}
-}
-
-func TestTmuxStatusParts_SeverityOrder(t *testing.T) {
-	cfg := config.Default()
-	out := tmuxStatusParts(1, 1, 1, 1, cfg)
-	errIdx := strings.Index(out, cfg.Theme.IconAlertError)
-	warnIdx := strings.Index(out, cfg.Theme.IconAlertWarn)
-	infoIdx := strings.Index(out, cfg.Theme.IconAlertInfo)
-	deferIdx := strings.Index(out, cfg.Theme.IconAlertDefer)
-	if errIdx == -1 || warnIdx == -1 || infoIdx == -1 || deferIdx == -1 {
-		t.Fatalf("missing icon in output: %q", out)
-	}
-	if !(errIdx < warnIdx && warnIdx < infoIdx && infoIdx < deferIdx) {
-		t.Errorf("wrong severity order in output: %q", out)
+	if idle != 1 {
+		t.Errorf("idle: want 1, got %d", idle)
 	}
 }
 
-func TestTmuxStatusParts_ZeroDefer(t *testing.T) {
+func TestTmuxStatusParts_NoStates(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 0, 1, 0, cfg)
-	if strings.Contains(out, cfg.Theme.IconAlertDefer) {
-		t.Errorf("defer icon should not appear when defers=0: %q", out)
+	out := tmuxStatusParts(0, 0, 0, 0, 0, cfg)
+	if !strings.Contains(out, cfg.Theme.IconStateDone) {
+		t.Errorf("expected done icon %q, got: %q", cfg.Theme.IconStateDone, out)
 	}
 }
 
-func TestFormatStatusOutput_PlainOrder(t *testing.T) {
+func TestTmuxStatusParts_OrderErrorFlaggedWaiting(t *testing.T) {
 	cfg := config.Default()
-	out := formatStatusOutput("plain", 1, 1, 1, 1, cfg)
-	errIdx := strings.Index(out, "errors=")
-	warnIdx := strings.Index(out, "warns=")
-	infoIdx := strings.Index(out, "infos=")
-	deferIdx := strings.Index(out, "defers=")
-	if !(errIdx < warnIdx && warnIdx < infoIdx && infoIdx < deferIdx) {
-		t.Errorf("wrong severity order in plain output: %q", out)
+	out := tmuxStatusParts(1, 1, 1, 0, 0, cfg)
+	errIdx := strings.Index(out, cfg.Theme.IconStateError)
+	flagIdx := strings.Index(out, cfg.Theme.IconStateFlagged)
+	waitIdx := strings.Index(out, cfg.Theme.IconStateWaiting)
+	if errIdx == -1 || flagIdx == -1 || waitIdx == -1 {
+		t.Fatalf("missing icon in: %q", out)
+	}
+	if !(errIdx < flagIdx && flagIdx < waitIdx) {
+		t.Errorf("expected order error < flagged < waiting, got positions %d %d %d", errIdx, flagIdx, waitIdx)
 	}
 }
 
-func TestFormatStatusOutput_PlainSkipsZeros(t *testing.T) {
+func TestTmuxStatusParts_WaitingOnly(t *testing.T) {
 	cfg := config.Default()
-	out := formatStatusOutput("plain", 1, 0, 0, 0, cfg)
-	if strings.Contains(out, "errors=") || strings.Contains(out, "warns=") || strings.Contains(out, "defers=") {
-		t.Errorf("plain output should skip zero counts: %q", out)
+	out := tmuxStatusParts(2, 0, 0, 0, 0, cfg)
+	if !strings.Contains(out, cfg.Theme.IconStateWaiting) {
+		t.Errorf("expected waiting icon: %q", out)
 	}
-	if !strings.Contains(out, "infos=1") {
-		t.Errorf("plain output missing infos=1: %q", out)
+	if strings.Contains(out, cfg.Theme.IconStateError) {
+		t.Errorf("unexpected error icon: %q", out)
 	}
 }
 
-func TestFormatStatusOutput_JSON(t *testing.T) {
+func TestTmuxStatusParts_FlaggedOnly(t *testing.T) {
 	cfg := config.Default()
-	out := formatStatusOutput("json", 1, 2, 3, 4, cfg)
-	// defers is intentionally omitted from JSON output; schema is stable
-	want := `{"infos":1,"warns":2,"errors":3}`
-	if out != want {
-		t.Errorf("json output: want %q, got %q", want, out)
+	out := tmuxStatusParts(0, 0, 1, 0, 0, cfg)
+	if !strings.Contains(out, cfg.Theme.IconStateFlagged) {
+		t.Errorf("expected flagged icon: %q", out)
+	}
+	if strings.Contains(out, cfg.Theme.IconStateDone) {
+		t.Errorf("unexpected done icon when states present: %q", out)
+	}
+}
+
+func TestTmuxStatusParts_UsesThemeColors(t *testing.T) {
+	cfg := config.Default()
+	out := tmuxStatusParts(0, 1, 0, 0, 0, cfg)
+	if !strings.Contains(out, cfg.Theme.ColorStateError) {
+		t.Errorf("expected error color %q in output: %q", cfg.Theme.ColorStateError, out)
 	}
 }

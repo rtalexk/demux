@@ -2,12 +2,12 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/db"
-	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -22,7 +22,7 @@ const (
 // Returns (filter, true) if the key matches a filter binding, ("", false) otherwise.
 func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
 	switch {
-	case key.Matches(msg, keys.AlertFilter.Binding):
+	case key.Matches(msg, keys.StateFilter.Binding):
 		return FilterPriority, true
 	case key.Matches(msg, keys.FilterTmux.Binding):
 		return FilterTmux, true
@@ -57,7 +57,7 @@ func (m Model) handleNormalModeDefault(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.sidebar.SetFilter(newFilter, sidebarVisibleRows)
 		if node := m.sidebar.Selected(); node != nil {
-			m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+			m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 			m.updateDetailFromSelection()
 		}
 		return m, nil
@@ -93,7 +93,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showYank = true
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
-		return m, tea.Batch(m.fetchPanes(), m.fetchAlerts(), m.scheduleProcFetch())
+		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.scheduleProcFetch())
 	default:
 		return m.handleNormalModeDefault(msg)
 	}
@@ -109,7 +109,7 @@ func (m Model) navigateSidebarInSearch(direction int) (Model, tea.Cmd) {
 		m.sidebar.CursorUp()
 	}
 	if node := m.sidebar.Selected(); node != nil {
-		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		m.updateDetailFromSelection()
 		return m, m.scheduleProcFetch()
@@ -185,16 +185,39 @@ func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 	return m, m.fetchPanes()
 }
 
-// switchLiveSession switches the tmux client to the best target within sessionName.
+// highestPriorityPaneTarget returns the Target of the highest-priority active
+// state for the given session, or "" when no qualifying state exists.
+// Only pane/window-level targets (those containing ":") are considered so the
+// caller can switch directly to the relevant pane. Idle states are excluded;
+// Done is included so the user can navigate to a recently-finished pane.
+// The target string is returned verbatim for tmux switch-client.
+func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string {
+	prefix := sessionName + ":"
+	best := ""
+	bestPri := -1
+	for _, st := range states {
+		if !strings.HasPrefix(st.Target, prefix) {
+			continue
+		}
+		if !st.Value.IsDisplayable() {
+			continue
+		}
+		if pri := st.Value.Priority(); pri > bestPri {
+			bestPri = pri
+			best = st.Target
+		}
+	}
+	return best
+}
+
+// switchLiveSession switches the tmux client to the given session, landing on
+// the pane with the highest-priority active state when one exists.
 func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
-	target := m.sidebar.BestAlertTargetInSession(sessionName, m.cfg.Sidebar.SwitchFocus)
+	target := highestPriorityPaneTarget(sessionName, m.states)
 	if target == "" {
 		target = sessionName
 	}
 	err := tmux.SwitchClient(target)
-	if err != nil && target != sessionName {
-		err = tmux.SwitchClient(sessionName)
-	}
 	if err == nil && m.popupMode {
 		return m, tea.Quit
 	}
@@ -214,7 +237,7 @@ func (m Model) launchOrSwitchSession(sess *session.Session, sessionName string) 
 func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 	var cmd tea.Cmd
 	if node := m.sidebar.Selected(); node != nil {
-		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		cmd = m.scheduleProcFetch()
 	}
@@ -262,13 +285,20 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.Esc.Binding):
 		m.sidebar.MoveToSessionLevel()
-	case key.Matches(msg, keys.Defer.Binding):
+	case key.Matches(msg, keys.FlagState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
-			return m, m.toggleDeferAlert(node.Session)
+			if st := m.sidebar.stateForSession(node.Session); st != nil && st.Value == db.StateFlagged {
+				return m, m.clearCurrentState(st.Target)
+			}
+			return m, m.flagCurrentState(node.Session)
 		}
-	case key.Matches(msg, keys.DeferSticky.Binding):
+	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
-			return m, m.toggleStickyDeferAlert(node.Session)
+			target := node.Session
+			if st := m.sidebar.stateForSession(node.Session); st != nil {
+				target = st.Target
+			}
+			return m.showClearConfirm(target), nil
 		}
 	}
 	return m.sidebarNavUpdate()
@@ -299,7 +329,7 @@ func (m Model) procListDimensions() (procH, detailH int) {
 // and schedules a delayed proc fetch.
 func (m Model) afterCollapse(procH int) (Model, tea.Cmd) {
 	if node := m.sidebar.Selected(); node != nil {
-		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.alertMap(), m.cfg)
+		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}
 	m.procGen++
 	m.procList.clampOffset(procH - 2)
@@ -396,6 +426,17 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return nm, cmd
 	case key.Matches(msg, keys.Esc.Binding):
 		m.focus = panelSidebar
+	case key.Matches(msg, keys.FlagState.Binding):
+		if target := m.procListStateTarget(); target != "" {
+			if st := activeStateFor(m.states, target); st != nil && st.Value == db.StateFlagged {
+				return m, m.clearCurrentState(target)
+			}
+			return m, m.flagCurrentState(target)
+		}
+	case key.Matches(msg, keys.ClearState.Binding):
+		if target := m.procListStateTarget(); target != "" {
+			return m.showClearConfirm(target), nil
+		}
 	case key.Matches(msg, keys.Kill.Binding):
 		// TODO: confirmation prompt
 	case key.Matches(msg, keys.Restart.Binding):
@@ -408,84 +449,65 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// deferAlertState summarizes a target's current alert for defer-toggle decisions.
-type deferAlertState struct {
-	hasDefer bool // target has a defer-level alert
-	isSticky bool // that defer alert is sticky
-	blocked  bool // target has a higher-severity (non-defer) alert
+// flagCurrentState sets the flagged state for the given target.
+func (m Model) flagCurrentState(target string) tea.Cmd {
+	d := m.db
+	msg := m.cfg.Tui.FlagDefaultMessage
+	return func() tea.Msg {
+		_ = d.StateSet(target, "", db.StateFlagged, msg, db.SourceUser, false, nil)
+		states, _ := d.StateList(0, "")
+		return statesMsg{states: states}
+	}
 }
 
-// deferStateFor scans m.alerts once and returns the defer state for target.
-func (m Model) deferStateFor(target string) deferAlertState {
-	var s deferAlertState
-	for _, a := range m.alerts {
-		if a.Target != target {
-			continue
-		}
-		if a.Level == db.LevelDefer {
-			s.hasDefer = true
-			s.isSticky = a.Sticky
-		} else {
-			s.blocked = true
-		}
+// procListStateTarget returns the state target string for the currently selected
+// proc list node: "session:wi" for window headers, "session:wi.pi" for pane/proc nodes.
+func (m Model) procListStateTarget() string {
+	node := m.procList.SelectedNode()
+	if node == nil {
+		return ""
 	}
-	return s
+	if node.IsWindowHeader {
+		return fmt.Sprintf("%s:%d", node.Pane.Session, node.Pane.WindowIndex)
+	}
+	return fmt.Sprintf("%s:%d.%d", node.Pane.Session, node.Pane.WindowIndex, node.Pane.PaneIndex)
 }
 
-func (m Model) toggleDeferAlert(target string) tea.Cmd {
-	s := m.deferStateFor(target)
-	if s.isSticky || s.blocked {
-		return nil
-	}
-	reason := m.cfg.Alerts.DeferDefaultReason
+// clearCurrentState clears the state for the given target.
+func (m Model) clearCurrentState(target string) tea.Cmd {
 	d := m.db
 	return func() tea.Msg {
-		if s.hasDefer {
-			if err := d.AlertRemove(target); err != nil {
-				demuxlog.Warn("defer remove failed", "err", err)
-			}
-		} else {
-			if err := d.AlertSet(target, reason, db.LevelDefer, false); err != nil {
-				demuxlog.Warn("defer set failed", "err", err)
-			}
-		}
-		alerts, err := d.AlertList()
-		if err != nil {
-			demuxlog.Warn("fetch alerts after defer toggle failed", "err", err)
-		}
-		return alertsMsg{alerts: alerts}
+		_ = d.StateClear(target)
+		states, _ := d.StateList(0, "")
+		return statesMsg{states: states}
 	}
 }
 
-func (m Model) toggleStickyDeferAlert(target string) tea.Cmd {
-	s := m.deferStateFor(target)
-	if s.blocked {
-		return nil
+// showClearConfirm opens the confirmation overlay for clearing the state of target.
+func (m Model) showClearConfirm(target string) Model {
+	st := activeStateFor(m.states, target)
+	maxTargetLen := m.width/2 - 12 // leave room for label + border + padding
+	if maxTargetLen < 20 {
+		maxTargetLen = 20
 	}
-	reason := m.cfg.Alerts.DeferDefaultReason
-	d := m.db
-	return func() tea.Msg {
-		var opErr error
-		switch {
-		case s.isSticky:
-			// Toggle off: remove sticky defer
-			opErr = d.AlertRemove(target)
-		case s.hasDefer:
-			// Upgrade existing non-sticky defer to sticky
-			opErr = d.AlertUpgradeToSticky(target)
-		default:
-			// Create new sticky defer
-			opErr = d.AlertSet(target, reason, db.LevelDefer, true)
+	body := "  target: " + truncateTarget(target, maxTargetLen)
+	if st != nil {
+		body += "\n  state:  " + st.Value.String()
+		if st.Message != "" {
+			msg := st.Message
+			if runes := []rune(msg); len(runes) > maxTargetLen {
+				msg = string(runes[:maxTargetLen-1]) + "…"
+			}
+			body += "\n          " + msg
 		}
-		if opErr != nil {
-			demuxlog.Warn("sticky defer toggle failed", "err", opErr)
-		}
-		alerts, err := d.AlertList()
-		if err != nil {
-			demuxlog.Warn("fetch alerts after sticky defer toggle failed", "err", err)
-		}
-		return alertsMsg{alerts: alerts}
 	}
+	m.confirm = ConfirmModel{
+		prompt: "Clear state?",
+		body:   body,
+	}
+	m.confirmCmd = m.clearCurrentState(target)
+	m.showConfirm = true
+	return m
 }
 
 func (m Model) openSidebarSelected() (Model, tea.Cmd) {

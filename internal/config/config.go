@@ -76,22 +76,25 @@ type ThemeConfig struct {
 	ColorGitBehind string `toml:"color_git_behind"`
 	ColorGitAhead  string `toml:"color_git_ahead"`
 
-	ColorAlertInfo          string `toml:"color_alert_info"`
-	ColorAlertWarn          string `toml:"color_alert_warn"`
-	ColorAlertError         string `toml:"color_alert_error"`
-	ColorAlertDefer         string `toml:"color_alert_defer"`
-	ColorAlertInfoBg        string `toml:"color_alert_info_bg"`
-	ColorAlertWarnBg        string `toml:"color_alert_warn_bg"`
-	ColorAlertErrorBg       string `toml:"color_alert_error_bg"`
-	ColorAlertDeferBg       string `toml:"color_alert_defer_bg"`
-	ColorAlertDeferSticky   string `toml:"color_alert_defer_sticky"`
-	ColorAlertDeferStickyBg string `toml:"color_alert_defer_sticky_bg"`
+	ColorStateWorking   string `toml:"color_state_working"`
+	ColorStateWorkingBg string `toml:"color_state_working_bg"`
+	ColorStateWaiting   string `toml:"color_state_waiting"`
+	ColorStateWaitingBg string `toml:"color_state_waiting_bg"`
+	ColorStateDone      string `toml:"color_state_done"`
+	ColorStateDoneBg    string `toml:"color_state_done_bg"`
+	ColorStateError     string `toml:"color_state_error"`
+	ColorStateErrorBg   string `toml:"color_state_error_bg"`
+	ColorStateFlagged   string `toml:"color_state_flagged"`
+	ColorStateFlaggedBg string `toml:"color_state_flagged_bg"`
+	ColorStateIdle      string `toml:"color_state_idle"`
+	ColorStateIdleBg    string `toml:"color_state_idle_bg"`
 
-	IconAlertInfo        string `toml:"icon_alert_info"`
-	IconAlertWarn        string `toml:"icon_alert_warn"`
-	IconAlertError       string `toml:"icon_alert_error"`
-	IconAlertDefer       string `toml:"icon_alert_defer"`
-	IconAlertDeferSticky string `toml:"icon_alert_defer_sticky"`
+	IconStateWorking string `toml:"icon_state_working"`
+	IconStateWaiting string `toml:"icon_state_waiting"`
+	IconStateDone    string `toml:"icon_state_done"`
+	IconStateError   string `toml:"icon_state_error"`
+	IconStateFlagged string `toml:"icon_state_flagged"`
+	IconStateIdle    string `toml:"icon_state_idle"`
 
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
@@ -138,8 +141,10 @@ type LogConfig struct {
 	Level string `toml:"level"` // off|error|warn|info|debug
 }
 
-type AlertsConfig struct {
-	DeferDefaultReason string `toml:"defer_default_reason"`
+type TuiConfig struct {
+	AttentionFilterIncludeWorking bool   `toml:"attention_filter_include_working"`
+	FlagDefaultMessage            string `toml:"flag_default_message"`
+	DoneIdleAfterSecs             int    `toml:"done_idle_after_secs"` // 0 = disabled
 }
 
 type Config struct {
@@ -152,7 +157,7 @@ type Config struct {
 	ProcessList       ProcessListConfig `toml:"process_list"`
 	StatusBar         StatusBarConfig   `toml:"status_bar"`
 	Log               LogConfig         `toml:"log"`
-	Alerts            AlertsConfig      `toml:"alerts"`
+	Tui               TuiConfig         `toml:"tui"`
 	Git               GitConfig         `toml:"git"`
 	Theme             ThemeConfig       `toml:"theme"`
 	PathAliases       []PathAlias       `toml:"path_aliases"`
@@ -167,7 +172,7 @@ func Default() Config {
 		Mode:              "full",
 		Sidebar: SidebarConfig{
 			DefaultFilter: "t",
-			FocusOnOpen:   "alert_session",
+			FocusOnOpen:   "",
 			SearchSort:    "score",
 			Sort:          []string{"priority", "last_seen", "alphabetical"},
 			SwitchFocus:   "severity",
@@ -176,8 +181,10 @@ func Default() Config {
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
-		Alerts: AlertsConfig{
-			DeferDefaultReason: "Come back",
+		Tui: TuiConfig{
+			AttentionFilterIncludeWorking: false,
+			FlagDefaultMessage:            "Come back",
+			DoneIdleAfterSecs:             60,
 		},
 		Git: GitConfig{
 			Enabled:         true,
@@ -211,22 +218,25 @@ func Default() Config {
 			ColorGitBehind: "#74c7ec",
 			ColorGitAhead:  "#a6e3a1",
 
-			ColorAlertInfo:          "#89b4fa",
-			ColorAlertWarn:          "#f9e2af",
-			ColorAlertError:         "#f38ba8",
-			ColorAlertDefer:         "#b4befe",
-			ColorAlertInfoBg:        "#1a2a4d",
-			ColorAlertWarnBg:        "#3d3500",
-			ColorAlertErrorBg:       "#3d1020",
-			ColorAlertDeferBg:       "#1e1e2e",
-			ColorAlertDeferSticky:   "#b4befe",
-			ColorAlertDeferStickyBg: "#1e1e2e",
+			ColorStateWorking:   "#7f849c",
+			ColorStateWorkingBg: "#1e1e2e",
+			ColorStateWaiting:   "#f9e2af",
+			ColorStateWaitingBg: "#3d3500",
+			ColorStateDone:      "#a6e3a1",
+			ColorStateDoneBg:    "#1a3a1a",
+			ColorStateError:     "#f38ba8",
+			ColorStateErrorBg:   "#3d1020",
+			ColorStateFlagged:   "#cba6f7",
+			ColorStateFlaggedBg: "#2a1a4d",
+			ColorStateIdle:      "#89dceb",
+			ColorStateIdleBg:    "#0d2530",
 
-			IconAlertInfo:        "ℹ️",
-			IconAlertWarn:        "⚠️",
-			IconAlertError:       "🚨",
-			IconAlertDefer:       "🔖",
-			IconAlertDeferSticky: "🔖",
+			IconStateWorking: "⟳",
+			IconStateWaiting: "●",
+			IconStateDone:    "✔",
+			IconStateError:   "✗",
+			IconStateFlagged: "🔖",
+			IconStateIdle:    "○",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

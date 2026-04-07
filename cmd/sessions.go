@@ -34,13 +34,13 @@ func init() {
 }
 
 type sessionRow struct {
-	session, windows, procs, alerts, status string
-	branch, dirty, ahead, behind            string
-	includeGit, gitOnly                     bool
+	session, windows, procs, state, status string
+	branch, dirty, ahead, behind           string
+	includeGit, gitOnly                    bool
 }
 
 func (r sessionRow) Fields() []string {
-	base := []string{r.session, r.windows, r.procs, r.alerts, r.status}
+	base := []string{r.session, r.windows, r.procs, r.state, r.status}
 	gitCols := []string{r.branch, r.dirty, r.ahead, r.behind}
 	if r.gitOnly {
 		return append([]string{r.session}, gitCols...)
@@ -111,20 +111,24 @@ func fillSessionGitFields(row *sessionRow, sessionName string, windows map[int][
 	row.behind = fmt.Sprint(info.Behind)
 }
 
-func buildSessionRows(grouped map[string]map[int][]tmux.Pane, sessionProcCount map[string]int, alertsBySession map[string][]db.Alert, gitResults map[string]git.Info, cfg config.Config, includeGit, gitOnly bool) []format.Row {
+func buildSessionRows(grouped map[string]map[int][]tmux.Pane, sessionProcCount map[string]int, statesBySession map[string]db.ToolState, gitResults map[string]git.Info, cfg config.Config, includeGit, gitOnly bool) []format.Row {
 	var rows []format.Row
 	for sessionName, windows := range grouped {
 		if isIgnored(cfg, sessionName) {
 			continue
 		}
-		sessionAlerts := alertsBySession[sessionName]
-		status := resolveSessionStatus(sessionAlerts)
+		sessionState := statesBySession[sessionName]
+		stateStr := ""
+		if sessionState.Value != 0 {
+			stateStr = sessionState.Value.String()
+		}
+		status := resolveSessionStatus(statesBySession)
 
 		row := sessionRow{
 			session:    sessionName,
 			windows:    fmt.Sprint(len(windows)),
 			procs:      fmt.Sprint(sessionProcCount[sessionName]),
-			alerts:     fmt.Sprint(len(sessionAlerts)),
+			state:      stateStr,
 			status:     status,
 			includeGit: includeGit,
 			gitOnly:    gitOnly,
@@ -139,15 +143,19 @@ func buildSessionRows(grouped map[string]map[int][]tmux.Pane, sessionProcCount m
 	return rows
 }
 
-func buildAlertsBySession(alerts []db.Alert) map[string][]db.Alert {
-	alertsBySession := map[string][]db.Alert{}
-	for _, a := range alerts {
-		parts := strings.SplitN(a.Target, ":", 2)
+func buildStatesBySession(states []db.ToolState) map[string]db.ToolState {
+	out := map[string]db.ToolState{}
+	for _, st := range states {
+		parts := strings.SplitN(st.Target, ":", 2)
 		if len(parts) > 0 {
-			alertsBySession[parts[0]] = append(alertsBySession[parts[0]], a)
+			sessName := parts[0]
+			// Keep highest-priority state per session
+			if existing, ok := out[sessName]; !ok || st.Value.Priority() > existing.Value.Priority() {
+				out[sessName] = st
+			}
 		}
 	}
-	return alertsBySession
+	return out
 }
 
 func runSessions(cmd *cobra.Command, _ []string) error {
@@ -164,14 +172,14 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	defer database.Close()
-	alerts, err := database.AlertList()
+	states, err := database.StateList(0, "")
 	if err != nil {
-		demuxlog.Warn("failed to list alerts", "err", err)
+		demuxlog.Warn("failed to list states", "err", err)
 	}
 
-	alertsBySession := buildAlertsBySession(alerts)
+	statesBySession := buildStatesBySession(states)
 
-	headers := []string{"SESSION", "WINDOWS", "PROCS", "ALERTS", "STATUS"}
+	headers := []string{"SESSION", "WINDOWS", "PROCS", "STATE", "STATUS"}
 	if sessionListGitOnly {
 		headers = []string{"SESSION", "BRANCH", "DIRTY", "AHEAD", "BEHIND"}
 	} else if sessionListGit {
@@ -195,7 +203,7 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 	}
 	gitResults := git.FetchConcurrent(gitWork, cfg.Git.TimeoutMs)
 
-	rows := buildSessionRows(grouped, sessionProcCount, alertsBySession, gitResults, cfg, sessionListGit, sessionListGitOnly)
+	rows := buildSessionRows(grouped, sessionProcCount, statesBySession, gitResults, cfg, sessionListGit, sessionListGitOnly)
 
 	isTTYVal := isatty.IsTerminal(os.Stdout.Fd())
 	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTYVal))
@@ -211,17 +219,19 @@ func isIgnored(cfg config.Config, name string) bool {
 	return false
 }
 
-func resolveSessionStatus(alerts []db.Alert) string {
-	status := "ok"
-	for _, a := range alerts {
-		switch a.Level {
-		case "error":
-			status = "error"
-		case "warn":
-			if status != "error" {
-				status = "warn"
-			}
+func resolveSessionStatus(statesBySession map[string]db.ToolState) string {
+	for _, st := range statesBySession {
+		switch st.Value {
+		case db.StateError:
+			return "error"
+		case db.StateFlagged:
+			return "flagged"
 		}
 	}
-	return status
+	for _, st := range statesBySession {
+		if st.Value == db.StateWaiting {
+			return "waiting"
+		}
+	}
+	return "ok"
 }

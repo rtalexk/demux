@@ -267,7 +267,7 @@ func TestRenderSession_truncatedNameWithIndicators_noOverflow(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "hf-garmin-credentials-integration", IsLive: true, Activity: activity},
 		},
-		alerts:  map[string]db.Alert{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg:     config.Config{Sidebar: config.SidebarConfig{ShowLastSeen: true}},
 	}
@@ -377,55 +377,6 @@ func TestSessionCount_Empty(t *testing.T) {
 	}
 }
 
-// --- newestSessionAlert ---
-
-func TestNewestSessionAlert_NoAlerts(t *testing.T) {
-	s := SidebarModel{alerts: map[string]db.Alert{}}
-	if !s.newestSessionAlert("sess").IsZero() {
-		t.Error("expected zero time when no alerts for session")
-	}
-}
-
-func TestNewestSessionAlert_IgnoresDifferentSession(t *testing.T) {
-	t1 := time.Now()
-	s := SidebarModel{
-		alerts: map[string]db.Alert{
-			"other:0": {Target: "other:0", CreatedAt: t1},
-		},
-	}
-	if !s.newestSessionAlert("sess").IsZero() {
-		t.Error("expected zero time — alert belongs to a different session")
-	}
-}
-
-func TestNewestSessionAlert_ReturnsNewestAmongWindows(t *testing.T) {
-	t1 := time.Now().Add(-10 * time.Second)
-	t2 := time.Now()
-	s := SidebarModel{
-		alerts: map[string]db.Alert{
-			"sess:0.0": {Target: "sess:0.0", CreatedAt: t1},
-			"sess:1.0": {Target: "sess:1.0", CreatedAt: t2},
-		},
-	}
-	got := s.newestSessionAlert("sess")
-	if !got.Equal(t2) {
-		t.Errorf("expected newest alert time %v, got %v", t2, got)
-	}
-}
-
-func TestNewestSessionAlert_MatchesSessionLevelTarget(t *testing.T) {
-	t1 := time.Now()
-	s := SidebarModel{
-		alerts: map[string]db.Alert{
-			"sess": {Target: "sess", CreatedAt: t1},
-		},
-	}
-	got := s.newestSessionAlert("sess")
-	if !got.Equal(t1) {
-		t.Errorf("expected %v, got %v", t1, got)
-	}
-}
-
 // --- rebuildNodes sorting ---
 
 // TestRebuildNodes_ZeroResultSearch is a regression test for the bug where a
@@ -435,7 +386,7 @@ func TestNewestSessionAlert_MatchesSessionLevelTarget(t *testing.T) {
 func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta", "gamma"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 		// Non-nil empty slice = active search with no matches.
 		queryResult: query.Result{Sessions: []query.SessionMatch{}},
 	}
@@ -448,7 +399,7 @@ func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
 func TestRender_NoResultsHint(t *testing.T) {
 	s := SidebarModel{
 		sessions:    makeSessions("alpha", "beta"),
-		alerts:      map[string]db.Alert{},
+		states:      map[string]db.ToolState{},
 		queryResult: query.Result{Sessions: []query.SessionMatch{}},
 	}
 	s.rebuildNodes()
@@ -461,7 +412,7 @@ func TestRender_NoResultsHint(t *testing.T) {
 func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("charlie", "alpha", "beta"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 	}
 	s.rebuildNodes()
 	var got []string
@@ -474,49 +425,26 @@ func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 	}
 }
 
-func TestRebuildNodes_SessionWithAlertSortsFirst(t *testing.T) {
-	t1 := time.Now()
+func TestRebuildNodes_SessionWithStateSortsFirst(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		alerts: map[string]db.Alert{
-			"beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
+		states: map[string]db.ToolState{
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 	}
 	s.rebuildNodes()
 	if len(s.nodes) == 0 || s.nodes[0].Session != "beta" {
-		t.Errorf("expected beta (has alert) first, got %v", s.nodes[0].Session)
+		t.Errorf("expected beta (has state) first, got %v", s.nodes[0].Session)
 	}
 }
 
-func TestRebuildNodes_NewestAlertSessionSortsFirst(t *testing.T) {
-	t1 := time.Now().Add(-time.Minute)
-	t2 := time.Now()
-	s := SidebarModel{
-		sessions: makeSessions("alpha", "beta"),
-		alerts: map[string]db.Alert{
-			"alpha:0.0": {Target: "alpha:0.0", CreatedAt: t1},
-			"beta:0.0":  {Target: "beta:0.0", CreatedAt: t2},
-		},
-	}
-	s.rebuildNodes()
-	if len(s.nodes) == 0 || s.nodes[0].Session != "beta" {
-		t.Errorf("expected beta (newer alert) first, got %v", s.nodes[0].Session)
-	}
-}
-
-// TestRebuildNodes_PrioritySort_SeverityBeatsRecency is the regression test for
-// the bug where a newer info alert sorted before an older warn alert. Severity
-// must be compared first; recency is only a tiebreaker within the same level.
-func TestRebuildNodes_PrioritySort_SeverityBeatsRecency(t *testing.T) {
-	// dm-main has a newer info alert; vem-main has an older warn alert.
-	// warn > info, so vem-main must sort first regardless of timestamp.
-	older := time.Now().Add(-time.Minute)
-	newer := time.Now()
+func TestRebuildNodes_HigherPriorityStateSortsFirst(t *testing.T) {
+	// error > working, so vem-main (error) must sort before dm-main (working)
 	s := SidebarModel{
 		sessions: makeSessions("dm-main", "vem-main"),
-		alerts: map[string]db.Alert{
-			"dm-main:0.0":  {Target: "dm-main:0.0", Level: "info", CreatedAt: newer},
-			"vem-main:0.0": {Target: "vem-main:0.0", Level: "warn", CreatedAt: older},
+		states: map[string]db.ToolState{
+			"dm-main:0.0":  {Target: "dm-main:0.0", Value: db.StateWorking},
+			"vem-main:0.0": {Target: "vem-main:0.0", Value: db.StateError},
 		},
 	}
 	s.rebuildNodes()
@@ -524,33 +452,7 @@ func TestRebuildNodes_PrioritySort_SeverityBeatsRecency(t *testing.T) {
 		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
 	}
 	if s.nodes[0].Session != "vem-main" {
-		t.Errorf("expected vem-main (warn) first, got %q", s.nodes[0].Session)
-	}
-}
-
-// TestRebuildNodes_PrioritySort_TiebreakerIgnoresLowerLevelAlert is the
-// regression test for the bug where a session with [warn (old), defer (new)]
-// sorted before a session with [warn (recent)] because the defer timestamp was
-// used as the tiebreaker instead of restricting to the matching severity.
-func TestRebuildNodes_PrioritySort_TiebreakerIgnoresLowerLevelAlert(t *testing.T) {
-	// hf has a warn (9m) and a newer defer (11s). dm has a warn (7m).
-	// Both highest severities are equal (warn). Tiebreaker must compare only
-	// the warn timestamps: dm's warn (7m) is more recent, so dm sorts first.
-	now := time.Now()
-	s := SidebarModel{
-		sessions: makeSessions("hf-add-to-home-screen", "dm-main"),
-		alerts: map[string]db.Alert{
-			"hf-add-to-home-screen:0.1": {Target: "hf-add-to-home-screen:0.1", Level: "warn", CreatedAt: now.Add(-9 * time.Minute)},
-			"hf-add-to-home-screen":     {Target: "hf-add-to-home-screen", Level: "defer", CreatedAt: now.Add(-11 * time.Second)},
-			"dm-main:0.1":               {Target: "dm-main:0.1", Level: "warn", CreatedAt: now.Add(-7 * time.Minute)},
-		},
-	}
-	s.rebuildNodes()
-	if len(s.nodes) < 2 {
-		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
-	}
-	if s.nodes[0].Session != "dm-main" {
-		t.Errorf("expected dm-main (newer warn) first, got %q", s.nodes[0].Session)
+		t.Errorf("expected vem-main (error) first, got %q", s.nodes[0].Session)
 	}
 }
 
@@ -564,7 +466,7 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true, Activity: older},
 			{DisplayName: "beta", IsLive: true, Activity: now},
 		},
-		alerts: map[string]db.Alert{},
+		states: map[string]db.ToolState{},
 		cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
 	}
 	s.rebuildNodes()
@@ -586,7 +488,7 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true, Activity: now},
 			{DisplayName: "beta", IsLive: true, Activity: now},
 		},
-		alerts: map[string]db.Alert{},
+		states: map[string]db.ToolState{},
 		// all same activity time → falls through to alpha
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
 	}
@@ -602,11 +504,10 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
 }
 
 func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
-	t1 := time.Now()
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		alerts: map[string]db.Alert{
-			"beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
+		states: map[string]db.ToolState{
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -624,7 +525,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 func TestSetFilter_AllFiltersToggle(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 		filter:   FilterTmux,
 	}
@@ -657,11 +558,10 @@ func TestSetFilter_AllFiltersToggle(t *testing.T) {
 }
 
 func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
-	t1 := time.Now()
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		alerts: map[string]db.Alert{
-			"beta:0.0": {Target: "beta:0.0", CreatedAt: t1},
+		states: map[string]db.ToolState{
+			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -678,7 +578,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("a"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	if s.ActiveFilter() == FilterPriority {
@@ -693,13 +593,67 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("sess"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	s.cursor = 5
 	s.SetFilter(FilterPriority, 10)
 	if s.cursor != 0 {
 		t.Errorf("expected cursor clamped to 0 on empty node list, got %d", s.cursor)
+	}
+}
+
+// --- FirstStateSession ---
+
+func TestFirstStateSession_ReturnsFirstWithState(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"gamma": {Target: "gamma", Value: db.StateWaiting},
+		},
+		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "gamma" {
+		t.Errorf("FirstStateSession() = %q, want %q", got, "gamma")
+	}
+}
+
+func TestFirstStateSession_PrioritySort(t *testing.T) {
+	// With priority sort, the session with the highest-priority state comes first.
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"alpha": {Target: "alpha", Value: db.StateIdle},
+			"beta":  {Target: "beta", Value: db.StateError},
+		},
+		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"priority", "alphabetical"}}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "beta" {
+		t.Errorf("FirstStateSession() = %q, want \"beta\" (error > idle)", got)
+	}
+}
+
+func TestFirstStateSession_NoneReturnsEmpty(t *testing.T) {
+	s := SidebarModel{
+		sessions: makeSessions("alpha", "beta"),
+		states:   map[string]db.ToolState{},
+		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
+	}
+	s.rebuildNodes()
+	got := s.FirstStateSession()
+	if got != "" {
+		t.Errorf("FirstStateSession() = %q, want empty string", got)
 	}
 }
 
@@ -711,7 +665,7 @@ func TestFocusNode_SessionLevel(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true},
 			{DisplayName: "beta", IsLive: true},
 		},
-		alerts: map[string]db.Alert{},
+		states: map[string]db.ToolState{},
 		cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
 	}
 	s.rebuildNodes()
@@ -725,179 +679,12 @@ func TestFocusNode_SessionLevel(t *testing.T) {
 func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha"),
-		alerts:   map[string]db.Alert{},
+		states:   map[string]db.ToolState{},
 	}
 	s.rebuildNodes()
 	s.FocusNode("nonexistent", 20)
 	if s.cursor != 0 {
 		t.Errorf("expected cursor=0, got %d", s.cursor)
-	}
-}
-
-// --- FocusFirstAlertSession ---
-
-func TestFocusFirstAlertSession_MovesToAlertedSession(t *testing.T) {
-	t1 := time.Now()
-	s := SidebarModel{
-		sessions: makeSessions("alpha", "beta"),
-		alerts: map[string]db.Alert{
-			"beta:0.0": {Target: "beta:0.0", Level: "warn", CreatedAt: t1},
-		},
-		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-	}
-	s.rebuildNodes()
-	s.FocusFirstAlertSession(20)
-	node := s.Selected()
-	if node == nil || node.Session != "beta" {
-		t.Errorf("expected session node beta, got %+v", node)
-	}
-}
-
-func TestFocusFirstAlertSession_NoAlerts_LeavesCursorAt0(t *testing.T) {
-	s := SidebarModel{
-		sessions: makeSessions("alpha", "beta"),
-		alerts:   map[string]db.Alert{},
-	}
-	s.rebuildNodes()
-	s.FocusFirstAlertSession(20)
-	if s.cursor != 0 {
-		t.Errorf("expected cursor=0, got %d", s.cursor)
-	}
-}
-
-// --- FocusFirstAlertSession returns bool ---
-
-func TestFocusFirstAlertSession_ReturnsTrue_WhenFound(t *testing.T) {
-	t1 := time.Now()
-	s := SidebarModel{
-		sessions: makeSessions("alpha"),
-		alerts: map[string]db.Alert{
-			"alpha:0.0": {Target: "alpha:0.0", Level: "warn", CreatedAt: t1},
-		},
-		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
-	}
-	s.rebuildNodes()
-	found := s.FocusFirstAlertSession(20)
-	if !found {
-		t.Error("expected found=true")
-	}
-}
-
-func TestFocusFirstAlertSession_ReturnsFalse_WhenNotFound(t *testing.T) {
-	s := SidebarModel{
-		sessions: makeSessions("alpha"),
-		alerts:   map[string]db.Alert{},
-	}
-	s.rebuildNodes()
-	found := s.FocusFirstAlertSession(20)
-	if found {
-		t.Error("expected found=false when no alerted sessions")
-	}
-}
-
-func makeSidebarWithAlerts(alerts []db.Alert) SidebarModel {
-	s := SidebarModel{}
-	s.alerts = make(map[string]db.Alert, len(alerts))
-	for _, a := range alerts {
-		s.alerts[a.Target] = a
-	}
-	return s
-}
-
-func TestBestAlertTargetInSession_NoAlerts(t *testing.T) {
-	s := makeSidebarWithAlerts(nil)
-	if got := s.BestAlertTargetInSession("work", "severity"); got != "" {
-		t.Errorf("expected empty, got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_SingleAlert(t *testing.T) {
-	now := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelWarn, CreatedAt: now},
-	})
-	if got := s.BestAlertTargetInSession("work", "severity"); got != "work:1.0" {
-		t.Errorf("expected \"work:1.0\", got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_SeverityPriority(t *testing.T) {
-	now := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelWarn, CreatedAt: now.Add(-time.Minute)},
-		{Target: "work:2.0", Level: db.LevelError, CreatedAt: now.Add(-2 * time.Minute)},
-		{Target: "work:3.0", Level: db.LevelInfo, CreatedAt: now},
-	})
-	if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
-		t.Errorf("expected \"work:2.0\" (highest severity), got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_SeverityTiebreaker(t *testing.T) {
-	base := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelError, CreatedAt: base.Add(-time.Minute)},
-		{Target: "work:2.0", Level: db.LevelError, CreatedAt: base},
-	})
-	// equal severity — newest wins
-	if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
-		t.Errorf("expected \"work:2.0\" (newer tiebreaker), got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_NewestPriority(t *testing.T) {
-	base := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelError, CreatedAt: base.Add(-time.Minute)},
-		{Target: "work:2.0", Level: db.LevelInfo, CreatedAt: base},
-	})
-	if got := s.BestAlertTargetInSession("work", "newest"); got != "work:2.0" {
-		t.Errorf("expected \"work:2.0\" (newest), got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_OldestPriority(t *testing.T) {
-	base := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelInfo, CreatedAt: base.Add(-time.Minute)},
-		{Target: "work:2.0", Level: db.LevelError, CreatedAt: base},
-	})
-	if got := s.BestAlertTargetInSession("work", "oldest"); got != "work:1.0" {
-		t.Errorf("expected \"work:1.0\" (oldest), got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_OtherSessionIgnored(t *testing.T) {
-	now := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "other:1.0", Level: db.LevelError, CreatedAt: now},
-		{Target: "work:2.0", Level: db.LevelInfo, CreatedAt: now.Add(-time.Minute)},
-	})
-	if got := s.BestAlertTargetInSession("work", "severity"); got != "work:2.0" {
-		t.Errorf("expected only work session alert, got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_UnknownPriorityFallsBackToSeverity(t *testing.T) {
-	base := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelWarn, CreatedAt: base.Add(-time.Minute)},
-		{Target: "work:2.0", Level: db.LevelError, CreatedAt: base.Add(-2 * time.Minute)},
-	})
-	if got := s.BestAlertTargetInSession("work", "bogus"); got != "work:2.0" {
-		t.Errorf("expected severity fallback to return \"work:2.0\", got %q", got)
-	}
-}
-
-func TestBestAlertTargetInSession_DefaultPriority(t *testing.T) {
-	now := time.Now()
-	s := makeSidebarWithAlerts([]db.Alert{
-		{Target: "work:1.0", Level: db.LevelError, CreatedAt: now},
-		{Target: "work:2.0", Level: db.LevelWarn, CreatedAt: now.Add(-time.Minute)},
-	})
-	// "default" must return "" regardless of what alerts exist
-	if got := s.BestAlertTargetInSession("work", "default"); got != "" {
-		t.Errorf("expected \"\" for default priority, got %q", got)
 	}
 }
 
@@ -952,8 +739,8 @@ func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
 			{DisplayName: "alerted", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
-		alerts: map[string]db.Alert{
-			"alerted": {Target: "alerted", Level: "warn", CreatedAt: time.Now()},
+		states: map[string]db.ToolState{
+			"alerted": {Target: "alerted", Value: db.StateError},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -961,6 +748,81 @@ func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
 	s.rebuildNodes()
 	if len(s.nodes) != 1 || s.nodes[0].Session != "alerted" {
 		t.Errorf("FilterPriority should show only alerted sessions, got %v", s.nodes)
+	}
+}
+
+func TestFilterPriority_IncludesFlagged(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "flagged", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"flagged": {Target: "flagged", Value: db.StateFlagged},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	if len(s.nodes) != 1 || s.nodes[0].Session != "flagged" {
+		t.Errorf("FilterPriority must include Flagged sessions, got %v", s.nodes)
+	}
+}
+
+func TestFilterPriority_ExcludesDone(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "done-sess", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"done-sess": {Target: "done-sess", Value: db.StateDone},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	for _, n := range s.nodes {
+		if n.Session == "done-sess" {
+			t.Error("FilterPriority must NOT include Done sessions")
+		}
+	}
+}
+
+func TestFilterPriority_IncludesWorkingWhenFlagSet(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "working-sess", IsLive: true},
+			{DisplayName: "clean", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{Tui: config.TuiConfig{AttentionFilterIncludeWorking: true}},
+	}
+	s.rebuildNodes()
+	if len(s.nodes) != 1 || s.nodes[0].Session != "working-sess" {
+		t.Errorf("FilterPriority with AttentionFilterIncludeWorking must include Working sessions, got %v", s.nodes)
+	}
+}
+
+func TestFilterPriority_ExcludesWorkingByDefault(t *testing.T) {
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "working-sess", IsLive: true},
+		},
+		states: map[string]db.ToolState{
+			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		},
+		filter: FilterPriority,
+		cfg:    config.Config{},
+	}
+	s.rebuildNodes()
+	for _, n := range s.nodes {
+		if n.Session == "working-sess" {
+			t.Error("FilterPriority must NOT include Working sessions by default")
+		}
 	}
 }
 
@@ -1093,7 +955,7 @@ func TestRenderSession_ShowsLastSeen(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myses", IsLive: true, Activity: activity},
 		},
-		alerts:  map[string]db.Alert{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: true},
@@ -1117,7 +979,7 @@ func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "xyz", IsLive: true, Activity: activity},
 		},
-		alerts:  map[string]db.Alert{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: false},
@@ -1201,23 +1063,20 @@ func TestFormatAge(t *testing.T) {
 	}
 }
 
-func TestAlertSeverity(t *testing.T) {
-	tests := []struct {
-		level string
-		want  int
-	}{
-		{"defer", 0},
-		{"info", 1},
-		{"warn", 2},
-		{"error", 3},
-		{"unknown", 0},
+func TestStateValue_Priority_InTUI(t *testing.T) {
+	// Verify the priority ordering used by sorting and filtering in the TUI.
+	// The canonical implementation lives in db.StateValue.Priority().
+	if db.StateWaiting.Priority() <= db.StateError.Priority() {
+		t.Error("Waiting must have higher priority than Error")
 	}
-	for _, tt := range tests {
-		t.Run(tt.level, func(t *testing.T) {
-			if got := alertSeverity(tt.level); got != tt.want {
-				t.Errorf("alertSeverity(%q) = %d, want %d", tt.level, got, tt.want)
-			}
-		})
+	if db.StateError.Priority() <= db.StateDone.Priority() {
+		t.Error("Error must have higher priority than Done")
+	}
+	if db.StateDone.Priority() <= db.StateFlagged.Priority() {
+		t.Error("Done must have higher priority than Flagged")
+	}
+	if db.StateFlagged.Priority() <= db.StateWorking.Priority() {
+		t.Error("Flagged must have higher priority than Working")
 	}
 }
 

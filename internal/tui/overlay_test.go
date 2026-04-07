@@ -3,11 +3,6 @@ package tui
 import (
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/rtalexk/demux/internal/config"
-	"github.com/rtalexk/demux/internal/db"
-	"github.com/rtalexk/demux/internal/tmux"
 )
 
 // ── overlayCenter ─────────────────────────────────────────────────────────────
@@ -77,111 +72,5 @@ func TestOverlayCenter_FgTallerThanBgClampsStartYToZero(t *testing.T) {
 	}
 	if lines[0] != "backXround" {
 		t.Errorf("expected backXround, got %q", lines[0])
-	}
-}
-
-// ── pruneStaleAlerts ──────────────────────────────────────────────────────────
-
-func newPruneTestModel(t *testing.T) Model {
-	t.Helper()
-	d, err := db.Open(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { d.Close() })
-	return New(config.Default(), d)
-}
-
-func TestPruneStaleAlerts_NilWhenNoPanes(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.panes = nil
-	m.alerts = []db.Alert{{Target: "work:0.0", CreatedAt: time.Now()}}
-	if cmd := m.pruneStaleAlerts(); cmd != nil {
-		t.Error("expected nil when panes list is empty")
-	}
-}
-
-func TestPruneStaleAlerts_NilWhenAllAlertsAreLive(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
-	m.alerts = []db.Alert{
-		{Target: "work:0.0", CreatedAt: time.Now()}, // live pane
-		{Target: "work:0", CreatedAt: time.Now()},   // live window
-		{Target: "work", CreatedAt: time.Now()},     // live session
-	}
-	if cmd := m.pruneStaleAlerts(); cmd != nil {
-		t.Error("expected nil when all alerts reference live targets")
-	}
-}
-
-func TestPruneStaleAlerts_PrunesStalePaneTarget(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.db.AlertSet("gone:9.9", "r", "warn", false)
-	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
-	alerts, _ := m.db.AlertList()
-	m.alerts = alerts
-
-	cmd := m.pruneStaleAlerts()
-	if cmd == nil {
-		t.Fatal("expected non-nil cmd for stale pane-level alert")
-	}
-	msg := cmd().(alertsMsg)
-	if len(msg.alerts) != 0 {
-		t.Errorf("expected stale pane alert removed; %d remain", len(msg.alerts))
-	}
-}
-
-func TestPruneStaleAlerts_PrunesStaleWindowTarget(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.db.AlertSet("gone:9", "r", "warn", false)
-	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
-	alerts, _ := m.db.AlertList()
-	m.alerts = alerts
-
-	cmd := m.pruneStaleAlerts()
-	if cmd == nil {
-		t.Fatal("expected non-nil cmd for stale window-level alert")
-	}
-	msg := cmd().(alertsMsg)
-	if len(msg.alerts) != 0 {
-		t.Errorf("expected stale window alert removed; %d remain", len(msg.alerts))
-	}
-}
-
-func TestPruneStaleAlerts_PrunesStaleSessionTarget(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.db.AlertSet("gone-session", "r", "warn", false)
-	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
-	alerts, _ := m.db.AlertList()
-	m.alerts = alerts
-
-	cmd := m.pruneStaleAlerts()
-	if cmd == nil {
-		t.Fatal("expected non-nil cmd for stale session-level alert")
-	}
-	msg := cmd().(alertsMsg)
-	if len(msg.alerts) != 0 {
-		t.Errorf("expected stale session alert removed; %d remain", len(msg.alerts))
-	}
-}
-
-func TestPruneStaleAlerts_PreservesLiveAlerts(t *testing.T) {
-	m := newPruneTestModel(t)
-	m.db.AlertSet("work:0.0", "live pane", "info", false)
-	m.db.AlertSet("gone:9.9", "stale pane", "warn", false)
-	m.panes = []tmux.Pane{{Session: "work", WindowIndex: 0, PaneIndex: 0}}
-	alerts, _ := m.db.AlertList()
-	m.alerts = alerts
-
-	cmd := m.pruneStaleAlerts()
-	if cmd == nil {
-		t.Fatal("expected non-nil cmd (one stale alert present)")
-	}
-	msg := cmd().(alertsMsg)
-	if len(msg.alerts) != 1 {
-		t.Fatalf("expected 1 alert to survive, got %d", len(msg.alerts))
-	}
-	if msg.alerts[0].Target != "work:0.0" {
-		t.Errorf("expected live alert work:0.0 to survive, got: %q", msg.alerts[0].Target)
 	}
 }

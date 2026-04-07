@@ -13,7 +13,6 @@ func TestDetailRender_clipsContentToHeight(t *testing.T) {
 		sessionCWD: "/some/path",
 		winCount:   3,
 		procCount:  6,
-		alertCount: 1,
 	}
 	// height=6 → inner=4, so content must be clipped to 4 lines
 	rendered := d.Render(40, 6)
@@ -66,7 +65,6 @@ func TestDetailRender_showsSessionFields(t *testing.T) {
 		sessionCWD: "/work/myses",
 		winCount:   2,
 		procCount:  4,
-		alertCount: 0,
 	}
 	rendered := stripANSI(d.Render(60, 14))
 	for _, want := range []string{"/work/myses", "2", "4"} {

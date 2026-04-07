@@ -1,8 +1,11 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
 )
 
 // activeTheme is set once at startup by initStyles.
@@ -31,6 +34,7 @@ var (
 	helpStyle     lipgloss.Style
 	helpDescStyle lipgloss.Style
 	yankStyle     lipgloss.Style
+	confirmStyle  lipgloss.Style
 
 	// Sidebar text
 	sessionStyle lipgloss.Style
@@ -90,6 +94,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	helpStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 	helpDescStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 	yankStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
+	confirmStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 1)
 
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
 	paneHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorFgSubtext)
@@ -120,60 +125,93 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	sessionIconStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 }
 
-// alertIcon renders the configured icon for the given alert level, colored by theme.
-func alertIcon(level string, sticky bool) string {
-	if level == "defer" && sticky {
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDeferSticky).Render(activeTheme.IconAlertDeferSticky)
+// ageDrivenValue returns the effective display value for a state.
+// If the state is Done and thresholdSecs > 0 and enough time has passed since
+// it was last updated, it returns StateIdle so the TUI renders an idle icon
+// without touching the DB record.
+func ageDrivenValue(st db.ToolState, thresholdSecs int) db.StateValue {
+	if thresholdSecs > 0 && st.Value == db.StateDone {
+		if time.Since(st.UpdatedAt) >= time.Duration(thresholdSecs)*time.Second {
+			return db.StateIdle
+		}
 	}
-	switch level {
-	case "info":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Render(activeTheme.IconAlertInfo)
-	case "warn":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Render(activeTheme.IconAlertWarn)
-	case "error":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Render(activeTheme.IconAlertError)
-	case "defer":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDefer).Render(activeTheme.IconAlertDefer)
+	return st.Value
+}
+
+// stateIcon renders the configured icon for the given state value, colored by theme.
+func stateIcon(value db.StateValue) string {
+	switch value {
+	case db.StateWorking:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateWorking).Render(activeTheme.IconStateWorking)
+	case db.StateWaiting:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateWaiting).Render(activeTheme.IconStateWaiting)
+	case db.StateDone:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateDone).Render(activeTheme.IconStateDone)
+	case db.StateError:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateError).Bold(true).Render(activeTheme.IconStateError)
+	case db.StateFlagged:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateFlagged).Render(activeTheme.IconStateFlagged)
+	case db.StateIdle:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateIdle).Render(activeTheme.IconStateIdle)
 	}
 	return ""
 }
 
-// alertIconOnBG renders the configured icon with a background color applied.
-func alertIconOnBG(level string, sticky bool, bg lipgloss.Color) string {
-	if level == "defer" && sticky {
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDeferSticky).Background(bg).Render(activeTheme.IconAlertDeferSticky)
-	}
-	switch level {
-	case "info":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertInfo).Background(bg).Render(activeTheme.IconAlertInfo)
-	case "warn":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertWarn).Background(bg).Render(activeTheme.IconAlertWarn)
-	case "error":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertError).Bold(true).Background(bg).Render(activeTheme.IconAlertError)
-	case "defer":
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorAlertDefer).Background(bg).Render(activeTheme.IconAlertDefer)
+// stateIconOnBG renders the state icon with a background color applied.
+func stateIconOnBG(value db.StateValue, bg lipgloss.Color) string {
+	switch value {
+	case db.StateWorking:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateWorking).Background(bg).Render(activeTheme.IconStateWorking)
+	case db.StateWaiting:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateWaiting).Background(bg).Render(activeTheme.IconStateWaiting)
+	case db.StateDone:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateDone).Background(bg).Render(activeTheme.IconStateDone)
+	case db.StateError:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateError).Bold(true).Background(bg).Render(activeTheme.IconStateError)
+	case db.StateFlagged:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateFlagged).Background(bg).Render(activeTheme.IconStateFlagged)
+	case db.StateIdle:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateIdle).Background(bg).Render(activeTheme.IconStateIdle)
 	}
 	return ""
 }
 
-// alertBadge renders the alert reason with a severity-based background color.
-func alertBadge(level string, sticky bool, reason string) string {
+// stateBadge renders the state message with a state-based background color.
+func stateBadge(value db.StateValue, msg string) string {
+	if msg == "" {
+		return ""
+	}
 	var fg, bg lipgloss.Color
-	if level == "defer" && sticky {
-		fg, bg = activeTheme.ColorAlertDeferSticky, activeTheme.ColorAlertDeferStickyBg
-		return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
-	}
-	switch level {
-	case "info":
-		fg, bg = activeTheme.ColorAlertInfo, activeTheme.ColorAlertInfoBg
-	case "warn":
-		fg, bg = activeTheme.ColorAlertWarn, activeTheme.ColorAlertWarnBg
-	case "error":
-		fg, bg = activeTheme.ColorAlertError, activeTheme.ColorAlertErrorBg
-	case "defer":
-		fg, bg = activeTheme.ColorAlertDefer, activeTheme.ColorAlertDeferBg
+	switch value {
+	case db.StateWorking:
+		fg, bg = activeTheme.ColorStateWorking, activeTheme.ColorStateWorkingBg
+	case db.StateWaiting:
+		fg, bg = activeTheme.ColorStateWaiting, activeTheme.ColorStateWaitingBg
+	case db.StateDone:
+		fg, bg = activeTheme.ColorStateDone, activeTheme.ColorStateDoneBg
+	case db.StateError:
+		fg, bg = activeTheme.ColorStateError, activeTheme.ColorStateErrorBg
+	case db.StateFlagged:
+		fg, bg = activeTheme.ColorStateFlagged, activeTheme.ColorStateFlaggedBg
+	case db.StateIdle:
+		fg, bg = activeTheme.ColorStateIdle, activeTheme.ColorStateIdleBg
 	default:
-		return reason
+		return msg
 	}
-	return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + reason + " ")
+	return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + msg + " ")
+}
+
+// paneStateIndicator returns the inline state text for a pane header row.
+// Returns "" when st is nil. Shows icon + message badge; falls back to the
+// state name when no custom message is set.
+func paneStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	icon := stateIcon(st.Value)
+	msg := st.Message
+	if msg == "" {
+		msg = st.Value.String()
+	}
+	return icon + " " + stateBadge(st.Value, msg)
 }

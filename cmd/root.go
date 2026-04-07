@@ -19,7 +19,7 @@ var logLevelFlag string
 
 var rootCmd = &cobra.Command{
 	Use:          "demux",
-	Short:        "Monitor tmux sessions, processes, and alerts",
+	Short:        "Monitor tmux sessions, processes, and tool states",
 	SilenceUsage: true,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		cfg := loadConfig()

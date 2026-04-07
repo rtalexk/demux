@@ -58,8 +58,9 @@ width = 35
 # Show last-seen age indicator on each live session row (e.g. " 5s", "12m", " 3h", "14d")
 show_last_seen = true
 
-# Where to position the sidebar cursor on open: current_session | alert_session | first_session
-focus_on_open = "alert_session"
+# Where to position the sidebar cursor on open: current_session | first_session | state_session
+# state_session focuses the first session with a visible state (based on configured sort order)
+focus_on_open = "current_session"
 
 # Start with cursor in the search input (also available as --search flag)
 # focus_search_on_open = false
@@ -71,16 +72,31 @@ default_filter = "t"
 # Valid keys: priority | last_seen | alphabetical
 sort = ["priority", "last_seen", "alphabetical"]
 
-# Which target to focus when switching to a session: default | severity | newest | oldest
+# Which target to focus when switching to a session: default | newest | oldest
 #   default  — let tmux use its last-focused window
-#   severity — navigate to highest-severity alerted window; newest tiebreaker
-#   newest   — navigate to most recently alerted window
-#   oldest   — navigate to oldest alerted window
-switch_focus = "severity"
+#   newest   — navigate to most recently updated state window
+#   oldest   — navigate to oldest updated state window
+switch_focus = "default"
 
 [process_list]
 # Right-align pane CWD paths in the process list, with a fill separator
 path_right_align = false
+
+[tui]
+# Include working sessions in the ! attention filter (default: false — only error/flagged/waiting)
+attention_filter_include_working = false
+
+# Default message stored when flagging a session with 'd' in the sidebar
+flag_default_message = "Come back"
+
+# Seconds after which a "done" state is rendered as "idle" in the TUI (0 = disabled).
+# The DB record is not changed; this is purely a visual override.
+done_idle_after_secs = 60
+
+[log]
+# Log level: off | error | warn | info | debug
+# Logs are written to ~/.local/share/demux/demux.log
+level = "warn"
 
 [status_bar]
 # Show the status bar at the bottom of the screen
@@ -109,10 +125,6 @@ error_display = "git err"
 # Enable pull-request info in the detail panel
 enabled = false
 
-
-[alerts]
-# Default reason text used when setting a defer alert without --reason
-defer_default_reason = "Come back"
 
 # ---------------------------------------------------------------------------
 # Theme (Catppuccin Mocha)
@@ -144,26 +156,30 @@ color_git_dirty  = "#f9e2af"
 color_git_behind = "#74c7ec"
 color_git_ahead  = "#a6e3a1"
 
-# Alert icons
-icon_alert_info  = "ℹ️"
-color_alert_info  = "#89b4fa"
-color_alert_info_bg  = "#1a2a4d"
+# State icons and colours
+icon_state_working  = "⟳"
+color_state_working    = "#a6e3a1"
+color_state_working_bg = "#1a3a2a"
 
-icon_alert_warn  = "⚠️"
-color_alert_warn  = "#f9e2af"
-color_alert_warn_bg  = "#3d3500"
+icon_state_waiting  = "●"
+color_state_waiting    = "#f9e2af"
+color_state_waiting_bg = "#3d3500"
 
-icon_alert_error = "🚨"
-color_alert_error = "#f38ba8"
-color_alert_error_bg = "#3d1020"
+icon_state_done  = "✓"
+color_state_done    = "#a6e3a1"
+color_state_done_bg = "#1a3a2a"
 
-icon_alert_defer  = "🔖"
-color_alert_defer    = "#b4befe"
-color_alert_defer_bg = "#1e1e2e"
+icon_state_error = "✗"
+color_state_error    = "#f38ba8"
+color_state_error_bg = "#3d1020"
 
-icon_alert_defer_sticky     = "📌"
-color_alert_defer_sticky    = "#b4befe"
-color_alert_defer_sticky_bg = "#1e1e2e"
+icon_state_flagged  = "⚑"
+color_state_flagged    = "#cba6f7"
+color_state_flagged_bg = "#2a1a4d"
+
+icon_state_idle  = "○"
+color_state_idle    = "#89dceb"
+color_state_idle_bg = "#0d2530"
 
 # Session source icons
 icon_tmux_session = "⊞"

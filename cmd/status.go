@@ -19,72 +19,73 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 }
 
-func tmuxCounter(style, icon string, count int) string {
-	return fmt.Sprintf("%s%s %d", style, icon, count)
+func tmuxCounter(color, icon string, count int) string {
+	return fmt.Sprintf("#[fg=%s]%s %d", color, icon, count)
 }
 
-func countAlertsByLevel(alerts []db.Alert) (infos, warns, errors, defers int) {
-	for _, a := range alerts {
-		switch a.Level {
-		case "info":
-			infos++
-		case "warn":
-			warns++
-		case "error":
-			errors++
-		case "defer":
-			defers++
+func countStatesByValue(states []db.ToolState) (waiting, errs, flagged, done, idle int) {
+	for _, s := range states {
+		switch s.Value {
+		case db.StateWaiting:
+			waiting++
+		case db.StateError:
+			errs++
+		case db.StateFlagged:
+			flagged++
+		case db.StateDone:
+			done++
+		case db.StateIdle:
+			idle++
 		}
 	}
 	return
 }
 
-func tmuxStatusParts(infos, warns, errors, defers int, cfg config.Config) string {
-	if infos == 0 && warns == 0 && errors == 0 && defers == 0 {
-		return "#[fg=green]#[default]"
+func tmuxStatusParts(waiting, errs, flagged, done, idle int, cfg config.Config) string {
+	th := cfg.Theme
+	if waiting == 0 && errs == 0 && flagged == 0 && done == 0 && idle == 0 {
+		return fmt.Sprintf("#[fg=%s]%s#[default]", th.ColorStateDone, th.IconStateDone)
 	}
 	var parts []string
-	if errors > 0 {
-		parts = append(parts, tmuxCounter("#[fg=red,bold]", cfg.Theme.IconAlertError, errors))
+	if errs > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateError+",bold", th.IconStateError, errs))
 	}
-	if warns > 0 {
-		parts = append(parts, tmuxCounter("#[fg=yellow]", cfg.Theme.IconAlertWarn, warns))
+	if flagged > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateFlagged, th.IconStateFlagged, flagged))
 	}
-	if infos > 0 {
-		parts = append(parts, tmuxCounter("#[fg=cyan]", cfg.Theme.IconAlertInfo, infos))
+	if waiting > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateWaiting, th.IconStateWaiting, waiting))
 	}
-	if defers > 0 {
-		parts = append(parts, tmuxCounter("#[fg=#b4befe]", cfg.Theme.IconAlertDefer, defers))
+	if done > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateDone, th.IconStateDone, done))
+	}
+	if idle > 0 {
+		parts = append(parts, tmuxCounter(th.ColorStateIdle, th.IconStateIdle, idle))
 	}
 	return strings.Join(parts, " ") + "#[default]"
 }
 
-func formatStatusOutput(fmtName string, infos, warns, errors, defers int, cfg config.Config) string {
-	switch fmtName {
-	case "tmux":
-		return tmuxStatusParts(infos, warns, errors, defers, cfg)
-	case "json":
-		// defers intentionally omitted; JSON schema is stable and order is not meaningful.
-		return fmt.Sprintf(`{"infos":%d,"warns":%d,"errors":%d}`, infos, warns, errors)
-	default:
-		if infos == 0 && warns == 0 && errors == 0 && defers == 0 {
-			return "ok"
-		}
-		var parts []string
-		if errors > 0 {
-			parts = append(parts, fmt.Sprintf("errors=%d", errors))
-		}
-		if warns > 0 {
-			parts = append(parts, fmt.Sprintf("warns=%d", warns))
-		}
-		if infos > 0 {
-			parts = append(parts, fmt.Sprintf("infos=%d", infos))
-		}
-		if defers > 0 {
-			parts = append(parts, fmt.Sprintf("defers=%d", defers))
-		}
-		return strings.Join(parts, " ")
+func textStatusParts(waiting, errs, flagged, done, idle int) string {
+	if waiting == 0 && errs == 0 && flagged == 0 && done == 0 && idle == 0 {
+		return "ok"
 	}
+	var parts []string
+	if errs > 0 {
+		parts = append(parts, fmt.Sprintf("errors=%d", errs))
+	}
+	if flagged > 0 {
+		parts = append(parts, fmt.Sprintf("flagged=%d", flagged))
+	}
+	if waiting > 0 {
+		parts = append(parts, fmt.Sprintf("waiting=%d", waiting))
+	}
+	if done > 0 {
+		parts = append(parts, fmt.Sprintf("done=%d", done))
+	}
+	if idle > 0 {
+		parts = append(parts, fmt.Sprintf("idle=%d", idle))
+	}
+	return strings.Join(parts, " ")
 }
 
 func runStatus(cmd *cobra.Command, _ []string) error {
@@ -94,12 +95,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	}
 	defer database.Close()
 
-	alerts, err := database.AlertList()
+	states, err := database.StateList(0, "")
 	if err != nil {
-		return err
+		return fmt.Errorf("list states: %w", err)
 	}
-
-	infos, warns, errors, defers := countAlertsByLevel(alerts)
+	waiting, errs, flagged, done, idle := countStatesByValue(states)
 
 	cfg := loadConfig()
 
@@ -108,11 +108,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		fmtName = "tmux"
 	}
 
-	out := formatStatusOutput(fmtName, infos, warns, errors, defers, cfg)
-	if fmtName == "tmux" {
-		fmt.Print(out)
-	} else {
-		fmt.Println(out)
+	switch fmtName {
+	case "tmux":
+		fmt.Print(tmuxStatusParts(waiting, errs, flagged, done, idle, cfg))
+	default:
+		fmt.Println(textStatusParts(waiting, errs, flagged, done, idle))
 	}
 	return nil
 }

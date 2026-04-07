@@ -38,7 +38,7 @@ type panesMsg struct {
 	panes          []tmux.Pane
 	currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
 }
-type alertsMsg struct{ alerts []db.Alert }
+type statesMsg struct{ states []db.ToolState }
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
@@ -63,7 +63,7 @@ type Model struct {
 	height int
 
 	panes   []tmux.Pane
-	alerts  []db.Alert
+	states  []db.ToolState
 	gitInfo map[string]git.Info // keyed by session name
 	procs   []proc.Process
 	cwdMap  map[int32]string // PID -> CWD, pre-fetched async
@@ -74,8 +74,11 @@ type Model struct {
 	yank     YankModel
 	help     HelpModel
 
-	showYank bool
-	showHelp bool
+	showYank    bool
+	showHelp    bool
+	showConfirm bool
+	confirm     ConfirmModel
+	confirmCmd  tea.Cmd // executed when the user confirms
 
 	pulse        bool
 	spinnerFrame int
@@ -122,9 +125,9 @@ func New(cfg config.Config, database *db.DB) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	// Only fetch panes on startup — sidebar renders immediately.
-	// fetchAlerts, fetchProcs, and the tick are deferred until panesMsg arrives.
-	return m.fetchPanes()
+	// Fetch panes and states in parallel so the first sidebar render uses
+	// correct state-based sort. Tick and procs are deferred until panesMsg arrives.
+	return tea.Batch(m.fetchPanes(), m.fetchStates())
 }
 
 func (m Model) View() string {
@@ -247,16 +250,25 @@ func (m Model) buildProcTitle() string {
 	if runes := []rune(bc); len(runes) > 0 && isIconRune(runes[len(runes)-1]) {
 		procTitleSuffix = "  "
 	}
-	return " [l] " + bc + procTitleSuffix
+	title := " [l] " + bc + procTitleSuffix
+	if st := activeStateFor(m.states, bc); st != nil {
+		effective := *st
+		effective.Value = ageDrivenValue(*st, m.cfg.Tui.DoneIdleAfterSecs)
+		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective) + " "
+	}
+	return title
 }
 
-// applyOverlay wraps base with the help or yank overlay when active.
+// applyOverlay wraps base with the help, yank, or confirm overlay when active.
 func (m Model) applyOverlay(base string) string {
 	if m.showHelp {
 		return overlayCenter(m.help.Render(m.height), base, m.width, m.height)
 	}
 	if m.showYank {
 		return overlayCenter(m.yank.Render(), base, m.width, m.height)
+	}
+	if m.showConfirm {
+		return overlayCenter(m.confirm.Render(), base, m.width, m.height)
 	}
 	return base
 }
@@ -272,9 +284,9 @@ func (m Model) buildStatusBar(width int) string {
 	if m.statusMsg != "" && time.Now().Before(m.statusExp) {
 		statusBar = m.statusMsg
 	} else if m.cfg.Mode == "compact" {
-		statusBar = "  j/k:nav  Enter:open  !:alerts  ?:help  q:quit"
+		statusBar = "  j/k:nav  Enter:open  !:states  ?:help  q:quit"
 	} else if m.focus == panelSidebar {
-		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:alerts  ?:help  q:quit"
+		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:states  ?:help  q:quit"
 	} else {
 		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
 	}

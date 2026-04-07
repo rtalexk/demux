@@ -36,52 +36,47 @@ func (m Model) fetchPanes() tea.Cmd {
 	}
 }
 
-func (m Model) fetchAlerts() tea.Cmd {
+func (m Model) fetchStates() tea.Cmd {
 	return func() tea.Msg {
-		alerts, err := m.db.AlertList()
+		states, err := m.db.StateList(0, "")
 		if err != nil {
-			demuxlog.Warn("fetch alerts failed", "err", err)
+			demuxlog.Warn("fetch states failed", "err", err)
+			return statesMsg{}
 		}
-		return alertsMsg{alerts: alerts}
+		return statesMsg{states: states}
+	}
+}
+
+// makeProcFetch returns a closure that snapshots processes and CWD maps,
+// tagged with the given generation so stale results can be discarded.
+func makeProcFetch(gen int) func() tea.Msg {
+	return func() tea.Msg {
+		procs, err := proc.Snapshot()
+		if err != nil {
+			return procDataMsg{gen: gen}
+		}
+		cwdMap, err := proc.CWDAll()
+		if err != nil {
+			demuxlog.Warn("cwd fetch failed", "err", err)
+		}
+		if cwdMap == nil {
+			cwdMap = make(map[int32]string)
+		}
+		return procDataMsg{procs: procs, cwdMap: cwdMap, gen: gen}
 	}
 }
 
 // scheduleProcFetch fires an immediate proc snapshot tagged with the current generation.
 // Stale results (gen mismatch) are discarded in the procDataMsg handler.
 func (m Model) scheduleProcFetch() tea.Cmd {
-	gen := m.procGen
-	return func() tea.Msg {
-		procs, err := proc.Snapshot()
-		if err != nil {
-			return procDataMsg{gen: gen}
-		}
-		cwdMap, err := proc.CWDAll()
-		if err != nil {
-			demuxlog.Warn("cwd fetch failed", "err", err)
-		}
-		if cwdMap == nil {
-			cwdMap = make(map[int32]string)
-		}
-		return procDataMsg{procs: procs, cwdMap: cwdMap, gen: gen}
-	}
+	return makeProcFetch(m.procGen)
 }
 
 // scheduleDelayedProcFetch schedules a proc snapshot after 2s, tagged with the current generation.
 func (m Model) scheduleDelayedProcFetch() tea.Cmd {
-	gen := m.procGen
+	fetch := makeProcFetch(m.procGen)
 	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
-		procs, err := proc.Snapshot()
-		if err != nil {
-			return procDataMsg{gen: gen}
-		}
-		cwdMap, err := proc.CWDAll()
-		if err != nil {
-			demuxlog.Warn("cwd fetch failed", "err", err)
-		}
-		if cwdMap == nil {
-			cwdMap = make(map[int32]string)
-		}
-		return procDataMsg{procs: procs, cwdMap: cwdMap, gen: gen}
+		return fetch()
 	})
 }
 

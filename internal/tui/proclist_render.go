@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
@@ -83,10 +84,6 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 	rightTitle := ""
 	if p.primaryCWD != "" {
 		rightTitle = " " + format.ShortenPath(p.primaryCWD, p.cfg.PathAliases) + " "
-	}
-
-	if p.sessionAlert != nil {
-		title += paneSepStyle.Render("──") + " " + alertIcon(p.sessionAlert.Level, p.sessionAlert.Sticky) + " " + alertBadge(p.sessionAlert.Level, p.sessionAlert.Sticky, p.sessionAlert.Reason)
 	}
 
 	if len(p.nodes) == 0 {
@@ -256,11 +253,6 @@ func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW i
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
 	label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
 
-	alertSuffix := ""
-	if node.Alert != nil {
-		alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level, node.Alert.Sticky) + " " + alertBadge(node.Alert.Level, node.Alert.Sticky, node.Alert.Reason)
-	}
-
 	pathStr := ""
 	if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {
 		pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
@@ -274,14 +266,52 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 		}
 	}
 
+	st := p.stateForPane(node.Pane)
 	if selected {
-		return p.renderPaneHeaderSelected(label, alertSuffix, pathStr, gitSuffix, innerW, hasIdle)
+		stateStr := p.selectedStateIndicator(st)
+		if stateStr != "" {
+			stateVisW := len([]rune(stripANSI(stateStr)))
+			labelW := len([]rune(label))
+			padCount := innerW - labelW - stateVisW
+			if padCount < 0 {
+				padCount = 0
+			}
+			return selectedBG.Render(label) + stateStr + selectedBG.Render(strings.Repeat(" ", padCount))
+		}
+		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, innerW, hasIdle)
 	}
-	return p.renderPaneHeaderUnselected(node, label, alertSuffix, pathStr, gitSuffix, innerW)
+	return p.renderPaneHeaderUnselected(node, label, pathStr, gitSuffix, innerW) + p.unselectedStateIndicator(st)
 }
 
-func (p ProcListModel) renderPaneHeaderSelected(label, alertSuffix, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
-	left := label + stripANSI(alertSuffix)
+// selectedStateIndicator returns the state indicator for a selected row.
+// The separator, icon, and surrounding spaces all carry the selected background
+// so the entire row between label and badge is uniformly highlighted.
+func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	value := ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
+	msg := st.Message
+	if msg == "" {
+		msg = value.String()
+	}
+	sepOnBG := paneSepStyle.Background(activeTheme.ColorSelected).Render("────")
+	iconOnBG := stateIconOnBG(value, activeTheme.ColorSelected)
+	return selectedBG.Render("  ") + sepOnBG + selectedBG.Render("  ") + iconOnBG + selectedBG.Render(" ") + stateBadge(value, msg)
+}
+
+// unselectedStateIndicator returns the state indicator for an unselected pane row.
+func (p ProcListModel) unselectedStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	effective := *st
+	effective.Value = ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
+	return "  " + paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective)
+}
+
+func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
+	left := label
 	rightPart := pathStr + gitSuffix
 	if rightPart != "" && p.cfg.ProcessList.PathRightAlign && innerW > 0 {
 		rightW := len([]rune(rightPart))
@@ -320,10 +350,10 @@ func (p ProcListModel) renderPaneHeaderSelected(label, alertSuffix, pathStr, git
 	return selectedBG.Render(left + strings.Repeat(" ", padCount))
 }
 
-func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, alertSuffix, pathStr, gitSuffix string, innerW int) string {
+func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, pathStr, gitSuffix string, innerW int) string {
 	rightPart := pathStr + gitSuffix
 	if rightPart == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
-		out := paneHeaderStyle.Render(label) + alertSuffix
+		out := paneHeaderStyle.Render(label)
 		if pathStr != "" {
 			out += "  " + panePathStyle.Render(pathStr)
 		}
@@ -337,14 +367,13 @@ func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, aler
 		return out
 	}
 
-	labelW := len([]rune(label + stripANSI(alertSuffix)))
+	labelW := len([]rune(label))
 	rightW := len([]rune(rightPart))
 	fillCount := innerW - labelW - 2 - 2 - rightW
 	if fillCount < 1 {
 		fillCount = 1
 	}
 	out := paneHeaderStyle.Render(label) +
-		alertSuffix +
 		"  " +
 		paneSepStyle.Render(strings.Repeat("─", fillCount)) +
 		"  " +
@@ -365,24 +394,30 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 		label = fmt.Sprintf("Win %d: %s", node.Pane.WindowIndex, node.Pane.WindowName)
 	}
 
-	alertSuffix := ""
-	if node.Alert != nil {
-		alertSuffix = "  " + paneSepStyle.Render("────") + "  " + alertIcon(node.Alert.Level, node.Alert.Sticky) + " " + alertBadge(node.Alert.Level, node.Alert.Sticky, node.Alert.Reason)
-	}
-
 	pathStr := ""
 	if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {
 		pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
 	}
 
+	st := p.stateForWindow(node.Pane.Session, node.Pane.WindowIndex)
 	if selected {
-		return p.renderWindowHeaderSelected(label, alertSuffix, pathStr, innerW)
+		stateStr := p.selectedStateIndicator(st)
+		if stateStr != "" {
+			stateVisW := len([]rune(stripANSI(stateStr)))
+			labelW := len([]rune(label))
+			padCount := innerW - labelW - stateVisW
+			if padCount < 0 {
+				padCount = 0
+			}
+			return selectedBG.Render(label) + stateStr + selectedBG.Render(strings.Repeat(" ", padCount))
+		}
+		return p.renderWindowHeaderSelected(label, pathStr, innerW)
 	}
-	return p.renderWindowHeaderUnselected(node, label, alertSuffix, pathStr, innerW)
+	return p.renderWindowHeaderUnselected(node, label, pathStr, innerW) + p.unselectedStateIndicator(st)
 }
 
-func (p ProcListModel) renderWindowHeaderSelected(label, alertSuffix, pathStr string, innerW int) string {
-	left := label + stripANSI(alertSuffix)
+func (p ProcListModel) renderWindowHeaderSelected(label, pathStr string, innerW int) string {
+	left := label
 	if pathStr != "" && innerW > 0 {
 		rightW := len([]rune(pathStr))
 		padCount := innerW - len([]rune(left)) - rightW
@@ -406,23 +441,22 @@ func (p ProcListModel) renderWindowHeaderSelected(label, alertSuffix, pathStr st
 	return selectedBG.Render(left + strings.Repeat(" ", padCount))
 }
 
-func (p ProcListModel) renderWindowHeaderUnselected(node ProcListNode, label, alertSuffix, pathStr string, innerW int) string {
+func (p ProcListModel) renderWindowHeaderUnselected(node ProcListNode, label, pathStr string, innerW int) string {
 	if pathStr == "" || innerW <= 0 {
-		out := windowHeaderStyle.Render(label) + alertSuffix
+		out := windowHeaderStyle.Render(label)
 		if pathStr != "" {
 			out += "  " + panePathStyle.Render(pathStr)
 		}
 		return out
 	}
 
-	labelW := len([]rune(label + stripANSI(alertSuffix)))
+	labelW := len([]rune(label))
 	rightW := len([]rune(pathStr))
 	fillCount := innerW - labelW - 2 - 2 - rightW
 	if fillCount < 1 {
 		fillCount = 1
 	}
 	return windowHeaderStyle.Render(label) +
-		alertSuffix +
 		"  " +
 		paneSepStyle.Render(strings.Repeat("─", fillCount)) +
 		"  " +

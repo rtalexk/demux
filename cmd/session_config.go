@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -58,23 +59,8 @@ func runSessionAdd(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	var labels []string
-	if sessionAddLabels != "" {
-		for _, l := range strings.Split(sessionAddLabels, ",") {
-			if t := strings.TrimSpace(l); t != "" {
-				labels = append(labels, t)
-			}
-		}
-	}
-
-	var windows []string
-	if sessionAddWindows != "" {
-		for _, w := range strings.Split(sessionAddWindows, ",") {
-			if t := strings.TrimSpace(w); t != "" {
-				windows = append(windows, t)
-			}
-		}
-	}
+	labels := splitCSV(sessionAddLabels)
+	windows := splitCSV(sessionAddWindows)
 
 	e := session.ConfigEntry{
 		Name:     sessionAddName,
@@ -157,10 +143,7 @@ func init() {
 }
 
 func runSessionRemove(_ *cobra.Command, _ []string) error {
-	candidates := []bool{false, true}
-	if sessionRemovePrivate {
-		candidates = []bool{true}
-	}
+	candidates := sessionFileCandidates(sessionRemovePrivate)
 	for _, private := range candidates {
 		path, err := sessionFilePath(private)
 		if err != nil {
@@ -176,6 +159,82 @@ func runSessionRemove(_ *cobra.Command, _ []string) error {
 		}
 	}
 	return fmt.Errorf("session %q not found in sessions.toml or private.toml", sessionRemoveName)
+}
+
+// --- remove (full: tmux + config + db) ---
+
+var (
+	sessionRemoveFullName    string
+	sessionRemoveFullPrivate bool
+)
+
+var sessionRemoveFullCmd = &cobra.Command{
+	Use:     "remove",
+	Aliases: []string{"rm"},
+	Short:   "Kill tmux session, remove config entry, and clear DB states",
+	RunE:    runSessionRemoveFull,
+}
+
+func init() {
+	sessionRemoveFullCmd.Flags().StringVar(&sessionRemoveFullName, "name", "", "Session name (required)")
+	sessionRemoveFullCmd.Flags().BoolVar(&sessionRemoveFullPrivate, "private", false, "Target private.toml only for config step")
+
+	_ = sessionRemoveFullCmd.MarkFlagRequired("name")
+
+	sessionCmd.AddCommand(sessionRemoveFullCmd)
+}
+
+func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
+	name := sessionRemoveFullName
+
+	tmuxOut := killTmuxSession(name)
+	configOut := removeSessionConfig(name, sessionRemoveFullPrivate)
+	dbOut := clearSessionStates(name)
+
+	fmt.Printf("tmux:   %s\n", tmuxOut)
+	fmt.Printf("config: %s\n", configOut)
+	fmt.Printf("db:     %s\n", dbOut)
+	return nil
+}
+
+func killTmuxSession(name string) string {
+	err := exec.Command("tmux", "kill-session", "-t", name).Run()
+	if err != nil {
+		return "not found (skipped)"
+	}
+	return "killed"
+}
+
+func removeSessionConfig(name string, private bool) string {
+	candidates := sessionFileCandidates(private)
+	for _, isPrivate := range candidates {
+		path, err := sessionFilePath(isPrivate)
+		if err != nil {
+			continue
+		}
+		err = session.RemoveEntry(path, name)
+		if err == nil {
+			return fmt.Sprintf("removed from %s", filepath.Base(path))
+		}
+		if !session.IsNotFound(err) || private {
+			return fmt.Sprintf("error: %v", err)
+		}
+	}
+	return "not found in sessions.toml or private.toml (skipped)"
+}
+
+func clearSessionStates(name string) string {
+	database, err := openDB()
+	if err != nil {
+		return fmt.Sprintf("error opening db: %v", err)
+	}
+	defer database.Close()
+
+	n, err := database.StateDeleteBySession(name)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("%d state(s) cleared", n)
 }
 
 // --- create-windows ---
@@ -219,12 +278,7 @@ func runSessionCreateWindows(_ *cobra.Command, _ []string) error {
 		}
 	}
 
-	var ids []string
-	for _, id := range strings.Split(sessionCreateWindowsIDs, ",") {
-		if t := strings.TrimSpace(id); t != "" {
-			ids = append(ids, t)
-		}
-	}
+	ids := splitCSV(sessionCreateWindowsIDs)
 
 	specs, unknown := session.ResolveWindowSpecs(ids, cfg.WindowTemplates)
 	for _, id := range unknown {
@@ -238,6 +292,30 @@ func runSessionCreateWindows(_ *cobra.Command, _ []string) error {
 }
 
 // --- helpers ---
+
+// splitCSV splits a comma-separated string, trimming whitespace and dropping empty tokens.
+func splitCSV(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	for _, item := range strings.Split(s, ",") {
+		if t := strings.TrimSpace(item); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// sessionFileCandidates returns the ordered list of private flags to search when
+// looking up or removing a session config entry. With privateOnly=true only
+// private.toml is searched; otherwise sessions.toml is tried first.
+func sessionFileCandidates(privateOnly bool) []bool {
+	if privateOnly {
+		return []bool{true}
+	}
+	return []bool{false, true}
+}
 
 func sessionFilePath(private bool) (string, error) {
 	cfgPath, err := config.DefaultPath()
