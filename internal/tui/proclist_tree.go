@@ -104,8 +104,6 @@ func containsStr(list []string, s string) bool {
 	return false
 }
 
-
-
 // isSelectable reports whether the cursor may land on n.
 func isSelectable(n ProcListNode) bool { return !n.IsIdle }
 

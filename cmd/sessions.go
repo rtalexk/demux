@@ -35,8 +35,8 @@ func init() {
 
 type sessionRow struct {
 	session, windows, procs, state, status string
-	branch, dirty, ahead, behind            string
-	includeGit, gitOnly                     bool
+	branch, dirty, ahead, behind           string
+	includeGit, gitOnly                    bool
 }
 
 func (r sessionRow) Fields() []string {

@@ -18,7 +18,7 @@ func truncateTarget(target string, maxLen int) string {
 		// No suffix — truncate the whole thing.
 		return string(runes[:maxLen-1]) + "…"
 	}
-	suffix := []rune(target[idx:]) // e.g. ":2.0"
+	suffix := []rune(target[idx:])        // e.g. ":2.0"
 	available := maxLen - len(suffix) - 1 // -1 for "…"
 	if available <= 0 {
 		return "…" + string(suffix)

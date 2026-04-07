@@ -267,7 +267,7 @@ func TestRenderSession_truncatedNameWithIndicators_noOverflow(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "hf-garmin-credentials-integration", IsLive: true, Activity: activity},
 		},
-		states: map[string]db.ToolState{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg:     config.Config{Sidebar: config.SidebarConfig{ShowLastSeen: true}},
 	}
@@ -386,7 +386,7 @@ func TestSessionCount_Empty(t *testing.T) {
 func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta", "gamma"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 		// Non-nil empty slice = active search with no matches.
 		queryResult: query.Result{Sessions: []query.SessionMatch{}},
 	}
@@ -412,7 +412,7 @@ func TestRender_NoResultsHint(t *testing.T) {
 func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("charlie", "alpha", "beta"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 	}
 	s.rebuildNodes()
 	var got []string
@@ -525,7 +525,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 func TestSetFilter_AllFiltersToggle(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 		filter:   FilterTmux,
 	}
@@ -578,7 +578,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("a"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	if s.ActiveFilter() == FilterPriority {
@@ -593,7 +593,7 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("sess"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	s.cursor = 5
@@ -625,7 +625,7 @@ func TestFocusNode_SessionLevel(t *testing.T) {
 func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha"),
-		states: map[string]db.ToolState{},
+		states:   map[string]db.ToolState{},
 	}
 	s.rebuildNodes()
 	s.FocusNode("nonexistent", 20)
@@ -633,7 +633,6 @@ func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
 		t.Errorf("expected cursor=0, got %d", s.cursor)
 	}
 }
-
 
 // --- visibleSessions filter tests ---
 
@@ -827,7 +826,7 @@ func TestRenderSession_ShowsLastSeen(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myses", IsLive: true, Activity: activity},
 		},
-		states: map[string]db.ToolState{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: true},
@@ -851,7 +850,7 @@ func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "xyz", IsLive: true, Activity: activity},
 		},
-		states: map[string]db.ToolState{},
+		states:  map[string]db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: false},

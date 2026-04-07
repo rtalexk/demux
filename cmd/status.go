@@ -55,6 +55,23 @@ func tmuxStatusParts(waiting, errs, flagged int, cfg config.Config) string {
 	return strings.Join(parts, " ") + "#[default]"
 }
 
+func textStatusParts(waiting, errs, flagged int) string {
+	if waiting == 0 && errs == 0 && flagged == 0 {
+		return "ok"
+	}
+	var parts []string
+	if errs > 0 {
+		parts = append(parts, fmt.Sprintf("errors=%d", errs))
+	}
+	if flagged > 0 {
+		parts = append(parts, fmt.Sprintf("flagged=%d", flagged))
+	}
+	if waiting > 0 {
+		parts = append(parts, fmt.Sprintf("waiting=%d", waiting))
+	}
+	return strings.Join(parts, " ")
+}
+
 func runStatus(cmd *cobra.Command, _ []string) error {
 	database, err := openDB()
 	if err != nil {
@@ -75,28 +92,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		fmtName = "tmux"
 	}
 
-	var out string
 	switch fmtName {
 	case "tmux":
-		out = tmuxStatusParts(waiting, errs, flagged, cfg)
-		fmt.Print(out)
+		fmt.Print(tmuxStatusParts(waiting, errs, flagged, cfg))
 	default:
-		if waiting == 0 && errs == 0 && flagged == 0 {
-			out = "ok"
-		} else {
-			var parts []string
-			if errs > 0 {
-				parts = append(parts, fmt.Sprintf("errors=%d", errs))
-			}
-			if flagged > 0 {
-				parts = append(parts, fmt.Sprintf("flagged=%d", flagged))
-			}
-			if waiting > 0 {
-				parts = append(parts, fmt.Sprintf("waiting=%d", waiting))
-			}
-			out = strings.Join(parts, " ")
-		}
-		fmt.Println(out)
+		fmt.Println(textStatusParts(waiting, errs, flagged))
 	}
 	return nil
 }

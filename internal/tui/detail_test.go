@@ -13,7 +13,6 @@ func TestDetailRender_clipsContentToHeight(t *testing.T) {
 		sessionCWD: "/some/path",
 		winCount:   3,
 		procCount:  6,
-	
 	}
 	// height=6 → inner=4, so content must be clipped to 4 lines
 	rendered := d.Render(40, 6)
