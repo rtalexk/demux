@@ -941,11 +941,11 @@ func TestStatePriority(t *testing.T) {
 		want  int
 	}{
 		{0, 0}, // idle (implicit zero)
-		{db.StateDone, 0},
-		{db.StateWorking, 1},
-		{db.StateWaiting, 2},
-		{db.StateFlagged, 3},
-		{db.StateError, 4},
+		{db.StateWorking, 0},
+		{db.StateFlagged, 1},
+		{db.StateDone, 2},
+		{db.StateError, 3},
+		{db.StateWaiting, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.value.String(), func(t *testing.T) {

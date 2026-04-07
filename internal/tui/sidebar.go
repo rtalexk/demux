@@ -100,15 +100,15 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 // statePriority maps a StateValue to a numeric priority (higher = more urgent).
 func statePriority(value db.StateValue) int {
 	switch value {
-	case db.StateError:
-		return 4
-	case db.StateFlagged:
-		return 3
 	case db.StateWaiting:
+		return 4
+	case db.StateError:
+		return 3
+	case db.StateDone:
 		return 2
-	case db.StateWorking:
+	case db.StateFlagged:
 		return 1
-	default: // StateDone and idle
+	default: // working, idle — fall through to next sort key
 		return 0
 	}
 }
