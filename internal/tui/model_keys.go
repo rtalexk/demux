@@ -453,7 +453,11 @@ func (m Model) showClearConfirm(target string) Model {
 	if st != nil {
 		body += "\n  state:  " + st.Value.String()
 		if st.Message != "" {
-			body += "\n          " + st.Message
+			msg := st.Message
+			if runes := []rune(msg); len(runes) > maxTargetLen {
+				msg = string(runes[:maxTargetLen-1]) + "…"
+			}
+			body += "\n          " + msg
 		}
 	}
 	m.confirm = ConfirmModel{
