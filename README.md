@@ -9,7 +9,7 @@ Track what your tools are doing across every pane: working, waiting, done, or fa
 ![demux compact mode](docs/assets/compact_view.png)
 
 > [!CAUTION]
-> **v2 breaking change:** The alert system has been replaced by the state system. `demux alert` commands, `[alerts]` config, and `color_alert_*` theme tokens no longer exist. See the [migration guide](docs/migration/v2-state-system.md) before upgrading.
+> **Breaking change:** The alert system has been replaced by the state system. `demux alert` commands, `[alerts]` config, and `color_alert_*` theme tokens no longer exist. See the [migration guide](docs/migration/state-system.md) before upgrading from v0.3.0.
 
 ## Motivation
 
@@ -975,9 +975,9 @@ demux event pane_focus --target <session:window.pane> --log-level debug
 
 </details>
 
-## Migrating from v1 (alert system)
+## Migrating from v0.3.0 (alert system)
 
-The alert system from v1 has been replaced by the state system. See [docs/migration/v2-state-system.md](docs/migration/v2-state-system.md) for the full guide.
+The alert system has been replaced by the state system. See [docs/migration/state-system.md](docs/migration/state-system.md) for the full guide.
 
 <details>
 
@@ -985,7 +985,7 @@ The alert system from v1 has been replaced by the state system. See [docs/migrat
 
 **CLI commands**
 
-| v1                          | v2                                      |
+| v0.3.0                      | now                                     |
 | --------------------------- | --------------------------------------- |
 | `demux alert set`           | `demux state set`                       |
 | `demux alert rm`            | `demux state clear`                     |
@@ -996,7 +996,7 @@ The alert system from v1 has been replaced by the state system. See [docs/migrat
 
 **Config**
 
-| v1                           | v2              |
+| v0.3.0                       | now             |
 | ---------------------------- | --------------- |
 | `[alerts]` section           | removed         |
 | `color_alert_*` theme tokens | `color_state_*` |

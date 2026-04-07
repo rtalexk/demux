@@ -1,4 +1,4 @@
-# demux v2 migration: alert system → state system
+# demux migration from v0.3.0: alert system → state system
 
 ## Why the change
 
