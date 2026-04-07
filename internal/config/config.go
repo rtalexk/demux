@@ -234,7 +234,7 @@ func Default() Config {
 			IconStateDone:    "✔",
 			IconStateError:   "✗",
 			IconStateFlagged: "🔖",
-			IconStateIdle:    "·",
+			IconStateIdle:    "○",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

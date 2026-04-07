@@ -66,13 +66,12 @@ func (p ProcListModel) stateForWindow(session string, windowIndex int) *db.ToolS
 	return activeStateFor(p.states, key)
 }
 
-// activeStateFor returns the first non-idle, non-done state matching target, or nil.
+// activeStateFor returns the first non-done state matching target, or nil.
 func activeStateFor(states []db.ToolState, target string) *db.ToolState {
 	for i := range states {
 		if states[i].Target == target &&
 			states[i].Value != 0 &&
-			states[i].Value != db.StateDone &&
-			states[i].Value != db.StateIdle {
+			states[i].Value != db.StateDone {
 			return &states[i]
 		}
 	}
