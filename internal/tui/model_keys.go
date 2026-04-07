@@ -388,6 +388,10 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return nm, cmd
 	case key.Matches(msg, keys.Esc.Binding):
 		m.focus = panelSidebar
+	case key.Matches(msg, keys.ClearState.Binding):
+		if target := m.procListStateTarget(); target != "" {
+			return m, m.clearCurrentState(target)
+		}
 	case key.Matches(msg, keys.Kill.Binding):
 		// TODO: confirmation prompt
 	case key.Matches(msg, keys.Restart.Binding):
@@ -409,6 +413,19 @@ func (m Model) flagCurrentState(sessionName string) tea.Cmd {
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
+}
+
+// procListStateTarget returns the state target string for the currently selected
+// proc list node: "session:wi" for window headers, "session:wi.pi" for pane/proc nodes.
+func (m Model) procListStateTarget() string {
+	node := m.procList.SelectedNode()
+	if node == nil {
+		return ""
+	}
+	if node.IsWindowHeader {
+		return fmt.Sprintf("%s:%d", node.Pane.Session, node.Pane.WindowIndex)
+	}
+	return fmt.Sprintf("%s:%d.%d", node.Pane.Session, node.Pane.WindowIndex, node.Pane.PaneIndex)
 }
 
 // clearCurrentState clears the state for the given session target.
