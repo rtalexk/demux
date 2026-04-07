@@ -80,7 +80,7 @@ func (m Model) handleConfirmOverlay(msg tea.Msg) (Model, tea.Cmd) {
 		m.showConfirm = false
 		m.confirmCmd = nil
 		return m, cmd
-	case "n", "esc":
+	case "n", "esc", "q":
 		m.showConfirm = false
 		m.confirmCmd = nil
 	}

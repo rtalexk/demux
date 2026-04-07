@@ -23,7 +23,7 @@ func (c ConfirmModel) Render() string {
 	sb.WriteString("\n\n")
 	sb.WriteString(fmt.Sprintf("  %s  confirm\n  %s  cancel",
 		hintStyle.Render("y / Enter"),
-		hintStyle.Render("n / Esc"),
+		hintStyle.Render("n / Esc / q"),
 	))
 	return yankStyle.Render(sb.String())
 }
