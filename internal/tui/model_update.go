@@ -151,7 +151,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 		// First load: sidebar is visible — kick off tick and states; procs are fetched on-demand
 		m.currentSession = msg.currentSession
 		switch m.cfg.Sidebar.FocusOnOpen {
-		case "current_session", "first_session", "state_session":
+		case "current_session", "first_session":
 			visibleRows := max(1, m.height-1-2-searchBoxH)
 			m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
 		}
@@ -199,6 +199,10 @@ func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
 	m.sidebar.SetData(merged, msg.states, m.gitInfo, m.cfg)
 	if !m.startupFocusDone {
 		m.startupFocusDone = true
+		if m.cfg.Sidebar.FocusOnOpen == "state_session" {
+			visibleRows := max(1, m.height-1-2-searchBoxH)
+			m.applyNonAlertFocusMode("state_session", visibleRows)
+		}
 		if m.cfg.Sidebar.FocusSearchOnOpen {
 			m.searchInput.EnterInsertMode()
 		}
