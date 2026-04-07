@@ -169,3 +169,56 @@ func TestStateIdle_SetAndRetrieve(t *testing.T) {
 		t.Errorf("expected idle state, got: %+v", st)
 	}
 }
+
+func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Set to done.
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil)
+
+	// Try to overwrite with working, but guard says "only if currently working".
+	ifWorking := StateWorking
+	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifWorking)
+	if err != nil {
+		t.Fatalf("ifState mismatch should be a silent no-op, got: %v", err)
+	}
+
+	st, _ := d.StateByTarget("s:0:0")
+	if st == nil || st.Value != StateDone {
+		t.Errorf("state should remain done after mismatch, got: %+v", st)
+	}
+}
+
+func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, nil)
+
+	ifWorking := StateWorking
+	if err := d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, &ifWorking); err != nil {
+		t.Fatalf("ifState match should write: %v", err)
+	}
+	st, _ := d.StateByTarget("s:0:0")
+	if st == nil || st.Value != StateDone {
+		t.Errorf("expected done state, got: %+v", st)
+	}
+}
+
+func TestStateSet_IfState_NoopWhenNoRow(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// No row exists. Passing ifState=StateIdle (6) should be a no-op because
+	// a missing row is treated as StateValue(0), not StateIdle.
+	ifIdle := StateIdle
+	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifIdle)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	st, _ := d.StateByTarget("s:0:0")
+	if st != nil {
+		t.Errorf("no row should exist: missing row != StateIdle, got: %+v", st)
+	}
+}

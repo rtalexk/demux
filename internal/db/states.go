@@ -118,7 +118,9 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 		current = &cur
 	}
 
-	// Apply --if-state condition: bail out (no-op) if current state doesn't match.
+	// Apply --if-state condition: no-op if current state doesn't match.
+	// A missing row is treated as StateValue(0), not StateIdle; callers
+	// wanting "write if currently idle" must pass StateValue(0), not &StateIdle.
 	if ifState != nil {
 		currentValue := StateValue(0)
 		if current != nil {
