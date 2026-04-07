@@ -97,23 +97,6 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 	return s.filter
 }
 
-// statePriority maps a StateValue to a numeric priority (higher = more urgent).
-func statePriority(value db.StateValue) int {
-	switch value {
-	case db.StateWaiting:
-		return 4
-	case db.StateError:
-		return 3
-	case db.StateDone:
-		return 2
-	case db.StateFlagged:
-		return 1
-	case db.StateIdle:
-		return 0
-	default: // working — fall through to next sort key
-		return 0
-	}
-}
 
 // stateForSession returns the highest-priority ToolState for the session, or nil if none.
 func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
@@ -124,7 +107,7 @@ func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 		if target != sess && !strings.HasPrefix(target, prefix) {
 			continue
 		}
-		pri := statePriority(st.Value)
+		pri := st.Value.Priority()
 		if pri > bestPri {
 			bestPri = pri
 			st := st
@@ -282,11 +265,11 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
 func (s *SidebarModel) comparePriority(si, sj session.Session) int {
 	priI := -1
 	if stI := s.stateForSession(si.DisplayName); stI != nil {
-		priI = statePriority(stI.Value)
+		priI = stI.Value.Priority()
 	}
 	priJ := -1
 	if stJ := s.stateForSession(sj.DisplayName); stJ != nil {
-		priJ = statePriority(stJ.Value)
+		priJ = stJ.Value.Priority()
 	}
 	if priI != priJ {
 		if priI > priJ {

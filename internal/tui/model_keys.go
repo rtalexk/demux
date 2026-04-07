@@ -201,7 +201,7 @@ func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string
 		if st.Value == db.StateDone || st.Value == db.StateIdle || st.Value == 0 {
 			continue
 		}
-		if pri := statePriority(st.Value); pri > bestPri {
+		if pri := st.Value.Priority(); pri > bestPri {
 			bestPri = pri
 			best = st.Target
 		}

@@ -48,6 +48,24 @@ func (v StateValue) String() string {
 	}
 }
 
+// Priority returns a numeric urgency score for sorting and filtering.
+// Higher values are more urgent. Waiting is the most urgent because it
+// blocks on human input; Working and Idle are least urgent.
+func (v StateValue) Priority() int {
+	switch v {
+	case StateWaiting:
+		return 4
+	case StateError:
+		return 3
+	case StateDone:
+		return 2
+	case StateFlagged:
+		return 1
+	default: // StateWorking, StateIdle, unknown
+		return 0
+	}
+}
+
 // ParseStateValue converts a user-supplied string to a StateValue.
 func ParseStateValue(s string) (StateValue, error) {
 	switch s {

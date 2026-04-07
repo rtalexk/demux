@@ -4,6 +4,28 @@ import (
 	"testing"
 )
 
+func TestStateValue_Priority(t *testing.T) {
+	tests := []struct {
+		value StateValue
+		want  int
+	}{
+		{0, 0},            // implicit zero / unknown
+		{StateWorking, 0}, // in-progress but not urgent
+		{StateIdle, 0},
+		{StateFlagged, 1},
+		{StateDone, 2},
+		{StateError, 3},
+		{StateWaiting, 4}, // highest — needs human input
+	}
+	for _, tt := range tests {
+		t.Run(tt.value.String(), func(t *testing.T) {
+			if got := tt.value.Priority(); got != tt.want {
+				t.Errorf("Priority() = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStateSet_BasicUpsert(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()

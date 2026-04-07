@@ -1063,24 +1063,20 @@ func TestFormatAge(t *testing.T) {
 	}
 }
 
-func TestStatePriority(t *testing.T) {
-	tests := []struct {
-		value db.StateValue
-		want  int
-	}{
-		{0, 0}, // idle (implicit zero)
-		{db.StateWorking, 0},
-		{db.StateFlagged, 1},
-		{db.StateDone, 2},
-		{db.StateError, 3},
-		{db.StateWaiting, 4},
+func TestStateValue_Priority_InTUI(t *testing.T) {
+	// Verify the priority ordering used by sorting and filtering in the TUI.
+	// The canonical implementation lives in db.StateValue.Priority().
+	if db.StateWaiting.Priority() <= db.StateError.Priority() {
+		t.Error("Waiting must have higher priority than Error")
 	}
-	for _, tt := range tests {
-		t.Run(tt.value.String(), func(t *testing.T) {
-			if got := statePriority(tt.value); got != tt.want {
-				t.Errorf("statePriority(%v) = %d, want %d", tt.value, got, tt.want)
-			}
-		})
+	if db.StateError.Priority() <= db.StateDone.Priority() {
+		t.Error("Error must have higher priority than Done")
+	}
+	if db.StateDone.Priority() <= db.StateFlagged.Priority() {
+		t.Error("Done must have higher priority than Flagged")
+	}
+	if db.StateFlagged.Priority() <= db.StateWorking.Priority() {
+		t.Error("Flagged must have higher priority than Working")
 	}
 }
 

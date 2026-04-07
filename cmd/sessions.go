@@ -150,7 +150,7 @@ func buildStatesBySession(states []db.ToolState) map[string]db.ToolState {
 		if len(parts) > 0 {
 			sessName := parts[0]
 			// Keep highest-priority state per session
-			if existing, ok := out[sessName]; !ok || st.Value > existing.Value {
+			if existing, ok := out[sessName]; !ok || st.Value.Priority() > existing.Value.Priority() {
 				out[sessName] = st
 			}
 		}
