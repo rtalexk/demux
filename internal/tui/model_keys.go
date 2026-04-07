@@ -453,7 +453,7 @@ func (m Model) showClearConfirm(target string) Model {
 	if st != nil {
 		body += "\n  state:  " + st.Value.String()
 		if st.Message != "" {
-			body += "  •  " + st.Message
+			body += "\n          " + st.Message
 		}
 	}
 	m.confirm = ConfirmModel{
