@@ -184,6 +184,20 @@ func (d *DB) StateDeleteIfResting(target string) error {
 	return err
 }
 
+// StateDeleteBySession removes all state records for the given session.
+// It matches targets equal to name (bare) or prefixed with "name:" (session:window).
+// Returns the number of rows deleted.
+func (d *DB) StateDeleteBySession(name string) (int64, error) {
+	res, err := d.sql.Exec(
+		`DELETE FROM tool_states WHERE target = ? OR target LIKE ?`,
+		name, name+":%",
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // StateByTarget returns the ToolState for target, or nil if no record exists (idle).
 func (d *DB) StateByTarget(target string) (*ToolState, error) {
 	row := d.sql.QueryRow(`
