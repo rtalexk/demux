@@ -221,8 +221,8 @@ func Default() Config {
 			ColorStateDoneBg:    "#1a3a1a",
 			ColorStateError:     "#f38ba8",
 			ColorStateErrorBg:   "#3d1020",
-			ColorStateFlagged:   "#b4befe",
-			ColorStateFlaggedBg: "#1e1e2e",
+			ColorStateFlagged:   "#cba6f7",
+			ColorStateFlaggedBg: "#2a1a4d",
 
 			IconStateWorking: "⟳",
 			IconStateWaiting: "●",
