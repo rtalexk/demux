@@ -41,6 +41,7 @@ type keyMap struct {
 	FilterWorktree    keyDef
 	Open              keyDef
 	StateFilter       keyDef
+	FlagState         keyDef
 	ExpandCollapse    keyDef // display-only combined entry
 	Expand            keyDef
 	Collapse          keyDef
@@ -77,7 +78,8 @@ var keys = keyMap{
 	Enter:      keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "attach to session")), "Sidebar", 1},
 	Open:       keyDef{key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o / ctrl+o", "attach to session / window")), "Sidebar", 2},
 	Esc:        keyDef{key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back to session level")), "Sidebar", 3},
-	ClearState: keyDef{key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "clear state")), "Sidebar", 4},
+	FlagState:  keyDef{key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "flag (bookmark)")), "Sidebar", 4},
+	ClearState: keyDef{key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "clear state")), "Sidebar", 5},
 
 	// Filters
 	FilterTmux:     keyDef{key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tmux sessions only (default)")), "Filters", 1},
@@ -113,7 +115,7 @@ func allKeyDefs() []keyDef {
 		// Navigation
 		keys.Navigate, keys.Tab, keys.GotoTop, keys.GotoBottom,
 		// Sidebar
-		keys.Enter, keys.Open, keys.Esc, keys.ClearState,
+		keys.Enter, keys.Open, keys.Esc, keys.FlagState, keys.ClearState,
 		// Filters
 		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter,
 		// Process list

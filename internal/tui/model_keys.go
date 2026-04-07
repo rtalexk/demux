@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -253,6 +254,10 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.Esc.Binding):
 		m.sidebar.MoveToSessionLevel()
+	case key.Matches(msg, keys.FlagState.Binding):
+		if node := m.sidebar.Selected(); node != nil {
+			return m, m.flagCurrentState(node.Session)
+		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
 			return m, m.clearCurrentState(node.Session)
@@ -393,6 +398,17 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
 	m.updateDetailFromSelection()
 	return m, nil
+}
+
+// flagCurrentState sets the flagged state for the given session target.
+func (m Model) flagCurrentState(sessionName string) tea.Cmd {
+	d := m.db
+	msg := m.cfg.Tui.FlagDefaultMessage
+	return func() tea.Msg {
+		_ = d.StateSet(sessionName, "", db.StateFlagged, msg, db.SourceUser)
+		states, _ := d.StateList(0, "")
+		return statesMsg{states: states}
+	}
 }
 
 // clearCurrentState clears the state for the given session target.

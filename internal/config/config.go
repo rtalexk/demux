@@ -139,7 +139,8 @@ type LogConfig struct {
 }
 
 type TuiConfig struct {
-	AttentionFilterIncludeWorking bool `toml:"attention_filter_include_working"`
+	AttentionFilterIncludeWorking bool   `toml:"attention_filter_include_working"`
+	FlagDefaultMessage            string `toml:"flag_default_message"`
 }
 
 type Config struct {
@@ -178,6 +179,7 @@ func Default() Config {
 		Log:       LogConfig{Level: "warn"},
 		Tui: TuiConfig{
 			AttentionFilterIncludeWorking: false,
+			FlagDefaultMessage:            "Come back",
 		},
 		Git: GitConfig{
 			Enabled:         true,

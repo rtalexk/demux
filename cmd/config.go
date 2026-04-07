@@ -81,6 +81,13 @@ switch_focus = "default"
 # Right-align pane CWD paths in the process list, with a fill separator
 path_right_align = false
 
+[tui]
+# Include working sessions in the ! attention filter (default: false — only error/flagged/waiting)
+attention_filter_include_working = false
+
+# Default message stored when flagging a session with 'd' in the sidebar
+flag_default_message = "Come back"
+
 [status_bar]
 # Show the status bar at the bottom of the screen
 show = true

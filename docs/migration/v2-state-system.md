@@ -62,8 +62,9 @@ demux state set --target "$TARGET" --state working --tool claude \
 
 | Key | Action                                                                       |
 | --- | ---------------------------------------------------------------------------- |
-| `!` | Toggle attention filter (sessions with error/flagged/waiting/working states) |
+| `F` | Flag the selected session (bookmark for follow-up)                           |
 | `X` | Clear state for the currently selected session                               |
+| `!` | Toggle attention filter (sessions with error/flagged/waiting/working states) |
 
 ### Attention filter
 
