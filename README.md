@@ -2,11 +2,14 @@
 
 **demux** is a session manager and dashboard for tmux. It allows you to move fast across tmux sessions, shows you what is running across all your sessions: processes, git branches, ports, all without leaving the terminal.
 
-Configure your coding agent, or any other tool, to alert you when it needs attention.
+Track what your tools are doing across every pane: working, waiting, done, or failed.
 
 ![demux TUI](docs/assets/normal_view.png)
 
 ![demux compact mode](docs/assets/compact_view.png)
+
+> [!CAUTION]
+> **v2 breaking change:** The alert system has been replaced by the state system. `demux alert` commands, `[alerts]` config, and `color_alert_*` theme tokens no longer exist. See the [migration guide](docs/migration/v2-state-system.md) before upgrading.
 
 ## Motivation
 
@@ -24,7 +27,7 @@ I looked at a few tools ([Conductor](https://www.conductor.build/), [LazyAgent](
 
 I had already extended my personal CLI with commands to [manage git worktrees](https://github.com/rtalexk/dotfiles/tree/main/alx/cmd/worktree). I only discovered [Worktrunk](https://github.com/max-sixty/worktrunk) after the fact, and while my implementation is limited, it does what I need. I may switch eventually, but not any time soon.
 
-_opensessions_ came closest to what I was looking for, and its premise overlaps significantly with mine. But Sesh's UX is too deeply wired into my muscle memory, and I was already mid-implementation anyway. What I needed was Sesh, but with alerts and process information.
+_opensessions_ came closest to what I was looking for, and its premise overlaps significantly with mine. But Sesh's UX is too deeply wired into my muscle memory, and I was already mid-implementation anyway. What I needed was Sesh, but with state tracking and process information.
 
 Why not just configure Claude to send OS-level notifications? I hate notifications. Almost all of them are blocked on my phone, and only a handful are allowed on the desktop. They're disorganized, and they interrupt flow. What I actually want is: _tell me you need attention, and I'll get to you when I'm free._
 
@@ -63,7 +66,7 @@ windows = ["editor", "shell"]
 
 `alx wt add` reads that file, creates a worktree in the repo, spins up a tmux session named `<alias>-<worktree>` (e.g. `rem-user-signup`), copies any files listed in `copy_files`, runs the `on_create` command, and registers the session in demux's `private.toml` forwarding the `[demux]` block.
 
-Claude knows this workflow. It uses my CLI to take tickets independently with worktrees, opens PRs, and notifies me via `demux alert set ...`.
+Claude knows this workflow. It uses my CLI to take tickets independently with worktrees, opens PRs, and notifies me via `demux state set ...`.
 
 demux will keep evolving as my workflow does. tmux and Neovim are constants ((Neo)?Vim for 15+ years, tmux for 5+). I don't expect to replace them any time soon.
 
@@ -72,14 +75,14 @@ demux will keep evolving as my workflow does. tmux and Neovim are constants ((Ne
 ## Features
 
 - Jump fast across tmux sessions
-- Live sidebar of tmux sessions with git status (branch, dirty, ahead/behind)
+- Live sidebar with git status (branch, dirty, ahead/behind) and last-seen age
 - Process list per session: CPU, memory, uptime, listening port, working directory
-- Alert system: set info/warn/error alerts on any window or pane, pluggable on any tool
+- State system: track tool lifecycle (working, waiting, done, error, flagged) across any pane
 - Fuzzy search across sessions, windows, and processes
 - Compact popup mode for use in a tmux split or popup
-- Scriptable CLI: list sessions, procs, ports, alerts in text/table/json
+- Scriptable CLI: list sessions, procs, ports, and states in text/table/json
 - Tmux status bar integration via `demux status`
-- Auto-clears alerts on pane focus via tmux hooks
+- Auto-clears state on pane focus via tmux hooks
 - Fully themeable with a Catppuccin Mocha default
 - Session config: define sessions with groups, labels, icons, and window templates
 
@@ -89,6 +92,20 @@ demux will keep evolving as my workflow does. tmux and Neovim are constants ((Ne
 
 ```bash
 brew install rtalexk/demux/demux
+```
+
+**Go**
+
+```bash
+go install github.com/rtalexk/demux@latest
+```
+
+## Upgrade
+
+**Homebrew**
+
+```bash
+brew upgrade rtalexk/demux/demux
 ```
 
 **Go**
@@ -111,64 +128,405 @@ Launch in compact mode (useful as a tmux popup):
 demux --compact
 ```
 
-Set `DEMUX_POPUP=1` to make demux quit automatically after switching to a
-session. Pair this with a tmux popup binding:
-
-```tmux
-bind-key K display-popup -E -w 80% -h 80% "DEMUX_POPUP=1 demux"
-bind-key k display-popup -E -w 30% -h 80% "DEMUX_POPUP=1 demux --compact"
-```
-
 Start with the search input focused:
 
 ```bash
 demux --search
 ```
 
-## Key Bindings
+<details>
 
-| Key                 | Action                          |
-| ------------------- | ------------------------------- |
-| `j` / `k`           | Move down / up                  |
-| `g` / `G`           | Jump to top / bottom            |
-| `J` / `K`           | Jump down / up (large step)     |
-| `h`                 | Focus sidebar                   |
-| `l`                 | Focus process list              |
-| `enter`             | Switch to session               |
-| `o`                 | Open / attach to session        |
-| `y`                 | Yank session name to clipboard  |
-| `x`                 | Kill selected process           |
-| `r`                 | Restart selected process        |
-| `L`                 | View process log                |
-| `R`                 | Force refresh                   |
-| `t`                 | Filter: tmux sessions only      |
-| `a`                 | Filter: all sessions            |
-| `c`                 | Filter: config sessions only    |
-| `w`                 | Filter: worktree sessions only  |
-| `!`                 | Filter: sessions with alerts    |
-| `tab` / `shift+tab` | Cycle focus                     |
-| `[` / `]`           | Collapse / expand process group |
-| `{` / `}`           | Collapse / expand all groups    |
-| `?`                 | Toggle help overlay             |
-| `q` / `ctrl+c`      | Quit                            |
+<summary>Using demux as a tmux popup</summary>
+
+Set `DEMUX_POPUP=1` to make demux quit automatically after switching to a session. Pair this with a tmux popup binding:
+
+```tmux
+# Full mode popup (80% width)
+bind-key K display-popup -E -w 80% -h 80% "DEMUX_POPUP=1 demux"
+
+# Compact mode popup (30% width, sidebar only)
+bind-key k display-popup -E -w 30% -h 80% "DEMUX_POPUP=1 demux --compact"
+```
+
+Paste these lines into `~/.tmux.conf` and reload:
+
+```bash
+tmux source ~/.tmux.conf
+```
+
+</details>
+
+## TUI
+
+The TUI has three panels:
+
+- **Sidebar** — lists sessions with state indicators, git status, and last-seen age.
+- **Process list** — shows processes for the selected session, grouped by pane.
+- **Detail panel** — contextual info for the selected session, window, or process.
+
+In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar and search box are shown, making it suitable for narrow tmux popups.
+
+<details>
+
+<summary>Key bindings</summary>
+
+**Global**
+
+| Key                 | Action                       |
+| ------------------- | ---------------------------- |
+| `h` / `l`           | Focus sidebar / process list |
+| `Tab` / `Shift+Tab` | Cycle focus (wraps)          |
+| `f`                 | Focus search input / filter  |
+| `Ctrl+u`            | Clear search filter          |
+| `R`                 | Force refresh                |
+| `?`                 | Toggle help overlay          |
+| `q` / `Ctrl+c`      | Quit                         |
+
+**Navigation** (works in sidebar and process list)
+
+| Key                 | Action                |
+| ------------------- | --------------------- |
+| `j` / `k`           | Move down / up        |
+| `Ctrl+j` / `Ctrl+n` | Move down (alternate) |
+| `Ctrl+k` / `Ctrl+p` | Move up (alternate)   |
+| `g` / `G`           | Jump to top / bottom  |
+
+**Sidebar**
+
+| Key            | Action                                            |
+| -------------- | ------------------------------------------------- |
+| `Enter`        | Attach to session                                 |
+| `o` / `Ctrl+o` | Attach to session / highest-priority state window |
+| `Esc`          | Back to session level (from window view)          |
+| `y`            | Open yank menu (copy session name to clipboard)   |
+| `F`            | Flag the selected session                         |
+| `X`            | Clear state for the selected session              |
+
+**Sidebar filters**
+
+| Key | Filter                                               |
+| --- | ---------------------------------------------------- |
+| `t` | Tmux sessions only (default)                         |
+| `a` | All sessions (tmux + config)                         |
+| `c` | Config sessions only                                 |
+| `w` | Sessions in current worktree                         |
+| `!` | Sessions needing attention (error, flagged, waiting) |
+
+**Process list**
+
+| Key            | Action                             |
+| -------------- | ---------------------------------- |
+| `J` / `K`      | Jump to next / previous pane group |
+| `Enter`        | Toggle expand / collapse group     |
+| `o` / `Ctrl+o` | Attach to selected pane            |
+| `]` / `[`      | Expand / collapse group            |
+| `}` / `{`      | Expand / collapse all groups       |
+| `x`            | Kill selected process              |
+| `r`            | Restart selected process           |
+| `L`            | Open process log popup             |
 
 Press `?` inside the TUI for the full interactive reference.
 
+</details>
+
+<details>
+
+<summary>Sidebar filters and sort order</summary>
+
+The sidebar can show different sets of sessions depending on the active filter:
+
+- **tmux (`t`)** — only live tmux sessions (default).
+- **all (`a`)** — live tmux sessions plus sessions defined in config that are not currently running.
+- **config (`c`)** — config-only sessions (defined but not currently live).
+- **worktree (`w`)** — sessions whose path belongs to the same git worktree as the current session.
+- **attention (`!`)** — sessions with `error`, `flagged`, or `waiting` states. Configure whether `working` is included with `tui.attention_filter_include_working`.
+
+Sessions are sorted by priority, then last-seen time, then alphabetically. Change the order in `demux.toml`:
+
+```toml
+[sidebar]
+sort = ["priority", "last_seen", "alphabetical"]
+```
+
+When you open the TUI, the sidebar can focus different rows based on `focus_on_open`:
+
+- `current_session` — select the currently active tmux session.
+- `first_session` — select the first row.
+- `state_session` — select the first session that has a visible state.
+
+</details>
+
+## State System
+
+demux tracks what tools are doing in each pane. A state has:
+
+- **target** — which pane/window/session is affected, in `session:window.pane` format.
+- **state** — one of `working`, `waiting`, `done`, `error`, or `flagged`.
+- **tool** — optional name of the tool that set the state (e.g. `claude`).
+- **message** — optional human-readable detail.
+
+States are stored in a local SQLite database and reflected in the sidebar and status bar in near-real time.
+
+<details>
+
+<summary>Setting and clearing states</summary>
+
+```bash
+# Mark a pane as working
+demux state set --target myproject:1.0 --state working --tool claude --message "on it"
+
+# Mark as done
+demux state set --target myproject:1.0 --state done --tool claude --message "task complete"
+
+# Clear a state (return to idle)
+demux state clear --target myproject:1.0
+
+# Clear a flagged state (requires --yes)
+demux state clear --target myproject:1.0 --yes
+
+# List all active states
+demux state ls
+
+# Filter by state or tool
+demux state ls --state waiting
+demux state ls --tool claude
+```
+
+**Conditional writes**
+
+Use `--if-state` to only update if the current state matches:
+
+```bash
+# Only set to idle if currently done (avoids overwriting active states)
+demux state set --target myproject:1.0 --state idle --if-state done
+```
+
+**Write lock**
+
+When a tool sets an active state (`working` or `waiting`), that pane is locked. Another tool cannot overwrite it unless `--force` is passed:
+
+```bash
+demux state set --target myproject:1.0 --state working --tool other --force
+```
+
+> [!WARNING]
+> `--force` bypasses all lock rules, including the `flagged` state which is user-owned. Avoid using it in automated hooks — it can silently overwrite bookmarks you set manually.
+
+**Flagging**
+
+The `flagged` state is a user-facing bookmark. It can only be set with `--source user`:
+
+```bash
+demux state set --target myproject:1.0 --state flagged --source user --message "review this"
+```
+
+In the TUI, press `F` on a target to flag it directly. Press `F` again to unflag it.
+
+</details>
+
+<details>
+
+<summary>State values and priority</summary>
+
+| State     | Meaning                             | Priority |
+| --------- | ----------------------------------- | -------- |
+| `waiting` | Tool is paused, expecting input     | Highest  |
+| `error`   | Tool failed or encountered an error | High     |
+| `done`    | Tool completed successfully         | Medium   |
+| `flagged` | User-set bookmark (needs attention) | Low      |
+| `working` | Tool is actively running            | Lower    |
+| _(idle)_  | No active state                     | None     |
+
+When multiple panes in a session have states, the highest-priority one is shown in the sidebar.
+
+**Done → idle visual transition**
+
+After a configurable timeout (default 60 seconds), a `done` state is rendered as `idle` in the TUI. This prevents `done` badges from accumulating when you're busy and lets you see at a glance that a tool finished a while ago versus just now.
+
+> [!NOTE]
+> The DB record is not changed. Navigating to the pane or pressing `X` still clears it normally — the idle rendering is purely visual.
+
+Configure the threshold in `demux.toml`:
+
+```toml
+[tui]
+done_idle_after_secs = 60   # 0 to disable; done stays visible until manually cleared
+```
+
+</details>
+
 ## Configuration
 
-The default config path is `~/.config/demux/demux.toml`. Generate a
-commented starting point with:
+The default config path is `~/.config/demux/demux.toml`. Generate a commented starting point with:
 
 ```bash
 demux config init > ~/.config/demux/demux.toml
 ```
 
-The generated file is fully commented and covers all available options.
+<details>
 
-### Sessions
+<summary>All configuration options</summary>
 
-Define sessions in `~/.config/demux/sessions.toml`. Sensitive entries can
-go in `~/.config/demux/private.toml`, which is gitignore-friendly.
+```toml
+# How often to refresh session/process data (milliseconds)
+refresh_interval_ms = 3000
+
+# Sessions to hide from the sidebar
+ignored_sessions = []
+
+# Processes to hide from the process list (children are promoted up)
+ignored_processes = ["zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"]
+
+# Default output format for CLI commands: text | table | json
+default_format = "text"
+
+# UI layout mode: full | compact
+mode = "full"
+
+# Path prefix aliases — shorten verbose absolute paths in the TUI.
+# Longest matching prefix wins. Supports environment variables.
+# [[path_aliases]]
+# prefix  = "$HOME"
+# replace = "~"
+
+[sidebar]
+width = 35                          # sidebar width in columns
+show_last_seen = true               # show last-seen age on each live session row
+focus_on_open = "current_session"   # current_session | first_session | state_session
+focus_search_on_open = false        # start with cursor in the search input
+default_filter = "t"                # t | a | c | w | !
+sort = ["priority", "last_seen", "alphabetical"]
+switch_focus = "default"            # default | newest | oldest
+
+[process_list]
+path_right_align = false            # right-align pane CWD paths
+
+[tui]
+attention_filter_include_working = false  # include working sessions in the ! filter
+flag_default_message = "Come back"        # default message when flagging a session
+done_idle_after_secs = 60                 # render done as idle after N seconds (0 = disabled)
+
+[log]
+level = "warn"                      # off | error | warn | info | debug
+                                    # log file: ~/.local/share/demux/demux.log
+
+[status_bar]
+show = true
+
+[git]
+enabled = true
+show_spinner = false
+timeout_ms = 500
+on_timeout = "cached"               # cached | hide | error
+fallback_display = "—"
+error_display = "git err"
+
+[git.pr]
+enabled = false                     # show PR info in the detail panel
+```
+
+</details>
+
+<details>
+
+<summary>Theme customization</summary>
+
+All colors use hex values. The default is Catppuccin Mocha.
+
+```toml
+[theme]
+# Structure & chrome
+color_bg       = "#0d0d14"
+color_surface  = "#13131a"
+color_raised   = "#1e1e2e"
+color_selected = "#2a2a4a"
+color_border   = "#313244"
+
+# Text hierarchy
+color_fg_primary = "#cdd6f4"
+color_fg_subtext = "#a6adc8"
+color_fg_muted   = "#9399b2"
+color_fg_dim     = "#6c7086"
+color_fg_ghost   = "#45475a"
+
+# Session name color
+color_session = "#89b4fa"
+
+# Process type colors
+color_proc_claude = "#cba6f7"
+color_proc_server = "#89dceb"
+color_proc_editor = "#b4befe"
+color_proc_child  = "#a6adc8"
+
+# Git status indicators
+color_git_dirty  = "#f9e2af"
+color_git_behind = "#74c7ec"
+color_git_ahead  = "#a6e3a1"
+
+# State icons and colors (foreground + background per state)
+icon_state_working = "⟳"
+color_state_working    = "#7f849c"
+color_state_working_bg = "#1e1e2e"
+
+icon_state_waiting = "●"
+color_state_waiting    = "#f9e2af"
+color_state_waiting_bg = "#3d3500"
+
+icon_state_done = "✔"
+color_state_done    = "#a6e3a1"
+color_state_done_bg = "#1a3a1a"
+
+icon_state_error = "✗"
+color_state_error    = "#f38ba8"
+color_state_error_bg = "#3d1020"
+
+icon_state_flagged = "🔖"
+color_state_flagged    = "#cba6f7"
+color_state_flagged_bg = "#2a1a4d"
+
+icon_state_idle = "○"
+color_state_idle    = "#89dceb"
+color_state_idle_bg = "#0d2530"
+
+# Session source icons (shown in sidebar)
+icon_tmux_session = "⊞"   # live tmux session
+icon_cfg_session  = "⚙︎"   # config-only (not currently running)
+
+# Port badge
+color_port    = "#a6e3a1"
+color_port_bg = "#1a3a2a"
+
+# Misc semantic colors
+color_clean   = "#a6e3a1"   # clean git state
+color_cpu_low  = "#7f849c"
+color_cpu_med  = "#f9e2af"
+color_cpu_high = "#f38ba8"
+
+# Search match highlight
+color_fg_search_highlight = "#f9e2af"
+
+# Process type classification (matched case-insensitively against process name)
+[theme.processes]
+editors = ["nvim", "vim", "vi", "nano", "emacs", "hx", "micro", "helix"]
+agents  = ["claude", "aider", "cursor", "copilot", "continue", "cody"]
+servers = [
+  "railway", "rails", "node", "deno", "bun",
+  "python", "python3", "uvicorn", "gunicorn", "fastapi", "django", "flask",
+  "cargo", "go", "air", "watchexec",
+  "vite", "webpack", "next", "nuxt",
+  "caddy", "nginx", "httpd",
+]
+shells = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
+```
+
+</details>
+
+## Sessions
+
+Define sessions in `~/.config/demux/sessions.toml`. Sensitive or machine-specific entries (e.g. paths that differ per machine) can go in `~/.config/demux/private.toml` instead, which you can safely exclude from version control.
+
+> [!TIP]
+> Add `private.toml` to your dotfiles `.gitignore` to keep machine-specific paths and session names out of version control.
 
 Add a session from the command line:
 
@@ -183,16 +541,44 @@ Or write it by hand:
 name     = "myproject"          # must match the tmux session name
 path     = "~/code/myproject"   # root directory of the session
 group    = "work"               # optional group label in the sidebar
-labels   = ["rust", "api"]      # optional tags
+labels   = ["rust", "api"]      # optional tags shown in the detail panel
 icon     = "⚙︎"                  # optional icon shown in the sidebar
 worktree = false                # true if the path is a git worktree
 windows  = ["editor", "term"]   # window templates to create on launch
 ```
 
-### Window Templates
+<details>
 
-Window templates let you define reusable tmux window layouts. They live in
-`sessions.toml` alongside your session entries.
+<summary>Managing sessions from the CLI</summary>
+
+```bash
+# Add a session entry
+demux session config-add --name myproject --path ~/code/myproject \
+  --group work --labels rust,api --icon "⚙︎" --windows editor,term
+
+# Add to private.toml instead (for sensitive paths)
+demux session config-add --name myproject --path ~/code/myproject --private
+
+# Print a session's config block
+demux session config-get --name myproject
+
+# Remove a session entry from config (searches both files)
+demux session config-remove --name myproject
+
+# Remove a session completely: kills tmux session, removes config entry, clears states
+demux session remove --name myproject
+```
+
+> [!CAUTION]
+> `demux session remove` kills the tmux session, removes its config entry, and deletes all stored states. This cannot be undone.
+
+</details>
+
+<details>
+
+<summary>Window templates</summary>
+
+Window templates let you define reusable tmux window layouts. They live in `sessions.toml` alongside your session entries.
 
 ```toml
 [[window_templates]]
@@ -205,7 +591,7 @@ id               = "term"
 name             = "terminal"
 after_create_cmd = ""
 
-# inherit from another template and override fields
+# Inherit from another template and override fields
 [[window_templates]]
 id   = "server"
 from = "term"                       # copies name and after_create_cmd from "term"
@@ -219,7 +605,11 @@ Create the windows for a session:
 demux session create-windows --session myproject --windows editor,term,server
 ```
 
-### Path Aliases
+</details>
+
+<details>
+
+<summary>Path aliases</summary>
 
 Shorten verbose paths displayed in the TUI. The longest matching prefix wins.
 
@@ -243,94 +633,122 @@ prefix  = "$HOME"   # supports environment variables
 replace = "~"
 ```
 
-### Theme
-
-demux ships with a Catppuccin Mocha theme. All colors are configurable
-under the `[theme]` section of `demux.toml`.
+</details>
 
 ## Hooks
 
-### tmux
+### Tmux
 
-demux can automatically clear alerts when you navigate between panes,
-windows, or sessions. Print the hook configuration with:
+demux can automatically clear `done` states when you navigate between panes, windows, or sessions, so you always know if a tool finished while you were away. Generate the hook configuration with:
 
 ```bash
-demux hooks init --agent tmux
+demux hooks init --tool tmux
 ```
 
-> **Note:** The `--agent` flag will be renamed in a future version.
-
-Then paste the output into `~/.tmux.conf` and reload:
+Paste the output into `~/.tmux.conf` and reload:
 
 ```bash
 tmux source ~/.tmux.conf
 ```
 
-This is my Tmux hooks configuration
+<details>
+
+<summary>Tmux hook snippet</summary>
 
 ```tmux
-# Clears Demux alerts when switching between panes within the same window.
+# Clears Demux done states when switching between panes within the same window.
 set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
-# Clears Demux alerts when switching windows (after-select-pane does not fire for window switches).
+# Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
 set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
-# Clears Demux alerts when switching sessions (after-select-window does not fire for session switches).
+# Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
 set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 
-# Clears Demux alerts when switching back from another application.
+# Clears Demux done states when switching back from another application.
 set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
 ```
 
+</details>
+
 ### Tmux Status Bar
 
-Add a live alert summary to your tmux status bar:
+Add a live state summary to your tmux status bar:
 
 ```tmux
 set -g status-right "#(demux status)"
 ```
 
-This outputs a colored count of active alerts (info, warn, error). When
-there are no alerts it shows a green indicator.
+This outputs a colored summary of active pane states. When all panes are idle it shows a green indicator. Counts for `error`, `flagged`, and `waiting` are shown when any are active.
 
-### Claude
+### Claude Code
 
-I have the following configuration at `~/.claude/settings.json`. This will make Claude send demux alerts whenever it pauses for a permission prompt, waits for input, or finishes a task, so your tmux status line always reflects what Claude is doing in each pane.
+The following `~/.claude/settings.json` configuration makes Claude update the demux state whenever it starts working, pauses for a permission prompt, waits for input, or finishes a task. Your tmux status line will always reflect what Claude is doing in each pane.
 
 <details>
 
-<summary>Claude Notification settings</summary>
+<summary>Claude hook settings</summary>
 
 ```jsonc
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state working --tool claude --message \"on it\" --force || demux event hook_error --hook PreToolUse --tool claude --target \"$T\" --message \"state set failed\"",
+          },
+        ],
+      },
+    ],
     "Notification": [
       {
         "matcher": "permission_prompt",
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting permission\" --level warn",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state waiting --tool claude --message \"awaiting permission\" || demux event hook_error --hook Notification.permission_prompt --tool claude --target \"$T\" --message \"state set failed\"",
           },
         ],
       },
       {
-        "matcher": "idle_prompt",
+        "matcher": "elicitation_dialog",
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"awaiting input\" --level info",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state waiting --tool claude --message \"mcp input needed\" || demux event hook_error --hook Notification.elicitation_dialog --tool claude --target \"$T\" --message \"state set failed\"",
           },
         ],
       },
     ],
-    "Stop": [
+    "SessionStart": [
+      {
+        "matcher": "resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state working --tool claude --message \"on it\" || demux event hook_error --hook SessionStart.resume --tool claude --target \"$T\" --message \"state set failed\"",
+          },
+        ],
+      },
+    ],
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task complete\" --level info",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state working --tool claude --message \"on it\" || demux event hook_error --hook UserPromptSubmit --tool claude --target \"$T\" --message \"state set failed\"",
+          },
+        ],
+      },
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state working --tool claude --message \"spawning agent\" || demux event hook_error --hook SubagentStart --tool claude --target \"$T\" --message \"state set failed\"",
           },
         ],
       },
@@ -340,17 +758,45 @@ I have the following configuration at `~/.claude/settings.json`. This will make 
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"subagent complete\" --level info",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state working --tool claude --message \"subagent complete\" || demux event hook_error --hook SubagentStop --tool claude --target \"$T\" --message \"state set failed\"",
+          },
+        ],
+      },
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state done --tool claude --message \"task complete\" || demux event hook_error --hook Stop --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
     ],
     "StopFailure": [
       {
+        "matcher": "rate_limit",
         "hooks": [
           {
             "type": "command",
-            "command": "demux alert set --target \"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" --reason \"task failed\" --level error",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state error --tool claude --message \"rate limited\" || demux event hook_error --hook StopFailure.rate_limit --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+          },
+        ],
+      },
+      {
+        "matcher": "authentication_failed",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state error --tool claude --message \"auth failed\" || demux event hook_error --hook StopFailure.authentication_failed --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+          },
+        ],
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --state error --tool claude --message \"task failed\" || demux event hook_error --hook StopFailure --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
@@ -363,66 +809,223 @@ I have the following configuration at `~/.claude/settings.json`. This will make 
 
 ## CLI Reference
 
+<details>
+
+<summary>Full command reference</summary>
+
 ```bash
-demux                          # launch the TUI
-demux --compact                # compact mode (sidebar + search only)
-demux --search                 # start with search focused
-demux --format text|table|json # output format for CLI commands
+# TUI
+demux                              # launch the TUI
+demux --compact                    # compact mode (sidebar + search only)
+demux --search                     # start with search focused
+demux --format text|table|json     # default output format for this invocation
 demux --log-level off|error|warn|info|debug
 
-demux session list             # list all tmux sessions
-demux session list --git       # include git columns
-demux session list --git-only  # session + git columns only
-demux session config-add       --name <n> --path <p> [--group <g>] [--labels <l>] [--worktree] [--private]
-demux session config-get       --name <n>
-demux session config-remove    --name <n> [--private]
-demux session create-windows   --session <n> --windows <ids>
+# Sessions
+demux session list                 # list all tmux sessions
+demux session list --git           # include git columns
+demux session list --git-only      # session + git columns only
 
-demux windows --session <n>    # list windows in a session
-demux windows --session <n> --git
+demux session config-add  --name <n> --path <p> [--group <g>] [--labels <l>]
+                          [--icon <i>] [--windows <ids>] [--worktree] [--private]
+demux session config-get  --name <n>
+demux session config-remove --name <n> [--private]
+demux session remove      --name <n> [--private]   # kills tmux + removes config + clears states
+demux session create-windows --session <n> --windows <ids>
 
-demux procs                    # list processes across all sessions
-demux procs --session <n>      # filter to a session
-demux procs --window <n:idx>   # filter to a window
-demux procs --git              # include git column
+# Windows
+demux windows --session <n>        # list windows in a session
+demux windows --session <n> --git  # include git column
 
-demux ports                    # list all TCP listening ports
+# Processes
+demux procs                        # list processes across all sessions
+demux procs --session <n>          # filter to a session
+demux procs --window <n:idx>       # filter to a window
+demux procs --git                  # include git column on pane headers
 
-demux alert list               # list active alerts
-demux alert set   --target <session:window[.pane]> --reason <text> [--level info|warn|error]
-demux alert remove --target <session:window[.pane]>
+# Ports
+demux ports                        # list all TCP listening ports
 
-demux query <term>             # fuzzy search sessions, windows, processes
-demux query <term> --session-name-only  # output session names only (for fzf)
+# State
+demux state ls                     # list active (non-idle) states
+demux state ls --state <value>     # filter by state
+demux state ls --tool <name>       # filter by tool
 
-demux status                   # alert summary for tmux status bar
-demux status --format json
+demux state set   --target <session:window[.pane]> --state working|waiting|done|error|flagged
+                  [--tool <name>] [--message <text>] [--source tool|user]
+                  [--force] [--if-state <value>]
 
-demux event pane_focus         # clear alerts for the focused pane (used by hooks)
+demux state clear --target <session:window[.pane]> [--yes]
 
-demux config init              # print default config to stdout
-demux hooks init --agent tmux|claude
+# Search
+demux query <term>                       # fuzzy search sessions, windows, processes
+demux query <term> --session-name-only   # output session names only (for fzf piping)
+
+# Status bar
+demux status                       # state summary for tmux status bar (tmux color format)
+demux status --format text         # plain text summary
+
+# Hooks
+demux event pane_focus             # clear done states for the focused pane (used by tmux hooks)
+demux event pane_focus --target <session:window.pane>
+
+# Config
+demux config init                  # print default config to stdout
+demux hooks init --tool tmux       # print tmux hook snippet to paste into .tmux.conf
 ```
+
+</details>
+
+## Debugging
+
+demux writes structured logs to `~/.local/share/demux/demux.log`. The default level is `warn`, which captures config and startup problems but nothing routine.
+
+Set the level in `demux.toml`:
+
+```toml
+[log]
+level = "debug"   # off | error | warn | info | debug
+```
+
+Or pass `--log-level` for a single invocation without touching the config:
+
+```bash
+demux --log-level debug
+demux state set --target myproject:1.0 --state working --tool claude --log-level debug
+```
+
+Then tail the log in a separate pane:
+
+```bash
+tail -f ~/.local/share/demux/demux.log
+```
+
+<details>
+
+<summary>What each level captures</summary>
+
+| Level   | What gets logged                                                            |
+| ------- | --------------------------------------------------------------------------- |
+| `off`   | Nothing                                                                     |
+| `error` | Unrecoverable failures (DB errors, I/O errors)                              |
+| `warn`  | Recoverable issues (bad config values, failed git fetches, lock rejections) |
+| `info`  | High-level lifecycle events (config loaded, TUI started)                    |
+| `debug` | Every state read/write, pane focus event, hook call, git fetch              |
+
+`debug` is verbose. Use it when a state is not updating as expected or a hook does not appear to be firing.
+
+</details>
+
+<details>
+
+<summary>Common issues</summary>
+
+**State not updating in the sidebar**
+
+1. Confirm the target format is correct: `session:windowIndex.paneIndex` (e.g. `myproject:1.0`).
+2. Run `demux state ls` to check what is actually stored.
+3. If the state is locked, the set call exits with a non-zero code and logs a warning. Run with `--log-level debug` to see the rejection reason, or add `--force` to override.
+
+**Tmux hooks not clearing done states**
+
+First, confirm the hooks are registered in the running tmux session (not just in `.tmux.conf`):
+
+```bash
+# List all global hooks — demux registers four of them
+tmux show-hooks -g
+
+# Filter to just the demux lines
+tmux show-hooks -g | grep demux
+```
+
+Expected output includes entries for `after-select-pane`, `after-select-window`, `client-session-changed`, and `client-focus-in`. If any are missing, reload the config:
+
+```bash
+tmux source ~/.tmux.conf
+tmux show-hooks -g | grep demux   # verify again
+```
+
+If the hooks are registered but states are still not clearing, check whether the hook commands are actually executing by adding a debug hook that writes to a log file:
+
+```bash
+# -ag appends to existing hooks instead of replacing them.
+# Swap client-focus-in for whichever hook you want to test.
+tmux set-hook -ag client-focus-in "run-shell 'echo \"$(date -Iseconds) #{session_name}:#{window_index}.#{pane_index}\" >> /tmp/tmux-hooks.log'"
+
+# Then switch panes and watch the file
+tail -f /tmp/tmux-hooks.log
+```
+
+If the log file gets entries but states are not clearing, run the `pane_focus` event manually to isolate whether the issue is in the hook firing or in demux itself:
+
+```bash
+demux event pane_focus --target <session:window.pane> --log-level debug
+```
+
+**Claude hooks not firing**
+
+1. Check `~/.claude/settings.json` is valid JSON — a syntax error silently disables all hooks.
+2. Confirm `$TMUX_PANE` is set in the pane where Claude is running (`echo $TMUX_PANE`).
+3. Run a hook command manually in the shell to verify it succeeds.
+
+**Config not taking effect**
+
+> [!NOTE]
+> demux reads config at startup. Restart the TUI after editing `demux.toml`. Live reload is on the roadmap but not yet implemented.
+
+</details>
+
+## Migrating from v1 (alert system)
+
+The alert system from v1 has been replaced by the state system. See [docs/migration/v2-state-system.md](docs/migration/v2-state-system.md) for the full guide.
+
+<details>
+
+<summary>Quick reference</summary>
+
+**CLI commands**
+
+| v1                          | v2                                      |
+| --------------------------- | --------------------------------------- |
+| `demux alert set`           | `demux state set`                       |
+| `demux alert rm`            | `demux state clear`                     |
+| `demux alert ls`            | `demux state ls`                        |
+| `--level info\|warn\|error` | `--state working\|waiting\|done\|error` |
+| `--level defer --sticky`    | `--state flagged`                       |
+| `--reason`                  | `--message`                             |
+
+**Config**
+
+| v1                           | v2              |
+| ---------------------------- | --------------- |
+| `[alerts]` section           | removed         |
+| `color_alert_*` theme tokens | `color_state_*` |
+
+Old `color_alert_*` keys in `demux.toml` are silently ignored. Missing `color_state_*` keys fall back to defaults.
+
+**Hook scripts**
+
+```bash
+# before
+demux alert set --target "$TARGET" --reason "Running: $TOOL_NAME" --level warn
+
+# after
+demux state set --target "$TARGET" --state working --tool claude --message "Running: $TOOL_NAME" || true
+```
+
+</details>
 
 ## Roadmap
 
-- **AI coding agent integration:** Surface the state of running AI agents
-  directly in the TUI.
-- **Sticky sidebar mode:** A persistent sidebar that retains its position
-  and selection as you switch between sessions.
-- **Richer ports view:** Expand the `ports` command with process trees,
-  protocol details, and per-session grouping.
+- **Sticky sidebar mode:** A persistent sidebar that retains its position and selection as you switch between sessions.
+- **Richer ports view:** Expand the `ports` command with process trees, protocol details, and per-session grouping.
 - **Richer session rows:** Show more at a glance on each sidebar row.
-- **Live config reload:** Pick up changes to `demux.toml` without
-  restarting.
-- **Per-pane environment variables:** Inspect the environment of any pane
-  from the process list.
+- **Live config reload:** Pick up changes to `demux.toml` without restarting.
+- **Per-pane environment variables:** Inspect the environment of any pane from the process list.
 
 ## Contributing
 
-Open an issue to report a bug or propose a feature. Pull requests are not
-being accepted yet; the project is still in its early stages. Starting a
-discussion first is the best way to get something considered.
+Open an issue to report a bug or propose a feature. Pull requests are not being accepted yet; the project is still in its early stages. Starting a discussion first is the best way to get something considered.
 
 ## Special thanks
 
