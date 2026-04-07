@@ -7,6 +7,7 @@ import (
 
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/format"
+	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/spf13/cobra"
 )
 
@@ -116,23 +117,33 @@ func applyStateSet(d *db.DB) error {
 
 	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce, ifState); err != nil {
 		if errors.Is(err, db.ErrStateLocked) {
+			demuxlog.Warn("state set rejected: lock", "target", stateTarget, "tool", stateTool, "state", stateValue, "err", err)
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+		demuxlog.Error("state set failed", "target", stateTarget, "tool", stateTool, "state", stateValue, "err", err)
 		return fmt.Errorf("state set: %w", err)
 	}
+	demuxlog.Debug("state set", "target", stateTarget, "tool", stateTool, "state", stateValue)
 	return nil
 }
 
 func applyStateClear(d *db.DB) error {
 	st, err := d.StateByTarget(clearTarget)
 	if err != nil {
+		demuxlog.Error("state clear lookup failed", "target", clearTarget, "err", err)
 		return fmt.Errorf("state lookup: %w", err)
 	}
 	if st != nil && st.Value == db.StateFlagged && !clearYes {
+		demuxlog.Warn("state clear rejected: flagged", "target", clearTarget)
 		return fmt.Errorf("target is flagged; use --yes to clear it")
 	}
-	return d.StateClear(clearTarget)
+	if err := d.StateClear(clearTarget); err != nil {
+		demuxlog.Error("state clear failed", "target", clearTarget, "err", err)
+		return err
+	}
+	demuxlog.Debug("state cleared", "target", clearTarget)
+	return nil
 }
 
 type stateRow struct {

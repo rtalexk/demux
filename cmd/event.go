@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/rtalexk/demux/internal/db"
+	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/spf13/cobra"
 )
 
@@ -38,13 +39,22 @@ var eventPaneFocusCmd = &cobra.Command{
 }
 
 func applyPaneFocus(d *db.DB, paneTarget string) error {
+	demuxlog.Debug("pane_focus", "target", paneTarget)
 	if err := d.StateDeleteIfResting(paneTarget); err != nil {
+		demuxlog.Error("pane_focus: delete resting state failed", "target", paneTarget, "err", err)
 		return err
 	}
-	if err := d.StateDeleteIfResting(windowTargetFromPane(paneTarget)); err != nil {
+	windowTarget := windowTargetFromPane(paneTarget)
+	if err := d.StateDeleteIfResting(windowTarget); err != nil {
+		demuxlog.Error("pane_focus: delete resting state failed", "target", windowTarget, "err", err)
 		return err
 	}
-	return d.StateDeleteIfResting(sessionTargetFromPane(paneTarget))
+	sessionTarget := sessionTargetFromPane(paneTarget)
+	if err := d.StateDeleteIfResting(sessionTarget); err != nil {
+		demuxlog.Error("pane_focus: delete resting state failed", "target", sessionTarget, "err", err)
+		return err
+	}
+	return nil
 }
 
 func windowTargetFromPane(paneTarget string) string {

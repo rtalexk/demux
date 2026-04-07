@@ -89,6 +89,11 @@ attention_filter_include_working = false
 # Default message stored when flagging a session with 'd' in the sidebar
 flag_default_message = "Come back"
 
+[log]
+# Log level: off | error | warn | info | debug
+# Logs are written to ~/.local/share/demux/demux.log
+level = "warn"
+
 [status_bar]
 # Show the status bar at the bottom of the screen
 show = true
