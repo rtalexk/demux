@@ -74,8 +74,11 @@ type Model struct {
 	yank     YankModel
 	help     HelpModel
 
-	showYank bool
-	showHelp bool
+	showYank    bool
+	showHelp    bool
+	showConfirm bool
+	confirm     ConfirmModel
+	confirmCmd  tea.Cmd // executed when the user confirms
 
 	pulse        bool
 	spinnerFrame int
@@ -254,13 +257,16 @@ func (m Model) buildProcTitle() string {
 	return title
 }
 
-// applyOverlay wraps base with the help or yank overlay when active.
+// applyOverlay wraps base with the help, yank, or confirm overlay when active.
 func (m Model) applyOverlay(base string) string {
 	if m.showHelp {
 		return overlayCenter(m.help.Render(m.height), base, m.width, m.height)
 	}
 	if m.showYank {
 		return overlayCenter(m.yank.Render(), base, m.width, m.height)
+	}
+	if m.showConfirm {
+		return overlayCenter(m.confirm.Render(), base, m.width, m.height)
 	}
 	return base
 }

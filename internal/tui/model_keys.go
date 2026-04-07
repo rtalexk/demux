@@ -260,7 +260,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
-			return m, m.clearCurrentState(node.Session)
+			return m.showClearConfirm(node.Session), nil
 		}
 	}
 	return m.sidebarNavUpdate()
@@ -390,7 +390,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.focus = panelSidebar
 	case key.Matches(msg, keys.ClearState.Binding):
 		if target := m.procListStateTarget(); target != "" {
-			return m, m.clearCurrentState(target)
+			return m.showClearConfirm(target), nil
 		}
 	case key.Matches(msg, keys.Kill.Binding):
 		// TODO: confirmation prompt
@@ -428,14 +428,33 @@ func (m Model) procListStateTarget() string {
 	return fmt.Sprintf("%s:%d.%d", node.Pane.Session, node.Pane.WindowIndex, node.Pane.PaneIndex)
 }
 
-// clearCurrentState clears the state for the given session target.
-func (m Model) clearCurrentState(sessionName string) tea.Cmd {
+// clearCurrentState clears the state for the given target.
+func (m Model) clearCurrentState(target string) tea.Cmd {
 	d := m.db
 	return func() tea.Msg {
-		_ = d.StateClear(sessionName)
+		_ = d.StateClear(target)
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
+}
+
+// showClearConfirm opens the confirmation overlay for clearing the state of target.
+func (m Model) showClearConfirm(target string) Model {
+	st := activeStateFor(m.states, target)
+	body := "  target:  " + target
+	if st != nil {
+		body += "\n  state:   " + st.Value.String()
+		if st.Message != "" {
+			body += "  •  " + st.Message
+		}
+	}
+	m.confirm = ConfirmModel{
+		prompt: "Clear state?",
+		body:   body,
+	}
+	m.confirmCmd = m.clearCurrentState(target)
+	m.showConfirm = true
+	return m
 }
 
 func (m Model) openSidebarSelected() (Model, tea.Cmd) {

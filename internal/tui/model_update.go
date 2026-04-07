@@ -62,7 +62,29 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 		mo, cmd := m.updateYank(msg)
 		return mo.(Model), cmd, true
 	}
+	if m.showConfirm {
+		mo, cmd := m.handleConfirmOverlay(msg)
+		return mo, cmd, true
+	}
 	return m, nil, false
+}
+
+func (m Model) handleConfirmOverlay(msg tea.Msg) (Model, tea.Cmd) {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return m, nil
+	}
+	switch keyMsg.String() {
+	case "y", "enter":
+		cmd := m.confirmCmd
+		m.showConfirm = false
+		m.confirmCmd = nil
+		return m, cmd
+	case "n", "esc":
+		m.showConfirm = false
+		m.confirmCmd = nil
+	}
+	return m, nil
 }
 
 func (m Model) handleGitResultMsg(msg gitResultMsg) (Model, tea.Cmd) {
