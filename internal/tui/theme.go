@@ -44,12 +44,15 @@ type Theme struct {
 	ColorStateErrorBg   lipgloss.Color
 	ColorStateFlagged   lipgloss.Color
 	ColorStateFlaggedBg lipgloss.Color
+	ColorStateIdle      lipgloss.Color
+	ColorStateIdleBg    lipgloss.Color
 
 	IconStateWorking string
 	IconStateWaiting string
 	IconStateDone    string
 	IconStateError   string
 	IconStateFlagged string
+	IconStateIdle    string
 
 	IconTmuxSession string
 	IconCfgSession  string
@@ -101,12 +104,15 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 		ColorStateErrorBg:   lipgloss.Color(tc.ColorStateErrorBg),
 		ColorStateFlagged:   lipgloss.Color(tc.ColorStateFlagged),
 		ColorStateFlaggedBg: lipgloss.Color(tc.ColorStateFlaggedBg),
+		ColorStateIdle:      lipgloss.Color(tc.ColorStateIdle),
+		ColorStateIdleBg:    lipgloss.Color(tc.ColorStateIdleBg),
 
 		IconStateWorking: tc.IconStateWorking,
 		IconStateWaiting: tc.IconStateWaiting,
 		IconStateDone:    tc.IconStateDone,
 		IconStateError:   tc.IconStateError,
 		IconStateFlagged: tc.IconStateFlagged,
+		IconStateIdle:    tc.IconStateIdle,
 
 		IconTmuxSession: tc.IconTmuxSession,
 		IconCfgSession:  tc.IconCfgSession,

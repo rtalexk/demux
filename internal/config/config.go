@@ -86,12 +86,15 @@ type ThemeConfig struct {
 	ColorStateErrorBg   string `toml:"color_state_error_bg"`
 	ColorStateFlagged   string `toml:"color_state_flagged"`
 	ColorStateFlaggedBg string `toml:"color_state_flagged_bg"`
+	ColorStateIdle      string `toml:"color_state_idle"`
+	ColorStateIdleBg    string `toml:"color_state_idle_bg"`
 
 	IconStateWorking string `toml:"icon_state_working"`
 	IconStateWaiting string `toml:"icon_state_waiting"`
 	IconStateDone    string `toml:"icon_state_done"`
 	IconStateError   string `toml:"icon_state_error"`
 	IconStateFlagged string `toml:"icon_state_flagged"`
+	IconStateIdle    string `toml:"icon_state_idle"`
 
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
@@ -223,12 +226,15 @@ func Default() Config {
 			ColorStateErrorBg:   "#3d1020",
 			ColorStateFlagged:   "#cba6f7",
 			ColorStateFlaggedBg: "#2a1a4d",
+			ColorStateIdle:      "#45475a",
+			ColorStateIdleBg:    "#13131a",
 
 			IconStateWorking: "⟳",
 			IconStateWaiting: "●",
 			IconStateDone:    "✔",
 			IconStateError:   "✗",
 			IconStateFlagged: "🔖",
+			IconStateIdle:    "·",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",
