@@ -142,8 +142,10 @@ func inlineStat(label, value string) string {
 func (d DetailModel) renderStateSection() []string {
 	var active []db.ToolState
 	for _, st := range d.sessionStates {
-		if st.Value.IsDisplayable() {
-			active = append(active, st)
+		effective := st
+		effective.Value = ageDrivenValue(st, d.cfg.Tui.DoneIdleAfterSecs)
+		if effective.Value.IsDisplayable() {
+			active = append(active, effective)
 		}
 	}
 	if len(active) == 0 {

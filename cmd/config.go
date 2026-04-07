@@ -89,6 +89,10 @@ attention_filter_include_working = false
 # Default message stored when flagging a session with 'd' in the sidebar
 flag_default_message = "Come back"
 
+# Seconds after which a "done" state is rendered as "idle" in the TUI (0 = disabled).
+# The DB record is not changed; this is purely a visual override.
+done_idle_after_secs = 60
+
 [log]
 # Log level: off | error | warn | info | debug
 # Logs are written to ~/.local/share/demux/demux.log

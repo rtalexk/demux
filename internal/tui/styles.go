@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
@@ -121,6 +123,19 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	gitDirtyStyle = lipgloss.NewStyle().Foreground(t.ColorGitDirty)
 
 	sessionIconStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
+}
+
+// ageDrivenValue returns the effective display value for a state.
+// If the state is Done and thresholdSecs > 0 and enough time has passed since
+// it was last updated, it returns StateIdle so the TUI renders an idle icon
+// without touching the DB record.
+func ageDrivenValue(st db.ToolState, thresholdSecs int) db.StateValue {
+	if thresholdSecs > 0 && st.Value == db.StateDone {
+		if time.Since(st.UpdatedAt) >= time.Duration(thresholdSecs)*time.Second {
+			return db.StateIdle
+		}
+	}
+	return st.Value
 }
 
 // stateIcon renders the configured icon for the given state value, colored by theme.

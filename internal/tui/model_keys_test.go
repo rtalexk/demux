@@ -10,7 +10,7 @@ import (
 func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 	states := []db.ToolState{
 		{Target: "sess:0.0", Value: db.StateWorking},
-		{Target: "sess:1.0", Value: db.StateError},   // highest priority
+		{Target: "sess:1.0", Value: db.StateError}, // highest priority
 		{Target: "sess:2.0", Value: db.StateFlagged},
 	}
 	got := highestPriorityPaneTarget("sess", states)

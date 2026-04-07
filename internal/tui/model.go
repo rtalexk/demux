@@ -252,7 +252,9 @@ func (m Model) buildProcTitle() string {
 	}
 	title := " [l] " + bc + procTitleSuffix
 	if st := activeStateFor(m.states, bc); st != nil {
-		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(st) + " "
+		effective := *st
+		effective.Value = ageDrivenValue(*st, m.cfg.Tui.DoneIdleAfterSecs)
+		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective) + " "
 	}
 	return title
 }

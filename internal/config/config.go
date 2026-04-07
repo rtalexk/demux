@@ -144,6 +144,7 @@ type LogConfig struct {
 type TuiConfig struct {
 	AttentionFilterIncludeWorking bool   `toml:"attention_filter_include_working"`
 	FlagDefaultMessage            string `toml:"flag_default_message"`
+	DoneIdleAfterSecs             int    `toml:"done_idle_after_secs"` // 0 = disabled
 }
 
 type Config struct {
@@ -183,6 +184,7 @@ func Default() Config {
 		Tui: TuiConfig{
 			AttentionFilterIncludeWorking: false,
 			FlagDefaultMessage:            "Come back",
+			DoneIdleAfterSecs:             60,
 		},
 		Git: GitConfig{
 			Enabled:         true,

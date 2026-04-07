@@ -538,10 +538,11 @@ func (s SidebarModel) stateIndicator(node SidebarNode, selected, focused bool) s
 	if st == nil {
 		return ""
 	}
+	value := ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
 	if selected && focused {
-		return stateIconOnBG(st.Value, activeTheme.ColorSelected)
+		return stateIconOnBG(value, activeTheme.ColorSelected)
 	}
-	return stateIcon(st.Value)
+	return stateIcon(value)
 }
 
 // lastSeenIndicator returns the rendered last-seen age string for a sidebar row, or "".

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -28,8 +29,20 @@ func Open(path string) (*DB, error) {
 		return nil, err
 	}
 	sqldb.SetMaxOpenConns(1)
-	if _, err := sqldb.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
-		return nil, fmt.Errorf("set busy_timeout: %w", err)
+
+	// PRAGMA busy_timeout only covers SQLITE_BUSY (5), not SQLITE_BUSY_RECOVERY
+	// (261), which fires in WAL mode when another process is recovering from a
+	// crash. Recovery completes in milliseconds, so retry until it clears.
+	var busyErr error
+	for range 10 {
+		_, busyErr = sqldb.Exec(`PRAGMA busy_timeout = 5000`)
+		if busyErr == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if busyErr != nil {
+		return nil, fmt.Errorf("set busy_timeout: %w", busyErr)
 	}
 	d := &DB{sql: sqldb}
 	if err := d.migrate(); err != nil {
