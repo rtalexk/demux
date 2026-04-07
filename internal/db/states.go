@@ -94,7 +94,7 @@ type ToolState struct {
 
 // StateSet writes a state record for target, applying write-lock rules.
 // Returns ErrStateLocked (wrapped) if the write is rejected.
-func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource) error {
+func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource, force bool) error {
 	tx, err := d.sql.Begin()
 	if err != nil {
 		return fmt.Errorf("begin StateSet: %w", err)
@@ -113,8 +113,8 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 		current = &cur
 	}
 
-	// Apply lock rules for tool writes.
-	if source == SourceTool && current != nil {
+	// Apply lock rules for tool writes (skipped when force=true).
+	if !force && source == SourceTool && current != nil {
 		switch current.Value {
 		case StateFlagged:
 			tx.Rollback()

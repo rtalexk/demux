@@ -8,7 +8,7 @@ func TestStateSet_BasicUpsert(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "running tests", SourceTool); err != nil {
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "running tests", SourceTool, false); err != nil {
 		t.Fatal(err)
 	}
 	st, err := d.StateByTarget("s:0:0")
@@ -27,8 +27,8 @@ func TestStateSet_LockWorking_DifferentTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool)
-	err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool)
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false)
+	err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, false)
 	if err == nil {
 		t.Fatal("expected locked error, got nil")
 	}
@@ -43,8 +43,8 @@ func TestStateSet_LockWorking_SameTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "step 1", SourceTool)
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "step 2", SourceTool); err != nil {
+	d.StateSet("s:0:0", "claude", StateWorking, "step 1", SourceTool, false)
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "step 2", SourceTool, false); err != nil {
 		t.Errorf("same tool should not be locked: %v", err)
 	}
 }
@@ -53,10 +53,27 @@ func TestStateSet_LockFlagged_BlocksAllTools(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser)
+	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false)
 	// same tool name should still be blocked
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool); err == nil {
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false); err == nil {
 		t.Fatal("flagged should block all tool writes")
+	}
+}
+
+func TestStateSet_ForceOverridesLock(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Flagged blocks tool writes normally.
+	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false)
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, true); err != nil {
+		t.Fatalf("force should override flagged lock: %v", err)
+	}
+
+	// Different-tool lock overridden by force.
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false)
+	if err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, true); err != nil {
+		t.Fatalf("force should override different-tool lock: %v", err)
 	}
 }
 
@@ -64,8 +81,8 @@ func TestStateSet_UserWriteAlwaysSucceeds(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool)
-	if err := d.StateSet("s:0:0", "", StateFlagged, "note", SourceUser); err != nil {
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false)
+	if err := d.StateSet("s:0:0", "", StateFlagged, "note", SourceUser, false); err != nil {
 		t.Errorf("user write should always succeed: %v", err)
 	}
 }
@@ -74,7 +91,7 @@ func TestStateClear(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateError, "boom", SourceTool)
+	d.StateSet("s:0:0", "claude", StateError, "boom", SourceTool, false)
 	if err := d.StateClear("s:0:0"); err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +105,7 @@ func TestStateDeleteIfDone(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool)
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false)
 	if err := d.StateDeleteIfDone("s:0:0"); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +115,7 @@ func TestStateDeleteIfDone(t *testing.T) {
 	}
 
 	// non-done states must not be deleted
-	d.StateSet("s:1:0", "claude", StateError, "boom", SourceTool)
+	d.StateSet("s:1:0", "claude", StateError, "boom", SourceTool, false)
 	d.StateDeleteIfDone("s:1:0")
 	st2, _ := d.StateByTarget("s:1:0")
 	if st2 == nil {
@@ -110,8 +127,8 @@ func TestStateList(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool)
-	d.StateSet("s:1:0", "make", StateError, "fail", SourceTool)
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false)
+	d.StateSet("s:1:0", "make", StateError, "fail", SourceTool, false)
 
 	all, err := d.StateList(0, "")
 	if err != nil {

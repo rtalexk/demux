@@ -16,6 +16,7 @@ var (
 	stateTool    string
 	stateMessage string
 	stateSource  string
+	stateForce   bool
 
 	clearTarget string
 	clearYes    bool
@@ -50,6 +51,7 @@ func init() {
 	stateSetCmd.Flags().StringVar(&stateTool, "tool", "", "Tool name")
 	stateSetCmd.Flags().StringVar(&stateMessage, "message", "", "Human-readable detail")
 	stateSetCmd.Flags().StringVar(&stateSource, "source", "tool", "Source: tool|user")
+	stateSetCmd.Flags().BoolVar(&stateForce, "force", false, "Override write-lock (allow overwriting another tool's active state)")
 	stateSetCmd.MarkFlagRequired("target")
 	stateSetCmd.MarkFlagRequired("state")
 
@@ -101,7 +103,7 @@ func applyStateSet(d *db.DB) error {
 		return fmt.Errorf("--state flagged requires --source user")
 	}
 
-	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src); err != nil {
+	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce); err != nil {
 		if errors.Is(err, db.ErrStateLocked) {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)

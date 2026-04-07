@@ -409,7 +409,7 @@ func (m Model) flagCurrentState(sessionName string) tea.Cmd {
 	d := m.db
 	msg := m.cfg.Tui.FlagDefaultMessage
 	return func() tea.Msg {
-		_ = d.StateSet(sessionName, "", db.StateFlagged, msg, db.SourceUser)
+		_ = d.StateSet(sessionName, "", db.StateFlagged, msg, db.SourceUser, false)
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
