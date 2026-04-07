@@ -21,9 +21,9 @@ func (c ConfirmModel) Render() string {
 		sb.WriteString(c.body)
 	}
 	sb.WriteString("\n\n")
-	sb.WriteString(fmt.Sprintf("  %s  confirm\n  %s  cancel",
+	sb.WriteString(fmt.Sprintf("  %s    confirm\n  %s  cancel",
 		hintStyle.Render("y / Enter"),
 		hintStyle.Render("n / Esc / q"),
 	))
-	return yankStyle.Render(sb.String())
+	return confirmStyle.Render(sb.String())
 }

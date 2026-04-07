@@ -445,9 +445,9 @@ func (m Model) clearCurrentState(target string) tea.Cmd {
 // showClearConfirm opens the confirmation overlay for clearing the state of target.
 func (m Model) showClearConfirm(target string) Model {
 	st := activeStateFor(m.states, target)
-	body := "  target:  " + target
+	body := "  target: " + target
 	if st != nil {
-		body += "\n  state:   " + st.Value.String()
+		body += "\n  state:  " + st.Value.String()
 		if st.Message != "" {
 			body += "  •  " + st.Message
 		}
