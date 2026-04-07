@@ -137,12 +137,12 @@ func inlineStat(label, value string) string {
 	return detailLabelStyle.Width(0).Render(label+":") + " " + detailValueStyle.Render(value)
 }
 
-// renderStateSection builds detail lines for non-idle states of the focused session.
+// renderStateSection builds detail lines for displayable states of the focused session.
 // Returns nil when there are no states to show.
 func (d DetailModel) renderStateSection() []string {
 	var active []db.ToolState
 	for _, st := range d.sessionStates {
-		if st.Value != 0 && st.Value != db.StateDone {
+		if st.Value.IsDisplayable() {
 			active = append(active, st)
 		}
 	}

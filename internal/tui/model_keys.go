@@ -188,8 +188,9 @@ func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 // highestPriorityPaneTarget returns the Target of the highest-priority active
 // state for the given session, or "" when no qualifying state exists.
 // Only pane/window-level targets (those containing ":") are considered so the
-// caller can switch directly to the relevant pane. Done and Idle states are
-// excluded; the target string is returned verbatim for tmux switch-client.
+// caller can switch directly to the relevant pane. Idle states are excluded;
+// Done is included so the user can navigate to a recently-finished pane.
+// The target string is returned verbatim for tmux switch-client.
 func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string {
 	prefix := sessionName + ":"
 	best := ""
@@ -198,7 +199,7 @@ func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string
 		if !strings.HasPrefix(st.Target, prefix) {
 			continue
 		}
-		if st.Value == db.StateDone || st.Value == db.StateIdle || st.Value == 0 {
+		if !st.Value.IsDisplayable() {
 			continue
 		}
 		if pri := st.Value.Priority(); pri > bestPri {

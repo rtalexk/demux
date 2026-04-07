@@ -48,6 +48,13 @@ func (v StateValue) String() string {
 	}
 }
 
+// IsDisplayable reports whether the state should be shown in UI and considered
+// for navigation. It returns true for all named states except the two "resting"
+// representations: the zero value (no DB row) and StateIdle (explicit idle).
+func (v StateValue) IsDisplayable() bool {
+	return v != 0 && v != StateIdle
+}
+
 // Priority returns a numeric urgency score for sorting and filtering.
 // Higher values are more urgent. Waiting is the most urgent because it
 // blocks on human input; Working and Idle are least urgent.

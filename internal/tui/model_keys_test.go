@@ -19,25 +19,26 @@ func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 	}
 }
 
-func TestHighestPriorityPaneTarget_SkipsDone(t *testing.T) {
+func TestHighestPriorityPaneTarget_IncludesDone(t *testing.T) {
+	// Done has priority=2; Working has priority=0; Done wins.
 	states := []db.ToolState{
 		{Target: "sess:0.0", Value: db.StateDone},
 		{Target: "sess:1.0", Value: db.StateWorking},
 	}
 	got := highestPriorityPaneTarget("sess", states)
-	if got != "sess:1.0" {
-		t.Errorf("want sess:1.0 (done skipped), got %q", got)
+	if got != "sess:0.0" {
+		t.Errorf("want sess:0.0 (done beats working), got %q", got)
 	}
 }
 
-func TestHighestPriorityPaneTarget_ReturnsEmptyWhenNoState(t *testing.T) {
+func TestHighestPriorityPaneTarget_ReturnsEmptyWhenOnlyIdle(t *testing.T) {
 	states := []db.ToolState{
-		{Target: "sess:0.0", Value: db.StateDone},
+		{Target: "sess:0.0", Value: db.StateIdle},
 		{Target: "sess:1.0", Value: db.StateIdle},
 	}
 	got := highestPriorityPaneTarget("sess", states)
 	if got != "" {
-		t.Errorf("want empty (no qualifying state), got %q", got)
+		t.Errorf("want empty (only idle states), got %q", got)
 	}
 }
 
