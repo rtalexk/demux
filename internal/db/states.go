@@ -174,6 +174,16 @@ func (d *DB) StateDeleteIfDone(target string) error {
 	return err
 }
 
+// StateDeleteIfResting removes the state record when value is done or idle.
+// Used by event pane_focus to clear resting states on navigation.
+func (d *DB) StateDeleteIfResting(target string) error {
+	_, err := d.sql.Exec(
+		`DELETE FROM tool_states WHERE target = ? AND value IN (?, ?)`,
+		target, int(StateDone), int(StateIdle),
+	)
+	return err
+}
+
 // StateByTarget returns the ToolState for target, or nil if no record exists (idle).
 func (d *DB) StateByTarget(target string) (*ToolState, error) {
 	row := d.sql.QueryRow(`

@@ -123,6 +123,43 @@ func TestStateDeleteIfDone(t *testing.T) {
 	}
 }
 
+func TestStateDeleteIfResting(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// done is cleared
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil)
+	d.StateDeleteIfResting("s:0:0")
+	st, _ := d.StateByTarget("s:0:0")
+	if st != nil {
+		t.Errorf("done state should be cleared by StateDeleteIfResting, got: %+v", st)
+	}
+
+	// idle is cleared
+	d.StateSet("s:1:0", "claude", StateIdle, "available", SourceTool, false, nil)
+	d.StateDeleteIfResting("s:1:0")
+	st2, _ := d.StateByTarget("s:1:0")
+	if st2 != nil {
+		t.Errorf("idle state should be cleared by StateDeleteIfResting, got: %+v", st2)
+	}
+
+	// working is not cleared
+	d.StateSet("s:2:0", "claude", StateWorking, "running", SourceTool, false, nil)
+	d.StateDeleteIfResting("s:2:0")
+	st3, _ := d.StateByTarget("s:2:0")
+	if st3 == nil {
+		t.Error("working state should survive StateDeleteIfResting")
+	}
+
+	// error is not cleared
+	d.StateSet("s:3:0", "claude", StateError, "boom", SourceTool, false, nil)
+	d.StateDeleteIfResting("s:3:0")
+	st4, _ := d.StateByTarget("s:3:0")
+	if st4 == nil {
+		t.Error("error state should survive StateDeleteIfResting")
+	}
+}
+
 func TestStateList(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
