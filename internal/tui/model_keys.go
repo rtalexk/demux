@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -184,9 +185,38 @@ func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 	return m, m.fetchPanes()
 }
 
-// switchLiveSession switches the tmux client to sessionName.
+// highestPriorityPaneTarget returns the Target of the highest-priority active
+// state for the given session, or "" when no qualifying state exists.
+// Only pane/window-level targets (those containing ":") are considered so the
+// caller can switch directly to the relevant pane. Done and Idle states are
+// excluded; the target string is returned verbatim for tmux switch-client.
+func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string {
+	prefix := sessionName + ":"
+	best := ""
+	bestPri := -1
+	for _, st := range states {
+		if !strings.HasPrefix(st.Target, prefix) {
+			continue
+		}
+		if st.Value == db.StateDone || st.Value == db.StateIdle || st.Value == 0 {
+			continue
+		}
+		if pri := statePriority(st.Value); pri > bestPri {
+			bestPri = pri
+			best = st.Target
+		}
+	}
+	return best
+}
+
+// switchLiveSession switches the tmux client to the given session, landing on
+// the pane with the highest-priority active state when one exists.
 func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
-	err := tmux.SwitchClient(sessionName)
+	target := highestPriorityPaneTarget(sessionName, m.states)
+	if target == "" {
+		target = sessionName
+	}
+	err := tmux.SwitchClient(target)
 	if err == nil && m.popupMode {
 		return m, tea.Quit
 	}
