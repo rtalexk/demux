@@ -284,11 +284,14 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 }
 
 // selectedStateIndicator returns the state indicator for a selected pane row.
+// The separator and surrounding spaces carry the selected background so the
+// entire row between label and badge is uniformly highlighted.
 func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
 	if st == nil {
 		return ""
 	}
-	return "  " + paneSepStyle.Render("────") + "  " + paneStateIndicator(st)
+	sepOnBG := paneSepStyle.Background(activeTheme.ColorSelected).Render("────")
+	return selectedBG.Render("  ") + sepOnBG + selectedBG.Render("  ") + paneStateIndicator(st)
 }
 
 // unselectedStateIndicator returns the state indicator for an unselected pane row.
