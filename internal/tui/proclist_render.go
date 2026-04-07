@@ -278,7 +278,7 @@ func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
 	if st == nil {
 		return ""
 	}
-	return "  " + paneStateIndicator(st)
+	return "  " + paneSepStyle.Render("────") + "  " + paneStateIndicator(st)
 }
 
 // unselectedStateIndicator returns the state indicator for an unselected pane row.
@@ -286,7 +286,7 @@ func (p ProcListModel) unselectedStateIndicator(st *db.ToolState) string {
 	if st == nil {
 		return ""
 	}
-	return "  " + paneStateIndicator(st)
+	return "  " + paneSepStyle.Render("────") + "  " + paneStateIndicator(st)
 }
 
 func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
