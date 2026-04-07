@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
@@ -45,6 +46,23 @@ type ProcListModel struct {
 	cfg            config.Config
 	searchQuery    query.ParsedQuery
 	queryResult    query.Result
+	states         []db.ToolState // latest states snapshot for inline pane indicators
+}
+
+// SetStates updates the state snapshot used for inline pane-header indicators.
+func (p *ProcListModel) SetStates(states []db.ToolState) {
+	p.states = states
+}
+
+// stateForPane returns the active (non-idle, non-done) state for the given pane, or nil.
+func (p ProcListModel) stateForPane(pane tmux.Pane) *db.ToolState {
+	key := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+	for i := range p.states {
+		if p.states[i].Target == key && p.states[i].Value != 0 && p.states[i].Value != db.StateDone {
+			return &p.states[i]
+		}
+	}
+	return nil
 }
 
 // TODO: single-window mode (SetWindowData) must be removed — selecting individual

@@ -167,6 +167,7 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 
 func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
 	m.states = msg.states
+	m.procList.SetStates(msg.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, msg.states, m.gitInfo, m.cfg)
 	if !m.startupFocusDone {

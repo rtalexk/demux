@@ -177,3 +177,17 @@ func stateBadge(value db.StateValue, msg string) string {
 	}
 	return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + msg + " ")
 }
+
+// paneStateIndicator returns the inline state text for a pane header row.
+// Returns "" when st is nil. Shows icon + message badge when a message is set,
+// or just the icon otherwise.
+func paneStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	icon := stateIcon(st.Value)
+	if st.Message != "" {
+		return icon + " " + stateBadge(st.Value, st.Message)
+	}
+	return icon
+}

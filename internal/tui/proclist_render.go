@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
@@ -265,10 +266,27 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 		}
 	}
 
+	st := p.stateForPane(node.Pane)
 	if selected {
-		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, innerW, hasIdle)
+		return p.renderPaneHeaderSelected(label, pathStr, gitSuffix, innerW, hasIdle) + p.selectedStateIndicator(st)
 	}
-	return p.renderPaneHeaderUnselected(node, label, pathStr, gitSuffix, innerW)
+	return p.renderPaneHeaderUnselected(node, label, pathStr, gitSuffix, innerW) + p.unselectedStateIndicator(st)
+}
+
+// selectedStateIndicator returns the state indicator for a selected pane row.
+func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	return "  " + paneStateIndicator(st)
+}
+
+// unselectedStateIndicator returns the state indicator for an unselected pane row.
+func (p ProcListModel) unselectedStateIndicator(st *db.ToolState) string {
+	if st == nil {
+		return ""
+	}
+	return "  " + paneStateIndicator(st)
 }
 
 func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
