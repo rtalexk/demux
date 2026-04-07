@@ -75,3 +75,71 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 		t.Fatalf("non-flagged clear should not require --yes: %v", err)
 	}
 }
+
+func TestStateSet_IdleIsValid(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	stateTarget = "s:0.0"
+	stateValue = "idle"
+	stateTool = "claude"
+	stateMessage = "available"
+	stateSource = "tool"
+	stateForce = false
+	stateIfState = ""
+
+	if err := applyStateSet(d); err != nil {
+		t.Fatalf("--state idle should be valid: %v", err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil || st.Value != db.StateIdle {
+		t.Errorf("expected idle state, got: %+v", st)
+	}
+}
+
+func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	// Pre-set state to done.
+	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
+
+	stateTarget = "s:0.0"
+	stateValue = "waiting"
+	stateTool = "claude"
+	stateMessage = "awaiting input"
+	stateSource = "tool"
+	stateForce = false
+	stateIfState = "working"
+
+	if err := applyStateSet(d); err != nil {
+		t.Fatalf("--if-state mismatch should succeed silently: %v", err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil || st.Value != db.StateDone {
+		t.Errorf("state should remain done, got: %+v", st)
+	}
+}
+
+func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", db.StateWorking, "running", db.SourceTool, false, nil)
+
+	stateTarget = "s:0.0"
+	stateValue = "done"
+	stateTool = "claude"
+	stateMessage = "task complete"
+	stateSource = "tool"
+	stateForce = false
+	stateIfState = "working"
+
+	if err := applyStateSet(d); err != nil {
+		t.Fatalf("--if-state match should write: %v", err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil || st.Value != db.StateDone {
+		t.Errorf("expected done state, got: %+v", st)
+	}
+}
