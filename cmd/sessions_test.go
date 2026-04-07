@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"testing"
 
 	"github.com/rtalexk/demux/internal/db"
@@ -37,5 +38,65 @@ func TestBuildSessionProcCounts(t *testing.T) {
 	got := buildSessionProcCounts(grouped, procs, cwdByPID)
 	if got["work"] != 1 {
 		t.Errorf("got %d, want 1", got["work"])
+	}
+}
+
+func TestClearSessionStates(t *testing.T) {
+	// Use a temp file so we can open a second handle after clearSessionStates
+	// closes the first one.
+	f, err := os.CreateTemp("", "demux-test-*.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+	dbPath := f.Name()
+	t.Cleanup(func() { os.Remove(dbPath) })
+
+	// Seed via the first handle.
+	d, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.StateSet("myapp:0", "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet("myapp:1", "make", db.StateError, "fail", db.SourceTool, false, nil)
+	d.StateSet("other:0", "claude", db.StateDone, "ok", db.SourceTool, false, nil)
+	d.Close()
+
+	// Each clearSessionStates call opens and closes its own handle.
+	openHandles := func() (*db.DB, error) { return db.Open(dbPath) }
+	orig := openDB
+	openDB = openHandles
+	defer func() { openDB = orig }()
+
+	got := clearSessionStates("myapp")
+	if got != "2 state(s) cleared" {
+		t.Errorf("got %q, want %q", got, "2 state(s) cleared")
+	}
+
+	// Verify other session is untouched by opening a fresh handle.
+	d2, err := db.Open(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d2.Close()
+	st, _ := d2.StateByTarget("other:0")
+	if st == nil {
+		t.Error("other:0 should not be deleted")
+	}
+}
+
+func TestClearSessionStates_NoneExist(t *testing.T) {
+	d, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orig := openDB
+	openDB = func() (*db.DB, error) { return d, nil }
+	defer func() { openDB = orig }()
+
+	got := clearSessionStates("ghost")
+	if got != "0 state(s) cleared" {
+		t.Errorf("got %q, want %q", got, "0 state(s) cleared")
 	}
 }

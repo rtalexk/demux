@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -176,6 +177,85 @@ func runSessionRemove(_ *cobra.Command, _ []string) error {
 		}
 	}
 	return fmt.Errorf("session %q not found in sessions.toml or private.toml", sessionRemoveName)
+}
+
+// --- remove (full: tmux + config + db) ---
+
+var (
+	sessionRemoveFullName    string
+	sessionRemoveFullPrivate bool
+)
+
+var sessionRemoveFullCmd = &cobra.Command{
+	Use:     "remove",
+	Aliases: []string{"rm"},
+	Short:   "Kill tmux session, remove config entry, and clear DB states",
+	RunE:    runSessionRemoveFull,
+}
+
+func init() {
+	sessionRemoveFullCmd.Flags().StringVar(&sessionRemoveFullName, "name", "", "Session name (required)")
+	sessionRemoveFullCmd.Flags().BoolVar(&sessionRemoveFullPrivate, "private", false, "Target private.toml only for config step")
+
+	_ = sessionRemoveFullCmd.MarkFlagRequired("name")
+
+	sessionCmd.AddCommand(sessionRemoveFullCmd)
+}
+
+func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
+	name := sessionRemoveFullName
+
+	tmuxOut := killTmuxSession(name)
+	configOut := removeSessionConfig(name, sessionRemoveFullPrivate)
+	dbOut := clearSessionStates(name)
+
+	fmt.Printf("tmux:   %s\n", tmuxOut)
+	fmt.Printf("config: %s\n", configOut)
+	fmt.Printf("db:     %s\n", dbOut)
+	return nil
+}
+
+func killTmuxSession(name string) string {
+	err := exec.Command("tmux", "kill-session", "-t", name).Run()
+	if err != nil {
+		return "not found (skipped)"
+	}
+	return "killed"
+}
+
+func removeSessionConfig(name string, private bool) string {
+	candidates := []bool{false, true}
+	if private {
+		candidates = []bool{true}
+	}
+	for _, isPrivate := range candidates {
+		path, err := sessionFilePath(isPrivate)
+		if err != nil {
+			continue
+		}
+		err = session.RemoveEntry(path, name)
+		if err == nil {
+			return fmt.Sprintf("removed from %s", filepath.Base(path))
+		}
+		if !session.IsNotFound(err) || private {
+			return fmt.Sprintf("error: %v", err)
+		}
+	}
+	return "not found in sessions.toml or private.toml (skipped)"
+}
+
+func clearSessionStates(name string) string {
+	database, err := openDB()
+	if err != nil {
+		return fmt.Sprintf("error opening db: %v", err)
+	}
+	defer database.Close()
+
+	n, err := database.StateDeleteBySession(name)
+	if err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return fmt.Sprintf("%d state(s) cleared", n)
 }
 
 // --- create-windows ---
