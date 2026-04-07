@@ -260,7 +260,11 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
-			return m.showClearConfirm(node.Session), nil
+			target := node.Session
+			if st := m.sidebar.stateForSession(node.Session); st != nil {
+				target = st.Target
+			}
+			return m.showClearConfirm(target), nil
 		}
 	}
 	return m.sidebarNavUpdate()
