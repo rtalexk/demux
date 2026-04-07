@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
 // parseTS handles the varying timestamp formats returned by modernc.org/sqlite.
@@ -143,6 +145,13 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 		current = &cur
 	}
 
+	// No-op if value and tool are unchanged (avoids redundant DB writes from
+	// high-frequency hooks like PreToolUse firing working→working repeatedly).
+	if ifState == nil && current != nil && current.Value == value && current.Tool == tool {
+		demuxlog.Debug("state set skipped: no change", "target", target, "tool", tool, "state", value)
+		return tx.Rollback()
+	}
+
 	// Apply --if-state condition: no-op if current state doesn't match.
 	// A missing row is treated as StateValue(0), not StateIdle; callers
 	// wanting "write if currently idle" must pass StateValue(0), not &StateIdle.
@@ -208,6 +217,7 @@ func (d *DB) StateDeleteIfResting(target string) error {
 	)
 	return err
 }
+
 
 // StateDeleteBySession removes all state records for the given session.
 // It matches targets equal to name (bare) or prefixed with "name:" (session:window).

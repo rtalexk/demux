@@ -21,13 +21,16 @@ func Open(path string) (*DB, error) {
 	}
 	dsn := path
 	if path != ":memory:" {
-		dsn = path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+		dsn = path + "?_pragma=journal_mode(WAL)"
 	}
 	sqldb, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}
 	sqldb.SetMaxOpenConns(1)
+	if _, err := sqldb.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
+		return nil, fmt.Errorf("set busy_timeout: %w", err)
+	}
 	d := &DB{sql: sqldb}
 	if err := d.migrate(); err != nil {
 		return nil, err
