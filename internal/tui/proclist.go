@@ -57,9 +57,20 @@ func (p *ProcListModel) SetStates(states []db.ToolState) {
 // stateForPane returns the active (non-idle, non-done) state for the given pane, or nil.
 func (p ProcListModel) stateForPane(pane tmux.Pane) *db.ToolState {
 	key := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
-	for i := range p.states {
-		if p.states[i].Target == key && p.states[i].Value != 0 && p.states[i].Value != db.StateDone {
-			return &p.states[i]
+	return activeStateFor(p.states, key)
+}
+
+// stateForWindow returns the active state for a window-level target ("session:windowIndex"), or nil.
+func (p ProcListModel) stateForWindow(session string, windowIndex int) *db.ToolState {
+	key := fmt.Sprintf("%s:%d", session, windowIndex)
+	return activeStateFor(p.states, key)
+}
+
+// activeStateFor returns the first non-idle, non-done state matching target, or nil.
+func activeStateFor(states []db.ToolState, target string) *db.ToolState {
+	for i := range states {
+		if states[i].Target == target && states[i].Value != 0 && states[i].Value != db.StateDone {
+			return &states[i]
 		}
 	}
 	return nil

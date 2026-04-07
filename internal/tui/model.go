@@ -247,7 +247,11 @@ func (m Model) buildProcTitle() string {
 	if runes := []rune(bc); len(runes) > 0 && isIconRune(runes[len(runes)-1]) {
 		procTitleSuffix = "  "
 	}
-	return " [l] " + bc + procTitleSuffix
+	title := " [l] " + bc + procTitleSuffix
+	if st := activeStateFor(m.states, bc); st != nil {
+		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(st) + " "
+	}
+	return title
 }
 
 // applyOverlay wraps base with the help or yank overlay when active.
