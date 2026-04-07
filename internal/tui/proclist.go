@@ -69,7 +69,10 @@ func (p ProcListModel) stateForWindow(session string, windowIndex int) *db.ToolS
 // activeStateFor returns the first non-idle, non-done state matching target, or nil.
 func activeStateFor(states []db.ToolState, target string) *db.ToolState {
 	for i := range states {
-		if states[i].Target == target && states[i].Value != 0 && states[i].Value != db.StateDone {
+		if states[i].Target == target &&
+			states[i].Value != 0 &&
+			states[i].Value != db.StateDone &&
+			states[i].Value != db.StateIdle {
 			return &states[i]
 		}
 	}
@@ -166,8 +169,6 @@ func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int3
 	}
 	return nodes
 }
-
-
 
 // appendPaneNodes appends a pane header node and its process nodes to p.nodes.
 // displayPane may differ from pane (e.g. CWD suppressed when it matches winCWD).

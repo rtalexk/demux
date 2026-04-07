@@ -108,7 +108,9 @@ func statePriority(value db.StateValue) int {
 		return 2
 	case db.StateFlagged:
 		return 1
-	default: // working, idle — fall through to next sort key
+	case db.StateIdle:
+		return 0
+	default: // working — fall through to next sort key
 		return 0
 	}
 }
@@ -131,14 +133,6 @@ func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 	}
 	return best
 }
-
-
-
-
-
-
-
-
 
 // visibleSessions returns sessions matching the current filter with IgnoredSessions removed.
 // For FilterWorktree with no resolvable root, returns nil and sets s.filterHint.
@@ -833,8 +827,6 @@ func (s *SidebarModel) FocusNode(sess string, visibleRows int) bool {
 	}
 	return false
 }
-
-
 
 // SetSearchResult filters and optionally re-sorts the sidebar nodes by the
 // given query result. Passing an empty Result clears any active filter.

@@ -91,7 +91,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 
 	helpStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 	helpDescStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
-	yankStyle    = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
+	yankStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 	confirmStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 1)
 
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)
@@ -136,6 +136,8 @@ func stateIcon(value db.StateValue) string {
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateError).Bold(true).Render(activeTheme.IconStateError)
 	case db.StateFlagged:
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateFlagged).Render(activeTheme.IconStateFlagged)
+	case db.StateIdle:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateIdle).Render(activeTheme.IconStateIdle)
 	}
 	return ""
 }
@@ -153,6 +155,8 @@ func stateIconOnBG(value db.StateValue, bg lipgloss.Color) string {
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateError).Bold(true).Background(bg).Render(activeTheme.IconStateError)
 	case db.StateFlagged:
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateFlagged).Background(bg).Render(activeTheme.IconStateFlagged)
+	case db.StateIdle:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorStateIdle).Background(bg).Render(activeTheme.IconStateIdle)
 	}
 	return ""
 }
@@ -174,6 +178,8 @@ func stateBadge(value db.StateValue, msg string) string {
 		fg, bg = activeTheme.ColorStateError, activeTheme.ColorStateErrorBg
 	case db.StateFlagged:
 		fg, bg = activeTheme.ColorStateFlagged, activeTheme.ColorStateFlaggedBg
+	case db.StateIdle:
+		fg, bg = activeTheme.ColorStateIdle, activeTheme.ColorStateIdleBg
 	default:
 		return msg
 	}
