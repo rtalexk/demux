@@ -125,9 +125,9 @@ func New(cfg config.Config, database *db.DB) Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	// Only fetch panes on startup — sidebar renders immediately.
-	// fetchStates, fetchProcs, and the tick are deferred until panesMsg arrives.
-	return m.fetchPanes()
+	// Fetch panes and states in parallel so the first sidebar render uses
+	// correct state-based sort. Tick and procs are deferred until panesMsg arrives.
+	return tea.Batch(m.fetchPanes(), m.fetchStates())
 }
 
 func (m Model) View() string {

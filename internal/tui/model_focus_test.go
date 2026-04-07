@@ -77,3 +77,70 @@ func TestFocusSearchOnOpen_false(t *testing.T) {
 		t.Errorf("expected searchInput to not be in insert mode when FocusSearchOnOpen = false")
 	}
 }
+
+// TestStateSession_StatesBeforePanes verifies that state_session focus and
+// correct priority-based sort are applied even when the statesMsg arrives
+// before the panesMsg (the race introduced by fetching both in Init).
+func TestStateSession_StatesBeforePanes(t *testing.T) {
+	states := []db.ToolState{
+		{Target: "beta", Value: db.StateWaiting},
+	}
+	m := focusTestModel("state_session")
+	m.height = 40
+	// States arrive first (before panes).
+	m, _ = applyStatesMsg(m, states)
+	if m.startupFocusDone {
+		t.Error("startupFocusDone must not be set before panes arrive")
+	}
+	// Panes arrive — sidebar is now populated with correct state sort and focus applied.
+	m, _ = applyPanesMsg(m, "alpha")
+	if !m.startupFocusDone {
+		t.Error("startupFocusDone must be set after panes arrive with pre-loaded states")
+	}
+	node := m.sidebar.Selected()
+	if node == nil || node.Session != "beta" {
+		t.Errorf("expected state_session focus on beta (has waiting state), got %+v", node)
+	}
+}
+
+// TestStateSession_PanesBeforeStates verifies the existing behaviour: when
+// panes arrive before states (the common case), state_session focus is applied
+// in handleStatesMsg once m.ready is true.
+func TestStateSession_PanesBeforeStates(t *testing.T) {
+	states := []db.ToolState{
+		{Target: "beta", Value: db.StateWaiting},
+	}
+	m := focusTestModel("state_session")
+	m.height = 40
+	m, _ = applyPanesMsg(m, "alpha")
+	if m.startupFocusDone {
+		t.Error("startupFocusDone must not be set before states arrive")
+	}
+	m, _ = applyStatesMsg(m, states)
+	if !m.startupFocusDone {
+		t.Error("startupFocusDone must be set after states arrive with panes ready")
+	}
+	node := m.sidebar.Selected()
+	if node == nil || node.Session != "beta" {
+		t.Errorf("expected state_session focus on beta (has waiting state), got %+v", node)
+	}
+}
+
+// TestStartupSort_StatesBeforePanes verifies that sessions are sorted by
+// state priority on the first panes render when states arrived first.
+func TestStartupSort_StatesBeforePanes(t *testing.T) {
+	states := []db.ToolState{
+		{Target: "beta", Value: db.StateError},
+	}
+	m := focusTestModel("")
+	m.height = 40
+	m, _ = applyStatesMsg(m, states)
+	m, _ = applyPanesMsg(m, "alpha")
+	nodes := m.sidebar.nodes
+	if len(nodes) < 2 {
+		t.Fatalf("expected at least 2 nodes, got %d", len(nodes))
+	}
+	if nodes[0].Session != "beta" {
+		t.Errorf("expected beta (error state) to sort first, got %q", nodes[0].Session)
+	}
+}

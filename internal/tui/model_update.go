@@ -150,12 +150,23 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	if !m.ready {
 		// First load: sidebar is visible — kick off tick and states; procs are fetched on-demand
 		m.currentSession = msg.currentSession
+		visibleRows := max(1, m.height-1-2-searchBoxH)
 		switch m.cfg.Sidebar.FocusOnOpen {
 		case "current_session", "first_session":
-			visibleRows := max(1, m.height-1-2-searchBoxH)
 			m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
 		}
 		m.ready = true
+		// If states already arrived (Init fetched them in parallel), apply
+		// state-dependent startup focus now instead of waiting for statesMsg.
+		if !m.startupFocusDone && len(m.states) > 0 {
+			m.startupFocusDone = true
+			if m.cfg.Sidebar.FocusOnOpen == "state_session" {
+				m.applyNonAlertFocusMode("state_session", visibleRows)
+			}
+			if m.cfg.Sidebar.FocusSearchOnOpen {
+				m.searchInput.EnterInsertMode()
+			}
+		}
 		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates())
 		// If startup focus landed on a window node, kick off an initial proc fetch.
 		if node := m.sidebar.Selected(); node != nil {
@@ -197,7 +208,9 @@ func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
 	m.procList.SetStates(msg.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, msg.states, m.gitInfo, m.cfg)
-	if !m.startupFocusDone {
+	// Only apply startup focus once panes have landed (m.ready). If states
+	// arrived before panes, handlePanesMsg will apply focus when panes arrive.
+	if !m.startupFocusDone && m.ready {
 		m.startupFocusDone = true
 		if m.cfg.Sidebar.FocusOnOpen == "state_session" {
 			visibleRows := max(1, m.height-1-2-searchBoxH)
