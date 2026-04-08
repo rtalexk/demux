@@ -82,6 +82,7 @@ func (d *DB) migrate() error {
 		if err := d.migrateV4(); err != nil {
 			return err
 		}
+		version = 4
 	}
 	return nil
 }
