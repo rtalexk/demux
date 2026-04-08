@@ -633,12 +633,17 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 
 	// Row format: [focus(1)] [gap(1+)] [icon(iconW)] [name+indicators(availW)]
-	// The gap slot is nominally 1 column. If the active icon renders wider (e.g.
-	// certain Unicode arrows that terminals render as 2 columns), subtract the
-	// overage from availW so the session icon and name are not displaced.
+	// The gap slot is nominally 1 column. Some Unicode characters (e.g. arrows
+	// classified as East Asian ambiguous) are measured as 1 by runewidth but
+	// rendered as 2 columns by terminals with nerd-font configurations. We
+	// measure with both narrow and wide conditions and take the maximum so the
+	// name budget is reduced correctly in either case.
+	wideCondition := runewidth.NewCondition()
+	wideCondition.EastAsianWidth = true
+	activeIconW := max(runewidth.StringWidth(activeIcon), wideCondition.StringWidth(activeIcon))
 	availW := width - 6 - iconW
 	if node.Session == s.activeSession {
-		if extra := runewidth.StringWidth(activeIcon) - 1; extra > 0 {
+		if extra := activeIconW - 1; extra > 0 {
 			availW -= extra
 		}
 	}
