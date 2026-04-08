@@ -610,10 +610,10 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 	if focused {
 		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
 		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-		return indicatorGlyph + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+		return indicatorGlyph + gap + " " + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
 	}
 	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-	return indicatorGlyph + gap + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+	return indicatorGlyph + gap + " " + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
@@ -632,21 +632,10 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		activeIcon = "►"
 	}
 
-	// Row format: [focus(1)] [gap(1+)] [icon(iconW)] [name+indicators(availW)]
-	// The gap slot is nominally 1 column. Some Unicode characters (e.g. arrows
-	// classified as East Asian ambiguous) are measured as 1 by runewidth but
-	// rendered as 2 columns by terminals with nerd-font configurations. We
-	// measure with both narrow and wide conditions and take the maximum so the
-	// name budget is reduced correctly in either case.
-	wideCondition := runewidth.NewCondition()
-	wideCondition.EastAsianWidth = true
-	activeIconW := max(runewidth.StringWidth(activeIcon), wideCondition.StringWidth(activeIcon))
-	availW := width - 6 - iconW
-	if node.Session == s.activeSession {
-		if extra := activeIconW - 1; extra > 0 {
-			availW -= extra
-		}
-	}
+	// Row format: [focus(1)] [gap(1)] [active-slot(1)] [icon(iconW)] [name+indicators(availW)]
+	// The active-slot is always reserved (indicator or space) so the session icon
+	// stays at a fixed column regardless of which icon is configured.
+	availW := width - 7 - iconW
 	if availW < 4 {
 		availW = 4
 	}
@@ -673,7 +662,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
 	text := alignedRow(nameStr, indicators, availW)
-	return " " + gap + iconPrefix + sessionStyle.Render(text)
+	return " " + gap + " " + iconPrefix + sessionStyle.Render(text)
 }
 
 // formatAge returns a fixed-width 3-char age string for a session's last-seen
