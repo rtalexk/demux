@@ -595,18 +595,31 @@ func (s SidebarModel) lastSeenIndicator(node SidebarNode, selected, focused bool
 	return hintStyle.Render(age)
 }
 
-// watchIndicator returns the rendered watch icon for a sidebar row, or "".
+// watchIndicator returns a fixed-width string for the watch slot.
+// When watched: the configured icon. When not watched: blank spaces of the same
+// display width, so other indicators never shift position.
+// Returns "" when no icon is configured.
 func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) string {
-	if _, ok := s.watches[node.Session]; !ok {
+	if activeTheme.IconWatch == "" {
 		return ""
 	}
+	iconW := runewidth.StringWidth(activeTheme.IconWatch)
+	_, watched := s.watches[node.Session]
 	if selected && focused {
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
+		if watched {
+			return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
+		}
+		return selectedBG.Render(strings.Repeat(" ", iconW))
 	}
-	return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
+	if watched {
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
+	}
+	return strings.Repeat(" ", iconW)
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
+// The watch indicator is concatenated directly after the other indicators with no
+// separator, so it appears flush against the last-seen text.
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
@@ -618,14 +631,14 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	if ind := s.watchIndicator(node, selected, focused); ind != "" {
-		indParts = append(indParts, ind)
-	}
+	var other string
 	if selected && focused {
 		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-		return strings.Join(indParts, sep)
+		other = strings.Join(indParts, sep)
+	} else {
+		other = strings.Join(indParts, " ")
 	}
-	return strings.Join(indParts, " ")
+	return other + s.watchIndicator(node, selected, focused)
 }
 
 // truncateSessionName truncates name to fit within maxName display columns,

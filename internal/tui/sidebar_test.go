@@ -1007,15 +1007,29 @@ func TestWatchIndicator_ShowsIconWhenWatched(t *testing.T) {
 	}
 }
 
-func TestWatchIndicator_EmptyWhenNotWatched(t *testing.T) {
+func TestWatchIndicator_BlankSlotWhenNotWatched(t *testing.T) {
 	initStyles(Theme{IconWatch: "·"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{}
+	node := SidebarNode{Session: "myapp"}
+
+	// A blank of the same width as the icon must be returned so that other
+	// indicators never shift horizontally when a session is watched or unwatched.
+	got := s.watchIndicator(node, false, false)
+	if got != " " {
+		t.Errorf("watchIndicator() = %q, want blank space placeholder", got)
+	}
+}
+
+func TestWatchIndicator_EmptyWhenNoIconConfigured(t *testing.T) {
+	initStyles(Theme{IconWatch: ""}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{}
 	s.watches = map[string]struct{}{}
 	node := SidebarNode{Session: "myapp"}
 
 	got := s.watchIndicator(node, false, false)
 	if got != "" {
-		t.Errorf("watchIndicator() = %q, want empty for unwatched session", got)
+		t.Errorf("watchIndicator() = %q, want empty when icon not configured", got)
 	}
 }
 
