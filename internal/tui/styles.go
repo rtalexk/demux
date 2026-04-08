@@ -106,7 +106,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	paneIdleStyle = lipgloss.NewStyle().Foreground(t.ColorFgDim).Italic(true)
 
 	hintStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
-	detailLabelStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Width(10)
+	detailLabelStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Width(detailLabelWidth)
 	detailValueStyle = lipgloss.NewStyle().Foreground(t.ColorFgPrimary)
 	noSelectionStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted).Italic(true)
 	spinnerStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)

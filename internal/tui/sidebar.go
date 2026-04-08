@@ -28,6 +28,25 @@ const (
 	FilterPriority SidebarFilter = "!"
 )
 
+// Session row layout constants.
+const (
+	// focusGlyph is the left-edge bar rendered on selected/focused rows.
+	focusGlyph = "▌"
+
+	// selectedTrail is the trailing pad that extends the highlight to the right border.
+	selectedTrail = "  "
+
+	// sidebarRowOverhead is the total fixed-width cost of the non-name columns in a
+	// session row: border(2) + focus/indicator(1) + gap(1) + sep(1) + trail(2).
+	sidebarRowOverhead = 7
+
+	// minRowWidth is the minimum display-column budget reserved for the session name.
+	minRowWidth = 4
+
+	// warningGlyph is the icon prepended to sidebar error messages.
+	warningGlyph = "⚠"
+)
+
 type SidebarNode struct {
 	Session string
 }
@@ -421,7 +440,7 @@ func (s SidebarModel) emptyHintText() string {
 func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBelow, focused bool, width int, centeredHint func(string) string) []string {
 	var lines []string
 	if hasAbove {
-		lines = append(lines, centeredHint("▲ more"))
+		lines = append(lines, centeredHint(scrollHintAbove))
 	}
 	end := offset + contentRows
 	if end > len(s.nodes) {
@@ -431,7 +450,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 		lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
 	}
 	if hasBelow {
-		lines = append(lines, centeredHint("▼ more"))
+		lines = append(lines, centeredHint(scrollHintBelow))
 	}
 	return lines
 }
@@ -444,8 +463,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 
 	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes))
 
-	// inner content width (border takes 2)
-	innerW := width - 2
+	innerW := width - borderOverhead
 	centeredHint := func(text string) string {
 		pad := (innerW - len([]rune(text))) / 2
 		if pad < 0 {
@@ -466,17 +484,17 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 		errLine := lipgloss.NewStyle().
 			Foreground(activeTheme.ColorFgMuted).
 			Italic(true).
-			Width(width - 2).
+			Width(width - borderOverhead).
 			Align(lipgloss.Center).
-			Render("⚠ " + s.launchErr)
+			Render(warningGlyph + " " + s.launchErr)
 		inner += "\n" + errLine
 	}
 	style := borderInactive
 	if focused {
 		style = borderActive
 	}
-	rendered := injectBorderTitles(style.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
-	shortcutBar := filterShortcutBar(s.filter, width-2)
+	rendered := injectBorderTitles(style.Width(width-borderOverhead).Height(height-borderOverhead).Render(inner), title, rightTitle)
+	shortcutBar := filterShortcutBar(s.filter, width-borderOverhead)
 	return injectBottomBorderLabel(rendered, shortcutBar)
 }
 
@@ -597,7 +615,7 @@ func truncateSessionName(name string, maxName int) string {
 	for runewidth.StringWidth(string(runes)) > maxName-1 {
 		runes = runes[:len(runes)-1]
 	}
-	return string(runes) + "…"
+	return string(runes) + ellipsis
 }
 
 // renderSelectedRow renders a sidebar row that is currently selected.
@@ -608,12 +626,14 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 		pad = 0
 	}
 	if focused {
-		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
-		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-		return indicatorGlyph + gap + " " + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(selectedTrail)
+		name := selectedBG.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
+		return indicatorGlyph + gap + " " + iconPrefix + name + indicators + trail
 	}
-	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-	return indicatorGlyph + gap + " " + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
+	name := selectedInactive.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
+	return indicatorGlyph + gap + " " + iconPrefix + name + indicators
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
@@ -629,23 +649,23 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	// Resolve active icon early so its width can be accounted for in availW.
 	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
 	if activeIcon == "" {
-		activeIcon = "►"
+		activeIcon = config.DefaultActiveSessionIcon
 	}
 
 	// Row format: [focus(1)] [gap(1)] [active-slot(1)] [icon(iconW)] [name+indicators(availW)]
 	// The active-slot is always reserved (indicator or space) so the session icon
 	// stays at a fixed column regardless of which icon is configured.
-	availW := width - 7 - iconW
-	if availW < 4 {
-		availW = 4
+	availW := width - sidebarRowOverhead - iconW
+	if availW < minRowWidth {
+		availW = minRowWidth
 	}
 	indW := runewidth.StringWidth(stripANSI(indicators))
 	maxName := availW - indW
 	if indW > 0 {
 		maxName-- // alignedRow enforces pad>=1 separator; reserve it so truncation doesn't overflow
 	}
-	if maxName < 4 {
-		maxName = 4
+	if maxName < minRowWidth {
+		maxName = minRowWidth
 	}
 	nameStr := truncateSessionName(node.Session, maxName)
 
@@ -703,10 +723,10 @@ func formatAge(t, now time.Time) string {
 func compactGitIndicators(info git.Info) string {
 	var parts []string
 	if info.Ahead > 0 {
-		parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("↑%d", info.Ahead)))
+		parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("%s%d", gitAheadGlyph, info.Ahead)))
 	}
 	if info.Behind > 0 {
-		parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("↓%d", info.Behind)))
+		parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("%s%d", gitBehindGlyph, info.Behind)))
 	}
 	if info.Dirty {
 		parts = append(parts, gitDirtyStyle.Render("*"))
@@ -719,10 +739,10 @@ func compactGitIndicators(info git.Info) string {
 func compactGitIndicatorsOnBG(info git.Info, bg lipgloss.Color) string {
 	var parts []string
 	if info.Ahead > 0 {
-		parts = append(parts, gitAheadStyle.Background(bg).Render(fmt.Sprintf("↑%d", info.Ahead)))
+		parts = append(parts, gitAheadStyle.Background(bg).Render(fmt.Sprintf("%s%d", gitAheadGlyph, info.Ahead)))
 	}
 	if info.Behind > 0 {
-		parts = append(parts, gitBehindStyle.Background(bg).Render(fmt.Sprintf("↓%d", info.Behind)))
+		parts = append(parts, gitBehindStyle.Background(bg).Render(fmt.Sprintf("%s%d", gitBehindGlyph, info.Behind)))
 	}
 	if info.Dirty {
 		parts = append(parts, gitDirtyStyle.Background(bg).Render("*"))

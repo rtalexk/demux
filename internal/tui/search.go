@@ -50,17 +50,17 @@ func (s SearchInputModel) Update(msg tea.Msg) (SearchInputModel, tea.Cmd) {
 	return s, cmd
 }
 
+const searchBoxTitle = "[f] Search"
+
 // View renders the 3-line bordered search box at the given width.
 func (s SearchInputModel) View(width int) string {
-	const title = "[f] Search"
-
 	if s.insert {
 		s.input.Placeholder = "Type to search..."
 	} else {
 		s.input.Placeholder = "Press f to search..."
 	}
 	inputView := s.input.View()
-	innerWidth := width - 2 // subtract left + right border chars
+	innerWidth := width - borderOverhead
 
 	// Determine border color.
 	borderColor := activeTheme.ColorBorder
@@ -74,12 +74,12 @@ func (s SearchInputModel) View(width int) string {
 	mid := borderStyle.Render("│") + innerStyle.Render(inputView) + borderStyle.Render("│")
 
 	// Build top border with title.
-	titleWidth := runewidth.StringWidth(title)
+	titleWidth := runewidth.StringWidth(searchBoxTitle)
 	dashCount := innerWidth - titleWidth - 1
 	if dashCount < 0 {
 		dashCount = 0
 	}
-	top := borderStyle.Render("╭─") + title + borderStyle.Render(strings.Repeat("─", dashCount)+"╮")
+	top := borderStyle.Render("╭─") + searchBoxTitle + borderStyle.Render(strings.Repeat("─", dashCount)+"╮")
 	bot := borderStyle.Render("╰" + strings.Repeat("─", innerWidth) + "╯")
 
 	return top + "\n" + mid + "\n" + bot

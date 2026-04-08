@@ -51,7 +51,7 @@ func (m Model) handleNormalModeDefault(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if newFilter, ok := resolveFilterKey(msg); ok {
-		sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
+		sidebarVisibleRows := m.height - statusBarH - borderOverhead - searchBoxH
 		if sidebarVisibleRows < 1 {
 			sidebarVisibleRows = 1
 		}
@@ -120,7 +120,7 @@ func (m Model) navigateSidebarInSearch(direction int) (Model, tea.Cmd) {
 // handleSearchInsertKey handles key events when the search input is in insert mode.
 // Returns the updated model and command.
 func (m Model) handleSearchInsertKey(msg tea.KeyMsg) (Model, tea.Cmd) {
-	sidebarVisibleRows := m.height - 1 - 2 - searchBoxH
+	sidebarVisibleRows := m.height - statusBarH - borderOverhead - searchBoxH
 	if sidebarVisibleRows < 1 {
 		sidebarVisibleRows = 1
 	}
@@ -268,7 +268,7 @@ func (m Model) sidebarCursorMove(msg tea.KeyMsg, rows int) (Model, bool) {
 }
 
 func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	sidebarVisibleRows := m.height - 1 - 2 - searchBoxH // contentH (height-1) minus border (2) minus searchBoxH
+	sidebarVisibleRows := m.height - statusBarH - borderOverhead - searchBoxH
 	if sidebarVisibleRows < 1 {
 		sidebarVisibleRows = 1
 	}
@@ -496,7 +496,7 @@ func (m Model) showClearConfirm(target string) Model {
 		if st.Message != "" {
 			msg := st.Message
 			if runes := []rune(msg); len(runes) > maxTargetLen {
-				msg = string(runes[:maxTargetLen-1]) + "…"
+				msg = string(runes[:maxTargetLen-1]) + ellipsis
 			}
 			body += "\n          " + msg
 		}
