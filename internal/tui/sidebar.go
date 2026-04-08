@@ -66,6 +66,7 @@ type SidebarModel struct {
 	queryResult   query.Result
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
+	watches       map[string]struct{}
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -85,9 +86,13 @@ func (s *SidebarModel) SetActiveSession(name string) {
 	s.activeSession = name
 }
 
-// SetWatches stores the list of watched session names.
-// This is a stub that will be replaced in Task 4.
-func (s *SidebarModel) SetWatches(_ []string) {}
+// SetWatches updates the set of watched session names.
+func (s *SidebarModel) SetWatches(sessions []string) {
+	s.watches = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.watches[name] = struct{}{}
+	}
+}
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
 // key again toggles back to FilterTmux (the default) and restores the cursor
@@ -590,6 +595,17 @@ func (s SidebarModel) lastSeenIndicator(node SidebarNode, selected, focused bool
 	return hintStyle.Render(age)
 }
 
+// watchIndicator returns the rendered watch icon for a sidebar row, or "".
+func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) string {
+	if _, ok := s.watches[node.Session]; !ok {
+		return ""
+	}
+	if selected && focused {
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
+	}
+	return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
@@ -600,6 +616,9 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 		indParts = append(indParts, ind)
 	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
+	if ind := s.watchIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if selected && focused {

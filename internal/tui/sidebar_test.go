@@ -993,6 +993,31 @@ func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
 	}
 }
 
+func TestWatchIndicator_ShowsIconWhenWatched(t *testing.T) {
+	initStyles(Theme{IconWatch: "👁"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{"myapp": {}}
+	node := SidebarNode{Session: "myapp"}
+
+	// unselected, unfocused row
+	got := s.watchIndicator(node, false, false)
+	if got == "" {
+		t.Error("watchIndicator() = empty, want non-empty for watched session")
+	}
+}
+
+func TestWatchIndicator_EmptyWhenNotWatched(t *testing.T) {
+	initStyles(Theme{IconWatch: "👁"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{}
+	node := SidebarNode{Session: "myapp"}
+
+	got := s.watchIndicator(node, false, false)
+	if got != "" {
+		t.Errorf("watchIndicator() = %q, want empty for unwatched session", got)
+	}
+}
+
 func TestFilterShortcutBar_FitsWidth(t *testing.T) {
 	initStyles(Theme{
 		ColorSession: lipgloss.Color("#89b4fa"),
