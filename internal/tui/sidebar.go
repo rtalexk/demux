@@ -33,19 +33,20 @@ type SidebarNode struct {
 }
 
 type SidebarModel struct {
-	nodes       []SidebarNode
-	cursor      int
-	offset      int // viewport scroll offset
-	visibleRows int // last known visible row count; used by CursorDown/CursorUp
-	sessions    []session.Session
-	states      map[string]db.ToolState
-	gitInfo     map[string]git.Info
-	cfg         config.Config
-	filter      SidebarFilter
-	prevSession string // selected session before last filter switch; restored on toggle-off
-	filterHint  string
-	queryResult query.Result
-	launchErr   string // shown inline when last launch attempt failed
+	nodes         []SidebarNode
+	cursor        int
+	offset        int // viewport scroll offset
+	visibleRows   int // last known visible row count; used by CursorDown/CursorUp
+	sessions      []session.Session
+	states        map[string]db.ToolState
+	gitInfo       map[string]git.Info
+	cfg           config.Config
+	filter        SidebarFilter
+	prevSession   string // selected session before last filter switch; restored on toggle-off
+	filterHint    string
+	queryResult   query.Result
+	launchErr     string // shown inline when last launch attempt failed
+	activeSession string // tmux session the user is currently attached to
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -57,6 +58,12 @@ func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState
 	s.gitInfo = gitInfo
 	s.cfg = cfg
 	s.rebuildNodes()
+}
+
+// SetActiveSession records which tmux session the user is currently attached to.
+// Pass an empty string when not inside tmux.
+func (s *SidebarModel) SetActiveSession(name string) {
+	s.activeSession = name
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's

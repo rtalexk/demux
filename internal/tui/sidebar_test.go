@@ -1115,3 +1115,19 @@ func TestSidebarViewport(t *testing.T) {
 		})
 	}
 }
+
+func TestSetActiveSession_StoresName(t *testing.T) {
+	s := SidebarModel{}
+	s.SetActiveSession("myapp")
+	if s.activeSession != "myapp" {
+		t.Errorf("expected activeSession=myapp, got %q", s.activeSession)
+	}
+}
+
+func TestSetActiveSession_EmptyClears(t *testing.T) {
+	s := SidebarModel{activeSession: "myapp"}
+	s.SetActiveSession("")
+	if s.activeSession != "" {
+		t.Errorf("expected empty activeSession, got %q", s.activeSession)
+	}
+}
