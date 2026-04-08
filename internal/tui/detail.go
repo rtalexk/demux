@@ -24,6 +24,9 @@ const (
 	DetailProc
 )
 
+// detailLabelWidth is the fixed column width of the left-hand label column.
+const detailLabelWidth = 10
+
 type DetailModel struct {
 	selType DetailSelection
 	cfg     config.Config
@@ -69,7 +72,7 @@ func (d DetailModel) ContentLines(innerWidth int) int {
 	default:
 		return 1
 	}
-	valueW := innerWidth - 10 // label is 10 wide
+	valueW := innerWidth - detailLabelWidth
 	if valueW < 1 {
 		valueW = 1
 	}
@@ -92,7 +95,7 @@ func (d DetailModel) ContentLines(innerWidth int) int {
 }
 
 func (d DetailModel) Render(width, height int) string {
-	innerW := width - 2
+	innerW := width - borderOverhead
 	var lines []string
 	switch d.selType {
 	case DetailSession:
@@ -106,7 +109,7 @@ func (d DetailModel) Render(width, height int) string {
 			noSelectionStyle.Render("No selection"),
 		}
 	}
-	maxLines := height - 2
+	maxLines := height - borderOverhead
 	if maxLines < 0 {
 		maxLines = 0
 	}
@@ -114,7 +117,7 @@ func (d DetailModel) Render(width, height int) string {
 		lines = lines[:maxLines]
 	}
 	inner := strings.Join(lines, "\n")
-	return detailBorder.Width(innerW).Height(height - 2).Render(inner)
+	return detailBorder.Width(innerW).Height(height - borderOverhead).Render(inner)
 }
 
 func worktreeValue(info git.Info) string {
@@ -247,15 +250,13 @@ func (d DetailModel) renderWindow() []string {
 }
 
 func (d DetailModel) renderProc(innerWidth int) []string {
-	valueW := innerWidth - 10 // label column is 10 wide
+	valueW := innerWidth - detailLabelWidth
 	if valueW < 8 {
 		valueW = 8
 	}
 	cmd := d.proc.Cmdline
-	cmdRunes := []rune(cmd)
-	if len(cmdRunes) > valueW {
-		cmdRunes = append(cmdRunes[:valueW-1], '…')
-		cmd = string(cmdRunes)
+	if cmdRunes := []rune(cmd); len(cmdRunes) > valueW {
+		cmd = string(cmdRunes[:valueW-1]) + ellipsis
 	}
 	lines := []string{
 		row("name", d.proc.FriendlyName()),
@@ -277,7 +278,7 @@ func (d DetailModel) renderProc(innerWidth int) []string {
 		}
 		branch := d.procGit.Branch
 		if ind := gitIndicatorsLong(d.procGit); ind != "" {
-			branch += "  " + ind
+			branch += colSep + ind
 		}
 		lines = append(lines, row("branch", branch))
 	}
@@ -287,10 +288,10 @@ func (d DetailModel) renderProc(innerWidth int) []string {
 func gitIndicatorsLong(info git.Info) string {
 	var parts []string
 	if info.Ahead > 0 {
-		parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("↑%d", info.Ahead)))
+		parts = append(parts, gitAheadStyle.Render(fmt.Sprintf("%s%d", gitAheadGlyph, info.Ahead)))
 	}
 	if info.Behind > 0 {
-		parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("↓%d", info.Behind)))
+		parts = append(parts, gitBehindStyle.Render(fmt.Sprintf("%s%d", gitBehindGlyph, info.Behind)))
 	}
 	if info.Dirty {
 		parts = append(parts, gitDirtyStyle.Render("*"))

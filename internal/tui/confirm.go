@@ -6,7 +6,7 @@ import (
 )
 
 // truncateTarget shortens target to maxLen runes, preserving the :window.pane
-// suffix so it remains readable. The session name is truncated with "…".
+// suffix so it remains readable. The session name is truncated with ellipsis.
 func truncateTarget(target string, maxLen int) string {
 	runes := []rune(target)
 	if len(runes) <= maxLen {
@@ -16,18 +16,18 @@ func truncateTarget(target string, maxLen int) string {
 	idx := strings.IndexByte(target, ':')
 	if idx < 0 {
 		// No suffix — truncate the whole thing.
-		return string(runes[:maxLen-1]) + "…"
+		return string(runes[:maxLen-1]) + ellipsis
 	}
 	suffix := []rune(target[idx:])        // e.g. ":2.0"
-	available := maxLen - len(suffix) - 1 // -1 for "…"
+	available := maxLen - len(suffix) - 1 // -1 for ellipsis
 	if available <= 0 {
-		return "…" + string(suffix)
+		return ellipsis + string(suffix)
 	}
 	session := []rune(target[:idx])
 	if len(session) <= available {
 		return target
 	}
-	return string(session[:available]) + "…" + string(suffix)
+	return string(session[:available]) + ellipsis + string(suffix)
 }
 
 // ConfirmModel is a small confirmation popover.

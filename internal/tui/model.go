@@ -30,6 +30,23 @@ const (
 
 const searchBoxH = 3
 
+// TUI-wide layout and display constants.
+const (
+	// borderOverhead is the number of columns/rows consumed by a single bordered
+	// box on one axis (left+right border = 2 columns; top+bottom border = 2 rows).
+	borderOverhead = 2
+
+	// statusBarH is the number of rows reserved for the status bar at the bottom.
+	statusBarH = 1
+
+	// ellipsis is the Unicode horizontal ellipsis used for text truncation.
+	ellipsis = "…"
+
+	// gitAheadGlyph / gitBehindGlyph are the indicator characters for git divergence.
+	gitAheadGlyph  = "↑"
+	gitBehindGlyph = "↓"
+)
+
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // Message types

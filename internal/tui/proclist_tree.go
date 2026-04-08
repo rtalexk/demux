@@ -53,6 +53,16 @@ func ancestorIsLastAtDepth(nodes []ProcListNode, pos, ancDepth int) bool {
 //	"│  " ancestor continuation (non-last ancestor)
 //	"   " ancestor continuation (last ancestor)
 //
+// Tree-drawing constants. Each segment is 3 display columns wide; treePad is
+// the 2-column base indent at depth 0 (matches pane-level plain indent).
+const (
+	treePad      = "  "  // base indent before first tree level
+	treeNoCont   = "   " // 3-space continuation for a last-child ancestor
+	treeBarCont  = "│  " // bar continuation for a non-last-child ancestor
+	treeLastNode = "└─ " // prefix for the last sibling at this depth
+	treeContNode = "├─ " // prefix for a non-last sibling at this depth
+)
+
 // The base indent is 2 spaces (pane-level offset), matching the current
 // plain-indent scheme. Each connector/continuation segment is 3 visual columns.
 func assignTreePrefixes(nodes []ProcListNode) {
@@ -64,21 +74,21 @@ func assignTreePrefixes(nodes []ProcListNode) {
 		depth := nd.Depth
 
 		// Build the ancestor continuation chain for depths 1..depth-1.
-		cont := "  " // base 2-space indent
+		cont := treePad
 		for d := 1; d < depth; d++ {
 			if ancestorIsLastAtDepth(nodes, i, d) {
-				cont += "   "
+				cont += treeNoCont
 			} else {
-				cont += "│  "
+				cont += treeBarCont
 			}
 		}
 
 		if nodeIsLastAtDepth(nodes, i, depth) {
-			nd.TreePrefix = cont + "└─ "
-			nd.StatPrefix = cont + "   "
+			nd.TreePrefix = cont + treeLastNode
+			nd.StatPrefix = cont + treeNoCont
 		} else {
-			nd.TreePrefix = cont + "├─ "
-			nd.StatPrefix = cont + "│  "
+			nd.TreePrefix = cont + treeContNode
+			nd.StatPrefix = cont + treeBarCont
 		}
 	}
 }

@@ -12,6 +12,28 @@ import (
 	"github.com/rtalexk/demux/internal/query"
 )
 
+// Process list layout and display constants.
+const (
+	// colSep is the standard two-space column separator between visual fields.
+	colSep = "  "
+
+	// scrollHintAbove / scrollHintBelow are the labels shown when content overflows.
+	scrollHintAbove = "▲ more"
+	scrollHintBelow = "▼ more"
+
+	// pathRedirectGlyph marks a working directory that diverges from the session root.
+	pathRedirectGlyph = "↪"
+
+	// stateSepGlyph is the fixed-width bar rendered before state icons.
+	stateSepGlyph = "────"
+
+	// sessionIndent is the leading whitespace prepended to rows in session mode.
+	sessionIndent = "    "
+
+	// idleLabel is the text shown next to a pane with no active process.
+	idleLabel = "idle"
+)
+
 // renderedLine pairs a node index with its rendered text, used to build the
 // full line list before viewport selection.
 type renderedLine struct {
@@ -78,7 +100,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 	if focused {
 		border = procBorderActive
 	}
-	innerW := width - 2
+	innerW := width - borderOverhead
 
 	// Right border title: show the primary CWD (session or window path).
 	rightTitle := ""
@@ -89,7 +111,7 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 	if len(p.nodes) == 0 {
 		hint := "Select a window with Enter"
 		inner := noSelectionStyle.Render(hint)
-		return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+		return injectBorderTitles(border.Width(width-borderOverhead).Height(height-borderOverhead).Render(inner), title, rightTitle)
 	}
 
 	// build the full rendered line list, tracking node index
@@ -102,14 +124,14 @@ func (p ProcListModel) Render(width, height int, focused bool, title string) str
 
 	allLines := p.buildNodeLines(focused, innerW, searchActive, dimStyle, paneHasMatch, windowHasMatch)
 
-	maxRows := height - 2
+	maxRows := height - borderOverhead
 	if maxRows < 1 {
 		maxRows = 1
 	}
 
 	offset := p.safeOffset(maxRows)
 	inner := p.assembleInner(allLines, offset, maxRows)
-	return injectBorderTitles(border.Width(width-2).Height(height-2).Render(inner), title, rightTitle)
+	return injectBorderTitles(border.Width(width-borderOverhead).Height(height-borderOverhead).Render(inner), title, rightTitle)
 }
 
 // safeOffset computes a read-only clamped scroll offset for the given maxRows.
@@ -131,11 +153,11 @@ func (p ProcListModel) assembleInner(allLines []renderedLine, offset, maxRows in
 	visible, hasAbove, hasBelow := computeViewport(allLines, p.cursor, offset, maxRows)
 	var resultLines []string
 	if hasAbove {
-		resultLines = append(resultLines, hintStyle.Render("▲ more"))
+		resultLines = append(resultLines, hintStyle.Render(scrollHintAbove))
 	}
 	resultLines = append(resultLines, visible...)
 	if hasBelow {
-		resultLines = append(resultLines, hintStyle.Render("▼ more"))
+		resultLines = append(resultLines, hintStyle.Render(scrollHintBelow))
 	}
 	return strings.Join(resultLines, "\n")
 }
@@ -202,7 +224,7 @@ func (p ProcListModel) renderWindowHeaderLine(node ProcListNode, selected bool, 
 func (p ProcListModel) renderPaneHeaderLine(node ProcListNode, i int, selected bool, innerW int, searchActive bool, dimStyle lipgloss.Style, paneHasMatch map[string]bool) string {
 	paneInnerW := innerW
 	if p.inSessionMode {
-		paneInnerW -= 4
+		paneInnerW -= len(sessionIndent)
 		if paneInnerW < 0 {
 			paneInnerW = 0
 		}
@@ -210,10 +232,10 @@ func (p ProcListModel) renderPaneHeaderLine(node ProcListNode, i int, selected b
 	hasIdle := i+1 < len(p.nodes) && p.nodes[i+1].IsIdle
 	rendered := p.renderPaneHeader(node, selected, paneInnerW, hasIdle)
 	if hasIdle && !selected {
-		rendered += "  " + paneIdleStyle.Render("idle")
+		rendered += colSep + paneIdleStyle.Render(idleLabel)
 	}
 	if p.inSessionMode {
-		rendered = "    " + rendered
+		rendered = sessionIndent + rendered
 	}
 	if searchActive && !selected && !paneHasMatch[node.Pane.PaneID] {
 		return dimStyle.Render(stripANSI(rendered))
@@ -225,7 +247,7 @@ func (p ProcListModel) renderPaneHeaderLine(node ProcListNode, i int, selected b
 func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW int, searchActive bool, dimStyle lipgloss.Style, paneHasMatch map[string]bool) string {
 	procInnerW := innerW
 	if p.inSessionMode {
-		procInnerW = innerW - 4
+		procInnerW = innerW - len(sessionIndent)
 		if procInnerW < 0 {
 			procInnerW = 0
 		}
@@ -234,9 +256,9 @@ func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW i
 	if p.inSessionMode {
 		parts := strings.SplitN(rendered, "\n", 2)
 		if len(parts) == 2 {
-			rendered = "    " + parts[0] + "\n" + "    " + parts[1]
+			rendered = sessionIndent + parts[0] + "\n" + sessionIndent + parts[1]
 		} else {
-			rendered = "    " + rendered
+			rendered = sessionIndent + rendered
 		}
 	}
 	if !searchActive || selected {
@@ -260,9 +282,9 @@ func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW
 	gitSuffix := ""
 	if node.GitDeviant {
 		if node.GitInfo.Loading {
-			gitSuffix = "  ↪ …"
+			gitSuffix = colSep + pathRedirectGlyph + " …"
 		} else {
-			gitSuffix = "  ↪ " + stripANSI(compactGitIndicators(node.GitInfo))
+			gitSuffix = colSep + pathRedirectGlyph + " " + stripANSI(compactGitIndicators(node.GitInfo))
 		}
 	}
 
@@ -295,9 +317,10 @@ func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
 	if msg == "" {
 		msg = value.String()
 	}
-	sepOnBG := paneSepStyle.Background(activeTheme.ColorSelected).Render("────")
+	sepOnBG := paneSepStyle.Background(activeTheme.ColorSelected).Render(stateSepGlyph)
 	iconOnBG := stateIconOnBG(value, activeTheme.ColorSelected)
-	return selectedBG.Render("  ") + sepOnBG + selectedBG.Render("  ") + iconOnBG + selectedBG.Render(" ") + stateBadge(value, msg)
+	left := selectedBG.Render(colSep) + sepOnBG + selectedBG.Render(colSep)
+	return left + iconOnBG + selectedBG.Render(" ") + stateBadge(value, msg)
 }
 
 // unselectedStateIndicator returns the state indicator for an unselected pane row.
@@ -307,7 +330,7 @@ func (p ProcListModel) unselectedStateIndicator(st *db.ToolState) string {
 	}
 	effective := *st
 	effective.Value = ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
-	return "  " + paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective)
+	return colSep + paneSepStyle.Render(stateSepGlyph) + colSep + paneStateIndicator(&effective)
 }
 
 func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string, innerW int, hasIdle bool) string {
@@ -322,7 +345,7 @@ func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string
 		return selectedBG.Render(left + strings.Repeat(" ", padCount) + rightPart)
 	}
 	if rightPart != "" {
-		content := left + "  " + rightPart
+		content := left + colSep + rightPart
 		padCount := innerW - len([]rune(content))
 		if padCount < 0 {
 			padCount = 0
@@ -332,14 +355,14 @@ func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string
 	if hasIdle {
 		// Render "label  idle" inline, then fill the remaining width with
 		// the selected background so the row doesn't wrap.
-		const idleVisualW = 6 // len("  idle")
+		const idleVisualW = len(colSep) + len(idleLabel)
 		padCount := innerW - len([]rune(left)) - idleVisualW
 		if padCount < 0 {
 			padCount = 0
 		}
 		idleRendered := paneIdleStyle.Background(activeTheme.ColorSelected).Render("idle")
 		return selectedBG.Render(left) +
-			selectedBG.Render("  ") +
+			selectedBG.Render(colSep) +
 			idleRendered +
 			selectedBG.Render(strings.Repeat(" ", padCount))
 	}
@@ -355,13 +378,13 @@ func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, path
 	if rightPart == "" || !p.cfg.ProcessList.PathRightAlign || innerW <= 0 {
 		out := paneHeaderStyle.Render(label)
 		if pathStr != "" {
-			out += "  " + panePathStyle.Render(pathStr)
+			out += colSep + panePathStyle.Render(pathStr)
 		}
 		if node.GitDeviant {
 			if node.GitInfo.Loading {
-				out += "  " + panePathStyle.Render("↪ …")
+				out += colSep + panePathStyle.Render(pathRedirectGlyph+" …")
 			} else {
-				out += "  " + panePathStyle.Render("↪") + " " + compactGitIndicators(node.GitInfo)
+				out += colSep + panePathStyle.Render(pathRedirectGlyph) + " " + compactGitIndicators(node.GitInfo)
 			}
 		}
 		return out
@@ -369,20 +392,20 @@ func (p ProcListModel) renderPaneHeaderUnselected(node ProcListNode, label, path
 
 	labelW := len([]rune(label))
 	rightW := len([]rune(rightPart))
-	fillCount := innerW - labelW - 2 - 2 - rightW
+	fillCount := innerW - labelW - 2*len(colSep) - rightW
 	if fillCount < 1 {
 		fillCount = 1
 	}
 	out := paneHeaderStyle.Render(label) +
-		"  " +
+		colSep +
 		paneSepStyle.Render(strings.Repeat("─", fillCount)) +
-		"  " +
+		colSep +
 		panePathStyle.Render(pathStr)
 	if node.GitDeviant {
 		if node.GitInfo.Loading {
-			out += "  " + panePathStyle.Render("↪ …")
+			out += colSep + panePathStyle.Render(pathRedirectGlyph+" …")
 		} else {
-			out += "  " + panePathStyle.Render("↪") + " " + compactGitIndicators(node.GitInfo)
+			out += colSep + panePathStyle.Render(pathRedirectGlyph) + " " + compactGitIndicators(node.GitInfo)
 		}
 	}
 	return out
@@ -427,7 +450,7 @@ func (p ProcListModel) renderWindowHeaderSelected(label, pathStr string, innerW 
 		return selectedBG.Render(left + strings.Repeat(" ", padCount) + pathStr)
 	}
 	if pathStr != "" {
-		content := left + "  " + pathStr
+		content := left + colSep + pathStr
 		padCount := innerW - len([]rune(content))
 		if padCount < 0 {
 			padCount = 0
@@ -445,21 +468,21 @@ func (p ProcListModel) renderWindowHeaderUnselected(node ProcListNode, label, pa
 	if pathStr == "" || innerW <= 0 {
 		out := windowHeaderStyle.Render(label)
 		if pathStr != "" {
-			out += "  " + panePathStyle.Render(pathStr)
+			out += colSep + panePathStyle.Render(pathStr)
 		}
 		return out
 	}
 
 	labelW := len([]rune(label))
 	rightW := len([]rune(pathStr))
-	fillCount := innerW - labelW - 2 - 2 - rightW
+	fillCount := innerW - labelW - 2*len(colSep) - rightW
 	if fillCount < 1 {
 		fillCount = 1
 	}
 	return windowHeaderStyle.Render(label) +
-		"  " +
+		colSep +
 		paneSepStyle.Render(strings.Repeat("─", fillCount)) +
-		"  " +
+		colSep +
 		panePathStyle.Render(pathStr)
 }
 
@@ -500,7 +523,7 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool, innerW int) 
 	line1 := p.renderProcLine1(node, selected, innerW, indent, collapsePrefix)
 
 	// line 2: cpu/mem stats; show aggregated totals in parens when collapsed with children
-	statsIndent := treeConnectorStyle.Render(node.StatPrefix) + "  "
+	statsIndent := treeConnectorStyle.Render(node.StatPrefix) + colSep
 	l := statLabelStyle.Render
 	v := statValueStyle.Render
 
@@ -512,8 +535,8 @@ func (p ProcListModel) renderProc(node ProcListNode, selected bool, innerW int) 
 	}
 
 	line2 := statsIndent +
-		l("cpu:") + cpuStr + "  " +
-		l("mem:") + memStr + "  " +
+		l("cpu:") + cpuStr + colSep +
+		l("mem:") + memStr + colSep +
 		l("up:") + v(formatProcDuration(pr.Uptime))
 
 	return line1 + "\n" + line2
@@ -524,10 +547,10 @@ func (p ProcListModel) renderProcLine1(node ProcListNode, selected bool, innerW 
 	if selected {
 		plain := indent + collapsePrefix + pr.FriendlyName()
 		if pr.PID > 0 {
-			plain += fmt.Sprintf("  pid:%d", pr.PID)
+			plain += colSep + fmt.Sprintf("pid:%d", pr.PID)
 		}
 		if node.Port > 0 {
-			plain += fmt.Sprintf("  :%d", node.Port)
+			plain += colSep + fmt.Sprintf(":%d", node.Port)
 		}
 		padCount := innerW - len([]rune(plain))
 		if padCount < 0 {
@@ -535,12 +558,13 @@ func (p ProcListModel) renderProcLine1(node ProcListNode, selected bool, innerW 
 		}
 		return selectedBG.Render(plain + strings.Repeat(" ", padCount))
 	}
-	line1 := treeConnectorStyle.Render(indent) + procNameStyle(pr, node.Depth).Render(collapsePrefix+pr.FriendlyName())
+	styledName := procNameStyle(pr, node.Depth).Render(collapsePrefix + pr.FriendlyName())
+	line1 := treeConnectorStyle.Render(indent) + styledName
 	if pr.PID > 0 {
-		line1 += "  " + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
+		line1 += colSep + statLabelStyle.Render(fmt.Sprintf("pid:%d", pr.PID))
 	}
 	if node.Port > 0 {
-		line1 += "  " + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
+		line1 += colSep + statValueStyle.Render(fmt.Sprintf(":%d", node.Port))
 	}
 	return line1
 }

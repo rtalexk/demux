@@ -179,7 +179,7 @@ func Default() Config {
 			SwitchFocus:       "severity",
 			Width:             DefaultSidebarWidth,
 			ShowLastSeen:      true,
-			ActiveSessionIcon: "►",
+			ActiveSessionIcon: DefaultActiveSessionIcon,
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
