@@ -52,7 +52,7 @@ func (m Model) fetchWatches() tea.Cmd {
 		watches, err := m.db.WatchList()
 		if err != nil {
 			demuxlog.Warn("fetch watches failed", "err", err)
-			return watchesMsg{watches: []string{}}
+			return watchesMsg{}
 		}
 		return watchesMsg{watches: watches}
 	}

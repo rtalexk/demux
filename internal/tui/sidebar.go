@@ -624,12 +624,12 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	_, watched := s.watches[node.Session]
 	if selected && focused {
 		if watched {
-			return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
+			return watchStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
 		}
 		return selectedBG.Render(strings.Repeat(" ", iconW))
 	}
 	if watched {
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
+		return watchStyle.Render(activeTheme.IconWatch)
 	}
 	return strings.Repeat(" ", iconW)
 }
