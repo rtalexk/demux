@@ -200,6 +200,7 @@ In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar a
 | `Esc`          | Back to session level (from window view)          |
 | `y`            | Open yank menu (copy session name to clipboard)   |
 | `F`            | Flag the selected session                         |
+| `P`            | Toggle watch — mark/unmark session as actively in progress |
 | `X`            | Clear state for the selected session              |
 
 **Sidebar filters**
@@ -321,6 +322,10 @@ demux state set --target myproject:1.0 --state flagged --source user --message "
 ```
 
 In the TUI, press `F` on a target to flag it directly. Press `F` again to unflag it.
+
+**Watch Sessions**
+
+Press `P` to mark a session as "watched" — a signal that you are actively working on it. Watched sessions display a configurable icon (default: `👁`) as the rightmost indicator in the sidebar, alongside the existing state and git indicators. The watch set is persistent across navigation and restarts, and is independent of the tool state system — watching a session does not affect or clear its tool state. Configure the icon and color with `icon_watch` and `color_watch` in the `[theme]` section.
 
 </details>
 
