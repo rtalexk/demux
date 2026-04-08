@@ -629,7 +629,9 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
 		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(selectedTrail)
 		name := selectedBG.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
-		return indicatorGlyph + gap + " " + iconPrefix + name + indicators + trail
+		spacer := selectedBG.Render(" ")
+		styledIcon := selectedBG.Render(iconPrefix)
+		return indicatorGlyph + gap + spacer + styledIcon + name + indicators + trail
 	}
 	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
 	name := selectedInactive.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
@@ -677,6 +679,8 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		} else {
 			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
 		}
+	} else if selected && focused {
+		gap = selectedBG.Render(gap)
 	}
 	if selected {
 		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
