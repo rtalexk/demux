@@ -595,27 +595,15 @@ func (s SidebarModel) lastSeenIndicator(node SidebarNode, selected, focused bool
 	return hintStyle.Render(age)
 }
 
-// watchIndicator returns the rendered watch icon for a sidebar row.
-// When the session is not watched it returns blank spaces of the same width as
-// the icon, reserving a fixed column so that other indicators (state, last-seen)
-// never shift horizontally as sessions are watched or unwatched.
-// Returns "" only when no watch icon is configured.
+// watchIndicator returns the rendered watch icon for a sidebar row, or "".
 func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) string {
-	if activeTheme.IconWatch == "" {
+	if _, ok := s.watches[node.Session]; !ok {
 		return ""
 	}
-	iconW := runewidth.StringWidth(activeTheme.IconWatch)
-	_, watched := s.watches[node.Session]
 	if selected && focused {
-		if watched {
-			return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
-		}
-		return selectedBG.Render(strings.Repeat(" ", iconW))
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
 	}
-	if watched {
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
-	}
-	return strings.Repeat(" ", iconW)
+	return lipgloss.NewStyle().Foreground(activeTheme.ColorWatch).Render(activeTheme.IconWatch)
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
