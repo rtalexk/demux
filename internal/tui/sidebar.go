@@ -602,8 +602,7 @@ func truncateSessionName(name string, maxName int) string {
 
 // renderSelectedRow renders a sidebar row that is currently selected.
 // When focused is true the row is highlighted with background colour and a trail.
-func renderSelectedRow(iconPrefix, nameStr, indicators string, availW, indW int, focused bool) string {
-	const gap = " "
+func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW int, focused bool) string {
 	pad := availW - runewidth.StringWidth(nameStr) - indW
 	if pad < 0 {
 		pad = 0
@@ -644,9 +643,21 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 	nameStr := truncateSessionName(node.Session, maxName)
 
-	const gap = " " // 1-space gap between focus indicator and icon
+	// Compute gap: active session gets the directional indicator; others get a space.
+	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
+	if activeIcon == "" {
+		activeIcon = "►"
+	}
+	gap := " "
+	if node.Session == s.activeSession {
+		if selected && focused {
+			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(activeIcon)
+		} else {
+			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
+		}
+	}
 	if selected {
-		return renderSelectedRow(iconPrefix, nameStr, indicators, availW, indW, focused)
+		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
 	text := alignedRow(nameStr, indicators, availW)
 	return " " + gap + iconPrefix + sessionStyle.Render(text)
