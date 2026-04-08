@@ -485,6 +485,9 @@ icon_state_flagged = "🔖"
 color_state_flagged    = "#cba6f7"
 color_state_flagged_bg = "#2a1a4d"
 
+icon_watch  = "👁"
+color_watch = "#89b4fa"
+
 icon_state_idle = "○"
 color_state_idle    = "#89dceb"
 color_state_idle_bg = "#0d2530"

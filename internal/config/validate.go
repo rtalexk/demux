@@ -96,6 +96,8 @@ func (c Config) Validate() []ValidationIssue {
 		"color_state_flagged":    c.Theme.ColorStateFlagged,
 		"color_state_flagged_bg": c.Theme.ColorStateFlaggedBg,
 
+		"color_watch": c.Theme.ColorWatch,
+
 		"color_port":                c.Theme.ColorPort,
 		"color_port_bg":             c.Theme.ColorPortBg,
 		"color_clean":               c.Theme.ColorClean,
