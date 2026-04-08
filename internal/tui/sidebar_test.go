@@ -3,6 +3,8 @@ package tui
 import (
 	"strings"
 	"testing"
+
+	runewidth "github.com/mattn/go-runewidth"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -1006,15 +1008,37 @@ func TestWatchIndicator_ShowsIconWhenWatched(t *testing.T) {
 	}
 }
 
-func TestWatchIndicator_EmptyWhenNotWatched(t *testing.T) {
+func TestWatchIndicator_ReservesSameWidthWhenNotWatched(t *testing.T) {
 	initStyles(Theme{IconWatch: "👁"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{}
 	s.watches = map[string]struct{}{}
 	node := SidebarNode{Session: "myapp"}
 
+	// When icon is configured but session is not watched, a blank placeholder of
+	// the same display width as the icon must be returned (not empty string) so
+	// that other indicators never shift position.
 	got := s.watchIndicator(node, false, false)
-	if got != "" {
-		t.Errorf("watchIndicator() = %q, want empty for unwatched session", got)
+	wantW := runewidth.StringWidth("👁")
+	if got == "" {
+		t.Error("watchIndicator() = empty, want blank placeholder when icon is configured")
+	}
+	if gotW := runewidth.StringWidth(got); gotW != wantW {
+		t.Errorf("watchIndicator() display width = %d, want %d", gotW, wantW)
+	}
+}
+
+func TestWatchIndicator_ConsistentWidthAcrossWatchedAndNot(t *testing.T) {
+	initStyles(Theme{IconWatch: "👁"}, config.ProcessesConfig{}, nil)
+	sWatched := SidebarModel{}
+	sWatched.watches = map[string]struct{}{"myapp": {}}
+	sNot := SidebarModel{}
+	sNot.watches = map[string]struct{}{}
+	node := SidebarNode{Session: "myapp"}
+
+	watchedW := runewidth.StringWidth(stripANSI(sWatched.watchIndicator(node, false, false)))
+	notW := runewidth.StringWidth(stripANSI(sNot.watchIndicator(node, false, false)))
+	if watchedW != notW {
+		t.Errorf("watchIndicator width: watched=%d not-watched=%d, want equal to prevent layout shift", watchedW, notW)
 	}
 }
 
