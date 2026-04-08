@@ -392,6 +392,7 @@ mode = "full"
 [sidebar]
 width = 35                          # sidebar width in columns
 show_last_seen = true               # show last-seen age on each live session row
+active_session_icon = "►"          # icon shown next to the currently attached tmux session
 focus_on_open = "current_session"   # current_session | first_session | state_session
 focus_search_on_open = false        # start with cursor in the search input
 default_filter = "t"                # t | a | c | w | !

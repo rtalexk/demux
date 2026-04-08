@@ -33,19 +33,20 @@ type SidebarNode struct {
 }
 
 type SidebarModel struct {
-	nodes       []SidebarNode
-	cursor      int
-	offset      int // viewport scroll offset
-	visibleRows int // last known visible row count; used by CursorDown/CursorUp
-	sessions    []session.Session
-	states      map[string]db.ToolState
-	gitInfo     map[string]git.Info
-	cfg         config.Config
-	filter      SidebarFilter
-	prevSession string // selected session before last filter switch; restored on toggle-off
-	filterHint  string
-	queryResult query.Result
-	launchErr   string // shown inline when last launch attempt failed
+	nodes         []SidebarNode
+	cursor        int
+	offset        int // viewport scroll offset
+	visibleRows   int // last known visible row count; used by CursorDown/CursorUp
+	sessions      []session.Session
+	states        map[string]db.ToolState
+	gitInfo       map[string]git.Info
+	cfg           config.Config
+	filter        SidebarFilter
+	prevSession   string // selected session before last filter switch; restored on toggle-off
+	filterHint    string
+	queryResult   query.Result
+	launchErr     string // shown inline when last launch attempt failed
+	activeSession string // tmux session the user is currently attached to
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -57,6 +58,12 @@ func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState
 	s.gitInfo = gitInfo
 	s.cfg = cfg
 	s.rebuildNodes()
+}
+
+// SetActiveSession records which tmux session the user is currently attached to.
+// Pass an empty string when not inside tmux.
+func (s *SidebarModel) SetActiveSession(name string) {
+	s.activeSession = name
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
@@ -595,8 +602,7 @@ func truncateSessionName(name string, maxName int) string {
 
 // renderSelectedRow renders a sidebar row that is currently selected.
 // When focused is true the row is highlighted with background colour and a trail.
-func renderSelectedRow(iconPrefix, nameStr, indicators string, availW, indW int, focused bool) string {
-	const gap = " "
+func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW int, focused bool) string {
 	pad := availW - runewidth.StringWidth(nameStr) - indW
 	if pad < 0 {
 		pad = 0
@@ -604,10 +610,10 @@ func renderSelectedRow(iconPrefix, nameStr, indicators string, availW, indW int,
 	if focused {
 		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render("▌")
 		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render("  ")
-		return indicatorGlyph + gap + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
+		return indicatorGlyph + gap + " " + iconPrefix + selectedBG.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators + trail
 	}
 	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render("▌")
-	return indicatorGlyph + gap + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
+	return indicatorGlyph + gap + " " + iconPrefix + selectedInactive.Bold(true).Render(nameStr+strings.Repeat(" ", pad)) + indicators
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
@@ -620,10 +626,16 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 	iconW := runewidth.StringWidth(stripANSI(iconPrefix))
 
-	// Row format: [focus(1)] [gap(2)] [icon(iconW)] [name+indicators(availW)]
-	// Box content = width-2. Selected rows append trail(2), so body must fill
-	// width-2 - 1 - 2 - iconW - 2 = width-7-iconW chars.
-	availW := width - 6 - iconW
+	// Resolve active icon early so its width can be accounted for in availW.
+	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
+	if activeIcon == "" {
+		activeIcon = "►"
+	}
+
+	// Row format: [focus(1)] [gap(1)] [active-slot(1)] [icon(iconW)] [name+indicators(availW)]
+	// The active-slot is always reserved (indicator or space) so the session icon
+	// stays at a fixed column regardless of which icon is configured.
+	availW := width - 7 - iconW
 	if availW < 4 {
 		availW = 4
 	}
@@ -637,12 +649,20 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 	nameStr := truncateSessionName(node.Session, maxName)
 
-	const gap = " " // 1-space gap between focus indicator and icon
+	// Compute gap: active session gets the directional indicator; others get a space.
+	gap := " "
+	if node.Session == s.activeSession {
+		if selected && focused {
+			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(activeIcon)
+		} else {
+			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
+		}
+	}
 	if selected {
-		return renderSelectedRow(iconPrefix, nameStr, indicators, availW, indW, focused)
+		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
 	text := alignedRow(nameStr, indicators, availW)
-	return " " + gap + iconPrefix + sessionStyle.Render(text)
+	return " " + gap + " " + iconPrefix + sessionStyle.Render(text)
 }
 
 // formatAge returns a fixed-width 3-char age string for a session's last-seen

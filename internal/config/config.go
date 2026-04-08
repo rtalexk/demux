@@ -124,6 +124,7 @@ type SidebarConfig struct {
 	FocusSearchOnOpen bool     `toml:"focus_search_on_open"`
 	SearchSort        string   `toml:"search_sort"`
 	ShowLastSeen      bool     `toml:"show_last_seen"`
+	ActiveSessionIcon string   `toml:"active_session_icon"`
 	Sort              []string `toml:"sort"`
 	SwitchFocus       string   `toml:"switch_focus"`
 	Width             int      `toml:"width"`
@@ -171,13 +172,14 @@ func Default() Config {
 		DefaultFormat:     "text",
 		Mode:              "full",
 		Sidebar: SidebarConfig{
-			DefaultFilter: "t",
-			FocusOnOpen:   "",
-			SearchSort:    "score",
-			Sort:          []string{"priority", "last_seen", "alphabetical"},
-			SwitchFocus:   "severity",
-			Width:         DefaultSidebarWidth,
-			ShowLastSeen:  true,
+			DefaultFilter:     "t",
+			FocusOnOpen:       "",
+			SearchSort:        "score",
+			Sort:              []string{"priority", "last_seen", "alphabetical"},
+			SwitchFocus:       "severity",
+			Width:             DefaultSidebarWidth,
+			ShowLastSeen:      true,
+			ActiveSessionIcon: "►",
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},

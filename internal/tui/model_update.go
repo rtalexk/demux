@@ -145,6 +145,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
+	m.sidebar.SetActiveSession(msg.currentSession)
 	m.updateDetailFromSelection()
 	var cmds []tea.Cmd
 	if !m.ready {

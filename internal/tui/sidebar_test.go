@@ -1115,3 +1115,146 @@ func TestSidebarViewport(t *testing.T) {
 		})
 	}
 }
+
+func TestSetActiveSession_StoresName(t *testing.T) {
+	s := SidebarModel{}
+	s.SetActiveSession("myapp")
+	if s.activeSession != "myapp" {
+		t.Errorf("expected activeSession=myapp, got %q", s.activeSession)
+	}
+}
+
+func TestSetActiveSession_EmptyClears(t *testing.T) {
+	s := SidebarModel{activeSession: "myapp"}
+	s.SetActiveSession("")
+	if s.activeSession != "" {
+		t.Errorf("expected empty activeSession, got %q", s.activeSession)
+	}
+}
+
+func TestRenderSession_ActiveSessionShowsIndicator(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		IconCfgSession:  "⚙︎",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+		ColorBorder:     lipgloss.Color("#313244"),
+		ColorSelected:   lipgloss.Color("#2a2a4a"),
+		ColorFgMuted:    lipgloss.Color("#9399b2"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
+		activeSession: "myapp",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], false, false, 40)
+	plain := stripANSI(row)
+	if !strings.Contains(plain, "►") {
+		t.Errorf("expected ► indicator for active session, got: %q", plain)
+	}
+}
+
+func TestRenderSession_NonActiveSessionNoIndicator(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		IconCfgSession:  "⚙︎",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+		ColorBorder:     lipgloss.Color("#313244"),
+		ColorSelected:   lipgloss.Color("#2a2a4a"),
+		ColorFgMuted:    lipgloss.Color("#9399b2"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
+		activeSession: "other",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], false, false, 40)
+	plain := stripANSI(row)
+	if strings.Contains(plain, "►") {
+		t.Errorf("unexpected ► indicator for non-active session, got: %q", plain)
+	}
+}
+
+func TestRenderSession_ActiveSessionCustomIcon(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "@"}},
+		activeSession: "myapp",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], false, false, 40)
+	plain := stripANSI(row)
+	if !strings.Contains(plain, "@") {
+		t.Errorf("expected @ indicator for active session with custom icon, got: %q", plain)
+	}
+}
+
+func TestRenderSession_ActiveSessionEmptyIconFallsBackToDefault(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: ""}},
+		activeSession: "myapp",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], false, false, 40)
+	plain := stripANSI(row)
+	if !strings.Contains(plain, "►") {
+		t.Errorf("expected ► fallback for empty ActiveSessionIcon, got: %q", plain)
+	}
+}
+
+func TestRenderSession_ActiveSessionSelectedFocused(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		IconCfgSession:  "⚙︎",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+		ColorBorder:     lipgloss.Color("#313244"),
+		ColorSelected:   lipgloss.Color("#2a2a4a"),
+		ColorFgMuted:    lipgloss.Color("#9399b2"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
+		activeSession: "myapp",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], true, true, 40)
+	plain := stripANSI(row)
+	if !strings.Contains(plain, "►") {
+		t.Errorf("expected ► indicator for selected+focused active session, got: %q", plain)
+	}
+}
