@@ -85,6 +85,10 @@ func (s *SidebarModel) SetActiveSession(name string) {
 	s.activeSession = name
 }
 
+// SetWatches stores the list of watched session names.
+// This is a stub that will be replaced in Task 4.
+func (s *SidebarModel) SetWatches(_ []string) {}
+
 // SetFilter changes the active sidebar filter. Pressing the current filter's
 // key again toggles back to FilterTmux (the default) and restores the cursor
 // to the session that was selected before the filter was applied.

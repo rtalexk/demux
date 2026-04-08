@@ -41,6 +41,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleProcDataMsg(msg)
 	case statesMsg:
 		return m.handleStatesMsg(msg)
+	case watchesMsg:
+		return m.handleWatchesMsg(msg)
 	case gitResultMsg:
 		return m.handleGitResultMsg(msg)
 	case queryResultMsg:
@@ -120,7 +122,7 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 	if time.Now().After(m.statusExp) {
 		m.statusMsg = ""
 	}
-	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates())
+	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches())
 }
 
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
@@ -168,7 +170,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 				m.searchInput.EnterInsertMode()
 			}
 		}
-		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates())
+		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches())
 		// If startup focus landed on a window node, kick off an initial proc fetch.
 		if node := m.sidebar.Selected(); node != nil {
 			m.procGen++
@@ -439,6 +441,11 @@ func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
 		windowPanes: wPanes,
 		windowGit:   m.gitInfo[gitKey],
 	}
+}
+
+func (m Model) handleWatchesMsg(msg watchesMsg) (Model, tea.Cmd) {
+	m.sidebar.SetWatches(msg.watches)
+	return m, nil
 }
 
 func (m *Model) detailForProcNode(node ProcListNode) DetailModel {

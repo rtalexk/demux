@@ -47,6 +47,17 @@ func (m Model) fetchStates() tea.Cmd {
 	}
 }
 
+func (m Model) fetchWatches() tea.Cmd {
+	return func() tea.Msg {
+		watches, err := m.db.WatchList()
+		if err != nil {
+			demuxlog.Warn("fetch watches failed", "err", err)
+			return watchesMsg{watches: []string{}}
+		}
+		return watchesMsg{watches: watches}
+	}
+}
+
 // makeProcFetch returns a closure that snapshots processes and CWD maps,
 // tagged with the given generation so stale results can be discarded.
 func makeProcFetch(gen int) func() tea.Msg {
