@@ -626,10 +626,22 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 	iconW := runewidth.StringWidth(stripANSI(iconPrefix))
 
-	// Row format: [focus(1)] [gap(2)] [icon(iconW)] [name+indicators(availW)]
-	// Box content = width-2. Selected rows append trail(2), so body must fill
-	// width-2 - 1 - 2 - iconW - 2 = width-7-iconW chars.
+	// Resolve active icon early so its width can be accounted for in availW.
+	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
+	if activeIcon == "" {
+		activeIcon = "►"
+	}
+
+	// Row format: [focus(1)] [gap(1+)] [icon(iconW)] [name+indicators(availW)]
+	// The gap slot is nominally 1 column. If the active icon renders wider (e.g.
+	// certain Unicode arrows that terminals render as 2 columns), subtract the
+	// overage from availW so the session icon and name are not displaced.
 	availW := width - 6 - iconW
+	if node.Session == s.activeSession {
+		if extra := runewidth.StringWidth(activeIcon) - 1; extra > 0 {
+			availW -= extra
+		}
+	}
 	if availW < 4 {
 		availW = 4
 	}
@@ -644,10 +656,6 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	nameStr := truncateSessionName(node.Session, maxName)
 
 	// Compute gap: active session gets the directional indicator; others get a space.
-	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
-	if activeIcon == "" {
-		activeIcon = "►"
-	}
 	gap := " "
 	if node.Session == s.activeSession {
 		if selected && focused {
