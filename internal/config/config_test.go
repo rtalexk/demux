@@ -445,6 +445,16 @@ func TestLoad_StatusBarShowFalse(t *testing.T) {
 	}
 }
 
+func writeTempConfig(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatalf("writeTempConfig: %v", err)
+	}
+	return path
+}
+
 func TestLoadFromFile_ProcessesConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demux.toml")
@@ -472,5 +482,26 @@ shells  = ["fish"]
 	}
 	if len(procs.Shells) != 1 || procs.Shells[0] != "fish" {
 		t.Errorf("unexpected shells: %v", procs.Shells)
+	}
+}
+
+func TestDefaults_ActiveSessionIcon(t *testing.T) {
+	cfg := config.Default()
+	if cfg.Sidebar.ActiveSessionIcon != "►" {
+		t.Errorf("expected ►, got %q", cfg.Sidebar.ActiveSessionIcon)
+	}
+}
+
+func TestLoadFromFile_ActiveSessionIcon(t *testing.T) {
+	path := writeTempConfig(t, `
+[sidebar]
+active_session_icon = "@"
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Sidebar.ActiveSessionIcon != "@" {
+		t.Errorf("expected @, got %q", cfg.Sidebar.ActiveSessionIcon)
 	}
 }
