@@ -41,6 +41,7 @@ type keyMap struct {
 	FilterWorktree    keyDef
 	Open              keyDef
 	StateFilter       keyDef
+	WatchFilter       keyDef
 	FlagState         keyDef
 	WatchSession      keyDef
 	ExpandCollapse    keyDef // display-only combined entry
@@ -89,6 +90,7 @@ var keys = keyMap{
 	FilterConfig:   keyDef{key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "config sessions only")), "Filters", 3},
 	FilterWorktree: keyDef{key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "sessions in current worktree")), "Filters", 4},
 	StateFilter:    keyDef{key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "state filter")), "Filters", 5},
+	WatchFilter:    keyDef{key.NewBinding(key.WithKeys("@"), key.WithHelp("@", "watch filter")), "Filters", 6},
 
 	// Process list
 	JumpUpDown:        keyDef{key.NewBinding(key.WithHelp("J / K", "jump to next/prev pane")), "Process list", 1},
@@ -119,7 +121,7 @@ func allKeyDefs() []keyDef {
 		// Sidebar
 		keys.Enter, keys.Open, keys.Esc, keys.FlagState, keys.WatchSession, keys.ClearState,
 		// Filters
-		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter,
+		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter, keys.WatchFilter,
 		// Process list
 		keys.JumpUpDown, keys.ExpandCollapse, keys.ExpandCollapseAll,
 		keys.ProcEnter, keys.ProcOpen, keys.Kill, keys.Restart, keys.Log,

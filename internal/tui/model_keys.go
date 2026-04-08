@@ -24,6 +24,8 @@ func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
 	switch {
 	case key.Matches(msg, keys.StateFilter.Binding):
 		return FilterPriority, true
+	case key.Matches(msg, keys.WatchFilter.Binding):
+		return FilterWatch, true
 	case key.Matches(msg, keys.FilterTmux.Binding):
 		return FilterTmux, true
 	case key.Matches(msg, keys.FilterAll.Binding):

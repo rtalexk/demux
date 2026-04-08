@@ -26,6 +26,7 @@ const (
 	FilterConfig   SidebarFilter = "c"
 	FilterWorktree SidebarFilter = "w"
 	FilterPriority SidebarFilter = "!"
+	FilterWatch    SidebarFilter = "@"
 )
 
 // Session row layout constants.
@@ -208,6 +209,20 @@ func (s *SidebarModel) filterConfig() []session.Session {
 	return out
 }
 
+// filterWatch returns sessions that are in the watch set.
+func (s *SidebarModel) filterWatch() []session.Session {
+	var out []session.Session
+	for _, sess := range s.sessions {
+		if s.isIgnoredSession(sess.DisplayName) {
+			continue
+		}
+		if _, ok := s.watches[sess.DisplayName]; ok {
+			out = append(out, sess)
+		}
+	}
+	return out
+}
+
 // filterPriority returns non-ignored live sessions that have an attention state
 // (waiting, error, flagged, or optionally working).
 func (s *SidebarModel) filterPriority() []session.Session {
@@ -251,6 +266,8 @@ func (s *SidebarModel) visibleSessions() []session.Session {
 		return s.filterConfig()
 	case FilterPriority:
 		return s.filterPriority()
+	case FilterWatch:
+		return s.filterWatch()
 	case FilterWorktree:
 		rootRef := s.worktreeRootRef()
 		if rootRef == "" {
@@ -964,6 +981,7 @@ var filterShortcuts = []struct {
 	{FilterConfig, "[c] Cfg"},
 	{FilterWorktree, "[w] Workt"},
 	{FilterPriority, "[!] Prior"},
+	{FilterWatch, "[@] Watch"},
 }
 
 // filterShortcutBar builds the centered shortcut string for the sidebar bottom border.
