@@ -1231,3 +1231,30 @@ func TestRenderSession_ActiveSessionEmptyIconFallsBackToDefault(t *testing.T) {
 		t.Errorf("expected ► fallback for empty ActiveSessionIcon, got: %q", plain)
 	}
 }
+
+func TestRenderSession_ActiveSessionSelectedFocused(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession: "⊞",
+		IconCfgSession:  "⚙︎",
+		ColorSession:    lipgloss.Color("#89b4fa"),
+		ColorBorder:     lipgloss.Color("#313244"),
+		ColorSelected:   lipgloss.Color("#2a2a4a"),
+		ColorFgMuted:    lipgloss.Color("#9399b2"),
+	}, config.ProcessesConfig{}, nil)
+
+	s := SidebarModel{
+		sessions: []session.Session{
+			{DisplayName: "myapp", IsLive: true},
+		},
+		states:        map[string]db.ToolState{},
+		gitInfo:       map[string]git.Info{},
+		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
+		activeSession: "myapp",
+	}
+	s.rebuildNodes()
+	row := s.renderSession(s.nodes[0], true, true, 40)
+	plain := stripANSI(row)
+	if !strings.Contains(plain, "►") {
+		t.Errorf("expected ► indicator for selected+focused active session, got: %q", plain)
+	}
+}
