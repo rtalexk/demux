@@ -212,6 +212,7 @@ In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar a
 | `c` | Config sessions only                                 |
 | `w` | Sessions in current worktree                         |
 | `!` | Sessions needing attention (error, flagged, waiting) |
+| `@` | Watched sessions only                                |
 
 **Process list**
 
@@ -241,6 +242,7 @@ The sidebar can show different sets of sessions depending on the active filter:
 - **config (`c`)** — config-only sessions (defined but not currently live).
 - **worktree (`w`)** — sessions whose path belongs to the same git worktree as the current session.
 - **attention (`!`)** — sessions with `error`, `flagged`, or `waiting` states. Configure whether `working` is included with `tui.attention_filter_include_working`.
+- **watch (`@`)** — sessions you have marked as actively being worked on (see Watch Sessions below).
 
 Sessions are sorted by priority, then last-seen time, then alphabetically. Change the order in `demux.toml`:
 
@@ -325,7 +327,7 @@ In the TUI, press `F` on a target to flag it directly. Press `F` again to unflag
 
 **Watch Sessions**
 
-Press `P` to mark a session as "watched" — a signal that you are actively working on it. Watched sessions display a configurable icon (default: `👁`) as the rightmost indicator in the sidebar, alongside the existing state and git indicators. The watch set is persistent across navigation and restarts, and is independent of the tool state system — watching a session does not affect or clear its tool state. Configure the icon and color with `icon_watch` and `color_watch` in the `[theme]` section.
+Press `P` to mark a session as "watched" — a signal that you are actively working on it. Watched sessions display a configurable icon (default: `·`) flush against the last-seen indicator in the sidebar. The watch set is persistent across restarts and independent of the tool state system — watching a session does not affect its tool states. Press `@` to filter the sidebar to watched sessions only. Configure the icon and color with `icon_watch` and `color_watch` in the `[theme]` section.
 
 </details>
 
