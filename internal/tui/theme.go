@@ -54,6 +54,9 @@ type Theme struct {
 	IconStateFlagged string
 	IconStateIdle    string
 
+	IconWatch  string
+	ColorWatch lipgloss.Color
+
 	IconTmuxSession string
 	IconCfgSession  string
 
@@ -113,6 +116,9 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 		IconStateError:   tc.IconStateError,
 		IconStateFlagged: tc.IconStateFlagged,
 		IconStateIdle:    tc.IconStateIdle,
+
+		IconWatch:  tc.IconWatch,
+		ColorWatch: lipgloss.Color(tc.ColorWatch),
 
 		IconTmuxSession: tc.IconTmuxSession,
 		IconCfgSession:  tc.IconCfgSession,

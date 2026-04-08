@@ -76,6 +76,13 @@ func (d *DB) migrate() error {
 		if err := d.migrateV3(); err != nil {
 			return err
 		}
+		version = 3
+	}
+	if version < 4 {
+		if err := d.migrateV4(); err != nil {
+			return err
+		}
+		version = 4
 	}
 	return nil
 }
@@ -182,6 +189,27 @@ func (d *DB) migrateV3() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 3`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 3: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV4() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v4: %w", err)
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS session_watches (
+			session    TEXT NOT NULL PRIMARY KEY,
+			added_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("create session_watches v4: %w", err)
+	}
+	if _, err := tx.Exec(`PRAGMA user_version = 4`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 4: %w", err)
 	}
 	return tx.Commit()
 }

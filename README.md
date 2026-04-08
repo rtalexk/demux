@@ -193,14 +193,15 @@ In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar a
 
 **Sidebar**
 
-| Key            | Action                                            |
-| -------------- | ------------------------------------------------- |
-| `Enter`        | Attach to session                                 |
-| `o` / `Ctrl+o` | Attach to session / highest-priority state window |
-| `Esc`          | Back to session level (from window view)          |
-| `y`            | Open yank menu (copy session name to clipboard)   |
-| `F`            | Flag the selected session                         |
-| `X`            | Clear state for the selected session              |
+| Key            | Action                                                     |
+| -------------- | ---------------------------------------------------------- |
+| `Enter`        | Attach to session                                          |
+| `o` / `Ctrl+o` | Attach to session / highest-priority state window          |
+| `Esc`          | Back to session level (from window view)                   |
+| `y`            | Open yank menu (copy session name to clipboard)            |
+| `F`            | Flag the selected session                                  |
+| `P`            | Toggle watch — mark/unmark session as actively in progress |
+| `X`            | Clear state for the selected session                       |
 
 **Sidebar filters**
 
@@ -211,6 +212,7 @@ In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar a
 | `c` | Config sessions only                                 |
 | `w` | Sessions in current worktree                         |
 | `!` | Sessions needing attention (error, flagged, waiting) |
+| `@` | Watched sessions only                                |
 
 **Process list**
 
@@ -240,6 +242,7 @@ The sidebar can show different sets of sessions depending on the active filter:
 - **config (`c`)** — config-only sessions (defined but not currently live).
 - **worktree (`w`)** — sessions whose path belongs to the same git worktree as the current session.
 - **attention (`!`)** — sessions with `error`, `flagged`, or `waiting` states. Configure whether `working` is included with `tui.attention_filter_include_working`.
+- **watch (`@`)** — sessions you have marked as actively being worked on (see Watch Sessions below).
 
 Sessions are sorted by priority, then last-seen time, then alphabetically. Change the order in `demux.toml`:
 
@@ -321,6 +324,10 @@ demux state set --target myproject:1.0 --state flagged --source user --message "
 ```
 
 In the TUI, press `F` on a target to flag it directly. Press `F` again to unflag it.
+
+**Watch Sessions**
+
+Press `P` to mark a session as "watched" — a signal that you are actively working on it. Watched sessions display a configurable icon (default: `·`) flush against the last-seen indicator in the sidebar. The watch set is persistent across restarts and independent of the tool state system — watching a session does not affect its tool states. Press `@` to filter the sidebar to watched sessions only. Configure the icon and color with `icon_watch` and `color_watch` in the `[theme]` section.
 
 </details>
 
@@ -484,6 +491,9 @@ color_state_error_bg = "#3d1020"
 icon_state_flagged = "🔖"
 color_state_flagged    = "#cba6f7"
 color_state_flagged_bg = "#2a1a4d"
+
+icon_watch  = "·"
+color_watch = "#89b4fa"
 
 icon_state_idle = "○"
 color_state_idle    = "#89dceb"

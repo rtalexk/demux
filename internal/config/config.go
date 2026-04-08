@@ -96,6 +96,9 @@ type ThemeConfig struct {
 	IconStateFlagged string `toml:"icon_state_flagged"`
 	IconStateIdle    string `toml:"icon_state_idle"`
 
+	IconWatch  string `toml:"icon_watch"`
+	ColorWatch string `toml:"color_watch"`
+
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
 
@@ -239,6 +242,9 @@ func Default() Config {
 			IconStateError:   "✗",
 			IconStateFlagged: "🔖",
 			IconStateIdle:    "○",
+
+			IconWatch:  "·",
+			ColorWatch: "#89b4fa",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

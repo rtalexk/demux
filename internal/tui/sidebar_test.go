@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -990,6 +991,45 @@ func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
 	plain := stripANSI(row)
 	if strings.Contains(plain, "m") || strings.Contains(plain, "s") || strings.Contains(plain, "h") || strings.Contains(plain, "d") {
 		t.Errorf("expected no age indicator when ShowLastSeen=false, got: %q", plain)
+	}
+}
+
+func TestWatchIndicator_ShowsIconWhenWatched(t *testing.T) {
+	initStyles(Theme{IconWatch: "·"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{"myapp": {}}
+	node := SidebarNode{Session: "myapp"}
+
+	// unselected, unfocused row
+	got := s.watchIndicator(node, false, false)
+	if got == "" {
+		t.Error("watchIndicator() = empty, want non-empty for watched session")
+	}
+}
+
+func TestWatchIndicator_BlankSlotWhenNotWatched(t *testing.T) {
+	initStyles(Theme{IconWatch: "·"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{}
+	node := SidebarNode{Session: "myapp"}
+
+	// A blank of the same width as the icon must be returned so that other
+	// indicators never shift horizontally when a session is watched or unwatched.
+	got := s.watchIndicator(node, false, false)
+	if got != " " {
+		t.Errorf("watchIndicator() = %q, want blank space placeholder", got)
+	}
+}
+
+func TestWatchIndicator_EmptyWhenNoIconConfigured(t *testing.T) {
+	initStyles(Theme{IconWatch: ""}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{}
+	s.watches = map[string]struct{}{}
+	node := SidebarNode{Session: "myapp"}
+
+	got := s.watchIndicator(node, false, false)
+	if got != "" {
+		t.Errorf("watchIndicator() = %q, want empty when icon not configured", got)
 	}
 }
 

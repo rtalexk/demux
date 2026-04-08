@@ -41,7 +41,9 @@ type keyMap struct {
 	FilterWorktree    keyDef
 	Open              keyDef
 	StateFilter       keyDef
+	WatchFilter       keyDef
 	FlagState         keyDef
+	WatchSession      keyDef
 	ExpandCollapse    keyDef // display-only combined entry
 	Expand            keyDef
 	Collapse          keyDef
@@ -75,11 +77,12 @@ var keys = keyMap{
 	GotoBottom: keyDef{key.NewBinding(key.WithKeys("G"), key.WithHelp("G", "bottom")), "Navigation", 4},
 
 	// Sidebar
-	Enter:      keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "attach to session")), "Sidebar", 1},
-	Open:       keyDef{key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o / ctrl+o", "attach to session / window")), "Sidebar", 2},
-	Esc:        keyDef{key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back to session level")), "Sidebar", 3},
-	FlagState:  keyDef{key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "flag (bookmark)")), "Sidebar", 4},
-	ClearState: keyDef{key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "clear state")), "Sidebar", 5},
+	Enter:        keyDef{key.NewBinding(key.WithKeys("enter"), key.WithHelp("Enter", "attach to session")), "Sidebar", 1},
+	Open:         keyDef{key.NewBinding(key.WithKeys("o", "ctrl+o"), key.WithHelp("o / ctrl+o", "attach to session / window")), "Sidebar", 2},
+	Esc:          keyDef{key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back to session level")), "Sidebar", 3},
+	FlagState:    keyDef{key.NewBinding(key.WithKeys("F"), key.WithHelp("F", "flag (bookmark)")), "Sidebar", 4},
+	WatchSession: keyDef{key.NewBinding(key.WithKeys("P"), key.WithHelp("P", "watch session")), "Sidebar", 5},
+	ClearState:   keyDef{key.NewBinding(key.WithKeys("X"), key.WithHelp("X", "clear state")), "Sidebar", 6},
 
 	// Filters
 	FilterTmux:     keyDef{key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "tmux sessions only (default)")), "Filters", 1},
@@ -87,6 +90,7 @@ var keys = keyMap{
 	FilterConfig:   keyDef{key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "config sessions only")), "Filters", 3},
 	FilterWorktree: keyDef{key.NewBinding(key.WithKeys("w"), key.WithHelp("w", "sessions in current worktree")), "Filters", 4},
 	StateFilter:    keyDef{key.NewBinding(key.WithKeys("!"), key.WithHelp("!", "state filter")), "Filters", 5},
+	WatchFilter:    keyDef{key.NewBinding(key.WithKeys("@"), key.WithHelp("@", "watch filter")), "Filters", 6},
 
 	// Process list
 	JumpUpDown:        keyDef{key.NewBinding(key.WithHelp("J / K", "jump to next/prev pane")), "Process list", 1},
@@ -115,9 +119,9 @@ func allKeyDefs() []keyDef {
 		// Navigation
 		keys.Navigate, keys.Tab, keys.GotoTop, keys.GotoBottom,
 		// Sidebar
-		keys.Enter, keys.Open, keys.Esc, keys.FlagState, keys.ClearState,
+		keys.Enter, keys.Open, keys.Esc, keys.FlagState, keys.WatchSession, keys.ClearState,
 		// Filters
-		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter,
+		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter, keys.WatchFilter,
 		// Process list
 		keys.JumpUpDown, keys.ExpandCollapse, keys.ExpandCollapseAll,
 		keys.ProcEnter, keys.ProcOpen, keys.Kill, keys.Restart, keys.Log,

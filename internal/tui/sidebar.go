@@ -26,6 +26,7 @@ const (
 	FilterConfig   SidebarFilter = "c"
 	FilterWorktree SidebarFilter = "w"
 	FilterPriority SidebarFilter = "!"
+	FilterWatch    SidebarFilter = "@"
 )
 
 // Session row layout constants.
@@ -34,11 +35,11 @@ const (
 	focusGlyph = "▌"
 
 	// selectedTrail is the trailing pad that extends the highlight to the right border.
-	selectedTrail = "  "
+	selectedTrail = " "
 
 	// sidebarRowOverhead is the total fixed-width cost of the non-name columns in a
-	// session row: border(2) + focus/indicator(1) + gap(1) + sep(1) + trail(2).
-	sidebarRowOverhead = 7
+	// session row: border(2) + focus/indicator(1) + gap(1) + sep(1) + trail(1).
+	sidebarRowOverhead = 6
 
 	// minRowWidth is the minimum display-column budget reserved for the session name.
 	minRowWidth = 4
@@ -66,6 +67,7 @@ type SidebarModel struct {
 	queryResult   query.Result
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
+	watches       map[string]struct{}
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -83,6 +85,14 @@ func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState
 // Pass an empty string when not inside tmux.
 func (s *SidebarModel) SetActiveSession(name string) {
 	s.activeSession = name
+}
+
+// SetWatches updates the set of watched session names.
+func (s *SidebarModel) SetWatches(sessions []string) {
+	s.watches = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.watches[name] = struct{}{}
+	}
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
@@ -199,6 +209,20 @@ func (s *SidebarModel) filterConfig() []session.Session {
 	return out
 }
 
+// filterWatch returns sessions that are in the watch set.
+func (s *SidebarModel) filterWatch() []session.Session {
+	var out []session.Session
+	for _, sess := range s.sessions {
+		if s.isIgnoredSession(sess.DisplayName) {
+			continue
+		}
+		if _, ok := s.watches[sess.DisplayName]; ok {
+			out = append(out, sess)
+		}
+	}
+	return out
+}
+
 // filterPriority returns non-ignored live sessions that have an attention state
 // (waiting, error, flagged, or optionally working).
 func (s *SidebarModel) filterPriority() []session.Session {
@@ -242,6 +266,8 @@ func (s *SidebarModel) visibleSessions() []session.Session {
 		return s.filterConfig()
 	case FilterPriority:
 		return s.filterPriority()
+	case FilterWatch:
+		return s.filterWatch()
 	case FilterWorktree:
 		rootRef := s.worktreeRootRef()
 		if rootRef == "" {
@@ -586,7 +612,31 @@ func (s SidebarModel) lastSeenIndicator(node SidebarNode, selected, focused bool
 	return hintStyle.Render(age)
 }
 
+// watchIndicator returns a fixed-width string for the watch slot.
+// When watched: the configured icon. When not watched: blank spaces of the same
+// display width, so other indicators never shift position.
+// Returns "" when no icon is configured.
+func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) string {
+	if activeTheme.IconWatch == "" {
+		return ""
+	}
+	iconW := runewidth.StringWidth(activeTheme.IconWatch)
+	_, watched := s.watches[node.Session]
+	if selected && focused {
+		if watched {
+			return watchStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconWatch)
+		}
+		return selectedBG.Render(strings.Repeat(" ", iconW))
+	}
+	if watched {
+		return watchStyle.Render(activeTheme.IconWatch)
+	}
+	return strings.Repeat(" ", iconW)
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
+// The watch indicator is concatenated directly after the other indicators with no
+// separator, so it appears flush against the last-seen text.
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
@@ -598,11 +648,14 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
+	var other string
 	if selected && focused {
 		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-		return strings.Join(indParts, sep)
+		other = strings.Join(indParts, sep)
+	} else {
+		other = strings.Join(indParts, " ")
 	}
-	return strings.Join(indParts, " ")
+	return other + s.watchIndicator(node, selected, focused)
 }
 
 // truncateSessionName truncates name to fit within maxName display columns,
@@ -928,6 +981,7 @@ var filterShortcuts = []struct {
 	{FilterConfig, "[c] Cfg"},
 	{FilterWorktree, "[w] Workt"},
 	{FilterPriority, "[!] Prior"},
+	{FilterWatch, "[@] Watch"},
 }
 
 // filterShortcutBar builds the centered shortcut string for the sidebar bottom border.

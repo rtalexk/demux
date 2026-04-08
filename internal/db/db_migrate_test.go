@@ -41,7 +41,7 @@ func TestMigrateV3_UserVersion(t *testing.T) {
 	if err := d.sql.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if version != 3 {
-		t.Fatalf("expected user_version=3, got %d", version)
+	if version != 4 {
+		t.Fatalf("expected user_version=4, got %d", version)
 	}
 }

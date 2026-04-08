@@ -24,6 +24,8 @@ func resolveFilterKey(msg tea.KeyMsg) (SidebarFilter, bool) {
 	switch {
 	case key.Matches(msg, keys.StateFilter.Binding):
 		return FilterPriority, true
+	case key.Matches(msg, keys.WatchFilter.Binding):
+		return FilterWatch, true
 	case key.Matches(msg, keys.FilterTmux.Binding):
 		return FilterTmux, true
 	case key.Matches(msg, keys.FilterAll.Binding):
@@ -93,7 +95,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showYank = true
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
-		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.scheduleProcFetch())
+		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.scheduleProcFetch())
 	default:
 		return m.handleNormalModeDefault(msg)
 	}
@@ -292,6 +294,10 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.flagCurrentState(node.Session)
 		}
+	case key.Matches(msg, keys.WatchSession.Binding):
+		if node := m.sidebar.Selected(); node != nil {
+			return m, m.watchCurrentSession(node.Session)
+		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
 			target := node.Session
@@ -433,6 +439,10 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.flagCurrentState(target)
 		}
+	case key.Matches(msg, keys.WatchSession.Binding):
+		if sess := m.procListSession(); sess != "" {
+			return m, m.watchCurrentSession(sess)
+		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if target := m.procListStateTarget(); target != "" {
 			return m.showClearConfirm(target), nil
@@ -449,6 +459,21 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// watchCurrentSession toggles the watch state for the given session.
+func (m Model) watchCurrentSession(session string) tea.Cmd {
+	d := m.db
+	_, watched := m.sidebar.watches[session]
+	return func() tea.Msg {
+		if watched {
+			_ = d.WatchClear(session)
+		} else {
+			_ = d.WatchSet(session)
+		}
+		list, _ := d.WatchList()
+		return watchesMsg{watches: list}
+	}
+}
+
 // flagCurrentState sets the flagged state for the given target.
 func (m Model) flagCurrentState(target string) tea.Cmd {
 	d := m.db
@@ -458,6 +483,15 @@ func (m Model) flagCurrentState(target string) tea.Cmd {
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
+}
+
+// procListSession returns the session name for the currently selected proc list node.
+func (m Model) procListSession() string {
+	node := m.procList.SelectedNode()
+	if node == nil {
+		return ""
+	}
+	return node.Pane.Session
 }
 
 // procListStateTarget returns the state target string for the currently selected

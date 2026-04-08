@@ -71,6 +71,9 @@ var (
 
 	// Session icon
 	sessionIconStyle lipgloss.Style
+
+	// Watch indicator
+	watchStyle lipgloss.Style
 )
 
 // initStyles rebuilds every style using the given theme and merges proc-type
@@ -123,6 +126,8 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	gitDirtyStyle = lipgloss.NewStyle().Foreground(t.ColorGitDirty)
 
 	sessionIconStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
+
+	watchStyle = lipgloss.NewStyle().Foreground(t.ColorWatch)
 }
 
 // ageDrivenValue returns the effective display value for a state.

@@ -56,6 +56,7 @@ type panesMsg struct {
 	currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
 }
 type statesMsg struct{ states []db.ToolState }
+type watchesMsg struct{ watches []string }
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
