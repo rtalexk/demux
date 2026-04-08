@@ -34,11 +34,11 @@ const (
 	focusGlyph = "▌"
 
 	// selectedTrail is the trailing pad that extends the highlight to the right border.
-	selectedTrail = "  "
+	selectedTrail = " "
 
 	// sidebarRowOverhead is the total fixed-width cost of the non-name columns in a
-	// session row: border(2) + focus/indicator(1) + gap(1) + sep(1) + trail(2).
-	sidebarRowOverhead = 7
+	// session row: border(2) + focus/indicator(1) + gap(1) + sep(1) + trail(1).
+	sidebarRowOverhead = 6
 
 	// minRowWidth is the minimum display-column budget reserved for the session name.
 	minRowWidth = 4
