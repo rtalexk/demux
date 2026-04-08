@@ -193,15 +193,15 @@ In compact mode (`--compact` or `mode = "compact"` in config) only the sidebar a
 
 **Sidebar**
 
-| Key            | Action                                            |
-| -------------- | ------------------------------------------------- |
-| `Enter`        | Attach to session                                 |
-| `o` / `Ctrl+o` | Attach to session / highest-priority state window |
-| `Esc`          | Back to session level (from window view)          |
-| `y`            | Open yank menu (copy session name to clipboard)   |
-| `F`            | Flag the selected session                         |
+| Key            | Action                                                     |
+| -------------- | ---------------------------------------------------------- |
+| `Enter`        | Attach to session                                          |
+| `o` / `Ctrl+o` | Attach to session / highest-priority state window          |
+| `Esc`          | Back to session level (from window view)                   |
+| `y`            | Open yank menu (copy session name to clipboard)            |
+| `F`            | Flag the selected session                                  |
 | `P`            | Toggle watch — mark/unmark session as actively in progress |
-| `X`            | Clear state for the selected session              |
+| `X`            | Clear state for the selected session                       |
 
 **Sidebar filters**
 
