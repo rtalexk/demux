@@ -660,7 +660,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
 	text := alignedRow(nameStr, indicators, availW)
-	return gap + " " + iconPrefix + sessionStyle.Render(text)
+	return " " + gap + iconPrefix + sessionStyle.Render(text)
 }
 
 // formatAge returns a fixed-width 3-char age string for a session's last-seen
