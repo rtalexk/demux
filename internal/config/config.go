@@ -243,7 +243,7 @@ func Default() Config {
 			IconStateFlagged: "🔖",
 			IconStateIdle:    "○",
 
-			IconWatch:  "👁",
+			IconWatch:  "·",
 			ColorWatch: "#89b4fa",
 
 			IconTmuxSession: "⊞",
