@@ -75,6 +75,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchInsertKey(msg)
 	}
 
+	// Checklist mode intercepts all keys when active.
+	if m.checklistMode {
+		if m.checklistInput.IsActive() {
+			return m.handleChecklistInputKey(msg)
+		}
+		return m.handleChecklistKey(msg)
+	}
+
 	switch {
 	case key.Matches(msg, keys.Quit.Binding):
 		return m, tea.Quit
@@ -306,6 +314,12 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			return m.showClearConfirm(target), nil
 		}
+	default:
+		if msg.String() == "C" {
+			if node := m.sidebar.Selected(); node != nil {
+				return m.openChecklistMode(node.Session)
+			}
+		}
 	}
 	return m.sidebarNavUpdate()
 }
@@ -453,6 +467,12 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// TODO: restart via tmux send-keys Up Enter
 	case key.Matches(msg, keys.Log.Binding):
 		// TODO: tmux popup with scrollback
+	default:
+		if msg.String() == "C" {
+			if node := m.sidebar.Selected(); node != nil {
+				return m.openChecklistMode(node.Session)
+			}
+		}
 	}
 	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
 	m.updateDetailFromSelection()

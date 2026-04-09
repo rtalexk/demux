@@ -50,6 +50,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleTodosMsg(msg)
 	case todoEditorDoneMsg:
 		return m.handleTodoEditorDoneMsg(msg)
+	case checklistDeleteConfirmedMsg:
+		return m.handleChecklistDeleteConfirmed(msg)
 	case gitResultMsg:
 		return m.handleGitResultMsg(msg)
 	case queryResultMsg:
@@ -473,6 +475,17 @@ func (m Model) handleTodosMsg(msg todosMsg) (Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+func (m Model) handleChecklistDeleteConfirmed(msg checklistDeleteConfirmedMsg) (Model, tea.Cmd) {
+	if err := m.db.TodoDelete(msg.id); err != nil {
+		demuxlog.Error("todo delete failed", "id", msg.id, "err", err)
+		m.statusMsg = "error deleting item: " + err.Error()
+		m.statusExp = time.Now().Add(4 * time.Second)
+	} else {
+		demuxlog.Info("todo deleted", "id", msg.id, "session", msg.session)
+	}
+	return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
 }
 
 func (m Model) handleTodoEditorDoneMsg(msg todoEditorDoneMsg) (Model, tea.Cmd) {

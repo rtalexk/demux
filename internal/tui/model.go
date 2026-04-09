@@ -67,6 +67,10 @@ type todoEditorDoneMsg struct {
 	tempFile string
 	err      error
 }
+type checklistDeleteConfirmedMsg struct {
+	id      int64
+	session string
+}
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
