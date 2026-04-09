@@ -58,26 +58,26 @@ func (m Model) fetchWatches() tea.Cmd {
 	}
 }
 
-func (m Model) fetchTodoSessions() tea.Cmd {
+func (m Model) fetchItemSessions() tea.Cmd {
 	return func() tea.Msg {
-		sessions, err := m.db.TodoSessionsWithOpen()
+		sessions, err := m.db.ItemSessionsWithOpen()
 		if err != nil {
-			demuxlog.Warn("fetch todo sessions failed", "err", err)
-			return todoSessionsMsg{}
+			demuxlog.Warn("fetch item sessions failed", "err", err)
+			return itemSessionsMsg{}
 		}
-		return todoSessionsMsg{sessions: sessions}
+		return itemSessionsMsg{sessions: sessions}
 	}
 }
 
-func (m Model) fetchTodos(session string) tea.Cmd {
+func (m Model) fetchItems(session string) tea.Cmd {
 	return func() tea.Msg {
-		items, err := m.db.TodoList(session)
+		items, err := m.db.ItemList(session)
 		if err != nil {
-			demuxlog.Warn("fetch todos failed", "session", session, "err", err)
-			return todosMsg{session: session}
+			demuxlog.Warn("fetch items failed", "session", session, "err", err)
+			return itemsMsg{session: session}
 		}
-		demuxlog.Debug("fetched todos", "session", session, "count", len(items))
-		return todosMsg{session: session, items: items}
+		demuxlog.Debug("fetched items", "session", session, "count", len(items))
+		return itemsMsg{session: session, items: items}
 	}
 }
 

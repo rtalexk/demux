@@ -13,79 +13,155 @@ import (
 const (
 	checkboxUnchecked = "☐"
 	checkboxChecked   = "☑"
+	noteMarker        = "─"
+	emptyHint         = "(empty)"
 )
 
 // renderChecklistPanel renders the full bordered checklist panel (same
 // external dimensions as a proclist panel), including title bar, items,
-// separator, and input bar. baseTitle is the normal proclist title; " · TODOs"
+// separators, and input bar. baseTitle is the normal proclist title; "· Items"
 // is appended to it so the breadcrumb context is preserved.
 func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle string) string {
 	innerW := width - borderOverhead
 	innerH := height - borderOverhead
 
-	// Reserve 2 inner rows for separator + input bar.
+	// Split items by kind, preserving original flat indices for cursor matching.
+	var todoIdxs, noteIdxs []int
+	for i, it := range m.checklistItems {
+		if it.Kind == "todo" {
+			todoIdxs = append(todoIdxs, i)
+		} else {
+			noteIdxs = append(noteIdxs, i)
+		}
+	}
+
+	borderColor := activeTheme.ColorBorder
+	if focused {
+		borderColor = activeTheme.ColorSession
+	}
+	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
+	dimStyle := lipgloss.NewStyle().Faint(true)
+	sep := borderStyle.Render(strings.Repeat("─", innerW))
+
+	renderItem := func(flatIdx int, marker string) string {
+		item := m.checklistItems[flatIdx]
+		if item.Kind == "todo" {
+			if item.Checked {
+				marker = checkboxChecked
+			} else {
+				marker = checkboxUnchecked
+			}
+		}
+		markerW := runewidth.StringWidth(marker)
+		maxBody := innerW - markerW - 3
+		body := truncateToWidth(item.Body, maxBody)
+		line := fmt.Sprintf("  %s  %s", marker, body)
+		lineW := runewidth.StringWidth(xansi.Strip(line))
+		if lineW < innerW {
+			line += strings.Repeat(" ", innerW-lineW)
+		}
+		if flatIdx == m.checklistCursor {
+			line = selectedBG.Bold(true).Width(innerW).Render(line)
+		}
+		return line
+	}
+
+	sectionHeader := func(label string) string {
+		line := " " + label
+		lineW := runewidth.StringWidth(line)
+		if lineW < innerW {
+			line += strings.Repeat(" ", innerW-lineW)
+		}
+		return lipgloss.NewStyle().Bold(true).Render(line)
+	}
+
+	emptyLine := func() string {
+		line := "  " + dimStyle.Render(emptyHint)
+		lineW := runewidth.StringWidth(xansi.Strip(line))
+		if lineW < innerW {
+			line += strings.Repeat(" ", innerW-lineW)
+		}
+		return line
+	}
+
+	// Build all visible rows in order.
+	var rows []string
+	rows = append(rows, sectionHeader("TODOs"))
+	if len(todoIdxs) == 0 {
+		rows = append(rows, emptyLine())
+	} else {
+		for _, idx := range todoIdxs {
+			rows = append(rows, renderItem(idx, checkboxUnchecked))
+		}
+	}
+	rows = append(rows, sep)
+	rows = append(rows, sectionHeader("Notes"))
+	if len(noteIdxs) == 0 {
+		rows = append(rows, emptyLine())
+	} else {
+		for _, idx := range noteIdxs {
+			rows = append(rows, renderItem(idx, noteMarker))
+		}
+	}
+
+	// Reserve 2 inner rows for final separator + input bar.
 	listH := innerH - 2
 	if listH < 1 {
 		listH = 1
 	}
 
-	// Build item rows.
-	var rows []string
-	for i, item := range m.checklistItems {
-		cb := checkboxUnchecked
-		if item.Checked {
-			cb = checkboxChecked
+	// Viewport: find which visual row contains the cursor and scroll accordingly.
+	cursorRow := 0
+	if m.checklistCursor < len(m.checklistItems) {
+		// Count visual rows up to the cursor item.
+		// TODOs section: header(1) + items(len(todoIdxs) or 1 for empty) + sep(1) + Notes header(1)
+		// then note items.
+		counted := 1 // TODOs header
+		for _, idx := range todoIdxs {
+			if idx == m.checklistCursor {
+				cursorRow = counted
+				break
+			}
+			counted++
 		}
-		cbW := runewidth.StringWidth(cb)
-		maxBody := innerW - cbW - 3 // 2 leading spaces + 1 gap
-		body := truncateToWidth(item.Body, maxBody)
-
-		line := fmt.Sprintf("  %s  %s", cb, body)
-		lineW := runewidth.StringWidth(xansi.Strip(line))
-		if lineW < innerW {
-			line += strings.Repeat(" ", innerW-lineW)
+		if len(todoIdxs) == 0 {
+			counted++ // empty placeholder
 		}
-
-		if i == m.checklistCursor {
-			line = selectedBG.Bold(true).Width(innerW).Render(line)
+		counted++ // sep
+		counted++ // Notes header
+		for _, idx := range noteIdxs {
+			if idx == m.checklistCursor {
+				cursorRow = counted
+				break
+			}
+			counted++
 		}
-		rows = append(rows, line)
 	}
 
-	// Viewport: scroll so cursor is always visible.
 	start := 0
-	if m.checklistCursor >= listH {
-		start = m.checklistCursor - listH + 1
+	if cursorRow >= listH {
+		start = cursorRow - listH + 1
 	}
 	end := start + listH
 	if end > len(rows) {
 		end = len(rows)
 	}
 	visible := rows[start:end]
-	// Pad with blank lines to fill listH.
 	for len(visible) < listH {
 		visible = append(visible, strings.Repeat(" ", innerW))
 	}
 
-	// Separator line.
-	borderColor := activeTheme.ColorBorder
-	if focused {
-		borderColor = activeTheme.ColorSession
-	}
-	borderStyle := lipgloss.NewStyle().Foreground(borderColor)
-	sep := borderStyle.Render(strings.Repeat("─", innerW))
-
 	// Input bar.
 	var inputLine string
-	if m.checklistInput.IsActive() {
-		prompt := hintStyle.Render("[a]") + " "
-		if m.checklistInput.IsEdit() {
-			prompt = hintStyle.Render("[e]") + " "
-		}
-		inputView := m.checklistInput.View()
-		inputLine = prompt + inputView
-	} else {
-		inputLine = hintStyle.Render("[a]") + " Add item"
+	switch {
+	case m.checklistInput.IsEdit():
+		inputLine = hintStyle.Render("[e]") + " " + m.checklistInput.View()
+	case m.checklistInput.IsAdd() && m.checklistInput.Kind() == "note":
+		inputLine = hintStyle.Render("[n]") + " " + m.checklistInput.View()
+	case m.checklistInput.IsAdd():
+		inputLine = hintStyle.Render("[a]") + " " + m.checklistInput.View()
+	default:
+		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[n]") + " to add Note"
 	}
 	inputW := runewidth.StringWidth(xansi.Strip(inputLine))
 	if inputW < innerW {
@@ -94,10 +170,7 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 
 	content := strings.Join(visible, "\n") + "\n" + sep + "\n" + inputLine
 
-	// Append " · TODOs" to the existing proc title so the breadcrumb is preserved.
-	title := baseTitle + "· TODOs "
-
-	// Wrap in a border using the same style proclist uses.
+	title := baseTitle + "· Items "
 	titleWidth := runewidth.StringWidth(xansi.Strip(title))
 	dashCount := innerW - titleWidth - 1
 	if dashCount < 0 {
@@ -137,15 +210,20 @@ func checklistIndicatorWidth() int {
 	return runewidth.StringWidth(activeTheme.IconTodo)
 }
 
-// todoItemsForSession is a convenience wrapper used in tests.
-func todoItemsForSession(items []db.Todo) []string {
+// itemBodiesForSession is a convenience wrapper used in tests.
+func itemBodiesForSession(items []db.Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
-		cb := checkboxUnchecked
-		if it.Checked {
-			cb = checkboxChecked
+		switch it.Kind {
+		case "todo":
+			cb := checkboxUnchecked
+			if it.Checked {
+				cb = checkboxChecked
+			}
+			out[i] = fmt.Sprintf("%s %s", cb, it.Body)
+		default:
+			out[i] = fmt.Sprintf("%s %s", noteMarker, it.Body)
 		}
-		out[i] = fmt.Sprintf("%s %s", cb, it.Body)
 	}
 	return out
 }

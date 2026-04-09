@@ -17,7 +17,8 @@ const (
 type ChecklistInputModel struct {
 	input  textinput.Model
 	mode   checklistInputMode
-	editID int64 // set when mode == checklistInputEdit
+	kind   string // "todo" or "note", set when mode == checklistInputAdd
+	editID int64  // set when mode == checklistInputEdit
 }
 
 func newChecklistInputModel() ChecklistInputModel {
@@ -26,17 +27,22 @@ func newChecklistInputModel() ChecklistInputModel {
 	return ChecklistInputModel{input: ti}
 }
 
-// EnterAddMode prepares the input for adding a new item.
-func (c *ChecklistInputModel) EnterAddMode() {
+// EnterAddMode prepares the input for adding a new item of the given kind.
+func (c *ChecklistInputModel) EnterAddMode(kind string) {
 	c.mode = checklistInputAdd
+	c.kind = kind
 	c.editID = 0
 	c.input.SetValue("")
 	c.input.Focus()
 }
 
+// Kind returns the kind of item being added ("todo" or "note").
+func (c ChecklistInputModel) Kind() string { return c.kind }
+
 // EnterEditMode prepares the input for editing an existing item.
-func (c *ChecklistInputModel) EnterEditMode(id int64, body string) {
+func (c *ChecklistInputModel) EnterEditMode(id int64, kind, body string) {
 	c.mode = checklistInputEdit
+	c.kind = kind
 	c.editID = id
 	c.input.SetValue(body)
 	c.input.Focus()

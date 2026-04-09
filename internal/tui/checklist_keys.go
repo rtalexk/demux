@@ -15,7 +15,7 @@ func (m Model) openChecklistMode(session string) (Model, tea.Cmd) {
 	m.checklistCursor = 0
 	m.checklistInput.Exit()
 	demuxlog.Info("checklist mode on", "session", session)
-	return m, m.fetchTodos(session)
+	return m, m.fetchItems(session)
 }
 
 // handleChecklistKey handles key events when checklistMode is true, the proclist
@@ -51,14 +51,24 @@ func (m Model) handleChecklistKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "n":
+		m.checklistInput.EnterAddMode("note")
+		return m, nil
+
 	case "x":
+		if len(m.checklistItems) == 0 {
+			return m, nil
+		}
+		if m.checklistItems[m.checklistCursor].Kind == "note" {
+			return m, nil // toggle is a no-op for notes
+		}
 		return m.checklistToggle()
 
 	case "d":
 		return m.checklistDeletePrompt()
 
 	case "a":
-		m.checklistInput.EnterAddMode()
+		m.checklistInput.EnterAddMode("todo")
 		return m, nil
 
 	case "e":
@@ -66,7 +76,7 @@ func (m Model) handleChecklistKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		item := m.checklistItems[m.checklistCursor]
-		m.checklistInput.EnterEditMode(item.ID, item.Body)
+		m.checklistInput.EnterEditMode(item.ID, item.Kind, item.Body)
 		return m, nil
 
 	case "E":
@@ -85,24 +95,24 @@ func (m Model) handleChecklistInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.checklistInput.IsAdd() {
-			if err := m.db.TodoAdd(m.checklistSession, val); err != nil {
-				demuxlog.Error("todo add failed", "err", err)
+			if err := m.db.ItemAdd(m.checklistSession, m.checklistInput.Kind(), val); err != nil {
+				demuxlog.Error("item add failed", "err", err)
 				m.statusMsg = "error adding item: " + err.Error()
 				m.statusExp = time.Now().Add(4 * time.Second)
 			} else {
-				demuxlog.Info("todo added", "session", m.checklistSession, "body", val)
+				demuxlog.Info("item added", "session", m.checklistSession, "kind", m.checklistInput.Kind(), "body", val)
 			}
 		} else {
-			if err := m.db.TodoUpdate(m.checklistInput.EditID(), val); err != nil {
-				demuxlog.Error("todo update failed", "err", err)
+			if err := m.db.ItemUpdate(m.checklistInput.EditID(), val); err != nil {
+				demuxlog.Error("item update failed", "err", err)
 				m.statusMsg = "error updating item: " + err.Error()
 				m.statusExp = time.Now().Add(4 * time.Second)
 			} else {
-				demuxlog.Info("todo updated", "id", m.checklistInput.EditID(), "body", val)
+				demuxlog.Info("item updated", "id", m.checklistInput.EditID(), "body", val)
 			}
 		}
 		m.checklistInput.Exit()
-		return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
+		return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
 
 	case "esc":
 		m.checklistInput.Exit()
@@ -121,14 +131,14 @@ func (m Model) checklistToggle() (Model, tea.Cmd) {
 		return m, nil
 	}
 	item := m.checklistItems[m.checklistCursor]
-	if err := m.db.TodoToggle(item.ID); err != nil {
-		demuxlog.Error("todo toggle failed", "id", item.ID, "err", err)
+	if err := m.db.ItemToggle(item.ID); err != nil {
+		demuxlog.Error("item toggle failed", "id", item.ID, "err", err)
 		m.statusMsg = "error toggling item: " + err.Error()
 		m.statusExp = time.Now().Add(4 * time.Second)
 		return m, nil
 	}
-	demuxlog.Info("todo toggled", "id", item.ID, "was_checked", item.Checked)
-	return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
+	demuxlog.Info("item toggled", "id", item.ID, "was_checked", item.Checked)
+	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
 }
 
 // checklistDeletePrompt shows a confirm overlay before deleting the focused item.

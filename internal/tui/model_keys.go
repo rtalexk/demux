@@ -106,7 +106,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
-		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions(), m.scheduleProcFetch())
+		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
 	case msg.String() == "C":
 		// C toggles checklist mode globally regardless of focus.
 		// Not available in compact mode (no proclist panel to render into).
@@ -280,7 +280,7 @@ func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 			m.checklistSession = node.Session
 			m.checklistCursor = 0
 			m.checklistInput.Exit()
-			cmd = tea.Batch(cmd, m.fetchTodos(node.Session))
+			cmd = tea.Batch(cmd, m.fetchItems(node.Session))
 		}
 	}
 	m.updateDetailFromSelection()

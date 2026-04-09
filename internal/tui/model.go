@@ -57,12 +57,12 @@ type panesMsg struct {
 }
 type statesMsg struct{ states []db.ToolState }
 type watchesMsg struct{ watches []string }
-type todoSessionsMsg struct{ sessions []string }
-type todosMsg struct {
+type itemSessionsMsg struct{ sessions []string }
+type itemsMsg struct {
 	session string
-	items   []db.Todo
+	items   []db.Item
 }
-type todoEditorDoneMsg struct {
+type itemEditorDoneMsg struct {
 	session  string
 	tempFile string
 	err      error
@@ -128,7 +128,7 @@ type Model struct {
 	searchGen   int
 
 	checklistMode    bool
-	checklistItems   []db.Todo
+	checklistItems   []db.Item
 	checklistCursor  int
 	checklistSession string
 	checklistInput   ChecklistInputModel

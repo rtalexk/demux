@@ -12,10 +12,8 @@ import (
 	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
-const editorFileHeader = "# Checklist for session: %s\n# Lines: [ ] unchecked, [x] checked. Other lines are ignored.\n\n"
+const editorFileHeader = "# Items for session: %s\n# Edit TODOs and Notes below. Empty lines and comments are ignored.\n\n"
 
-// checklistOpenEditor opens $EDITOR (fallback: vi) with the current checklist
-// items pre-filled. On editor close the TUI receives a todoEditorDoneMsg.
 func (m Model) checklistOpenEditor() (Model, tea.Cmd) {
 	items := m.checklistItems
 	session := m.checklistSession
@@ -25,7 +23,7 @@ func (m Model) checklistOpenEditor() (Model, tea.Cmd) {
 		editor = "vi"
 	}
 
-	f, err := os.CreateTemp("", "demux-todo-*.txt")
+	f, err := os.CreateTemp("", "demux-items-*.txt")
 	if err != nil {
 		demuxlog.Error("create temp file for editor", "err", err)
 		m.statusMsg = "failed to open editor: " + err.Error()
@@ -34,59 +32,110 @@ func (m Model) checklistOpenEditor() (Model, tea.Cmd) {
 	}
 
 	fmt.Fprintf(f, editorFileHeader, session)
+
+	fmt.Fprintln(f, "# TODOs")
 	for _, item := range items {
+		if item.Kind != "todo" {
+			continue
+		}
 		mark := " "
 		if item.Checked {
 			mark = "x"
 		}
 		fmt.Fprintf(f, "[%s] %s\n", mark, item.Body)
 	}
+
+	fmt.Fprintln(f, "")
+	fmt.Fprintln(f, "# Notes")
+	for _, item := range items {
+		if item.Kind != "note" {
+			continue
+		}
+		fmt.Fprintln(f, item.Body)
+	}
 	f.Close()
 
 	tempFile := f.Name()
-	demuxlog.Info("opening editor for checklist", "session", session, "editor", editor, "file", tempFile)
+	demuxlog.Info("opening editor for items", "session", session, "editor", editor, "file", tempFile)
 
 	return m, tea.ExecProcess(exec.Command(editor, tempFile), func(err error) tea.Msg {
-		return todoEditorDoneMsg{session: session, tempFile: tempFile, err: err}
+		return itemEditorDoneMsg{session: session, tempFile: tempFile, err: err}
 	})
 }
 
-// syncTodosFromFile reads the editor temp file, parses [ ]/[x] lines,
-// replaces the session's checklist in the DB, and removes the temp file.
-func syncTodosFromFile(d *db.DB, session, path string) error {
+// syncItemsFromFile reads the editor temp file, parses # TODOs and # Notes sections,
+// replaces the session's items in the DB, and removes the temp file.
+func syncItemsFromFile(d *db.DB, session, path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read editor file: %w", err)
 	}
 	defer os.Remove(path)
 
-	if err := d.TodoDeleteSession(session); err != nil {
-		return fmt.Errorf("clear todos: %w", err)
+	if err := d.ItemDeleteSession(session); err != nil {
+		return fmt.Errorf("clear items: %w", err)
 	}
 
+	const (
+		sectionNone  = ""
+		sectionTodos = "todo"
+		sectionNotes = "note"
+	)
+	section := sectionNone
+
 	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		// Must match "[ ] body" or "[x] body" (or "[X] body")
-		if len(line) < 4 || line[0] != '[' || line[2] != ']' || line[3] != ' ' {
+		trimmed := strings.TrimSpace(line)
+
+		if trimmed == "# TODOs" {
+			section = sectionTodos
 			continue
 		}
-		checked := line[1] == 'x' || line[1] == 'X'
-		body := strings.TrimSpace(line[4:])
-		if body == "" {
+		if trimmed == "# Notes" {
+			section = sectionNotes
 			continue
 		}
-		if err := d.TodoAdd(session, body); err != nil {
-			return fmt.Errorf("add todo: %w", err)
+
+		// Skip comment lines and blank lines.
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
 		}
-		if checked {
-			items, err := d.TodoList(session)
-			if err != nil {
-				return err
+
+		switch section {
+		case sectionTodos:
+			// Expect "[ ] body" or "[x] body".
+			if len(trimmed) < 4 || trimmed[0] != '[' || trimmed[2] != ']' || trimmed[3] != ' ' {
+				continue
 			}
-			if len(items) > 0 {
-				if err := d.TodoToggle(items[len(items)-1].ID); err != nil {
-					return fmt.Errorf("toggle todo: %w", err)
+			checked := trimmed[1] == 'x' || trimmed[1] == 'X'
+			body := strings.TrimSpace(trimmed[4:])
+			if body == "" {
+				continue
+			}
+			if err := d.ItemAdd(session, "todo", body); err != nil {
+				return fmt.Errorf("add todo from editor: %w", err)
+			}
+			if checked {
+				items, err := d.ItemList(session)
+				if err != nil {
+					return err
 				}
+				// Toggle the last inserted todo.
+				for i := len(items) - 1; i >= 0; i-- {
+					if items[i].Kind == "todo" {
+						if err := d.ItemToggle(items[i].ID); err != nil {
+							return fmt.Errorf("toggle todo from editor: %w", err)
+						}
+						break
+					}
+				}
+			}
+
+		case sectionNotes:
+			if trimmed == "" {
+				continue
+			}
+			if err := d.ItemAdd(session, "note", trimmed); err != nil {
+				return fmt.Errorf("add note from editor: %w", err)
 			}
 		}
 	}

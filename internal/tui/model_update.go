@@ -44,12 +44,12 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatesMsg(msg)
 	case watchesMsg:
 		return m.handleWatchesMsg(msg)
-	case todoSessionsMsg:
-		return m.handleTodoSessionsMsg(msg)
-	case todosMsg:
-		return m.handleTodosMsg(msg)
-	case todoEditorDoneMsg:
-		return m.handleTodoEditorDoneMsg(msg)
+	case itemSessionsMsg:
+		return m.handleItemSessionsMsg(msg)
+	case itemsMsg:
+		return m.handleItemsMsg(msg)
+	case itemEditorDoneMsg:
+		return m.handleItemEditorDoneMsg(msg)
 	case checklistDeleteConfirmedMsg:
 		return m.handleChecklistDeleteConfirmed(msg)
 	case gitResultMsg:
@@ -131,7 +131,7 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 	if time.Now().After(m.statusExp) {
 		m.statusMsg = ""
 	}
-	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions())
+	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
 }
 
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
@@ -179,7 +179,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 				m.searchInput.EnterInsertMode()
 			}
 		}
-		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions())
+		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
 		// If startup focus landed on a window node, kick off an initial proc fetch.
 		if node := m.sidebar.Selected(); node != nil {
 			m.procGen++
@@ -457,12 +457,12 @@ func (m Model) handleWatchesMsg(msg watchesMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleTodoSessionsMsg(msg todoSessionsMsg) (Model, tea.Cmd) {
+func (m Model) handleItemSessionsMsg(msg itemSessionsMsg) (Model, tea.Cmd) {
 	m.sidebar.SetTodoSessions(msg.sessions)
 	return m, nil
 }
 
-func (m Model) handleTodosMsg(msg todosMsg) (Model, tea.Cmd) {
+func (m Model) handleItemsMsg(msg itemsMsg) (Model, tea.Cmd) {
 	if msg.session != m.checklistSession {
 		return m, nil // stale response
 	}
@@ -478,17 +478,17 @@ func (m Model) handleTodosMsg(msg todosMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleChecklistDeleteConfirmed(msg checklistDeleteConfirmedMsg) (Model, tea.Cmd) {
-	if err := m.db.TodoDelete(msg.id); err != nil {
-		demuxlog.Error("todo delete failed", "id", msg.id, "err", err)
+	if err := m.db.ItemDelete(msg.id); err != nil {
+		demuxlog.Error("item delete failed", "id", msg.id, "err", err)
 		m.statusMsg = "error deleting item: " + err.Error()
 		m.statusExp = time.Now().Add(4 * time.Second)
 	} else {
-		demuxlog.Info("todo deleted", "id", msg.id, "session", msg.session)
+		demuxlog.Info("item deleted", "id", msg.id, "session", msg.session)
 	}
-	return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
+	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
 }
 
-func (m Model) handleTodoEditorDoneMsg(msg todoEditorDoneMsg) (Model, tea.Cmd) {
+func (m Model) handleItemEditorDoneMsg(msg itemEditorDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		demuxlog.Error("editor exited with error", "err", msg.err)
 		m.statusMsg = "editor error: " + msg.err.Error()
@@ -496,15 +496,15 @@ func (m Model) handleTodoEditorDoneMsg(msg todoEditorDoneMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.tempFile != "" {
-		if err := syncTodosFromFile(m.db, msg.session, msg.tempFile); err != nil {
-			demuxlog.Error("todo editor sync failed", "err", err)
+		if err := syncItemsFromFile(m.db, msg.session, msg.tempFile); err != nil {
+			demuxlog.Error("item editor sync failed", "err", err)
 			m.statusMsg = "error syncing editor changes: " + err.Error()
 			m.statusExp = time.Now().Add(4 * time.Second)
 		} else {
 			demuxlog.Info("editor changes synced", "session", msg.session)
 		}
 	}
-	return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
+	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
 }
 
 func (m *Model) detailForProcNode(node ProcListNode) DetailModel {
