@@ -79,6 +79,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Version = Version
 	rootCmd.PersistentFlags().StringVar(&formatFlag, "format", "", "Output format: text|table|json")
 	rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "", "Log level: off|error|warn|info|debug (overrides config)")
 	rootCmd.PersistentFlags().BoolVar(&compactFlag, "compact", false, "Launch in compact mode (sidebar + search only)")
