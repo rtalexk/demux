@@ -109,6 +109,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions(), m.scheduleProcFetch())
 	case msg.String() == "C":
 		// C toggles checklist mode globally regardless of focus.
+		// Not available in compact mode (no proclist panel to render into).
+		if m.cfg.Mode == "compact" {
+			return m, nil
+		}
 		if m.checklistMode {
 			m.checklistMode = false
 			m.checklistInput.Exit()
