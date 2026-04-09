@@ -67,8 +67,8 @@ type SidebarModel struct {
 	queryResult   query.Result
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
-	watches      map[string]struct{}
-	todoSessions map[string]struct{}
+	watches       map[string]struct{}
+	todoSessions  map[string]struct{}
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -677,17 +677,23 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	// todo indicator: immediately left of last-seen (prepended with no separator)
+	// todo indicator: immediately left of last-seen, separated from state indicators by one space.
 	todoInd := s.todoIndicator(node, selected, focused)
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	var other string
+	var indSep string
 	if selected && focused {
-		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-		other = strings.Join(indParts, sep)
+		indSep = lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+		other = strings.Join(indParts, indSep)
 	} else {
-		other = strings.Join(indParts, " ")
+		indSep = " "
+		other = strings.Join(indParts, indSep)
+	}
+	// Separate the todo slot from the adjacent indicators with one space.
+	if todoInd != "" && other != "" {
+		return todoInd + indSep + other + s.watchIndicator(node, selected, focused)
 	}
 	return todoInd + other + s.watchIndicator(node, selected, focused)
 }
