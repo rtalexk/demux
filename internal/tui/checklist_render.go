@@ -17,8 +17,9 @@ const (
 
 // renderChecklistPanel renders the full bordered checklist panel (same
 // external dimensions as a proclist panel), including title bar, items,
-// separator, and input bar.
-func (m Model) renderChecklistPanel(width, height int, focused bool) string {
+// separator, and input bar. baseTitle is the normal proclist title; " · TODOs"
+// is appended to it so the breadcrumb context is preserved.
+func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle string) string {
 	innerW := width - borderOverhead
 	innerH := height - borderOverhead
 
@@ -93,14 +94,11 @@ func (m Model) renderChecklistPanel(width, height int, focused bool) string {
 
 	content := strings.Join(visible, "\n") + "\n" + sep + "\n" + inputLine
 
-	// Build the title.
-	title := "[C] checklist"
-	if m.checklistSession != "" {
-		title = "[C] " + m.checklistSession
-	}
+	// Append " · TODOs" to the existing proc title so the breadcrumb is preserved.
+	title := baseTitle + "· TODOs "
 
 	// Wrap in a border using the same style proclist uses.
-	titleWidth := runewidth.StringWidth(title)
+	titleWidth := runewidth.StringWidth(xansi.Strip(title))
 	dashCount := innerW - titleWidth - 1
 	if dashCount < 0 {
 		dashCount = 0

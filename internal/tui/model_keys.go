@@ -75,20 +75,14 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchInsertKey(msg)
 	}
 
-	// Checklist mode intercepts all keys when active.
-	if m.checklistMode {
-		if m.checklistInput.IsActive() {
-			return m.handleChecklistInputKey(msg)
-		}
-		return m.handleChecklistKey(msg)
-	}
-
+	// Global bindings are always active, even in checklist mode.
 	switch {
 	case key.Matches(msg, keys.Quit.Binding):
 		return m, tea.Quit
 	case key.Matches(msg, keys.FocusSidebar.Binding):
 		m.focus = panelSidebar
 		m.updateDetailFromSelection()
+		return m, nil
 	case key.Matches(msg, keys.FocusProcList.Binding):
 		// compact mode: FocusProcList is a no-op; panelSidebar is the only panel
 		if m.cfg.Mode != "compact" {
@@ -96,18 +90,28 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// updateDetailFromSelection gates on m.focus, so safe to call unconditionally
 		m.updateDetailFromSelection()
+		return m, nil
 	case key.Matches(msg, keys.Help.Binding):
 		m.showHelp = !m.showHelp
+		return m, nil
 	case key.Matches(msg, keys.Yank.Binding):
 		m.populateYankFields()
 		m.showYank = true
+		return m, nil
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions(), m.scheduleProcFetch())
-	default:
-		return m.handleNormalModeDefault(msg)
 	}
-	return m, nil
+
+	// Checklist mode intercepts remaining keys when active.
+	if m.checklistMode {
+		if m.checklistInput.IsActive() {
+			return m.handleChecklistInputKey(msg)
+		}
+		return m.handleChecklistKey(msg)
+	}
+
+	return m.handleNormalModeDefault(msg)
 }
 
 // navigateSidebarInSearch moves the sidebar cursor up (direction=-1) or down (direction=1)

@@ -188,7 +188,7 @@ func (m Model) View() string {
 
 	var procList string
 	if m.checklistMode {
-		procList = m.renderChecklistPanel(dims.procW, dims.procH, m.focus == panelProcList)
+		procList = m.renderChecklistPanel(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
 	} else {
 		procList = m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
 	}
