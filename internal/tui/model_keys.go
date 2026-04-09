@@ -75,6 +75,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchInsertKey(msg)
 	}
 
+	// When the checklist input has focus, route all keys directly to it so
+	// that alphanumeric global bindings (y, q, R, C, …) are not triggered.
+	if m.checklistInput.IsActive() {
+		return m.handleChecklistInputKey(msg)
+	}
+
 	// Global bindings are always active, even in checklist mode.
 	switch {
 	case key.Matches(msg, keys.Quit.Binding):
@@ -116,10 +122,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Checklist mode intercepts remaining keys only when the proclist panel is focused.
 	// When the sidebar is focused, normal sidebar shortcuts take precedence.
+	// (checklistInput.IsActive() is already handled above.)
 	if m.checklistMode && m.focus == panelProcList {
-		if m.checklistInput.IsActive() {
-			return m.handleChecklistInputKey(msg)
-		}
 		return m.handleChecklistKey(msg)
 	}
 
