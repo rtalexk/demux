@@ -67,7 +67,8 @@ type SidebarModel struct {
 	queryResult   query.Result
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
-	watches       map[string]struct{}
+	watches      map[string]struct{}
+	todoSessions map[string]struct{}
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -92,6 +93,14 @@ func (s *SidebarModel) SetWatches(sessions []string) {
 	s.watches = make(map[string]struct{}, len(sessions))
 	for _, name := range sessions {
 		s.watches[name] = struct{}{}
+	}
+}
+
+// SetTodoSessions updates the set of session names that have open (unchecked) TODO items.
+func (s *SidebarModel) SetTodoSessions(sessions []string) {
+	s.todoSessions = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.todoSessions[name] = struct{}{}
 	}
 }
 
@@ -634,9 +643,32 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	return strings.Repeat(" ", iconW)
 }
 
+// todoIndicator returns a fixed-width string for the todo slot.
+// When the session has open (unchecked) items: the configured icon.
+// Otherwise: blank spaces of the same display width, so other indicators never shift.
+// Returns "" when no icon is configured.
+func (s SidebarModel) todoIndicator(node SidebarNode, selected, focused bool) string {
+	if activeTheme.IconTodo == "" {
+		return ""
+	}
+	iconW := runewidth.StringWidth(activeTheme.IconTodo)
+	_, hasOpen := s.todoSessions[node.Session]
+	if selected && focused {
+		if hasOpen {
+			return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
+		}
+		return selectedBG.Render(strings.Repeat(" ", iconW))
+	}
+	if hasOpen {
+		return todoStyle.Render(activeTheme.IconTodo)
+	}
+	return strings.Repeat(" ", iconW)
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// The watch indicator is concatenated directly after the other indicators with no
-// separator, so it appears flush against the last-seen text.
+// Order: [git] [state] [todo icon] [last-seen] [watch dot] session name
+// The todo indicator sits immediately to the left of last-seen; the watch indicator
+// sits flush to the right of last-seen. Both use fixed-width slots.
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
@@ -645,6 +677,8 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
+	// todo indicator: immediately left of last-seen (prepended with no separator)
+	todoInd := s.todoIndicator(node, selected, focused)
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
@@ -655,7 +689,7 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	} else {
 		other = strings.Join(indParts, " ")
 	}
-	return other + s.watchIndicator(node, selected, focused)
+	return todoInd + other + s.watchIndicator(node, selected, focused)
 }
 
 // truncateSessionName truncates name to fit within maxName display columns,
