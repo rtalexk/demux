@@ -12,7 +12,11 @@ import (
 	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
-const editorFileHeader = "# Items for session: %s\n# Edit TODOs and Notes below. Empty lines and comments are ignored.\n\n"
+const (
+	editorFileHeader   = "# Items for session: %s\n# Edit TODOs and Notes below. Empty lines and comments are ignored.\n\n"
+	editorSectionTODOs = "# TODOs"
+	editorSectionNotes = "# Notes"
+)
 
 func (m Model) openItemEditor() (Model, tea.Cmd) {
 	items := m.itemList
@@ -33,9 +37,9 @@ func (m Model) openItemEditor() (Model, tea.Cmd) {
 
 	fmt.Fprintf(f, editorFileHeader, session)
 
-	fmt.Fprintln(f, "# TODOs")
+	fmt.Fprintln(f, editorSectionTODOs)
 	for _, item := range items {
-		if item.Kind != "todo" {
+		if item.Kind != db.KindTodo {
 			continue
 		}
 		mark := " "
@@ -46,9 +50,9 @@ func (m Model) openItemEditor() (Model, tea.Cmd) {
 	}
 
 	fmt.Fprintln(f, "")
-	fmt.Fprintln(f, "# Notes")
+	fmt.Fprintln(f, editorSectionNotes)
 	for _, item := range items {
-		if item.Kind != "note" {
+		if item.Kind != db.KindNote {
 			continue
 		}
 		fmt.Fprintln(f, item.Body)
@@ -76,22 +80,17 @@ func syncItemsFromFile(d *db.DB, session, path string) error {
 		return fmt.Errorf("clear items: %w", err)
 	}
 
-	const (
-		sectionNone  = ""
-		sectionTodos = "todo"
-		sectionNotes = "note"
-	)
-	section := sectionNone
+	section := ""
 
 	for _, line := range strings.Split(string(data), "\n") {
 		trimmed := strings.TrimSpace(line)
 
-		if trimmed == "# TODOs" {
-			section = sectionTodos
+		switch trimmed {
+		case editorSectionTODOs:
+			section = db.KindTodo
 			continue
-		}
-		if trimmed == "# Notes" {
-			section = sectionNotes
+		case editorSectionNotes:
+			section = db.KindNote
 			continue
 		}
 
@@ -101,7 +100,7 @@ func syncItemsFromFile(d *db.DB, session, path string) error {
 		}
 
 		switch section {
-		case sectionTodos:
+		case db.KindTodo:
 			// Expect "[ ] body" or "[x] body".
 			if len(trimmed) < 4 || trimmed[0] != '[' || trimmed[2] != ']' || trimmed[3] != ' ' {
 				continue
@@ -111,7 +110,7 @@ func syncItemsFromFile(d *db.DB, session, path string) error {
 			if body == "" {
 				continue
 			}
-			if err := d.ItemAdd(session, "todo", body); err != nil {
+			if err := d.ItemAdd(session, db.KindTodo, body); err != nil {
 				return fmt.Errorf("add todo from editor: %w", err)
 			}
 			if checked {
@@ -121,7 +120,7 @@ func syncItemsFromFile(d *db.DB, session, path string) error {
 				}
 				// Toggle the last inserted todo.
 				for i := len(items) - 1; i >= 0; i-- {
-					if items[i].Kind == "todo" {
+					if items[i].Kind == db.KindTodo {
 						if err := d.ItemToggle(items[i].ID); err != nil {
 							return fmt.Errorf("toggle todo from editor: %w", err)
 						}
@@ -130,11 +129,11 @@ func syncItemsFromFile(d *db.DB, session, path string) error {
 				}
 			}
 
-		case sectionNotes:
+		case db.KindNote:
 			if trimmed == "" {
 				continue
 			}
-			if err := d.ItemAdd(session, "note", trimmed); err != nil {
+			if err := d.ItemAdd(session, db.KindNote, trimmed); err != nil {
 				return fmt.Errorf("add note from editor: %w", err)
 			}
 		}

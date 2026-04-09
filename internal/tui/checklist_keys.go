@@ -5,6 +5,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
@@ -59,7 +60,7 @@ func (m Model) handleItemsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		if len(m.itemList) == 0 {
 			return m, nil
 		}
-		if m.itemList[m.itemCursor].Kind == "note" {
+		if m.itemList[m.itemCursor].Kind == db.KindNote {
 			return m, nil // toggle is a no-op for notes
 		}
 		return m.itemToggle()

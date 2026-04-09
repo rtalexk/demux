@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
@@ -81,20 +82,20 @@ func runItemListOrphaned(_ *cobra.Command, _ []string) error {
 		items := orphans[sess]
 		open := 0
 		for _, it := range items {
-			if it.Kind == "todo" && !it.Checked {
+			if it.Kind == db.KindTodo && !it.Checked {
 				open++
 			}
 		}
 		fmt.Printf("%s  (%d items, %d open TODOs)\n", sess, len(items), open)
 		for _, it := range items {
 			switch it.Kind {
-			case "todo":
+			case db.KindTodo:
 				mark := "[ ]"
 				if it.Checked {
 					mark = "[x]"
 				}
 				fmt.Printf("  %s %s\n", mark, it.Body)
-			case "note":
+			case db.KindNote:
 				fmt.Printf("  [-] %s\n", it.Body)
 			}
 		}

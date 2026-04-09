@@ -17,6 +17,41 @@ const (
 	emptyHint         = "(empty)"
 )
 
+// itemCheckboxMarker returns the display marker for item based on kind and checked state.
+func itemCheckboxMarker(item db.Item) string {
+	if item.Kind == db.KindTodo {
+		if item.Checked {
+			return checkboxChecked
+		}
+		return checkboxUnchecked
+	}
+	return noteMarker
+}
+
+// calculateCursorRow maps the flat item cursor to its visual row index in the
+// two-section layout (TODOs header + items + separator + Notes header + items).
+func calculateCursorRow(cursor int, todoIdxs, noteIdxs []int) int {
+	counted := 1 // TODOs section header
+	for _, idx := range todoIdxs {
+		if idx == cursor {
+			return counted
+		}
+		counted++
+	}
+	if len(todoIdxs) == 0 {
+		counted++ // empty placeholder row
+	}
+	counted++ // separator row
+	counted++ // Notes section header
+	for _, idx := range noteIdxs {
+		if idx == cursor {
+			return counted
+		}
+		counted++
+	}
+	return 0
+}
+
 // renderItemsPanel renders the full bordered checklist panel (same
 // external dimensions as a proclist panel), including title bar, items,
 // separators, and input bar. baseTitle is the normal proclist title; "· Items"
@@ -28,7 +63,7 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	// Split items by kind, preserving original flat indices for cursor matching.
 	var todoIdxs, noteIdxs []int
 	for i, it := range m.itemList {
-		if it.Kind == "todo" {
+		if it.Kind == db.KindTodo {
 			todoIdxs = append(todoIdxs, i)
 		} else {
 			noteIdxs = append(noteIdxs, i)
@@ -43,15 +78,9 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	dimStyle := lipgloss.NewStyle().Faint(true)
 	sep := borderStyle.Render(strings.Repeat("─", innerW))
 
-	renderItem := func(flatIdx int, marker string) string {
+	renderItem := func(flatIdx int) string {
 		item := m.itemList[flatIdx]
-		if item.Kind == "todo" {
-			if item.Checked {
-				marker = checkboxChecked
-			} else {
-				marker = checkboxUnchecked
-			}
-		}
+		marker := itemCheckboxMarker(item)
 		markerW := runewidth.StringWidth(marker)
 		maxBody := innerW - markerW - 3
 		body := truncateToWidth(item.Body, maxBody)
@@ -86,23 +115,19 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 
 	// Build all visible rows in order.
 	var rows []string
-	rows = append(rows, sectionHeader("TODOs"))
-	if len(todoIdxs) == 0 {
-		rows = append(rows, emptyLine())
-	} else {
-		for _, idx := range todoIdxs {
-			rows = append(rows, renderItem(idx, checkboxUnchecked))
+	appendSection := func(label string, idxs []int) {
+		rows = append(rows, sectionHeader(label))
+		if len(idxs) == 0 {
+			rows = append(rows, emptyLine())
+		} else {
+			for _, idx := range idxs {
+				rows = append(rows, renderItem(idx))
+			}
 		}
 	}
+	appendSection("TODOs", todoIdxs)
 	rows = append(rows, sep)
-	rows = append(rows, sectionHeader("Notes"))
-	if len(noteIdxs) == 0 {
-		rows = append(rows, emptyLine())
-	} else {
-		for _, idx := range noteIdxs {
-			rows = append(rows, renderItem(idx, noteMarker))
-		}
-	}
+	appendSection("Notes", noteIdxs)
 
 	// Reserve 2 inner rows for final separator + input bar.
 	listH := innerH - 2
@@ -113,29 +138,7 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	// Viewport: find which visual row contains the cursor and scroll accordingly.
 	cursorRow := 0
 	if m.itemCursor < len(m.itemList) {
-		// Count visual rows up to the cursor item.
-		// TODOs section: header(1) + items(len(todoIdxs) or 1 for empty) + sep(1) + Notes header(1)
-		// then note items.
-		counted := 1 // TODOs header
-		for _, idx := range todoIdxs {
-			if idx == m.itemCursor {
-				cursorRow = counted
-				break
-			}
-			counted++
-		}
-		if len(todoIdxs) == 0 {
-			counted++ // empty placeholder
-		}
-		counted++ // sep
-		counted++ // Notes header
-		for _, idx := range noteIdxs {
-			if idx == m.itemCursor {
-				cursorRow = counted
-				break
-			}
-			counted++
-		}
+		cursorRow = calculateCursorRow(m.itemCursor, todoIdxs, noteIdxs)
 	}
 
 	start := 0
@@ -156,7 +159,7 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	switch {
 	case m.itemInput.IsEdit():
 		inputLine = hintStyle.Render("[e]") + " " + m.itemInput.View()
-	case m.itemInput.IsAdd() && m.itemInput.Kind() == "note":
+	case m.itemInput.IsAdd() && m.itemInput.Kind() == db.KindNote:
 		inputLine = hintStyle.Render("[n]") + " " + m.itemInput.View()
 	case m.itemInput.IsAdd():
 		inputLine = hintStyle.Render("[a]") + " " + m.itemInput.View()
@@ -205,16 +208,8 @@ func truncateToWidth(s string, maxW int) string {
 func itemBodiesForSession(items []db.Item) []string {
 	out := make([]string, len(items))
 	for i, it := range items {
-		switch it.Kind {
-		case "todo":
-			cb := checkboxUnchecked
-			if it.Checked {
-				cb = checkboxChecked
-			}
-			out[i] = fmt.Sprintf("%s %s", cb, it.Body)
-		default:
-			out[i] = fmt.Sprintf("%s %s", noteMarker, it.Body)
-		}
+		marker := itemCheckboxMarker(it)
+		out[i] = fmt.Sprintf("%s %s", marker, it.Body)
 	}
 	return out
 }

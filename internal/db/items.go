@@ -5,8 +5,14 @@ import (
 	"time"
 )
 
+// Item kind constants.
+const (
+	KindTodo = "todo"
+	KindNote = "note"
+)
+
 // Item represents a single checklist item for a session.
-// Kind is either "todo" (checkable) or "note" (informational, never checked).
+// Kind is either KindTodo (checkable) or KindNote (informational, never checked).
 type Item struct {
 	ID        int64
 	Session   string
