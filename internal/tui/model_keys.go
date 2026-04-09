@@ -103,8 +103,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions(), m.scheduleProcFetch())
 	}
 
-	// Checklist mode intercepts remaining keys when active.
-	if m.checklistMode {
+	// Checklist mode intercepts remaining keys only when the proclist panel is focused.
+	// When the sidebar is focused, normal sidebar shortcuts take precedence.
+	if m.checklistMode && m.focus == panelProcList {
 		if m.checklistInput.IsActive() {
 			return m.handleChecklistInputKey(msg)
 		}
