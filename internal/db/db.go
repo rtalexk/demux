@@ -226,10 +226,10 @@ func (d *DB) migrateV5() error {
 		return fmt.Errorf("begin v5: %w", err)
 	}
 	if _, err := tx.Exec(`
-		CREATE TABLE IF NOT EXISTS session_todos (
+		CREATE TABLE IF NOT EXISTS session_items (
 			id         INTEGER PRIMARY KEY AUTOINCREMENT,
 			session    TEXT NOT NULL,
-			position   INTEGER NOT NULL DEFAULT 0,
+			kind       TEXT NOT NULL,
 			body       TEXT NOT NULL,
 			checked    INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -237,9 +237,9 @@ func (d *DB) migrateV5() error {
 		)
 	`); err != nil {
 		tx.Rollback()
-		return fmt.Errorf("create session_todos v5: %w", err)
+		return fmt.Errorf("create session_items v5: %w", err)
 	}
-	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_session_todos_session ON session_todos(session)`); err != nil {
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_session_items_session ON session_items(session)`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("index session v5: %w", err)
 	}
