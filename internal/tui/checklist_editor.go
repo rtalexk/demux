@@ -92,4 +92,3 @@ func syncTodosFromFile(d *db.DB, session, path string) error {
 	}
 	return nil
 }
-

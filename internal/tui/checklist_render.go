@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	runewidth "github.com/mattn/go-runewidth"
 	xansi "github.com/charmbracelet/x/ansi"
+	runewidth "github.com/mattn/go-runewidth"
 	"github.com/rtalexk/demux/internal/db"
 )
 
