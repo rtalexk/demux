@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
+	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
@@ -43,6 +44,12 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleStatesMsg(msg)
 	case watchesMsg:
 		return m.handleWatchesMsg(msg)
+	case todoSessionsMsg:
+		return m.handleTodoSessionsMsg(msg)
+	case todosMsg:
+		return m.handleTodosMsg(msg)
+	case todoEditorDoneMsg:
+		return m.handleTodoEditorDoneMsg(msg)
 	case gitResultMsg:
 		return m.handleGitResultMsg(msg)
 	case queryResultMsg:
@@ -122,7 +129,7 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 	if time.Now().After(m.statusExp) {
 		m.statusMsg = ""
 	}
-	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches())
+	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions())
 }
 
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
@@ -170,7 +177,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 				m.searchInput.EnterInsertMode()
 			}
 		}
-		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches())
+		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions())
 		// If startup focus landed on a window node, kick off an initial proc fetch.
 		if node := m.sidebar.Selected(); node != nil {
 			m.procGen++
@@ -446,6 +453,45 @@ func (m *Model) detailForWindowNode(node ProcListNode) DetailModel {
 func (m Model) handleWatchesMsg(msg watchesMsg) (Model, tea.Cmd) {
 	m.sidebar.SetWatches(msg.watches)
 	return m, nil
+}
+
+func (m Model) handleTodoSessionsMsg(msg todoSessionsMsg) (Model, tea.Cmd) {
+	m.sidebar.SetTodoSessions(msg.sessions)
+	return m, nil
+}
+
+func (m Model) handleTodosMsg(msg todosMsg) (Model, tea.Cmd) {
+	if msg.session != m.checklistSession {
+		return m, nil // stale response
+	}
+	m.checklistItems = msg.items
+	if m.checklistCursor >= len(m.checklistItems) {
+		if len(m.checklistItems) > 0 {
+			m.checklistCursor = len(m.checklistItems) - 1
+		} else {
+			m.checklistCursor = 0
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleTodoEditorDoneMsg(msg todoEditorDoneMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		demuxlog.Error("editor exited with error", "err", msg.err)
+		m.statusMsg = "editor error: " + msg.err.Error()
+		m.statusExp = time.Now().Add(4 * time.Second)
+		return m, nil
+	}
+	if msg.tempFile != "" {
+		if err := syncTodosFromFile(m.db, msg.session, msg.tempFile); err != nil {
+			demuxlog.Error("todo editor sync failed", "err", err)
+			m.statusMsg = "error syncing editor changes: " + err.Error()
+			m.statusExp = time.Now().Add(4 * time.Second)
+		} else {
+			demuxlog.Info("editor changes synced", "session", msg.session)
+		}
+	}
+	return m, tea.Batch(m.fetchTodos(m.checklistSession), m.fetchTodoSessions())
 }
 
 func (m *Model) detailForProcNode(node ProcListNode) DetailModel {

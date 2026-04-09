@@ -95,7 +95,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showYank = true
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
-		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.scheduleProcFetch())
+		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchTodoSessions(), m.scheduleProcFetch())
 	default:
 		return m.handleNormalModeDefault(msg)
 	}

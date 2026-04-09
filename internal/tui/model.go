@@ -57,6 +57,16 @@ type panesMsg struct {
 }
 type statesMsg struct{ states []db.ToolState }
 type watchesMsg struct{ watches []string }
+type todoSessionsMsg struct{ sessions []string }
+type todosMsg struct {
+	session string
+	items   []db.Todo
+}
+type todoEditorDoneMsg struct {
+	session  string
+	tempFile string
+	err      error
+}
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
@@ -113,6 +123,12 @@ type Model struct {
 	queryResult query.Result
 	searchGen   int
 
+	checklistMode    bool
+	checklistItems   []db.Todo
+	checklistCursor  int
+	checklistSession string
+	checklistInput   ChecklistInputModel
+
 	sessionsConfig session.SessionsConfig
 	configDir      string
 }
@@ -127,6 +143,7 @@ func New(cfg config.Config, database *db.DB) Model {
 		popupMode: os.Getenv("DEMUX_POPUP") == "1",
 	}
 	m.searchInput = NewSearchInputModel()
+	m.checklistInput = newChecklistInputModel()
 	cfgPath, _ := config.DefaultPath()
 	m.configDir = filepath.Dir(cfgPath)
 	var loadErr error

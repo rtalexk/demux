@@ -58,6 +58,29 @@ func (m Model) fetchWatches() tea.Cmd {
 	}
 }
 
+func (m Model) fetchTodoSessions() tea.Cmd {
+	return func() tea.Msg {
+		sessions, err := m.db.TodoSessionsWithOpen()
+		if err != nil {
+			demuxlog.Warn("fetch todo sessions failed", "err", err)
+			return todoSessionsMsg{}
+		}
+		return todoSessionsMsg{sessions: sessions}
+	}
+}
+
+func (m Model) fetchTodos(session string) tea.Cmd {
+	return func() tea.Msg {
+		items, err := m.db.TodoList(session)
+		if err != nil {
+			demuxlog.Warn("fetch todos failed", "session", session, "err", err)
+			return todosMsg{session: session}
+		}
+		demuxlog.Debug("fetched todos", "session", session, "count", len(items))
+		return todosMsg{session: session, items: items}
+	}
+}
+
 // makeProcFetch returns a closure that snapshots processes and CWD maps,
 // tagged with the given generation so stale results can be discarded.
 func makeProcFetch(gen int) func() tea.Msg {
