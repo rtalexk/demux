@@ -115,6 +115,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if node := m.sidebar.Selected(); node != nil {
+			m.focus = panelProcList
 			return m.openChecklistMode(node.Session)
 		}
 		return m, nil
