@@ -337,25 +337,25 @@ Sessions with at least one open (unchecked) item display a configurable icon (de
 
 Keybindings active in checklist mode:
 
-| Key | Action |
-| --- | ------ |
-| `j` / `k` | Move cursor down / up |
-| `g` / `G` | Jump to top / bottom |
-| `a` | Add a new item (type and press Enter) |
-| `e` | Edit the focused item inline |
-| `x` | Toggle checked / unchecked |
-| `d` | Delete the focused item (prompts confirmation) |
-| `E` | Open the full checklist in `$EDITOR` (fallback: `vi`) |
-| `C` / `Esc` | Exit checklist mode |
+| Key         | Action                                                |
+| ----------- | ----------------------------------------------------- |
+| `j` / `k`   | Move cursor down / up                                 |
+| `g` / `G`   | Jump to top / bottom                                  |
+| `a`         | Add a new item (type and press Enter)                 |
+| `e`         | Edit the focused item inline                          |
+| `x`         | Toggle checked / unchecked                            |
+| `d`         | Delete the focused item (prompts confirmation)        |
+| `E`         | Open the full checklist in `$EDITOR` (fallback: `vi`) |
+| `C` / `Esc` | Exit checklist mode                                   |
 
 Checklists are stored in the demux SQLite database and persist across restarts. When a session is removed with `demux session remove`, its checklist is deleted automatically.
 
 If a session is destroyed outside of demux (e.g. `tmux kill-session`), its checklist becomes orphaned. Use the CLI to manage orphans:
 
 ```
-demux todo list-orphaned              # list sessions with orphaned checklists
-demux todo clear-orphaned             # clear all orphaned checklists (prompts)
-demux todo clear-orphaned --name foo  # clear a specific orphaned checklist
+demux item list-orphaned              # list sessions with orphaned items
+demux item clear-orphaned             # clear all orphaned items (prompts)
+demux item clear-orphaned --name foo  # clear a specific session's orphaned items
 ```
 
 Configure the indicator icon and color in the `[theme]` section:

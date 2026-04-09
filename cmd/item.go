@@ -9,30 +9,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var todoCmd = &cobra.Command{
-	Use:   "todo",
-	Short: "Manage session TODO checklists",
+var itemCmd = &cobra.Command{
+	Use:   "item",
+	Short: "Manage session items (TODOs and Notes)",
 }
 
-var todoListOrphanedCmd = &cobra.Command{
+var itemListOrphanedCmd = &cobra.Command{
 	Use:   "list-orphaned",
-	Short: "List sessions with checklists that no longer have a live tmux session",
-	RunE:  runTodoListOrphaned,
+	Short: "List sessions with items that no longer have a live tmux session",
+	RunE:  runItemListOrphaned,
 }
 
-var todoClearOrphanedName string
+var itemClearOrphanedName string
 
-var todoClearOrphanedCmd = &cobra.Command{
+var itemClearOrphanedCmd = &cobra.Command{
 	Use:   "clear-orphaned [session]",
-	Short: "Delete orphaned checklists (all, or a specific session with --name)",
-	RunE:  runTodoClearOrphaned,
+	Short: "Delete orphaned items (all, or a specific session with --name)",
+	RunE:  runItemClearOrphaned,
 }
 
 func init() {
-	todoClearOrphanedCmd.Flags().StringVar(&todoClearOrphanedName, "name", "", "Delete only this session's orphaned checklist")
-	todoCmd.AddCommand(todoListOrphanedCmd)
-	todoCmd.AddCommand(todoClearOrphanedCmd)
-	rootCmd.AddCommand(todoCmd)
+	itemClearOrphanedCmd.Flags().StringVar(&itemClearOrphanedName, "name", "", "Delete only this session's orphaned items")
+	itemCmd.AddCommand(itemListOrphanedCmd)
+	itemCmd.AddCommand(itemClearOrphanedCmd)
+	rootCmd.AddCommand(itemCmd)
 }
 
 // liveTmuxSessions returns the names of all currently live tmux sessions.
@@ -50,7 +50,7 @@ func liveTmuxSessions() ([]string, error) {
 	return names, nil
 }
 
-func runTodoListOrphaned(_ *cobra.Command, _ []string) error {
+func runItemListOrphaned(_ *cobra.Command, _ []string) error {
 	database, err := openDB()
 	if err != nil {
 		return err
@@ -62,16 +62,15 @@ func runTodoListOrphaned(_ *cobra.Command, _ []string) error {
 		return err
 	}
 
-	orphans, err := database.TodoListOrphaned(active)
+	orphans, err := database.ItemListOrphaned(active)
 	if err != nil {
 		return err
 	}
 	if len(orphans) == 0 {
-		fmt.Println("No orphaned checklists.")
+		fmt.Println("No orphaned items.")
 		return nil
 	}
 
-	// Print in sorted order for deterministic output.
 	sessions := make([]string, 0, len(orphans))
 	for sess := range orphans {
 		sessions = append(sessions, sess)
@@ -82,23 +81,28 @@ func runTodoListOrphaned(_ *cobra.Command, _ []string) error {
 		items := orphans[sess]
 		open := 0
 		for _, it := range items {
-			if !it.Checked {
+			if it.Kind == "todo" && !it.Checked {
 				open++
 			}
 		}
-		fmt.Printf("%s  (%d items, %d open)\n", sess, len(items), open)
+		fmt.Printf("%s  (%d items, %d open TODOs)\n", sess, len(items), open)
 		for _, it := range items {
-			mark := "[ ]"
-			if it.Checked {
-				mark = "[x]"
+			switch it.Kind {
+			case "todo":
+				mark := "[ ]"
+				if it.Checked {
+					mark = "[x]"
+				}
+				fmt.Printf("  %s %s\n", mark, it.Body)
+			case "note":
+				fmt.Printf("  [-] %s\n", it.Body)
 			}
-			fmt.Printf("  %s %s\n", mark, it.Body)
 		}
 	}
 	return nil
 }
 
-func runTodoClearOrphaned(_ *cobra.Command, args []string) error {
+func runItemClearOrphaned(_ *cobra.Command, args []string) error {
 	database, err := openDB()
 	if err != nil {
 		return err
@@ -110,30 +114,29 @@ func runTodoClearOrphaned(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	orphans, err := database.TodoListOrphaned(active)
+	orphans, err := database.ItemListOrphaned(active)
 	if err != nil {
 		return err
 	}
 
-	// Specific session via --name or first positional arg.
-	target := todoClearOrphanedName
+	target := itemClearOrphanedName
 	if target == "" && len(args) > 0 {
 		target = args[0]
 	}
 
 	if target != "" {
 		if _, ok := orphans[target]; !ok {
-			return fmt.Errorf("no orphaned checklist for session %q", target)
+			return fmt.Errorf("no orphaned items for session %q", target)
 		}
-		if err := database.TodoDeleteSession(target); err != nil {
+		if err := database.ItemDeleteSession(target); err != nil {
 			return err
 		}
-		fmt.Printf("Cleared orphaned checklist for %q.\n", target)
+		fmt.Printf("Cleared orphaned items for %q.\n", target)
 		return nil
 	}
 
 	if len(orphans) == 0 {
-		fmt.Println("No orphaned checklists to clear.")
+		fmt.Println("No orphaned items to clear.")
 		return nil
 	}
 
@@ -143,7 +146,7 @@ func runTodoClearOrphaned(_ *cobra.Command, args []string) error {
 	}
 	sort.Strings(names)
 
-	fmt.Printf("This will clear orphaned checklists for: %s\nContinue? [y/N] ", strings.Join(names, ", "))
+	fmt.Printf("This will clear orphaned items for: %s\nContinue? [y/N] ", strings.Join(names, ", "))
 	var reply string
 	fmt.Scanln(&reply)
 	if strings.ToLower(strings.TrimSpace(reply)) != "y" {
@@ -151,7 +154,7 @@ func runTodoClearOrphaned(_ *cobra.Command, args []string) error {
 		return nil
 	}
 	for _, sess := range names {
-		if err := database.TodoDeleteSession(sess); err != nil {
+		if err := database.ItemDeleteSession(sess); err != nil {
 			fmt.Printf("error clearing %q: %v\n", sess, err)
 		} else {
 			fmt.Printf("Cleared %q.\n", sess)

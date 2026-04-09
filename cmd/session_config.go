@@ -206,7 +206,7 @@ func clearSessionTodos(name string) string {
 	}
 	defer database.Close()
 
-	if err := database.TodoDeleteSession(name); err != nil {
+	if err := database.ItemDeleteSession(name); err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}
 	return "cleared"
