@@ -270,6 +270,13 @@ func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		cmd = m.scheduleProcFetch()
+		// When checklist mode is active, follow the focused session.
+		if m.checklistMode && node.Session != m.checklistSession {
+			m.checklistSession = node.Session
+			m.checklistCursor = 0
+			m.checklistInput.Exit()
+			cmd = tea.Batch(cmd, m.fetchTodos(node.Session))
+		}
 	}
 	m.updateDetailFromSelection()
 	return m, cmd
