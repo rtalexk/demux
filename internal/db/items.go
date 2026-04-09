@@ -11,7 +11,7 @@ const (
 	KindNote = "note"
 )
 
-// Item represents a single checklist item for a session.
+// Item represents a single session item (TODO or Note).
 // Kind is either KindTodo (checkable) or KindNote (informational, never checked).
 type Item struct {
 	ID        int64

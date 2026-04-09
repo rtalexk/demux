@@ -52,7 +52,7 @@ func calculateCursorRow(cursor int, todoIdxs, noteIdxs []int) int {
 	return 0
 }
 
-// renderItemsPanel renders the full bordered checklist panel (same
+// renderItemsPanel renders the full bordered session-items panel (same
 // external dimensions as a proclist panel), including title bar, items,
 // separators, and input bar. baseTitle is the normal proclist title; "· Items"
 // is appended to it so the breadcrumb context is preserved.

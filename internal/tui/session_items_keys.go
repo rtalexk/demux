@@ -9,7 +9,7 @@ import (
 	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
-// openItemsMode switches the proclist panel to checklist mode for the given session.
+// openItemsMode switches the proclist panel to session-items mode for the given session.
 func (m Model) openItemsMode(session string) (Model, tea.Cmd) {
 	m.itemsMode = true
 	m.itemSession = session
