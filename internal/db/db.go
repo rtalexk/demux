@@ -84,6 +84,12 @@ func (d *DB) migrate() error {
 		}
 		version = 4
 	}
+	if version < 5 {
+		if err := d.migrateV5(); err != nil {
+			return err
+		}
+		version = 5
+	}
 	return nil
 }
 
@@ -210,6 +216,36 @@ func (d *DB) migrateV4() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 4`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 4: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV5() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v5: %w", err)
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS session_todos (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			session    TEXT NOT NULL,
+			position   INTEGER NOT NULL DEFAULT 0,
+			body       TEXT NOT NULL,
+			checked    INTEGER NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("create session_todos v5: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_session_todos_session ON session_todos(session)`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("index session v5: %w", err)
+	}
+	if _, err := tx.Exec(`PRAGMA user_version = 5`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 5: %w", err)
 	}
 	return tx.Commit()
 }
