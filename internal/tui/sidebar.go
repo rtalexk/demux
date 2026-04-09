@@ -68,7 +68,7 @@ type SidebarModel struct {
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
 	watches       map[string]struct{}
-	todoSessions  map[string]struct{}
+	itemSessions  map[string]struct{}
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -96,11 +96,11 @@ func (s *SidebarModel) SetWatches(sessions []string) {
 	}
 }
 
-// SetTodoSessions updates the set of session names that have open (unchecked) TODO items.
-func (s *SidebarModel) SetTodoSessions(sessions []string) {
-	s.todoSessions = make(map[string]struct{}, len(sessions))
+// SetItemSessions updates the set of session names that have open (unchecked) TODO items.
+func (s *SidebarModel) SetItemSessions(sessions []string) {
+	s.itemSessions = make(map[string]struct{}, len(sessions))
 	for _, name := range sessions {
-		s.todoSessions[name] = struct{}{}
+		s.itemSessions[name] = struct{}{}
 	}
 }
 
@@ -643,16 +643,16 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	return strings.Repeat(" ", iconW)
 }
 
-// todoIndicator returns a fixed-width string for the todo slot.
+// itemIndicator returns a fixed-width string for the todo slot.
 // When the session has open (unchecked) items: the configured icon.
 // Otherwise: blank spaces of the same display width, so other indicators never shift.
 // Returns "" when no icon is configured.
-func (s SidebarModel) todoIndicator(node SidebarNode, selected, focused bool) string {
+func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) string {
 	if activeTheme.IconTodo == "" {
 		return ""
 	}
 	iconW := runewidth.StringWidth(activeTheme.IconTodo)
-	_, hasOpen := s.todoSessions[node.Session]
+	_, hasOpen := s.itemSessions[node.Session]
 	if selected && focused {
 		if hasOpen {
 			return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
@@ -675,7 +675,7 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	if ind := s.todoIndicator(node, selected, focused); ind != "" {
+	if ind := s.itemIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {

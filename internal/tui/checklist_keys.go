@@ -8,129 +8,129 @@ import (
 	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
-// openChecklistMode switches the proclist panel to checklist mode for the given session.
-func (m Model) openChecklistMode(session string) (Model, tea.Cmd) {
-	m.checklistMode = true
-	m.checklistSession = session
-	m.checklistCursor = 0
-	m.checklistInput.Exit()
-	demuxlog.Info("checklist mode on", "session", session)
+// openItemsMode switches the proclist panel to checklist mode for the given session.
+func (m Model) openItemsMode(session string) (Model, tea.Cmd) {
+	m.itemsMode = true
+	m.itemSession = session
+	m.itemCursor = 0
+	m.itemInput.Exit()
+	demuxlog.Info("items mode on", "session", session)
 	return m, m.fetchItems(session)
 }
 
-// handleChecklistKey handles key events when checklistMode is true, the proclist
+// handleItemsKey handles key events when itemsMode is true, the proclist
 // panel is focused, and the input bar is idle. Global keys (including C) are
 // handled before this in handleKey and are not repeated here.
-func (m Model) handleChecklistKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+func (m Model) handleItemsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
-		m.checklistMode = false
-		m.checklistInput.Exit()
-		demuxlog.Debug("checklist mode off via esc", "session", m.checklistSession)
+		m.itemsMode = false
+		m.itemInput.Exit()
+		demuxlog.Debug("items mode off via esc", "session", m.itemSession)
 		return m, nil
 
 	case "j", "down":
-		if m.checklistCursor < len(m.checklistItems)-1 {
-			m.checklistCursor++
+		if m.itemCursor < len(m.itemList)-1 {
+			m.itemCursor++
 		}
 		return m, nil
 
 	case "k", "up":
-		if m.checklistCursor > 0 {
-			m.checklistCursor--
+		if m.itemCursor > 0 {
+			m.itemCursor--
 		}
 		return m, nil
 
 	case "g":
-		m.checklistCursor = 0
+		m.itemCursor = 0
 		return m, nil
 
 	case "G":
-		if len(m.checklistItems) > 0 {
-			m.checklistCursor = len(m.checklistItems) - 1
+		if len(m.itemList) > 0 {
+			m.itemCursor = len(m.itemList) - 1
 		}
 		return m, nil
 
 	case "n":
-		m.checklistInput.EnterAddMode("note")
+		m.itemInput.EnterAddMode("note")
 		return m, nil
 
 	case "x":
-		if len(m.checklistItems) == 0 {
+		if len(m.itemList) == 0 {
 			return m, nil
 		}
-		if m.checklistItems[m.checklistCursor].Kind == "note" {
+		if m.itemList[m.itemCursor].Kind == "note" {
 			return m, nil // toggle is a no-op for notes
 		}
-		return m.checklistToggle()
+		return m.itemToggle()
 
 	case "d":
-		return m.checklistDeletePrompt()
+		return m.itemDeletePrompt()
 
 	case "a":
-		m.checklistInput.EnterAddMode("todo")
+		m.itemInput.EnterAddMode("todo")
 		return m, nil
 
 	case "e":
-		if len(m.checklistItems) == 0 {
+		if len(m.itemList) == 0 {
 			return m, nil
 		}
-		item := m.checklistItems[m.checklistCursor]
-		m.checklistInput.EnterEditMode(item.ID, item.Kind, item.Body)
+		item := m.itemList[m.itemCursor]
+		m.itemInput.EnterEditMode(item.ID, item.Kind, item.Body)
 		return m, nil
 
 	case "E":
-		return m.checklistOpenEditor()
+		return m.openItemEditor()
 	}
 	return m, nil
 }
 
-// handleChecklistInputKey handles key events when checklistMode is true and the input bar is active.
-func (m Model) handleChecklistInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+// handleItemInputKey handles key events when itemsMode is true and the input bar is active.
+func (m Model) handleItemInputKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		val := strings.TrimSpace(m.checklistInput.Value())
+		val := strings.TrimSpace(m.itemInput.Value())
 		if val == "" {
-			m.checklistInput.Exit()
+			m.itemInput.Exit()
 			return m, nil
 		}
-		if m.checklistInput.IsAdd() {
-			if err := m.db.ItemAdd(m.checklistSession, m.checklistInput.Kind(), val); err != nil {
+		if m.itemInput.IsAdd() {
+			if err := m.db.ItemAdd(m.itemSession, m.itemInput.Kind(), val); err != nil {
 				demuxlog.Error("item add failed", "err", err)
 				m.statusMsg = "error adding item: " + err.Error()
 				m.statusExp = time.Now().Add(4 * time.Second)
 			} else {
-				demuxlog.Info("item added", "session", m.checklistSession, "kind", m.checklistInput.Kind(), "body", val)
+				demuxlog.Info("item added", "session", m.itemSession, "kind", m.itemInput.Kind(), "body", val)
 			}
 		} else {
-			if err := m.db.ItemUpdate(m.checklistInput.EditID(), val); err != nil {
+			if err := m.db.ItemUpdate(m.itemInput.EditID(), val); err != nil {
 				demuxlog.Error("item update failed", "err", err)
 				m.statusMsg = "error updating item: " + err.Error()
 				m.statusExp = time.Now().Add(4 * time.Second)
 			} else {
-				demuxlog.Info("item updated", "id", m.checklistInput.EditID(), "body", val)
+				demuxlog.Info("item updated", "id", m.itemInput.EditID(), "body", val)
 			}
 		}
-		m.checklistInput.Exit()
-		return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
+		m.itemInput.Exit()
+		return m, tea.Batch(m.fetchItems(m.itemSession), m.fetchItemSessions())
 
 	case "esc":
-		m.checklistInput.Exit()
+		m.itemInput.Exit()
 		return m, nil
 
 	default:
 		var cmd tea.Cmd
-		m.checklistInput, cmd = m.checklistInput.Update(msg)
+		m.itemInput, cmd = m.itemInput.Update(msg)
 		return m, cmd
 	}
 }
 
-// checklistToggle flips the checked state of the focused item.
-func (m Model) checklistToggle() (Model, tea.Cmd) {
-	if len(m.checklistItems) == 0 {
+// itemToggle flips the checked state of the focused item.
+func (m Model) itemToggle() (Model, tea.Cmd) {
+	if len(m.itemList) == 0 {
 		return m, nil
 	}
-	item := m.checklistItems[m.checklistCursor]
+	item := m.itemList[m.itemCursor]
 	if err := m.db.ItemToggle(item.ID); err != nil {
 		demuxlog.Error("item toggle failed", "id", item.ID, "err", err)
 		m.statusMsg = "error toggling item: " + err.Error()
@@ -138,27 +138,27 @@ func (m Model) checklistToggle() (Model, tea.Cmd) {
 		return m, nil
 	}
 	demuxlog.Info("item toggled", "id", item.ID, "was_checked", item.Checked)
-	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
+	return m, tea.Batch(m.fetchItems(m.itemSession), m.fetchItemSessions())
 }
 
-// checklistDeletePrompt shows a confirm overlay before deleting the focused item.
-func (m Model) checklistDeletePrompt() (Model, tea.Cmd) {
-	if len(m.checklistItems) == 0 {
+// itemDeletePrompt shows a confirm overlay before deleting the focused item.
+func (m Model) itemDeletePrompt() (Model, tea.Cmd) {
+	if len(m.itemList) == 0 {
 		return m, nil
 	}
-	item := m.checklistItems[m.checklistCursor]
+	item := m.itemList[m.itemCursor]
 	id := item.ID
-	session := m.checklistSession
+	session := m.itemSession
 	body := item.Body
 
 	m.showConfirm = true
 	m.confirm = ConfirmModel{
-		prompt: "Delete todo item?",
+		prompt: "Delete item?",
 		body:   truncateTarget(body, 50),
 	}
 	m.confirmCmd = func() tea.Msg {
 		// This is invoked when the user confirms.
-		return checklistDeleteConfirmedMsg{id: id, session: session}
+		return itemDeleteConfirmedMsg{id: id, session: session}
 	}
 	return m, nil
 }

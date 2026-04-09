@@ -75,13 +75,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchInsertKey(msg)
 	}
 
-	// When the checklist input has focus, route all keys directly to it so
+	// When the item input has focus, route all keys directly to it so
 	// that alphanumeric global bindings (y, q, R, C, …) are not triggered.
-	if m.checklistInput.IsActive() {
-		return m.handleChecklistInputKey(msg)
+	if m.itemInput.IsActive() {
+		return m.handleItemInputKey(msg)
 	}
 
-	// Global bindings are always active, even in checklist mode.
+	// Global bindings are always active, even in items mode.
 	switch {
 	case key.Matches(msg, keys.Quit.Binding):
 		return m, tea.Quit
@@ -108,28 +108,28 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
 	case msg.String() == "C":
-		// C toggles checklist mode globally regardless of focus.
+		// C toggles items mode globally regardless of focus.
 		// Not available in compact mode (no proclist panel to render into).
 		if m.cfg.Mode == "compact" {
 			return m, nil
 		}
-		if m.checklistMode {
-			m.checklistMode = false
-			m.checklistInput.Exit()
+		if m.itemsMode {
+			m.itemsMode = false
+			m.itemInput.Exit()
 			return m, nil
 		}
 		if node := m.sidebar.Selected(); node != nil {
 			m.focus = panelProcList
-			return m.openChecklistMode(node.Session)
+			return m.openItemsMode(node.Session)
 		}
 		return m, nil
 	}
 
-	// Checklist mode intercepts remaining keys only when the proclist panel is focused.
+	// Items mode intercepts remaining keys only when the proclist panel is focused.
 	// When the sidebar is focused, normal sidebar shortcuts take precedence.
-	// (checklistInput.IsActive() is already handled above.)
-	if m.checklistMode && m.focus == panelProcList {
-		return m.handleChecklistKey(msg)
+	// (itemInput.IsActive() is already handled above.)
+	if m.itemsMode && m.focus == panelProcList {
+		return m.handleItemsKey(msg)
 	}
 
 	return m.handleNormalModeDefault(msg)
@@ -275,11 +275,11 @@ func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		cmd = m.scheduleProcFetch()
-		// When checklist mode is active, follow the focused session.
-		if m.checklistMode && node.Session != m.checklistSession {
-			m.checklistSession = node.Session
-			m.checklistCursor = 0
-			m.checklistInput.Exit()
+		// When items mode is active, follow the focused session.
+		if m.itemsMode && node.Session != m.itemSession {
+			m.itemSession = node.Session
+			m.itemCursor = 0
+			m.itemInput.Exit()
 			cmd = tea.Batch(cmd, m.fetchItems(node.Session))
 		}
 	}

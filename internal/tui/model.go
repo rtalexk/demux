@@ -67,7 +67,7 @@ type itemEditorDoneMsg struct {
 	tempFile string
 	err      error
 }
-type checklistDeleteConfirmedMsg struct {
+type itemDeleteConfirmedMsg struct {
 	id      int64
 	session string
 }
@@ -127,11 +127,11 @@ type Model struct {
 	queryResult query.Result
 	searchGen   int
 
-	checklistMode    bool
-	checklistItems   []db.Item
-	checklistCursor  int
-	checklistSession string
-	checklistInput   ChecklistInputModel
+	itemsMode    bool
+	itemList   []db.Item
+	itemCursor  int
+	itemSession string
+	itemInput   ItemInputModel
 
 	sessionsConfig session.SessionsConfig
 	configDir      string
@@ -147,7 +147,7 @@ func New(cfg config.Config, database *db.DB) Model {
 		popupMode: os.Getenv("DEMUX_POPUP") == "1",
 	}
 	m.searchInput = NewSearchInputModel()
-	m.checklistInput = newChecklistInputModel()
+	m.itemInput = newItemInputModel()
 	cfgPath, _ := config.DefaultPath()
 	m.configDir = filepath.Dir(cfgPath)
 	var loadErr error
@@ -187,8 +187,8 @@ func (m Model) View() string {
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
 
 	var procList string
-	if m.checklistMode {
-		procList = m.renderChecklistPanel(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	if m.itemsMode {
+		procList = m.renderItemsPanel(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
 	} else {
 		procList = m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
 	}

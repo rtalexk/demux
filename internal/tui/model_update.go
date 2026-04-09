@@ -50,8 +50,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleItemsMsg(msg)
 	case itemEditorDoneMsg:
 		return m.handleItemEditorDoneMsg(msg)
-	case checklistDeleteConfirmedMsg:
-		return m.handleChecklistDeleteConfirmed(msg)
+	case itemDeleteConfirmedMsg:
+		return m.handleItemDeleteConfirmed(msg)
 	case gitResultMsg:
 		return m.handleGitResultMsg(msg)
 	case queryResultMsg:
@@ -458,26 +458,26 @@ func (m Model) handleWatchesMsg(msg watchesMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleItemSessionsMsg(msg itemSessionsMsg) (Model, tea.Cmd) {
-	m.sidebar.SetTodoSessions(msg.sessions)
+	m.sidebar.SetItemSessions(msg.sessions)
 	return m, nil
 }
 
 func (m Model) handleItemsMsg(msg itemsMsg) (Model, tea.Cmd) {
-	if msg.session != m.checklistSession {
+	if msg.session != m.itemSession {
 		return m, nil // stale response
 	}
-	m.checklistItems = msg.items
-	if m.checklistCursor >= len(m.checklistItems) {
-		if len(m.checklistItems) > 0 {
-			m.checklistCursor = len(m.checklistItems) - 1
+	m.itemList = msg.items
+	if m.itemCursor >= len(m.itemList) {
+		if len(m.itemList) > 0 {
+			m.itemCursor = len(m.itemList) - 1
 		} else {
-			m.checklistCursor = 0
+			m.itemCursor = 0
 		}
 	}
 	return m, nil
 }
 
-func (m Model) handleChecklistDeleteConfirmed(msg checklistDeleteConfirmedMsg) (Model, tea.Cmd) {
+func (m Model) handleItemDeleteConfirmed(msg itemDeleteConfirmedMsg) (Model, tea.Cmd) {
 	if err := m.db.ItemDelete(msg.id); err != nil {
 		demuxlog.Error("item delete failed", "id", msg.id, "err", err)
 		m.statusMsg = "error deleting item: " + err.Error()
@@ -485,7 +485,7 @@ func (m Model) handleChecklistDeleteConfirmed(msg checklistDeleteConfirmedMsg) (
 	} else {
 		demuxlog.Info("item deleted", "id", msg.id, "session", msg.session)
 	}
-	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
+	return m, tea.Batch(m.fetchItems(m.itemSession), m.fetchItemSessions())
 }
 
 func (m Model) handleItemEditorDoneMsg(msg itemEditorDoneMsg) (Model, tea.Cmd) {
@@ -504,7 +504,7 @@ func (m Model) handleItemEditorDoneMsg(msg itemEditorDoneMsg) (Model, tea.Cmd) {
 			demuxlog.Info("editor changes synced", "session", msg.session)
 		}
 	}
-	return m, tea.Batch(m.fetchItems(m.checklistSession), m.fetchItemSessions())
+	return m, tea.Batch(m.fetchItems(m.itemSession), m.fetchItemSessions())
 }
 
 func (m *Model) detailForProcNode(node ProcListNode) DetailModel {

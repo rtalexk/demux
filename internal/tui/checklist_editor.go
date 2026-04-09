@@ -14,9 +14,9 @@ import (
 
 const editorFileHeader = "# Items for session: %s\n# Edit TODOs and Notes below. Empty lines and comments are ignored.\n\n"
 
-func (m Model) checklistOpenEditor() (Model, tea.Cmd) {
-	items := m.checklistItems
-	session := m.checklistSession
+func (m Model) openItemEditor() (Model, tea.Cmd) {
+	items := m.itemList
+	session := m.itemSession
 
 	editor := os.Getenv("EDITOR")
 	if editor == "" {

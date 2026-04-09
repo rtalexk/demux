@@ -17,17 +17,17 @@ const (
 	emptyHint         = "(empty)"
 )
 
-// renderChecklistPanel renders the full bordered checklist panel (same
+// renderItemsPanel renders the full bordered checklist panel (same
 // external dimensions as a proclist panel), including title bar, items,
 // separators, and input bar. baseTitle is the normal proclist title; "· Items"
 // is appended to it so the breadcrumb context is preserved.
-func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle string) string {
+func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle string) string {
 	innerW := width - borderOverhead
 	innerH := height - borderOverhead
 
 	// Split items by kind, preserving original flat indices for cursor matching.
 	var todoIdxs, noteIdxs []int
-	for i, it := range m.checklistItems {
+	for i, it := range m.itemList {
 		if it.Kind == "todo" {
 			todoIdxs = append(todoIdxs, i)
 		} else {
@@ -44,7 +44,7 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 	sep := borderStyle.Render(strings.Repeat("─", innerW))
 
 	renderItem := func(flatIdx int, marker string) string {
-		item := m.checklistItems[flatIdx]
+		item := m.itemList[flatIdx]
 		if item.Kind == "todo" {
 			if item.Checked {
 				marker = checkboxChecked
@@ -60,7 +60,7 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 		if lineW < innerW {
 			line += strings.Repeat(" ", innerW-lineW)
 		}
-		if flatIdx == m.checklistCursor {
+		if flatIdx == m.itemCursor {
 			line = selectedBG.Bold(true).Width(innerW).Render(line)
 		}
 		return line
@@ -112,13 +112,13 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 
 	// Viewport: find which visual row contains the cursor and scroll accordingly.
 	cursorRow := 0
-	if m.checklistCursor < len(m.checklistItems) {
+	if m.itemCursor < len(m.itemList) {
 		// Count visual rows up to the cursor item.
 		// TODOs section: header(1) + items(len(todoIdxs) or 1 for empty) + sep(1) + Notes header(1)
 		// then note items.
 		counted := 1 // TODOs header
 		for _, idx := range todoIdxs {
-			if idx == m.checklistCursor {
+			if idx == m.itemCursor {
 				cursorRow = counted
 				break
 			}
@@ -130,7 +130,7 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 		counted++ // sep
 		counted++ // Notes header
 		for _, idx := range noteIdxs {
-			if idx == m.checklistCursor {
+			if idx == m.itemCursor {
 				cursorRow = counted
 				break
 			}
@@ -154,12 +154,12 @@ func (m Model) renderChecklistPanel(width, height int, focused bool, baseTitle s
 	// Input bar.
 	var inputLine string
 	switch {
-	case m.checklistInput.IsEdit():
-		inputLine = hintStyle.Render("[e]") + " " + m.checklistInput.View()
-	case m.checklistInput.IsAdd() && m.checklistInput.Kind() == "note":
-		inputLine = hintStyle.Render("[n]") + " " + m.checklistInput.View()
-	case m.checklistInput.IsAdd():
-		inputLine = hintStyle.Render("[a]") + " " + m.checklistInput.View()
+	case m.itemInput.IsEdit():
+		inputLine = hintStyle.Render("[e]") + " " + m.itemInput.View()
+	case m.itemInput.IsAdd() && m.itemInput.Kind() == "note":
+		inputLine = hintStyle.Render("[n]") + " " + m.itemInput.View()
+	case m.itemInput.IsAdd():
+		inputLine = hintStyle.Render("[a]") + " " + m.itemInput.View()
 	default:
 		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[n]") + " to add Note"
 	}
@@ -199,15 +199,6 @@ func truncateToWidth(s string, maxW int) string {
 		runes = runes[:len(runes)-1]
 	}
 	return string(runes) + ellipsis
-}
-
-// checklistIndicatorWidth returns the display width of the todo indicator slot.
-// Used by sidebar render to reserve consistent space.
-func checklistIndicatorWidth() int {
-	if activeTheme.IconTodo == "" {
-		return 0
-	}
-	return runewidth.StringWidth(activeTheme.IconTodo)
 }
 
 // itemBodiesForSession is a convenience wrapper used in tests.
