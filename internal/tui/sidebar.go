@@ -666,9 +666,7 @@ func (s SidebarModel) todoIndicator(node SidebarNode, selected, focused bool) st
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// Order: [git] [state] [todo icon] [last-seen] [watch dot] session name
-// The todo indicator sits immediately to the left of last-seen; the watch indicator
-// sits flush to the right of last-seen. Both use fixed-width slots.
+// Order: [git] [state] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
@@ -677,25 +675,20 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	// todo indicator: immediately left of last-seen, separated from state indicators by one space.
-	todoInd := s.todoIndicator(node, selected, focused)
+	if ind := s.todoIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	var other string
-	var indSep string
 	if selected && focused {
-		indSep = lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+		indSep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
 		other = strings.Join(indParts, indSep)
 	} else {
-		indSep = " "
-		other = strings.Join(indParts, indSep)
+		other = strings.Join(indParts, " ")
 	}
-	// Separate the todo slot from the adjacent indicators with one space.
-	if todoInd != "" && other != "" {
-		return todoInd + indSep + other + s.watchIndicator(node, selected, focused)
-	}
-	return todoInd + other + s.watchIndicator(node, selected, focused)
+	return other + s.watchIndicator(node, selected, focused)
 }
 
 // truncateSessionName truncates name to fit within maxName display columns,
