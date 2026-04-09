@@ -182,7 +182,12 @@ func (m Model) View() string {
 	searchBox := m.searchInput.View(dims.sidebarW)
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
 
-	procList := m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	var procList string
+	if m.checklistMode {
+		procList = m.renderChecklistPanel(dims.procW, dims.procH, m.focus == panelProcList)
+	} else {
+		procList = m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	}
 	detail := m.detail.Render(dims.procW, dims.detailH)
 
 	right := lipgloss.JoinVertical(lipgloss.Left, procList, detail)
