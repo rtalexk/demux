@@ -101,6 +101,7 @@ type ThemeConfig struct {
 
 	IconTodo  string `toml:"icon_todo"`
 	ColorTodo string `toml:"color_todo"`
+	IconNote  string `toml:"icon_note"`
 
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
@@ -251,6 +252,7 @@ func Default() Config {
 
 			IconTodo:  "☑︎",
 			ColorTodo: "",
+			IconNote:  "✏",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

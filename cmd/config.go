@@ -184,6 +184,7 @@ icon_watch  = "·"
 color_watch = "#89b4fa"
 
 icon_todo  = "☑︎"
+icon_note  = "✏"
 color_todo = ""
 
 icon_state_idle  = "○"

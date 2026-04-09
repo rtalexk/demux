@@ -59,6 +59,7 @@ type Theme struct {
 
 	IconTodo  string
 	ColorTodo lipgloss.Color
+	IconNote  string
 
 	IconTmuxSession string
 	IconCfgSession  string
@@ -125,6 +126,7 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 
 		IconTodo:  tc.IconTodo,
 		ColorTodo: lipgloss.Color(tc.ColorTodo),
+		IconNote:  tc.IconNote,
 
 		IconTmuxSession: tc.IconTmuxSession,
 		IconCfgSession:  tc.IconCfgSession,

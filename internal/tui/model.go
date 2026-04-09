@@ -57,7 +57,10 @@ type panesMsg struct {
 }
 type statesMsg struct{ states []db.ToolState }
 type watchesMsg struct{ watches []string }
-type itemSessionsMsg struct{ sessions []string }
+type itemSessionsMsg struct {
+	sessions     []string // sessions with open (unchecked) TODOs
+	noteSessions []string // sessions with at least one note
+}
 type itemsMsg struct {
 	session string
 	items   []db.Item
@@ -127,8 +130,8 @@ type Model struct {
 	queryResult query.Result
 	searchGen   int
 
-	itemsMode    bool
-	itemList   []db.Item
+	itemsMode   bool
+	itemList    []db.Item
 	itemCursor  int
 	itemSession string
 	itemInput   ItemInputModel

@@ -364,6 +364,7 @@ Configure the indicator icon and color in the `[theme]` section:
 [theme]
 icon_todo  = "☑︎"    # shown when session has open TODO items
 color_todo = ""      # icon color (empty = default text color)
+icon_note  = "✏"    # shown when session has notes but no open TODOs
 ```
 
 </details>

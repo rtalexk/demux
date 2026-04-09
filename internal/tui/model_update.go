@@ -459,6 +459,7 @@ func (m Model) handleWatchesMsg(msg watchesMsg) (Model, tea.Cmd) {
 
 func (m Model) handleItemSessionsMsg(msg itemSessionsMsg) (Model, tea.Cmd) {
 	m.sidebar.SetItemSessions(msg.sessions)
+	m.sidebar.SetNoteSessions(msg.noteSessions)
 	return m, nil
 }
 

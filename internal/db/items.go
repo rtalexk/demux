@@ -143,6 +143,28 @@ func (d *DB) ItemListOrphaned(activeSessions []string) (map[string][]Item, error
 	return result, nil
 }
 
+// ItemSessionsWithNotes returns session names that have at least one note.
+func (d *DB) ItemSessionsWithNotes() ([]string, error) {
+	rows, err := d.sql.Query(
+		`SELECT DISTINCT session FROM session_items
+		 WHERE kind = 'note' ORDER BY session ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("item sessions with notes: %w", err)
+	}
+	defer rows.Close()
+
+	sessions := []string{}
+	for rows.Next() {
+		var s string
+		if err := rows.Scan(&s); err != nil {
+			return nil, fmt.Errorf("item sessions with notes scan: %w", err)
+		}
+		sessions = append(sessions, s)
+	}
+	return sessions, rows.Err()
+}
+
 // ItemSessionsWithOpen returns session names that have at least one unchecked todo.
 func (d *DB) ItemSessionsWithOpen() ([]string, error) {
 	rows, err := d.sql.Query(

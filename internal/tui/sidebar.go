@@ -68,7 +68,8 @@ type SidebarModel struct {
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
 	watches       map[string]struct{}
-	itemSessions  map[string]struct{}
+	itemSessions  map[string]struct{} // sessions with open (unchecked) TODOs
+	noteSessions  map[string]struct{} // sessions with at least one note
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -101,6 +102,14 @@ func (s *SidebarModel) SetItemSessions(sessions []string) {
 	s.itemSessions = make(map[string]struct{}, len(sessions))
 	for _, name := range sessions {
 		s.itemSessions[name] = struct{}{}
+	}
+}
+
+// SetNoteSessions updates the set of session names that have at least one note.
+func (s *SidebarModel) SetNoteSessions(sessions []string) {
+	s.noteSessions = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.noteSessions[name] = struct{}{}
 	}
 }
 
@@ -643,20 +652,34 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	return strings.Repeat(" ", iconW)
 }
 
-// itemIndicator returns the todo icon when the session has open (unchecked) items.
-// Returns "" when no icon is configured or when the session has no open items.
+// itemIndicator returns an icon reflecting the session's item state:
+//   - open TODOs (with or without notes): the configured todo icon
+//   - notes only (no open TODOs): ✏
+//   - neither: ""
 func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) string {
-	if activeTheme.IconTodo == "" {
-		return ""
-	}
 	_, hasOpen := s.itemSessions[node.Session]
-	if !hasOpen {
+	_, hasNotes := s.noteSessions[node.Session]
+
+	switch {
+	case hasOpen:
+		if activeTheme.IconTodo == "" {
+			return ""
+		}
+		if selected && focused {
+			return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
+		}
+		return todoStyle.Render(activeTheme.IconTodo)
+	case hasNotes:
+		if activeTheme.IconNote == "" {
+			return ""
+		}
+		if selected && focused {
+			return selectedBG.Render(activeTheme.IconNote)
+		}
+		return activeTheme.IconNote
+	default:
 		return ""
 	}
-	if selected && focused {
-		return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
-	}
-	return todoStyle.Render(activeTheme.IconTodo)
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.

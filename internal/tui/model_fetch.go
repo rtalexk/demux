@@ -65,7 +65,12 @@ func (m Model) fetchItemSessions() tea.Cmd {
 			demuxlog.Warn("fetch item sessions failed", "err", err)
 			return itemSessionsMsg{}
 		}
-		return itemSessionsMsg{sessions: sessions}
+		noteSessions, err := m.db.ItemSessionsWithNotes()
+		if err != nil {
+			demuxlog.Warn("fetch note sessions failed", "err", err)
+			return itemSessionsMsg{sessions: sessions}
+		}
+		return itemSessionsMsg{sessions: sessions, noteSessions: noteSessions}
 	}
 }
 
