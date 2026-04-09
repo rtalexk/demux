@@ -643,26 +643,20 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	return strings.Repeat(" ", iconW)
 }
 
-// itemIndicator returns a fixed-width string for the todo slot.
-// When the session has open (unchecked) items: the configured icon.
-// Otherwise: blank spaces of the same display width, so other indicators never shift.
-// Returns "" when no icon is configured.
+// itemIndicator returns the todo icon when the session has open (unchecked) items.
+// Returns "" when no icon is configured or when the session has no open items.
 func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) string {
 	if activeTheme.IconTodo == "" {
 		return ""
 	}
-	iconW := runewidth.StringWidth(activeTheme.IconTodo)
 	_, hasOpen := s.itemSessions[node.Session]
+	if !hasOpen {
+		return ""
+	}
 	if selected && focused {
-		if hasOpen {
-			return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
-		}
-		return selectedBG.Render(strings.Repeat(" ", iconW))
+		return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
 	}
-	if hasOpen {
-		return todoStyle.Render(activeTheme.IconTodo)
-	}
-	return strings.Repeat(" ", iconW)
+	return todoStyle.Render(activeTheme.IconTodo)
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
