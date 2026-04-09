@@ -18,13 +18,15 @@ func (m Model) openChecklistMode(session string) (Model, tea.Cmd) {
 	return m, m.fetchTodos(session)
 }
 
-// handleChecklistKey handles key events when checklistMode is true and the input bar is idle.
+// handleChecklistKey handles key events when checklistMode is true, the proclist
+// panel is focused, and the input bar is idle. Global keys (including C) are
+// handled before this in handleKey and are not repeated here.
 func (m Model) handleChecklistKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.String() {
-	case "C", "esc":
+	case "esc":
 		m.checklistMode = false
 		m.checklistInput.Exit()
-		demuxlog.Debug("checklist mode off", "session", m.checklistSession)
+		demuxlog.Debug("checklist mode off via esc", "session", m.checklistSession)
 		return m, nil
 
 	case "j", "down":
