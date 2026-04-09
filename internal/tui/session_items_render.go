@@ -164,7 +164,7 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	case m.itemInput.IsAdd():
 		inputLine = hintStyle.Render("[a]") + " " + m.itemInput.View()
 	default:
-		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[n]") + " to add Note"
+		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[x]") + " Toggle TODO  " + hintStyle.Render("[n]") + " to add Note"
 	}
 	inputW := runewidth.StringWidth(xansi.Strip(inputLine))
 	if inputW < innerW {
