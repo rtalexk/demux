@@ -9,6 +9,8 @@ builds:
     binary: demux
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -X github.com/rtalexk/demux/cmd.Version={{.Version}}
     goos:
       - linux
       - windows
@@ -23,6 +25,8 @@ builds:
     binary: demux
     env:
       - CGO_ENABLED=1
+    ldflags:
+      - -X github.com/rtalexk/demux/cmd.Version={{.Version}}
     goos:
       - darwin
     goarch:
