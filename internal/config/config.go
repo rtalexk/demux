@@ -99,6 +99,10 @@ type ThemeConfig struct {
 	IconWatch  string `toml:"icon_watch"`
 	ColorWatch string `toml:"color_watch"`
 
+	IconTodo  string `toml:"icon_todo"`
+	ColorTodo string `toml:"color_todo"`
+	IconNote  string `toml:"icon_note"`
+
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
 
@@ -245,6 +249,10 @@ func Default() Config {
 
 			IconWatch:  "·",
 			ColorWatch: "#89b4fa",
+
+			IconTodo:  "☑︎",
+			ColorTodo: "",
+			IconNote:  "✏",
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

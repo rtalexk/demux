@@ -57,6 +57,23 @@ type panesMsg struct {
 }
 type statesMsg struct{ states []db.ToolState }
 type watchesMsg struct{ watches []string }
+type itemSessionsMsg struct {
+	sessions     []string // sessions with open (unchecked) TODOs
+	noteSessions []string // sessions with at least one note
+}
+type itemsMsg struct {
+	session string
+	items   []db.Item
+}
+type itemEditorDoneMsg struct {
+	session  string
+	tempFile string
+	err      error
+}
+type itemDeleteConfirmedMsg struct {
+	id      int64
+	session string
+}
 type procDataMsg struct {
 	procs  []proc.Process
 	cwdMap map[int32]string
@@ -113,6 +130,12 @@ type Model struct {
 	queryResult query.Result
 	searchGen   int
 
+	itemsMode   bool
+	itemList    []db.Item
+	itemCursor  int
+	itemSession string
+	itemInput   ItemInputModel
+
 	sessionsConfig session.SessionsConfig
 	configDir      string
 }
@@ -127,6 +150,7 @@ func New(cfg config.Config, database *db.DB) Model {
 		popupMode: os.Getenv("DEMUX_POPUP") == "1",
 	}
 	m.searchInput = NewSearchInputModel()
+	m.itemInput = newItemInputModel()
 	cfgPath, _ := config.DefaultPath()
 	m.configDir = filepath.Dir(cfgPath)
 	var loadErr error
@@ -165,7 +189,12 @@ func (m Model) View() string {
 	searchBox := m.searchInput.View(dims.sidebarW)
 	leftCol := lipgloss.JoinVertical(lipgloss.Left, searchBox, sidebarContent)
 
-	procList := m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	var procList string
+	if m.itemsMode {
+		procList = m.renderItemsPanel(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	} else {
+		procList = m.procList.Render(dims.procW, dims.procH, m.focus == panelProcList, procTitle)
+	}
 	detail := m.detail.Render(dims.procW, dims.detailH)
 
 	right := lipgloss.JoinVertical(lipgloss.Left, procList, detail)

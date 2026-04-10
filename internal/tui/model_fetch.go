@@ -58,6 +58,34 @@ func (m Model) fetchWatches() tea.Cmd {
 	}
 }
 
+func (m Model) fetchItemSessions() tea.Cmd {
+	return func() tea.Msg {
+		sessions, err := m.db.ItemSessionsWithOpen()
+		if err != nil {
+			demuxlog.Warn("fetch item sessions failed", "err", err)
+			return itemSessionsMsg{}
+		}
+		noteSessions, err := m.db.ItemSessionsWithNotes()
+		if err != nil {
+			demuxlog.Warn("fetch note sessions failed", "err", err)
+			return itemSessionsMsg{sessions: sessions}
+		}
+		return itemSessionsMsg{sessions: sessions, noteSessions: noteSessions}
+	}
+}
+
+func (m Model) fetchItems(session string) tea.Cmd {
+	return func() tea.Msg {
+		items, err := m.db.ItemList(session)
+		if err != nil {
+			demuxlog.Warn("fetch items failed", "session", session, "err", err)
+			return itemsMsg{session: session}
+		}
+		demuxlog.Debug("fetched items", "session", session, "count", len(items))
+		return itemsMsg{session: session, items: items}
+	}
+}
+
 // makeProcFetch returns a closure that snapshots processes and CWD maps,
 // tagged with the given generation so stale results can be discarded.
 func makeProcFetch(gen int) func() tea.Msg {

@@ -190,11 +190,26 @@ func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
 	tmuxOut := killTmuxSession(name)
 	configOut := removeSessionConfig(name, sessionRemoveFullPrivate)
 	dbOut := clearSessionStates(name)
+	todosOut := clearSessionTodos(name)
 
 	fmt.Printf("tmux:   %s\n", tmuxOut)
 	fmt.Printf("config: %s\n", configOut)
 	fmt.Printf("db:     %s\n", dbOut)
+	fmt.Printf("todos:  %s\n", todosOut)
 	return nil
+}
+
+func clearSessionTodos(name string) string {
+	database, err := openDB()
+	if err != nil {
+		return fmt.Sprintf("error opening db: %v", err)
+	}
+	defer database.Close()
+
+	if err := database.ItemDeleteSession(name); err != nil {
+		return fmt.Sprintf("error: %v", err)
+	}
+	return "cleared"
 }
 
 func killTmuxSession(name string) string {

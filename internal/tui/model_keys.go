@@ -75,12 +75,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchInsertKey(msg)
 	}
 
+	// When the item input has focus, route all keys directly to it so
+	// that alphanumeric global bindings (y, q, R, C, …) are not triggered.
+	if m.itemInput.IsActive() {
+		return m.handleItemInputKey(msg)
+	}
+
+	// Global bindings are always active, even in items mode.
 	switch {
 	case key.Matches(msg, keys.Quit.Binding):
 		return m, tea.Quit
 	case key.Matches(msg, keys.FocusSidebar.Binding):
 		m.focus = panelSidebar
 		m.updateDetailFromSelection()
+		return m, nil
 	case key.Matches(msg, keys.FocusProcList.Binding):
 		// compact mode: FocusProcList is a no-op; panelSidebar is the only panel
 		if m.cfg.Mode != "compact" {
@@ -88,18 +96,43 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// updateDetailFromSelection gates on m.focus, so safe to call unconditionally
 		m.updateDetailFromSelection()
+		return m, nil
 	case key.Matches(msg, keys.Help.Binding):
 		m.showHelp = !m.showHelp
+		return m, nil
 	case key.Matches(msg, keys.Yank.Binding):
 		m.populateYankFields()
 		m.showYank = true
+		return m, nil
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
-		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.scheduleProcFetch())
-	default:
-		return m.handleNormalModeDefault(msg)
+		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
+	case msg.String() == "C":
+		// C toggles items mode globally regardless of focus.
+		// Not available in compact mode (no proclist panel to render into).
+		if m.cfg.Mode == "compact" {
+			return m, nil
+		}
+		if m.itemsMode {
+			m.itemsMode = false
+			m.itemInput.Exit()
+			return m, nil
+		}
+		if node := m.sidebar.Selected(); node != nil {
+			m.focus = panelProcList
+			return m.openItemsMode(node.Session)
+		}
+		return m, nil
 	}
-	return m, nil
+
+	// Items mode intercepts remaining keys only when the proclist panel is focused.
+	// When the sidebar is focused, normal sidebar shortcuts take precedence.
+	// (itemInput.IsActive() is already handled above.)
+	if m.itemsMode && m.focus == panelProcList {
+		return m.handleItemsKey(msg)
+	}
+
+	return m.handleNormalModeDefault(msg)
 }
 
 // navigateSidebarInSearch moves the sidebar cursor up (direction=-1) or down (direction=1)
@@ -242,6 +275,13 @@ func (m Model) sidebarNavUpdate() (Model, tea.Cmd) {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 		m.procGen++
 		cmd = m.scheduleProcFetch()
+		// When items mode is active, follow the focused session.
+		if m.itemsMode && node.Session != m.itemSession {
+			m.itemSession = node.Session
+			m.itemCursor = 0
+			m.itemInput.Exit()
+			cmd = tea.Batch(cmd, m.fetchItems(node.Session))
+		}
 	}
 	m.updateDetailFromSelection()
 	return m, cmd

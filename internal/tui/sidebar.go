@@ -68,6 +68,8 @@ type SidebarModel struct {
 	launchErr     string // shown inline when last launch attempt failed
 	activeSession string // tmux session the user is currently attached to
 	watches       map[string]struct{}
+	itemSessions  map[string]struct{} // sessions with open (unchecked) TODOs
+	noteSessions  map[string]struct{} // sessions with at least one note
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -92,6 +94,22 @@ func (s *SidebarModel) SetWatches(sessions []string) {
 	s.watches = make(map[string]struct{}, len(sessions))
 	for _, name := range sessions {
 		s.watches[name] = struct{}{}
+	}
+}
+
+// SetItemSessions updates the set of session names that have open (unchecked) TODO items.
+func (s *SidebarModel) SetItemSessions(sessions []string) {
+	s.itemSessions = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.itemSessions[name] = struct{}{}
+	}
+}
+
+// SetNoteSessions updates the set of session names that have at least one note.
+func (s *SidebarModel) SetNoteSessions(sessions []string) {
+	s.noteSessions = make(map[string]struct{}, len(sessions))
+	for _, name := range sessions {
+		s.noteSessions[name] = struct{}{}
 	}
 }
 
@@ -634,9 +652,38 @@ func (s SidebarModel) watchIndicator(node SidebarNode, selected, focused bool) s
 	return strings.Repeat(" ", iconW)
 }
 
+// itemIndicator returns an icon reflecting the session's item state:
+//   - open TODOs (with or without notes): the configured todo icon
+//   - notes only (no open TODOs): ✏
+//   - neither: ""
+func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) string {
+	_, hasOpen := s.itemSessions[node.Session]
+	_, hasNotes := s.noteSessions[node.Session]
+
+	switch {
+	case hasOpen:
+		if activeTheme.IconTodo == "" {
+			return ""
+		}
+		if selected && focused {
+			return todoStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconTodo)
+		}
+		return todoStyle.Render(activeTheme.IconTodo)
+	case hasNotes:
+		if activeTheme.IconNote == "" {
+			return ""
+		}
+		if selected && focused {
+			return selectedBG.Render(activeTheme.IconNote)
+		}
+		return activeTheme.IconNote
+	default:
+		return ""
+	}
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// The watch indicator is concatenated directly after the other indicators with no
-// separator, so it appears flush against the last-seen text.
+// Order: [git] [state] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
@@ -645,13 +692,16 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
+	if ind := s.itemIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	var other string
 	if selected && focused {
-		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-		other = strings.Join(indParts, sep)
+		indSep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+		other = strings.Join(indParts, indSep)
 	} else {
 		other = strings.Join(indParts, " ")
 	}
