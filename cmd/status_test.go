@@ -42,8 +42,8 @@ func TestCountStatesByValue(t *testing.T) {
 func TestTmuxStatusParts_NoStates(t *testing.T) {
 	cfg := config.Default()
 	out := tmuxStatusParts(0, 0, 0, 0, 0, cfg)
-	if !strings.Contains(out, cfg.Theme.IconStateDone) {
-		t.Errorf("expected done icon %q, got: %q", cfg.Theme.IconStateDone, out)
+	if !strings.Contains(out, cfg.Theme.IconStatusClean) {
+		t.Errorf("expected clean icon %q, got: %q", cfg.Theme.IconStatusClean, out)
 	}
 }
 

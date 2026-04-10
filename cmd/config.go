@@ -191,6 +191,9 @@ icon_state_idle  = "○"
 color_state_idle    = "#89dceb"
 color_state_idle_bg = "#0d2530"
 
+# Icon shown by "demux status" when there are no active states
+icon_status_clean = "🟢"
+
 # Session source icons
 icon_tmux_session = "⊞"
 icon_cfg_session  = "⚙︎"

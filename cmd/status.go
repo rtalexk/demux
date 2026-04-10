@@ -44,7 +44,7 @@ func countStatesByValue(states []db.ToolState) (waiting, errs, flagged, done, id
 func tmuxStatusParts(waiting, errs, flagged, done, idle int, cfg config.Config) string {
 	th := cfg.Theme
 	if waiting == 0 && errs == 0 && flagged == 0 && done == 0 && idle == 0 {
-		return fmt.Sprintf("#[fg=%s]%s#[default]", th.ColorStateDone, th.IconStateDone)
+		return fmt.Sprintf("#[fg=%s]%s#[default]", th.ColorStateDone, th.IconStatusClean)
 	}
 	var parts []string
 	if errs > 0 {
