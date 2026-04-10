@@ -56,7 +56,7 @@ func (m Model) handleItemsKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		m.itemInput.EnterAddMode("note")
 		return m, nil
 
-	case "x":
+	case "x", " ":
 		if len(m.itemList) == 0 {
 			return m, nil
 		}
