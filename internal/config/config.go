@@ -95,6 +95,7 @@ type ThemeConfig struct {
 	IconStateError   string `toml:"icon_state_error"`
 	IconStateFlagged string `toml:"icon_state_flagged"`
 	IconStateIdle    string `toml:"icon_state_idle"`
+	IconStatusClean  string `toml:"icon_status_clean"`
 
 	IconWatch  string `toml:"icon_watch"`
 	ColorWatch string `toml:"color_watch"`
@@ -246,6 +247,7 @@ func Default() Config {
 			IconStateError:   "✗",
 			IconStateFlagged: "🔖",
 			IconStateIdle:    "○",
+			IconStatusClean:  "🟢",
 
 			IconWatch:  "·",
 			ColorWatch: "#89b4fa",

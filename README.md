@@ -537,6 +537,8 @@ icon_state_idle = "○"
 color_state_idle    = "#89dceb"
 color_state_idle_bg = "#0d2530"
 
+icon_status_clean = "🟢"  # shown by `demux status` when there are no active states
+
 # Session source icons (shown in sidebar)
 icon_tmux_session = "⊞"   # live tmux session
 icon_cfg_session  = "⚙︎"   # config-only (not currently running)
@@ -728,7 +730,7 @@ Add a live state summary to your tmux status bar:
 set -g status-right "#(demux status)"
 ```
 
-This outputs a colored summary of active pane states. When all panes are idle it shows a green indicator. Counts for `error`, `flagged`, `waiting`, `done`, and `idle` are shown when any are active.
+This outputs a colored summary of active pane states. When there are no active states it shows a configurable clean icon (default: `🟢`). Counts for `error`, `flagged`, `waiting`, `done`, and `idle` are shown when any are active. Configure the clean icon with `icon_status_clean` in the `[theme]` section.
 
 ### Claude Code
 
