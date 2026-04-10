@@ -164,7 +164,7 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 	case m.itemInput.IsAdd():
 		inputLine = hintStyle.Render("[a]") + " " + m.itemInput.View()
 	default:
-		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[x]") + " Toggle TODO  " + hintStyle.Render("[n]") + " to add Note"
+		inputLine = hintStyle.Render("[a]") + " to add TODO  " + hintStyle.Render("[x/Space]") + " Toggle TODO  " + hintStyle.Render("[n]") + " to add Note"
 	}
 	inputW := runewidth.StringWidth(xansi.Strip(inputLine))
 	if inputW < innerW {
@@ -175,11 +175,11 @@ func (m Model) renderItemsPanel(width, height int, focused bool, baseTitle strin
 
 	title := baseTitle + "· Items "
 	titleWidth := runewidth.StringWidth(xansi.Strip(title))
-	dashCount := innerW - titleWidth - 1
+	dashCount := innerW - titleWidth
 	if dashCount < 0 {
 		dashCount = 0
 	}
-	top := borderStyle.Render("╭─") + title + borderStyle.Render(strings.Repeat("─", dashCount)+"╮")
+	top := borderStyle.Render("╭") + title + borderStyle.Render(strings.Repeat("─", dashCount)+"╮")
 	bot := borderStyle.Render("╰" + strings.Repeat("─", innerW) + "╯")
 
 	var sb strings.Builder
