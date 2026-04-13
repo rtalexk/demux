@@ -57,9 +57,9 @@ func TestClearSessionStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.StateSet("myapp:0", "claude", db.StateWorking, "", db.SourceTool, false, nil)
-	d.StateSet("myapp:1", "make", db.StateError, "fail", db.SourceTool, false, nil)
-	d.StateSet("other:0", "claude", db.StateDone, "ok", db.SourceTool, false, nil)
+	d.StateSet("myapp:0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "")
+	d.StateSet("myapp:1", "make", db.StateError, "fail", db.SourceTool, false, nil, "")
+	d.StateSet("other:0", "claude", db.StateDone, "ok", db.SourceTool, false, nil, "")
 	d.Close()
 
 	// Each clearSessionStates call opens and closes its own handle.

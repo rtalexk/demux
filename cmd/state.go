@@ -19,6 +19,7 @@ var (
 	stateSource  string
 	stateForce   bool
 	stateIfState string
+	statePaneID  string
 
 	clearTarget string
 	clearYes    bool
@@ -55,6 +56,7 @@ func init() {
 	stateSetCmd.Flags().StringVar(&stateSource, "source", "tool", "Source: tool|user")
 	stateSetCmd.Flags().BoolVar(&stateForce, "force", false, "Override write-lock (allow overwriting another tool's active state)")
 	stateSetCmd.Flags().StringVar(&stateIfState, "if-state", "", "Only write if current state matches this value")
+	stateSetCmd.Flags().StringVar(&statePaneID, "pane-id", "", "Stable tmux pane ID (%N format, e.g. %12); stored alongside target for GC")
 	stateSetCmd.MarkFlagRequired("target")
 	stateSetCmd.MarkFlagRequired("state")
 
@@ -115,7 +117,7 @@ func applyStateSet(d *db.DB) error {
 		ifState = &sv
 	}
 
-	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce, ifState); err != nil {
+	if err := d.StateSet(stateTarget, stateTool, val, stateMessage, src, stateForce, ifState, statePaneID); err != nil {
 		if errors.Is(err, db.ErrStateLocked) {
 			demuxlog.Warn("state set rejected: lock", "target", stateTarget, "tool", stateTool, "state", stateValue, "err", err)
 			fmt.Fprintln(os.Stderr, "error:", err)
