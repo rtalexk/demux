@@ -9,34 +9,34 @@ import (
 
 func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 	states := []db.ToolState{
-		{Target: "sess:0.0", Value: db.StateWorking},
-		{Target: "sess:1.0", Value: db.StateError}, // highest priority
-		{Target: "sess:2.0", Value: db.StateFlagged},
+		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
+		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateError}, // highest priority
+		{Target: db.Target{Type: "pane", ID: "%3", SessionID: "$1"}, Value: db.StateFlagged},
 	}
-	got := highestPriorityPaneTarget("sess", states)
-	if got != "sess:1.0" {
-		t.Errorf("want sess:1.0 (error=highest), got %q", got)
+	got := highestPriorityPaneTarget("$1", states)
+	if got != "%2" {
+		t.Errorf("want %%2 (error=highest), got %q", got)
 	}
 }
 
 func TestHighestPriorityPaneTarget_IncludesDone(t *testing.T) {
 	// Done has priority=2; Working has priority=0; Done wins.
 	states := []db.ToolState{
-		{Target: "sess:0.0", Value: db.StateDone},
-		{Target: "sess:1.0", Value: db.StateWorking},
+		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateDone},
+		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateWorking},
 	}
-	got := highestPriorityPaneTarget("sess", states)
-	if got != "sess:0.0" {
-		t.Errorf("want sess:0.0 (done beats working), got %q", got)
+	got := highestPriorityPaneTarget("$1", states)
+	if got != "%1" {
+		t.Errorf("want %%1 (done beats working), got %q", got)
 	}
 }
 
 func TestHighestPriorityPaneTarget_ReturnsEmptyWhenOnlyIdle(t *testing.T) {
 	states := []db.ToolState{
-		{Target: "sess:0.0", Value: db.StateIdle},
-		{Target: "sess:1.0", Value: db.StateIdle},
+		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateIdle},
+		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateIdle},
 	}
-	got := highestPriorityPaneTarget("sess", states)
+	got := highestPriorityPaneTarget("$1", states)
 	if got != "" {
 		t.Errorf("want empty (only idle states), got %q", got)
 	}
@@ -44,52 +44,63 @@ func TestHighestPriorityPaneTarget_ReturnsEmptyWhenOnlyIdle(t *testing.T) {
 
 func TestHighestPriorityPaneTarget_IgnoresOtherSessions(t *testing.T) {
 	states := []db.ToolState{
-		{Target: "other:0.0", Value: db.StateWaiting},
-		{Target: "sess:0.0", Value: db.StateWorking},
+		{Target: db.Target{Type: "pane", ID: "%9", SessionID: "$9"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
 	}
-	got := highestPriorityPaneTarget("sess", states)
-	if got != "sess:0.0" {
-		t.Errorf("want sess:0.0 (other session ignored), got %q", got)
+	got := highestPriorityPaneTarget("$1", states)
+	if got != "%1" {
+		t.Errorf("want %%1 (other session ignored), got %q", got)
+	}
+}
+
+func TestHighestPriorityPaneTarget_IgnoresSessionTargets(t *testing.T) {
+	states := []db.ToolState{
+		{Target: db.Target{Type: "session", ID: "$1", SessionID: "$1"}, Value: db.StateError},
+		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
+	}
+	got := highestPriorityPaneTarget("$1", states)
+	// session target should be skipped; only pane target matters
+	if got != "%1" {
+		t.Errorf("want %%1 (session target ignored), got %q", got)
 	}
 }
 
 func TestHighestPriorityPaneTarget_ReturnsEmptyForEmptyStates(t *testing.T) {
-	got := highestPriorityPaneTarget("sess", nil)
+	got := highestPriorityPaneTarget("$1", nil)
 	if got != "" {
 		t.Errorf("want empty, got %q", got)
 	}
 }
 
-func TestClearCurrentState_ClearsByPaneID(t *testing.T) {
+func TestClearCurrentState_ClearsByTargetID(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	// State was written when pane was at old position.
-	_ = d.StateSet("work:1.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "%5")
+	target := db.Target{Type: "pane", ID: "%5", SessionID: "$1", WindowID: "@1", PaneID: "%5"}
+	_ = d.StateSet(target, "claude", db.StateWorking, "", db.SourceTool, false, nil)
 
 	m := Model{db: d}
-	cmd := m.clearCurrentState("work:2.0", "%5") // resolved target + pane_id
+	cmd := m.clearCurrentState(target)
 	cmd()
 
-	st, _ := d.StateByTarget("work:1.0")
+	st, _ := d.StateByID(target)
 	if st != nil {
-		t.Errorf("state should be cleared by pane_id, got: %+v", st)
+		t.Errorf("state should be cleared by target ID, got: %+v", st)
 	}
 }
 
-func TestClearCurrentState_FallsBackToTarget(t *testing.T) {
+func TestClearCurrentState_NoopForMissingTarget(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	_ = d.StateSet("work:1.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "")
+	target := db.Target{Type: "pane", ID: "%99", SessionID: "$1", WindowID: "@1", PaneID: "%99"}
 
 	m := Model{db: d}
-	cmd := m.clearCurrentState("work:1.0", "") // no pane_id, falls back to target
-	cmd()
-
-	st, _ := d.StateByTarget("work:1.0")
-	if st != nil {
-		t.Errorf("state should be cleared by target, got: %+v", st)
+	cmd := m.clearCurrentState(target)
+	// Should not panic or error even when no state exists.
+	result := cmd()
+	if _, ok := result.(statesMsg); !ok {
+		t.Errorf("expected statesMsg, got %T", result)
 	}
 }
 

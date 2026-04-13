@@ -268,7 +268,7 @@ func TestRenderSession_truncatedNameWithIndicators_noOverflow(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "hf-garmin-credentials-integration", IsLive: true, Activity: activity},
 		},
-		states:  map[string]db.ToolState{},
+		states:  []db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg:     config.Config{Sidebar: config.SidebarConfig{ShowLastSeen: true}},
 	}
@@ -387,7 +387,7 @@ func TestSessionCount_Empty(t *testing.T) {
 func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta", "gamma"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 		// Non-nil empty slice = active search with no matches.
 		queryResult: query.Result{Sessions: []query.SessionMatch{}},
 	}
@@ -400,7 +400,7 @@ func TestRebuildNodes_ZeroResultSearch(t *testing.T) {
 func TestRender_NoResultsHint(t *testing.T) {
 	s := SidebarModel{
 		sessions:    makeSessions("alpha", "beta"),
-		states:      map[string]db.ToolState{},
+		states:      []db.ToolState{},
 		queryResult: query.Result{Sessions: []query.SessionMatch{}},
 	}
 	s.rebuildNodes()
@@ -413,7 +413,7 @@ func TestRender_NoResultsHint(t *testing.T) {
 func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("charlie", "alpha", "beta"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 	}
 	s.rebuildNodes()
 	var got []string
@@ -429,8 +429,8 @@ func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 func TestRebuildNodes_SessionWithStateSortsFirst(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states: map[string]db.ToolState{
-			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateWorking},
 		},
 	}
 	s.rebuildNodes()
@@ -443,9 +443,9 @@ func TestRebuildNodes_HigherPriorityStateSortsFirst(t *testing.T) {
 	// error > working, so vem-main (error) must sort before dm-main (working)
 	s := SidebarModel{
 		sessions: makeSessions("dm-main", "vem-main"),
-		states: map[string]db.ToolState{
-			"dm-main:0.0":  {Target: "dm-main:0.0", Value: db.StateWorking},
-			"vem-main:0.0": {Target: "vem-main:0.0", Value: db.StateError},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "dm-main"}, Value: db.StateWorking},
+			{Target: db.Target{Type: "session", ID: "vem-main"}, Value: db.StateError},
 		},
 	}
 	s.rebuildNodes()
@@ -467,7 +467,7 @@ func TestRebuildNodes_LastSeenSort(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true, Activity: older},
 			{DisplayName: "beta", IsLive: true, Activity: now},
 		},
-		states: map[string]db.ToolState{},
+		states: []db.ToolState{},
 		cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
 	}
 	s.rebuildNodes()
@@ -489,7 +489,7 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true, Activity: now},
 			{DisplayName: "beta", IsLive: true, Activity: now},
 		},
-		states: map[string]db.ToolState{},
+		states: []db.ToolState{},
 		// all same activity time → falls through to alpha
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"last_seen", "priority", "alphabetical"}}},
 	}
@@ -507,8 +507,8 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
 func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states: map[string]db.ToolState{
-			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -526,7 +526,7 @@ func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 func TestSetFilter_AllFiltersToggle(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 		filter:   FilterTmux,
 	}
@@ -561,8 +561,8 @@ func TestSetFilter_AllFiltersToggle(t *testing.T) {
 func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states: map[string]db.ToolState{
-			"beta:0.0": {Target: "beta:0.0", Value: db.StateWorking},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -579,7 +579,7 @@ func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("a"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	if s.ActiveFilter() == FilterPriority {
@@ -594,7 +594,7 @@ func TestAlertFilterActive_ReportsCorrectState(t *testing.T) {
 func TestToggleAlertFilter_NoAlertedWindowFallback_CursorClamped(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("sess"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	s.cursor = 5
@@ -613,8 +613,8 @@ func TestFirstStateSession_ReturnsFirstWithState(t *testing.T) {
 			{DisplayName: "beta", IsLive: true},
 			{DisplayName: "gamma", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"gamma": {Target: "gamma", Value: db.StateWaiting},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "gamma"}, Value: db.StateWaiting},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
 	}
@@ -632,9 +632,9 @@ func TestFirstStateSession_PrioritySort(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true},
 			{DisplayName: "beta", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"alpha": {Target: "alpha", Value: db.StateIdle},
-			"beta":  {Target: "beta", Value: db.StateError},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "alpha"}, Value: db.StateIdle},
+			{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateError},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"priority", "alphabetical"}}},
 	}
@@ -648,7 +648,7 @@ func TestFirstStateSession_PrioritySort(t *testing.T) {
 func TestFirstStateSession_NoneReturnsEmpty(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 		cfg:      config.Config{Sidebar: config.SidebarConfig{}},
 	}
 	s.rebuildNodes()
@@ -666,7 +666,7 @@ func TestFocusNode_SessionLevel(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true},
 			{DisplayName: "beta", IsLive: true},
 		},
-		states: map[string]db.ToolState{},
+		states: []db.ToolState{},
 		cfg:    config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
 	}
 	s.rebuildNodes()
@@ -680,7 +680,7 @@ func TestFocusNode_SessionLevel(t *testing.T) {
 func TestFocusNode_NoMatch_LeavesCursorAt0(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha"),
-		states:   map[string]db.ToolState{},
+		states:   []db.ToolState{},
 	}
 	s.rebuildNodes()
 	s.FocusNode("nonexistent", 20)
@@ -740,8 +740,8 @@ func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
 			{DisplayName: "alerted", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"alerted": {Target: "alerted", Value: db.StateError},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "alerted"}, Value: db.StateError},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -758,8 +758,8 @@ func TestFilterPriority_IncludesFlagged(t *testing.T) {
 			{DisplayName: "flagged", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"flagged": {Target: "flagged", Value: db.StateFlagged},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "flagged"}, Value: db.StateFlagged},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -776,8 +776,8 @@ func TestFilterPriority_ExcludesDone(t *testing.T) {
 			{DisplayName: "done-sess", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"done-sess": {Target: "done-sess", Value: db.StateDone},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "done-sess"}, Value: db.StateDone},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -796,8 +796,8 @@ func TestFilterPriority_IncludesWorkingWhenFlagSet(t *testing.T) {
 			{DisplayName: "working-sess", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "working-sess"}, Value: db.StateWorking},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{Tui: config.TuiConfig{AttentionFilterIncludeWorking: true}},
@@ -813,8 +813,8 @@ func TestFilterPriority_ExcludesWorkingByDefault(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "working-sess", IsLive: true},
 		},
-		states: map[string]db.ToolState{
-			"working-sess": {Target: "working-sess", Value: db.StateWorking},
+		states: []db.ToolState{
+			{Target: db.Target{Type: "session", ID: "working-sess"}, Value: db.StateWorking},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -956,7 +956,7 @@ func TestRenderSession_ShowsLastSeen(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myses", IsLive: true, Activity: activity},
 		},
-		states:  map[string]db.ToolState{},
+		states:  []db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: true},
@@ -980,7 +980,7 @@ func TestRenderSession_HidesLastSeenWhenDisabled(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "xyz", IsLive: true, Activity: activity},
 		},
-		states:  map[string]db.ToolState{},
+		states:  []db.ToolState{},
 		gitInfo: map[string]git.Info{},
 		cfg: config.Config{
 			Sidebar: config.SidebarConfig{ShowLastSeen: false},
@@ -1186,7 +1186,7 @@ func TestRenderSession_ActiveSessionShowsIndicator(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myapp", IsLive: true},
 		},
-		states:        map[string]db.ToolState{},
+		states:        []db.ToolState{},
 		gitInfo:       map[string]git.Info{},
 		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
 		activeSession: "myapp",
@@ -1213,7 +1213,7 @@ func TestRenderSession_NonActiveSessionNoIndicator(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myapp", IsLive: true},
 		},
-		states:        map[string]db.ToolState{},
+		states:        []db.ToolState{},
 		gitInfo:       map[string]git.Info{},
 		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
 		activeSession: "other",
@@ -1236,7 +1236,7 @@ func TestRenderSession_ActiveSessionCustomIcon(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myapp", IsLive: true},
 		},
-		states:        map[string]db.ToolState{},
+		states:        []db.ToolState{},
 		gitInfo:       map[string]git.Info{},
 		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "@"}},
 		activeSession: "myapp",
@@ -1259,7 +1259,7 @@ func TestRenderSession_ActiveSessionEmptyIconFallsBackToDefault(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myapp", IsLive: true},
 		},
-		states:        map[string]db.ToolState{},
+		states:        []db.ToolState{},
 		gitInfo:       map[string]git.Info{},
 		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: ""}},
 		activeSession: "myapp",
@@ -1286,7 +1286,7 @@ func TestRenderSession_ActiveSessionSelectedFocused(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "myapp", IsLive: true},
 		},
-		states:        map[string]db.ToolState{},
+		states:        []db.ToolState{},
 		gitInfo:       map[string]git.Info{},
 		cfg:           config.Config{Sidebar: config.SidebarConfig{ActiveSessionIcon: "►"}},
 		activeSession: "myapp",
