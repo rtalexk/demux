@@ -116,6 +116,33 @@ func (s StateSource) String() string {
 // ErrStateLocked is returned by StateSet when a write is rejected due to lock rules.
 var ErrStateLocked = errors.New("target locked")
 
+// Target represents the identity of a state record.
+type Target struct {
+	Type      string // "session", "window", "pane"
+	ID        string // $N, @N, %N
+	SessionID string // $N — all record types
+	WindowID  string // @N — window and pane records
+	PaneID    string // %N — pane records only
+}
+
+// ParseTargetID infers the target type from the tmux ID prefix.
+// % → pane, @ → window, $ → session
+func ParseTargetID(id string) (Target, error) {
+	if len(id) == 0 {
+		return Target{}, fmt.Errorf("target ID cannot be empty")
+	}
+	switch id[0] {
+	case '%':
+		return Target{Type: "pane", ID: id, PaneID: id}, nil
+	case '@':
+		return Target{Type: "window", ID: id, WindowID: id}, nil
+	case '$':
+		return Target{Type: "session", ID: id, SessionID: id}, nil
+	default:
+		return Target{}, fmt.Errorf("invalid target ID prefix %q: must start with %%, @, or $", id[:1])
+	}
+}
+
 // ToolState represents a row in tool_states.
 type ToolState struct {
 	ID        int
