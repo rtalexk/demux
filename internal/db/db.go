@@ -102,6 +102,12 @@ func (d *DB) migrate() error {
 		}
 		version = 7
 	}
+	if version < 8 {
+		if err := d.migrateV8(); err != nil {
+			return err
+		}
+		version = 8
+	}
 	return nil
 }
 
@@ -318,6 +324,62 @@ func (d *DB) migrateV7() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 7`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 7: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV8() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v8: %w", err)
+	}
+
+	// Drop the old table.
+	if _, err := tx.Exec(`DROP TABLE IF EXISTS tool_states`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("drop tool_states v8: %w", err)
+	}
+
+	// Create the new table with explicit target type and stable IDs.
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS tool_states (
+			id          INTEGER PRIMARY KEY AUTOINCREMENT,
+			target_type TEXT NOT NULL CHECK(target_type IN ('session', 'window', 'pane')),
+			target_id   TEXT NOT NULL,
+			session_id  TEXT,
+			window_id   TEXT,
+			pane_id     TEXT,
+			tool        TEXT NOT NULL DEFAULT '',
+			value       INTEGER NOT NULL,
+			message     TEXT NOT NULL DEFAULT '',
+			source      INTEGER NOT NULL DEFAULT 1,
+			updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("create tool_states v8: %w", err)
+	}
+
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tool_states_type_id ON tool_states(target_type, target_id)`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("index type_id v8: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_states_session ON tool_states(session_id)`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("index session v8: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_states_window ON tool_states(window_id)`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("index window v8: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_states_value ON tool_states(value)`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("index value v8: %w", err)
+	}
+
+	if _, err := tx.Exec(`PRAGMA user_version = 8`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 8: %w", err)
 	}
 	return tx.Commit()
 }
