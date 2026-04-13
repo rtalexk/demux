@@ -37,8 +37,8 @@ type Pane struct {
 	SessionActivity int64 // Unix timestamp from #{session_activity}
 }
 
-// Target returns the "session:windowIndex.paneIndex" string used as a human-readable display label.
-func (p Pane) Target() string {
+// DisplayLabel returns the "session:windowIndex.paneIndex" string used as a human-readable display label.
+func (p Pane) DisplayLabel() string {
 	return fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)
 }
 
@@ -163,7 +163,7 @@ func PaneIDToTargetMap(panes []Pane) map[string]string {
 	m := make(map[string]string, len(panes))
 	for _, p := range panes {
 		if p.PaneID != "" {
-			m[p.PaneID] = p.Target()
+			m[p.PaneID] = p.DisplayLabel()
 		}
 	}
 	return m
@@ -188,6 +188,18 @@ func SessionIDToNameMap(panes []Pane) map[string]string {
 	for _, p := range panes {
 		if p.SessionID != "" && m[p.SessionID] == "" {
 			m[p.SessionID] = p.Session
+		}
+	}
+	return m
+}
+
+// SessionNameToIDMap returns a map from session_name to session_id ($N)
+// for all panes with a non-empty SessionID in the provided slice.
+func SessionNameToIDMap(panes []Pane) map[string]string {
+	m := make(map[string]string, len(panes))
+	for _, p := range panes {
+		if p.SessionID != "" && m[p.Session] == "" {
+			m[p.Session] = p.SessionID
 		}
 	}
 	return m
