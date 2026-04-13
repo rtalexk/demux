@@ -146,11 +146,10 @@ func ParseTargetID(id string) (Target, error) {
 // ToolState represents a row in tool_states.
 type ToolState struct {
 	ID        int
-	Target    string
+	Target    Target // embedded struct with Type, ID, SessionID, WindowID, PaneID
 	Tool      string
 	Value     StateValue
 	Message   string
-	PaneID    string
 	Source    StateSource
 	UpdatedAt time.Time
 }
