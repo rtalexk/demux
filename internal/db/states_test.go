@@ -542,6 +542,31 @@ func TestStateSet_NoStaleDeleteWhenTargetUnchanged(t *testing.T) {
 	}
 }
 
+func TestStateSet_NoopDoesNotSkipStalePaneDelete(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Pane %5 was at work:0.0.
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+	// work:1.0 already has a legacy record with the same (tool, value) — the
+	// no-op short-circuit would previously exit before reaching the stale-delete.
+	d.StateSet("work:1.0", "claude", StateWorking, "running", SourceTool, false, nil, "")
+
+	// Pane %5 has moved to work:1.0; same (tool, value) as the guard would trigger.
+	if err := d.StateSet("work:1.0", "claude", StateWorking, "still running", SourceTool, false, nil, "%5"); err != nil {
+		t.Fatalf("StateSet should succeed: %v", err)
+	}
+
+	// Stale record must be deleted even though the value did not change.
+	if st, _ := d.StateByTarget("work:0.0"); st != nil {
+		t.Errorf("stale pane record at work:0.0 should be deleted, got: %+v", st)
+	}
+	// New target must have the state.
+	if st, _ := d.StateByTarget("work:1.0"); st == nil || st.PaneID != "%5" {
+		t.Errorf("work:1.0 should carry pane_id %%5, got: %+v", st)
+	}
+}
+
 func TestStateDeleteIfRestingByPaneID_DeletesDone(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
@@ -586,6 +611,30 @@ func TestStateDeleteIfRestingByPaneID_NoopWhenNotFound(t *testing.T) {
 
 	if err := d.StateDeleteIfRestingByPaneID("%99"); err != nil {
 		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}
+
+func TestStateDeleteBySessionWithPaneIDs_EmptyPaneIDs(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("myapp:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%5")
+	d.StateSet("myapp:1.0", "make", StateDone, "", SourceTool, false, nil, "%6")
+	d.StateSet("other:0.0", "claude", StateDone, "", SourceTool, false, nil, "%7")
+
+	// nil paneIDs — should behave identically to StateDeleteBySession.
+	n, err := d.StateDeleteBySessionWithPaneIDs("myapp", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("myapp:0.0"); st != nil {
+		t.Error("myapp:0.0 should be deleted")
+	}
+	if st, _ := d.StateByTarget("other:0.0"); st == nil {
+		t.Error("unrelated session should survive")
 	}
 }
 

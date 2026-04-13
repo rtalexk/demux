@@ -151,7 +151,9 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 
 	// No-op if value and tool are unchanged (avoids redundant DB writes from
 	// high-frequency hooks like PreToolUse firing working→working repeatedly).
-	if ifState == nil && current != nil && current.Value == value && current.Tool == tool {
+	// When paneID is provided we must fall through to the stale-delete path even
+	// when the value is identical, because the pane may have moved to a new target.
+	if ifState == nil && paneID == "" && current != nil && current.Value == value && current.Tool == tool {
 		demuxlog.Debug("state set skipped: no change", "target", target, "tool", tool, "state", value)
 		return tx.Rollback()
 	}
@@ -290,6 +292,10 @@ func (d *DB) StateGCOrphaned(livePaneIDs map[string]bool, livePaneTargets map[st
 // StateDeleteBySession removes all state records for the given session.
 // It matches targets equal to name (bare) or prefixed with "name:" (session:window).
 // Returns the number of rows deleted.
+//
+// Deprecated: the production path uses StateDeleteBySessionWithPaneIDs, which also
+// catches drifted-target records for panes that moved since the last state write.
+// This function is retained for callers that do not have a live pane list.
 func (d *DB) StateDeleteBySession(name string) (int64, error) {
 	res, err := d.sql.Exec(
 		`DELETE FROM tool_states WHERE target = ? OR target LIKE ?`,
@@ -306,8 +312,14 @@ func (d *DB) StateDeleteBySession(name string) (int64, error) {
 // records whose target drifted after a pane move).
 // Returns the total number of rows deleted.
 func (d *DB) StateDeleteBySessionWithPaneIDs(name string, paneIDs []string) (int64, error) {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin StateDeleteBySessionWithPaneIDs: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+
 	// Delete by target prefix first (original behaviour).
-	res, err := d.sql.Exec(
+	res, err := tx.Exec(
 		`DELETE FROM tool_states WHERE target = ? OR target LIKE ?`,
 		name, name+":%",
 	)
@@ -318,12 +330,15 @@ func (d *DB) StateDeleteBySessionWithPaneIDs(name string, paneIDs []string) (int
 
 	// Delete any remaining records for panes that belong to this session.
 	for _, pid := range paneIDs {
-		r, err := d.sql.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, pid)
+		r, err := tx.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, pid)
 		if err != nil {
-			return n, err
+			return 0, err
 		}
 		rows, _ := r.RowsAffected()
 		n += rows
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit StateDeleteBySessionWithPaneIDs: %w", err)
 	}
 	return n, nil
 }
