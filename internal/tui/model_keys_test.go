@@ -60,6 +60,39 @@ func TestHighestPriorityPaneTarget_ReturnsEmptyForEmptyStates(t *testing.T) {
 	}
 }
 
+func TestClearCurrentState_ClearsByPaneID(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	// State was written when pane was at old position.
+	_ = d.StateSet("work:1.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "%5")
+
+	m := Model{db: d}
+	cmd := m.clearCurrentState("work:2.0", "%5") // resolved target + pane_id
+	cmd()
+
+	st, _ := d.StateByTarget("work:1.0")
+	if st != nil {
+		t.Errorf("state should be cleared by pane_id, got: %+v", st)
+	}
+}
+
+func TestClearCurrentState_FallsBackToTarget(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	_ = d.StateSet("work:1.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "")
+
+	m := Model{db: d}
+	cmd := m.clearCurrentState("work:1.0", "") // no pane_id, falls back to target
+	cmd()
+
+	st, _ := d.StateByTarget("work:1.0")
+	if st != nil {
+		t.Errorf("state should be cleared by target, got: %+v", st)
+	}
+}
+
 func TestResolveFilterKey(t *testing.T) {
 	tests := []struct {
 		keyStr string
