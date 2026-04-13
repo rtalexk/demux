@@ -151,6 +151,7 @@ func applyStateClear(d *db.DB) error {
 
 type stateRow struct {
 	target  string
+	paneID  string
 	tool    string
 	value   string
 	message string
@@ -159,7 +160,7 @@ type stateRow struct {
 }
 
 func (r stateRow) Fields() []string {
-	return []string{r.target, r.tool, r.value, r.message, r.source, r.updated}
+	return []string{r.target, r.paneID, r.tool, r.value, r.message, r.source, r.updated}
 }
 
 // resolveStateTarget returns the current "session:window.pane" for a state,
@@ -211,6 +212,7 @@ func runStateList(cmd *cobra.Command, args []string) error {
 		}
 		rows[i] = stateRow{
 			target:  resolveStateTarget(st, paneIDMap),
+			paneID:  st.PaneID,
 			tool:    tool,
 			value:   st.Value.String(),
 			message: st.Message,
@@ -219,7 +221,7 @@ func runStateList(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	headers := []string{"TARGET", "TOOL", "STATE", "MESSAGE", "SOURCE", "UPDATED"}
+	headers := []string{"TARGET", "PANE_ID", "TOOL", "STATE", "MESSAGE", "SOURCE", "UPDATED"}
 	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTY()))
 	return nil
 }
