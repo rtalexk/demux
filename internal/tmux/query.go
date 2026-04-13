@@ -37,7 +37,7 @@ type Pane struct {
 	SessionActivity int64 // Unix timestamp from #{session_activity}
 }
 
-// Target returns the "session:windowIndex.paneIndex" target string used as a demux state key.
+// Target returns the "session:windowIndex.paneIndex" string used as a human-readable display label.
 func (p Pane) Target() string {
 	return fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)
 }
@@ -157,7 +157,7 @@ func SwitchClient(target string) error {
 	return exec.Command("tmux", "switch-client", "-t", target).Run()
 }
 
-// PaneIDToTargetMap returns a map from pane_id (%N) to "session:windowIndex.paneIndex"
+// PaneIDToTargetMap returns a map from pane_id (%N) to display label "session:windowIndex.paneIndex"
 // for all panes with a non-empty PaneID in the provided slice.
 func PaneIDToTargetMap(panes []Pane) map[string]string {
 	m := make(map[string]string, len(panes))
@@ -169,7 +169,7 @@ func PaneIDToTargetMap(panes []Pane) map[string]string {
 	return m
 }
 
-// WindowIDToTargetMap returns a map from window_id (@N) to "session:windowIndex"
+// WindowIDToTargetMap returns a map from window_id (@N) to display label "session:windowIndex"
 // for all panes with a non-empty WindowID in the provided slice.
 func WindowIDToTargetMap(panes []Pane) map[string]string {
 	m := make(map[string]string, len(panes))
