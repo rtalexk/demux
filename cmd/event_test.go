@@ -131,3 +131,33 @@ func TestApplyPaneClosed_NoopUnknownPane(t *testing.T) {
 		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
 	}
 }
+
+func TestApplyHookError_SetsErrorState(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	if err := applyHookErrorDB(d, "%5", "claude", "Stop", "state set failed"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	target, _ := db.ParseTargetID("%5")
+	st, _ := d.StateByID(target)
+	if st == nil {
+		t.Fatal("expected error state to be written, got nil")
+	}
+	if st.Value != db.StateError {
+		t.Errorf("expected StateError, got %v", st.Value)
+	}
+}
+
+func TestApplyHookError_InvalidTargetIDIsNoop(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	if err := applyHookErrorDB(d, "invalid", "claude", "Stop", "failed"); err != nil {
+		t.Fatalf("unexpected error for invalid target: %v", err)
+	}
+	states, _ := d.StateList(0, "")
+	if len(states) != 0 {
+		t.Errorf("expected no states for invalid target, got %d", len(states))
+	}
+}
