@@ -58,7 +58,8 @@ type SidebarModel struct {
 	offset        int // viewport scroll offset
 	visibleRows   int // last known visible row count; used by CursorDown/CursorUp
 	sessions      []session.Session
-	states        map[string]db.ToolState
+	states        []db.ToolState
+	nameToID      map[string]string // session display name → session_id ($N)
 	gitInfo       map[string]git.Info
 	cfg           config.Config
 	filter        SidebarFilter
@@ -74,13 +75,16 @@ type SidebarModel struct {
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
 	s.sessions = sessions
-	s.states = make(map[string]db.ToolState, len(states))
-	for _, st := range states {
-		s.states[st.Target] = st
-	}
+	s.states = states
 	s.gitInfo = gitInfo
 	s.cfg = cfg
 	s.rebuildNodes()
+}
+
+// SetNameToIDMap stores the mapping from session display name to stable session_id.
+// Called by the Model after each panes refresh.
+func (s *SidebarModel) SetNameToIDMap(m map[string]string) {
+	s.nameToID = m
 }
 
 // SetActiveSession records which tmux session the user is currently attached to.
@@ -153,20 +157,27 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 
 // stateForSession returns the highest-priority ToolState for the session, or nil if none.
 func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
-	prefix := sess + ":"
+	sessID := s.nameToID[sess]
 	var best *db.ToolState
 	found := false
 	bestPri := 0
-	for target, st := range s.states {
-		if target != sess && !strings.HasPrefix(target, prefix) {
+	for i := range s.states {
+		st := &s.states[i]
+		// Match by session_id when available; fall back to session-level target by name.
+		var matches bool
+		if sessID != "" {
+			matches = st.Target.SessionID == sessID
+		} else {
+			matches = st.Target.Type == "session" && st.Target.ID == sess
+		}
+		if !matches {
 			continue
 		}
 		pri := st.Value.Priority()
 		if !found || pri > bestPri {
 			found = true
 			bestPri = pri
-			st := st
-			best = &st
+			best = st
 		}
 	}
 	return best

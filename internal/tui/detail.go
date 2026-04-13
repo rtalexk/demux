@@ -46,6 +46,11 @@ type DetailModel struct {
 	// session states (non-idle states for the focused session)
 	sessionStates []db.ToolState
 
+	// display maps for resolving stable IDs to human-readable targets
+	paneIDMap    map[string]string // %N → "session:wi.pi"
+	windowIDMap  map[string]string // @N → "session:wi"
+	sessionIDMap map[string]string // $N → session_name
+
 	// window
 	windowIndex int
 	windowPanes []tmux.Pane
@@ -140,6 +145,44 @@ func inlineStat(label, value string) string {
 	return detailLabelStyle.Width(0).Render(label+":") + " " + detailValueStyle.Render(value)
 }
 
+// targetDisplayStr returns a compact display string for a state target.
+// For pane targets, formats as "win{wi}·p{pi}" using the paneIDMap lookup.
+// For window targets, formats as "win{wi}" using the windowIDMap lookup.
+// For session targets, returns the session name from sessionIDMap.
+// Falls back to the raw target ID when no map entry exists.
+func targetDisplayStr(t db.Target, paneIDMap, windowIDMap, sessionIDMap map[string]string) string {
+	switch t.Type {
+	case "pane":
+		if full := paneIDMap[t.ID]; full != "" {
+			if idx := strings.Index(full, ":"); idx >= 0 {
+				rest := full[idx+1:]
+				parts := strings.SplitN(rest, ".", 2)
+				if len(parts) == 2 {
+					return "win" + parts[0] + "·p" + parts[1]
+				}
+				return rest
+			}
+			return full
+		}
+		return t.ID
+	case "window":
+		if full := windowIDMap[t.ID]; full != "" {
+			if idx := strings.Index(full, ":"); idx >= 0 {
+				return "win" + full[idx+1:]
+			}
+			return full
+		}
+		return t.ID
+	case "session":
+		if name := sessionIDMap[t.ID]; name != "" {
+			return name
+		}
+		return t.ID
+	default:
+		return t.ID
+	}
+}
+
 // renderStateSection builds detail lines for displayable states of the focused session.
 // Returns nil when there are no states to show.
 func (d DetailModel) renderStateSection() []string {
@@ -154,20 +197,16 @@ func (d DetailModel) renderStateSection() []string {
 	if len(active) == 0 {
 		return nil
 	}
-	// Sort by target for stable ordering.
-	sort.Slice(active, func(i, j int) bool { return active[i].Target < active[j].Target })
+	// Sort by display string for stable ordering.
+	sort.Slice(active, func(i, j int) bool {
+		di := targetDisplayStr(active[i].Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		dj := targetDisplayStr(active[j].Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		return di < dj
+	})
 	lines := []string{""}
 	for _, st := range active {
 		icon := stateIcon(st.Value)
-		target := st.Target
-		// Strip session prefix: "mysess:1.0" → "win1·p0"
-		if prefix := d.session + ":"; strings.HasPrefix(target, prefix) {
-			rest := target[len(prefix):]
-			parts := strings.SplitN(rest, ".", 2)
-			if len(parts) == 2 {
-				target = "win" + parts[0] + "·p" + parts[1]
-			}
-		}
+		target := targetDisplayStr(st.Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
 		tool := st.Tool
 		if tool == "" {
 			tool = "-"
