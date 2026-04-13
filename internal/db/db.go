@@ -90,6 +90,12 @@ func (d *DB) migrate() error {
 		}
 		version = 5
 	}
+	if version < 6 {
+		if err := d.migrateV6(); err != nil {
+			return err
+		}
+		version = 6
+	}
 	return nil
 }
 
@@ -246,6 +252,46 @@ func (d *DB) migrateV5() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 5`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 5: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV6() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v6: %w", err)
+	}
+	// Idempotency check — handles partial migrations.
+	rows, err := tx.Query(`PRAGMA table_info(tool_states)`)
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("table info v6: %w", err)
+	}
+	var hasPaneID bool
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var dfltVal sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltVal, &pk); err == nil && name == "pane_id" {
+			hasPaneID = true
+		}
+	}
+	rows.Close()
+	if !hasPaneID {
+		if _, err := tx.Exec(`ALTER TABLE tool_states ADD COLUMN pane_id TEXT`); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migrate v6 add pane_id: %w", err)
+		}
+		if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_states_pane_id ON tool_states(pane_id) WHERE pane_id IS NOT NULL`); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migrate v6 index pane_id: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`PRAGMA user_version = 6`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 6: %w", err)
 	}
 	return tx.Commit()
 }
