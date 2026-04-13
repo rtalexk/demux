@@ -222,6 +222,13 @@ func (d *DB) StateDeleteIfResting(target string) error {
 	return err
 }
 
+// StateClearByPaneID removes the state record whose pane_id matches.
+// No-op if no record has that pane_id.
+func (d *DB) StateClearByPaneID(paneID string) error {
+	_, err := d.sql.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, paneID)
+	return err
+}
+
 // StateDeleteBySession removes all state records for the given session.
 // It matches targets equal to name (bare) or prefixed with "name:" (session:window).
 // Returns the number of rows deleted.

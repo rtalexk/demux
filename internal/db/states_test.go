@@ -349,6 +349,43 @@ func TestStateSet_IfState_NoopWhenNoRow(t *testing.T) {
 	}
 }
 
+func TestStateClearByPaneID_DeletesRecord(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12")
+	if err := d.StateClearByPaneID("%12"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("expected state deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateClearByPaneID_NoopWhenNotFound(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateClearByPaneID("%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}
+
+func TestStateClearByPaneID_DoesNotDeleteOtherRecords(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12")
+	d.StateSet("s:1.0", "claude", StateWorking, "running", SourceTool, false, nil, "%13")
+	d.StateClearByPaneID("%12")
+
+	st, _ := d.StateByTarget("s:1.0")
+	if st == nil {
+		t.Error("unrelated pane state should not be deleted")
+	}
+}
+
 func TestStateSet_StoresPaneID(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
