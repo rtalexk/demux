@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/tmux"
 )
 
 func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
@@ -129,5 +131,29 @@ func TestResolveFilterKey(t *testing.T) {
 				t.Errorf("filter: got %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestProcListStateIdentity_EmptyPaneIDReturnsNil(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	m := New(config.Default(), d)
+	m.procList.nodes = []ProcListNode{
+		{Pane: tmux.Pane{}}, // empty PaneID
+	}
+	m.procList.cursor = 0
+	if got := m.procListStateIdentity(); got != nil {
+		t.Errorf("expected nil for empty PaneID, got %+v", got)
+	}
+}
+
+func TestProcListStateIdentity_EmptyWindowIDReturnsNil(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	m := New(config.Default(), d)
+	m.procList.nodes = []ProcListNode{
+		{IsWindowHeader: true, Pane: tmux.Pane{}}, // empty WindowID
+	}
+	m.procList.cursor = 0
+	if got := m.procListStateIdentity(); got != nil {
+		t.Errorf("expected nil for empty WindowID, got %+v", got)
 	}
 }
