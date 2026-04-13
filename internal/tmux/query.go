@@ -143,7 +143,7 @@ func PaneIDToTargetMap(panes []Pane) map[string]string {
 	m := make(map[string]string, len(panes))
 	for _, p := range panes {
 		if p.PaneID != "" {
-			m[p.PaneID] = fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)
+			m[p.PaneID] = p.Target()
 		}
 	}
 	return m
