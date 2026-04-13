@@ -55,19 +55,20 @@ func resolveAgent(name string) (agentDef, error) {
 	return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
 }
 
-// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
-// It uses $TMUX_PANE (set by tmux at process start) so the result always refers
-// to the pane where the agent was launched, not the currently focused pane.
-func tmuxPaneTarget() (string, error) {
+// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex"
+// and the stable pane ID (%N) from $TMUX_PANE.
+func tmuxPaneTarget() (target string, paneID string, err error) {
+	paneID = os.Getenv("TMUX_PANE") // already %N — set by tmux at process start
 	args := []string{"display-message", "-p", "#S:#I.#P"}
-	if pane := os.Getenv("TMUX_PANE"); pane != "" {
-		args = []string{"display-message", "-t", pane, "-p", "#S:#I.#P"}
+	if paneID != "" {
+		args = []string{"display-message", "-t", paneID, "-p", "#S:#I.#P"}
 	}
-	out, err := exec.Command("tmux", args...).Output()
-	if err != nil {
-		return "", fmt.Errorf("get tmux pane target: %w", err)
+	out, execErr := exec.Command("tmux", args...).Output()
+	if execErr != nil {
+		return "", paneID, fmt.Errorf("get tmux pane target: %w", execErr)
 	}
-	return strings.TrimSpace(string(out)), nil
+	target = strings.TrimSpace(string(out))
+	return target, paneID, nil
 }
 
 const tmuxHooksSnippet = `# demux tmux hooks

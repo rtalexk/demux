@@ -30,7 +30,7 @@ var eventPaneFocusCmd = &cobra.Command{
 		target := eventPaneFocusTarget
 		if target == "" {
 			var err error
-			target, err = tmuxPaneTarget()
+			target, _, err = tmuxPaneTarget()
 			if err != nil {
 				return err
 			}
