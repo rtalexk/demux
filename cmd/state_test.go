@@ -46,7 +46,7 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser, false, nil)
+	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser, false, nil, "")
 
 	clearTarget = "s:0.0"
 	clearYes = false
@@ -69,7 +69,7 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool, false, nil)
+	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool, false, nil, "")
 
 	clearTarget = "s:0.0"
 	clearYes = false
@@ -105,7 +105,7 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 	defer d.Close()
 
 	// Pre-set state to done.
-	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
+	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
 
 	stateTarget = "s:0.0"
 	stateValue = "waiting"
@@ -128,7 +128,7 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "claude", db.StateWorking, "running", db.SourceTool, false, nil)
+	d.StateSet("s:0.0", "claude", db.StateWorking, "running", db.SourceTool, false, nil, "")
 
 	stateTarget = "s:0.0"
 	stateValue = "done"

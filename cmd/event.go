@@ -101,7 +101,7 @@ func applyHookError() error {
 			return err
 		}
 		defer d.Close()
-		if err := d.StateSet(hookErrorTarget, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil); err != nil {
+		if err := d.StateSet(hookErrorTarget, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil, ""); err != nil {
 			demuxlog.Error("hook_error: set state error failed", "target", hookErrorTarget, "err", err)
 			return err
 		}
