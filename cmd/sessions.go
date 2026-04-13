@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/mattn/go-isatty"
 	"github.com/rtalexk/demux/internal/config"
@@ -143,16 +142,16 @@ func buildSessionRows(grouped map[string]map[int][]tmux.Pane, sessionProcCount m
 	return rows
 }
 
-func buildStatesBySession(states []db.ToolState) map[string]db.ToolState {
+func buildStatesBySession(states []db.ToolState, sessionIDToName map[string]string) map[string]db.ToolState {
 	out := map[string]db.ToolState{}
 	for _, st := range states {
-		parts := strings.SplitN(st.Target, ":", 2)
-		if len(parts) > 0 {
-			sessName := parts[0]
-			// Keep highest-priority state per session
-			if existing, ok := out[sessName]; !ok || st.Value.Priority() > existing.Value.Priority() {
-				out[sessName] = st
-			}
+		sessName := sessionIDToName[st.Target.SessionID]
+		if sessName == "" {
+			continue
+		}
+		// Keep highest-priority state per session
+		if existing, ok := out[sessName]; !ok || st.Value.Priority() > existing.Value.Priority() {
+			out[sessName] = st
 		}
 	}
 	return out
@@ -177,7 +176,8 @@ func runSessions(cmd *cobra.Command, _ []string) error {
 		demuxlog.Warn("failed to list states", "err", err)
 	}
 
-	statesBySession := buildStatesBySession(states)
+	sessionIDToName := tmux.SessionIDToNameMap(panes)
+	statesBySession := buildStatesBySession(states, sessionIDToName)
 
 	headers := []string{"SESSION", "WINDOWS", "PROCS", "STATE", "STATUS"}
 	if sessionListGitOnly {
