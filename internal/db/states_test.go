@@ -386,6 +386,70 @@ func TestStateClearByPaneID_DoesNotDeleteOtherRecords(t *testing.T) {
 	}
 }
 
+func TestStateGCOrphaned_DeletesByPaneID(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%12")
+	d.StateSet("s:1.0", "claude", StateWorking, "", SourceTool, false, nil, "%13")
+
+	// %12 is live; %13 is gone.
+	n, err := d.StateGCOrphaned(map[string]bool{"%12": true}, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("s:0.0"); st == nil {
+		t.Error("live pane state should survive GC")
+	}
+	if st, _ := d.StateByTarget("s:1.0"); st != nil {
+		t.Error("orphaned pane state should be deleted")
+	}
+}
+
+func TestStateGCOrphaned_LegacyFallback(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Legacy record: no pane_id, target is session:window.pane format.
+	d.StateSet("s:0.0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("s:1.0", "claude", StateWorking, "", SourceTool, false, nil, "")
+
+	// s:0.0 is live; s:1.0 is not.
+	n, err := d.StateGCOrphaned(map[string]bool{}, map[string]bool{"s:0.0": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("s:0.0"); st == nil {
+		t.Error("live legacy target should survive")
+	}
+	if st, _ := d.StateByTarget("s:1.0"); st != nil {
+		t.Error("orphaned legacy target should be deleted")
+	}
+}
+
+func TestStateGCOrphaned_SkipsSessionAndWindowTargets(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Bare session target and window target have no pane_id and no dot — skip GC.
+	d.StateSet("myapp", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("myapp:1", "claude", StateWorking, "", SourceTool, false, nil, "")
+
+	n, err := d.StateGCOrphaned(map[string]bool{}, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session/window targets should not be GC'd, deleted %d", n)
+	}
+}
+
 func TestStateSet_StoresPaneID(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	demuxlog "github.com/rtalexk/demux/internal/log"
@@ -227,6 +228,41 @@ func (d *DB) StateDeleteIfResting(target string) error {
 func (d *DB) StateClearByPaneID(paneID string) error {
 	_, err := d.sql.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, paneID)
 	return err
+}
+
+// looksLikePaneTarget reports whether target is in "session:window.pane" format.
+// Used by StateGCOrphaned to skip session-level and window-level targets.
+func looksLikePaneTarget(target string) bool {
+	return strings.Contains(target, ":") && strings.Contains(target, ".")
+}
+
+// StateGCOrphaned deletes state records whose pane is no longer live.
+// For records with a pane_id: orphaned when pane_id is not in livePaneIDs.
+// For legacy records (pane_id empty) that look like "session:window.pane":
+// orphaned when target is not in livePaneTargets.
+// Session-level and window-level targets (no ".") are never deleted.
+// Returns the number of records deleted.
+func (d *DB) StateGCOrphaned(livePaneIDs map[string]bool, livePaneTargets map[string]bool) (int64, error) {
+	states, err := d.StateList(0, "")
+	if err != nil {
+		return 0, err
+	}
+	var deleted int64
+	for _, st := range states {
+		orphaned := false
+		if st.PaneID != "" {
+			orphaned = !livePaneIDs[st.PaneID]
+		} else if looksLikePaneTarget(st.Target) {
+			orphaned = !livePaneTargets[st.Target]
+		}
+		if orphaned {
+			if err := d.StateClear(st.Target); err != nil {
+				return deleted, fmt.Errorf("gc: clear %q: %w", st.Target, err)
+			}
+			deleted++
+		}
+	}
+	return deleted, nil
 }
 
 // StateDeleteBySession removes all state records for the given session.
