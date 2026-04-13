@@ -55,19 +55,20 @@ func resolveAgent(name string) (agentDef, error) {
 	return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
 }
 
-// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex".
-// It uses $TMUX_PANE (set by tmux at process start) so the result always refers
-// to the pane where the agent was launched, not the currently focused pane.
-func tmuxPaneTarget() (string, error) {
+// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex"
+// and the stable pane ID (%N) from $TMUX_PANE.
+func tmuxPaneTarget() (target string, paneID string, err error) {
+	paneID = os.Getenv("TMUX_PANE") // already %N — set by tmux at process start
 	args := []string{"display-message", "-p", "#S:#I.#P"}
-	if pane := os.Getenv("TMUX_PANE"); pane != "" {
-		args = []string{"display-message", "-t", pane, "-p", "#S:#I.#P"}
+	if paneID != "" {
+		args = []string{"display-message", "-t", paneID, "-p", "#S:#I.#P"}
 	}
-	out, err := exec.Command("tmux", args...).Output()
-	if err != nil {
-		return "", fmt.Errorf("get tmux pane target: %w", err)
+	out, execErr := exec.Command("tmux", args...).Output()
+	if execErr != nil {
+		return "", paneID, fmt.Errorf("get tmux pane target: %w", execErr)
 	}
-	return strings.TrimSpace(string(out)), nil
+	target = strings.TrimSpace(string(out))
+	return target, paneID, nil
 }
 
 const tmuxHooksSnippet = `# demux tmux hooks
@@ -83,6 +84,7 @@ const tmuxHooksSnippet = `# demux tmux hooks
 #   Together they cover every way a pane can receive focus.
 #   Each hook targets the now-active pane and clears any done states on it and its
 #   parent window.
+#   after-kill-pane     — fires when a pane is closed; removes its state record.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Clears Demux done states when switching between panes within the same window.
@@ -96,6 +98,9 @@ set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #
 
 # Clears Demux done states when switching back from another application.
 set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+
+# Removes Demux state when a pane is closed (prevents stale state accumulation).
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{pane_id} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 

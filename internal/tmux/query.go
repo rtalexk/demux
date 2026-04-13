@@ -19,6 +19,11 @@ type Pane struct {
 	SessionActivity int64 // Unix timestamp from #{session_activity}
 }
 
+// Target returns the "session:windowIndex.paneIndex" target string used as a demux state key.
+func (p Pane) Target() string {
+	return fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)
+}
+
 // ListPanes runs tmux list-panes and returns all panes across all sessions.
 func ListPanes() ([]Pane, error) {
 	out, err := exec.Command("tmux", "list-panes", "-a",

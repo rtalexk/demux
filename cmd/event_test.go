@@ -34,8 +34,8 @@ func TestPaneFocusClearsDoneStates(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
-	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool, false, nil)
+	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
+	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
 
 	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
 		t.Fatal(err)
@@ -55,7 +55,7 @@ func TestPaneFocusDoesNotClearNonDone(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool, false, nil)
+	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool, false, nil, "")
 	applyPaneFocus(d, "myses:0.1")
 
 	st, _ := d.StateByTarget("myses:0.1")
@@ -68,7 +68,7 @@ func TestPaneFocusDoesNotClearFlagged(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser, false, nil)
+	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser, false, nil, "")
 	applyPaneFocus(d, "myses:0.1")
 
 	st, _ := d.StateByTarget("myses:0.1")
@@ -90,7 +90,7 @@ func TestPaneFocusClearsIdleStates(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("myses:0.1", "claude", db.StateIdle, "available", db.SourceTool, false, nil)
+	d.StateSet("myses:0.1", "claude", db.StateIdle, "available", db.SourceTool, false, nil, "")
 
 	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
 		t.Fatal(err)
@@ -99,5 +99,28 @@ func TestPaneFocusClearsIdleStates(t *testing.T) {
 	st, _ := d.StateByTarget("myses:0.1")
 	if st != nil {
 		t.Error("idle pane state should be cleared on focus")
+	}
+}
+
+func TestApplyPaneClosed_DeletesByPaneID(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "%7")
+	if err := applyPaneClosed(d, "%7"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("state should be deleted after pane_closed, got: %+v", st)
+	}
+}
+
+func TestApplyPaneClosed_NoopUnknownPane(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	if err := applyPaneClosed(d, "%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
 	}
 }

@@ -30,7 +30,7 @@ var eventPaneFocusCmd = &cobra.Command{
 		target := eventPaneFocusTarget
 		if target == "" {
 			var err error
-			target, err = tmuxPaneTarget()
+			target, _, err = tmuxPaneTarget()
 			if err != nil {
 				return err
 			}
@@ -101,12 +101,32 @@ func applyHookError() error {
 			return err
 		}
 		defer d.Close()
-		if err := d.StateSet(hookErrorTarget, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil); err != nil {
+		if err := d.StateSet(hookErrorTarget, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil, ""); err != nil {
 			demuxlog.Error("hook_error: set state error failed", "target", hookErrorTarget, "err", err)
 			return err
 		}
 	}
 	return nil
+}
+
+var eventPaneClosedPaneID string
+
+var eventPaneClosedCmd = &cobra.Command{
+	Use:   "pane_closed",
+	Short: "Clear state for a closed tmux pane (called by after-kill-pane hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return applyPaneClosed(d, eventPaneClosedPaneID)
+	},
+}
+
+func applyPaneClosed(d *db.DB, paneID string) error {
+	demuxlog.Debug("pane_closed", "pane_id", paneID)
+	return d.StateClearByPaneID(paneID)
 }
 
 func init() {
@@ -119,6 +139,9 @@ func init() {
 	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target)")
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd)
+	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")
+	eventPaneClosedCmd.MarkFlagRequired("pane")
+
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneClosedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

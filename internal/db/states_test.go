@@ -30,7 +30,7 @@ func TestStateSet_BasicUpsert(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "running tests", SourceTool, false, nil); err != nil {
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "running tests", SourceTool, false, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	st, err := d.StateByTarget("s:0:0")
@@ -49,8 +49,8 @@ func TestStateSet_LockWorking_DifferentTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil)
-	err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, false, nil, "")
 	if err == nil {
 		t.Fatal("expected locked error, got nil")
 	}
@@ -65,8 +65,8 @@ func TestStateSet_LockWorking_SameTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "step 1", SourceTool, false, nil)
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "step 2", SourceTool, false, nil); err != nil {
+	d.StateSet("s:0:0", "claude", StateWorking, "step 1", SourceTool, false, nil, "")
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "step 2", SourceTool, false, nil, ""); err != nil {
 		t.Errorf("same tool should not be locked: %v", err)
 	}
 }
@@ -75,9 +75,9 @@ func TestStateSet_LockFlagged_BlocksAllTools(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false, nil)
+	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false, nil, "")
 	// same tool name should still be blocked
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil); err == nil {
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil, ""); err == nil {
 		t.Fatal("flagged should block all tool writes")
 	}
 }
@@ -87,14 +87,14 @@ func TestStateSet_ForceOverridesLock(t *testing.T) {
 	defer d.Close()
 
 	// Flagged blocks tool writes normally.
-	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false, nil)
-	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, true, nil); err != nil {
+	d.StateSet("s:0:0", "", StateFlagged, "come back", SourceUser, false, nil, "")
+	if err := d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, true, nil, ""); err != nil {
 		t.Fatalf("force should override flagged lock: %v", err)
 	}
 
 	// Different-tool lock overridden by force.
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil)
-	if err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, true, nil); err != nil {
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	if err := d.StateSet("s:0:0", "make", StateWorking, "", SourceTool, true, nil, ""); err != nil {
 		t.Fatalf("force should override different-tool lock: %v", err)
 	}
 }
@@ -103,8 +103,8 @@ func TestStateSet_UserWriteAlwaysSucceeds(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil)
-	if err := d.StateSet("s:0:0", "", StateFlagged, "note", SourceUser, false, nil); err != nil {
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	if err := d.StateSet("s:0:0", "", StateFlagged, "note", SourceUser, false, nil, ""); err != nil {
 		t.Errorf("user write should always succeed: %v", err)
 	}
 }
@@ -113,7 +113,7 @@ func TestStateClear(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateError, "boom", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateError, "boom", SourceTool, false, nil, "")
 	if err := d.StateClear("s:0:0"); err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestStateDeleteIfDone(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil, "")
 	if err := d.StateDeleteIfDone("s:0:0"); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestStateDeleteIfDone(t *testing.T) {
 	}
 
 	// non-done states must not be deleted
-	d.StateSet("s:1:0", "claude", StateError, "boom", SourceTool, false, nil)
+	d.StateSet("s:1:0", "claude", StateError, "boom", SourceTool, false, nil, "")
 	d.StateDeleteIfDone("s:1:0")
 	st2, _ := d.StateByTarget("s:1:0")
 	if st2 == nil {
@@ -150,7 +150,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	defer d.Close()
 
 	// done is cleared
-	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil, "")
 	d.StateDeleteIfResting("s:0:0")
 	st, _ := d.StateByTarget("s:0:0")
 	if st != nil {
@@ -158,7 +158,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// idle is cleared
-	d.StateSet("s:1:0", "claude", StateIdle, "available", SourceTool, false, nil)
+	d.StateSet("s:1:0", "claude", StateIdle, "available", SourceTool, false, nil, "")
 	d.StateDeleteIfResting("s:1:0")
 	st2, _ := d.StateByTarget("s:1:0")
 	if st2 != nil {
@@ -166,7 +166,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// working is not cleared
-	d.StateSet("s:2:0", "claude", StateWorking, "running", SourceTool, false, nil)
+	d.StateSet("s:2:0", "claude", StateWorking, "running", SourceTool, false, nil, "")
 	d.StateDeleteIfResting("s:2:0")
 	st3, _ := d.StateByTarget("s:2:0")
 	if st3 == nil {
@@ -174,7 +174,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// error is not cleared
-	d.StateSet("s:3:0", "claude", StateError, "boom", SourceTool, false, nil)
+	d.StateSet("s:3:0", "claude", StateError, "boom", SourceTool, false, nil, "")
 	d.StateDeleteIfResting("s:3:0")
 	st4, _ := d.StateByTarget("s:3:0")
 	if st4 == nil {
@@ -186,8 +186,8 @@ func TestStateList(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil)
-	d.StateSet("s:1:0", "make", StateError, "fail", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("s:1:0", "make", StateError, "fail", SourceTool, false, nil, "")
 
 	all, err := d.StateList(0, "")
 	if err != nil {
@@ -208,9 +208,9 @@ func TestStateDeleteBySession(t *testing.T) {
 	defer d.Close()
 
 	// populate: two targets for session "myapp", one for another session
-	d.StateSet("myapp:0", "claude", StateWorking, "", SourceTool, false, nil)
-	d.StateSet("myapp:1", "make", StateError, "fail", SourceTool, false, nil)
-	d.StateSet("other:0", "claude", StateDone, "ok", SourceTool, false, nil)
+	d.StateSet("myapp:0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("myapp:1", "make", StateError, "fail", SourceTool, false, nil, "")
+	d.StateSet("other:0", "claude", StateDone, "ok", SourceTool, false, nil, "")
 
 	n, err := d.StateDeleteBySession("myapp")
 	if err != nil {
@@ -242,7 +242,7 @@ func TestStateDeleteBySession_BareTarget(t *testing.T) {
 	defer d.Close()
 
 	// target that is exactly the session name (no colon suffix)
-	d.StateSet("myapp", "claude", StateWorking, "", SourceTool, false, nil)
+	d.StateSet("myapp", "claude", StateWorking, "", SourceTool, false, nil, "")
 
 	n, err := d.StateDeleteBySession("myapp")
 	if err != nil {
@@ -287,7 +287,7 @@ func TestStateIdle_SetAndRetrieve(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	if err := d.StateSet("s:0:0", "claude", StateIdle, "available", SourceTool, false, nil); err != nil {
+	if err := d.StateSet("s:0:0", "claude", StateIdle, "available", SourceTool, false, nil, ""); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := d.StateByTarget("s:0:0")
@@ -301,11 +301,11 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 	defer d.Close()
 
 	// Set to done.
-	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, nil, "")
 
 	// Try to overwrite with working, but guard says "only if currently working".
 	ifWorking := StateWorking
-	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifWorking)
+	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifWorking, "")
 	if err != nil {
 		t.Fatalf("ifState mismatch should be a silent no-op, got: %v", err)
 	}
@@ -320,10 +320,10 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, nil)
+	d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, nil, "")
 
 	ifWorking := StateWorking
-	if err := d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, &ifWorking); err != nil {
+	if err := d.StateSet("s:0:0", "claude", StateDone, "finished", SourceTool, false, &ifWorking, ""); err != nil {
 		t.Fatalf("ifState match should write: %v", err)
 	}
 	st, _ := d.StateByTarget("s:0:0")
@@ -339,12 +339,162 @@ func TestStateSet_IfState_NoopWhenNoRow(t *testing.T) {
 	// No row exists. Passing ifState=StateIdle (6) should be a no-op because
 	// a missing row is treated as StateValue(0), not StateIdle.
 	ifIdle := StateIdle
-	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifIdle)
+	err := d.StateSet("s:0:0", "claude", StateWorking, "running", SourceTool, false, &ifIdle, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	st, _ := d.StateByTarget("s:0:0")
 	if st != nil {
 		t.Errorf("no row should exist: missing row != StateIdle, got: %+v", st)
+	}
+}
+
+func TestStateClearByPaneID_DeletesRecord(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12")
+	if err := d.StateClearByPaneID("%12"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("expected state deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateClearByPaneID_NoopWhenNotFound(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateClearByPaneID("%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}
+
+func TestStateClearByPaneID_DoesNotDeleteOtherRecords(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12")
+	d.StateSet("s:1.0", "claude", StateWorking, "running", SourceTool, false, nil, "%13")
+	d.StateClearByPaneID("%12")
+
+	st, _ := d.StateByTarget("s:1.0")
+	if st == nil {
+		t.Error("unrelated pane state should not be deleted")
+	}
+}
+
+func TestStateGCOrphaned_DeletesByPaneID(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%12")
+	d.StateSet("s:1.0", "claude", StateWorking, "", SourceTool, false, nil, "%13")
+
+	// %12 is live; %13 is gone.
+	n, err := d.StateGCOrphaned(map[string]bool{"%12": true}, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("s:0.0"); st == nil {
+		t.Error("live pane state should survive GC")
+	}
+	if st, _ := d.StateByTarget("s:1.0"); st != nil {
+		t.Error("orphaned pane state should be deleted")
+	}
+}
+
+func TestStateGCOrphaned_LegacyFallback(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Legacy record: no pane_id, target is session:window.pane format.
+	d.StateSet("s:0.0", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("s:1.0", "claude", StateWorking, "", SourceTool, false, nil, "")
+
+	// s:0.0 is live; s:1.0 is not.
+	n, err := d.StateGCOrphaned(map[string]bool{}, map[string]bool{"s:0.0": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Errorf("expected 1 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("s:0.0"); st == nil {
+		t.Error("live legacy target should survive")
+	}
+	if st, _ := d.StateByTarget("s:1.0"); st != nil {
+		t.Error("orphaned legacy target should be deleted")
+	}
+}
+
+func TestStateGCOrphaned_SkipsSessionAndWindowTargets(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Bare session target and window target have no pane_id and no dot — skip GC.
+	d.StateSet("myapp", "claude", StateWorking, "", SourceTool, false, nil, "")
+	d.StateSet("myapp:1", "claude", StateWorking, "", SourceTool, false, nil, "")
+
+	n, err := d.StateGCOrphaned(map[string]bool{}, map[string]bool{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("session/window targets should not be GC'd, deleted %d", n)
+	}
+}
+
+func TestStateSet_StoresPaneID(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.PaneID != "%12" {
+		t.Errorf("expected PaneID %%12, got %q", st.PaneID)
+	}
+}
+
+func TestStateSet_PaneIDPreservedOnUpdate(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%12")
+	// Update with empty pane_id — existing value must be kept.
+	d.StateSet("s:0.0", "claude", StateDone, "done", SourceTool, true, nil, "")
+
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.PaneID != "%12" {
+		t.Errorf("pane_id should be preserved when update passes empty string, got %q", st.PaneID)
+	}
+}
+
+func TestStateSet_EmptyPaneID(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.PaneID != "" {
+		t.Errorf("expected empty PaneID, got %q", st.PaneID)
 	}
 }

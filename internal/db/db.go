@@ -90,7 +90,38 @@ func (d *DB) migrate() error {
 		}
 		version = 5
 	}
+	if version < 6 {
+		if err := d.migrateV6(); err != nil {
+			return err
+		}
+		version = 6
+	}
 	return nil
+}
+
+// tableHasColumn reports whether table contains a column named column.
+// It accepts both *sql.DB and *sql.Tx via the querier interface, so it works
+// inside and outside transactions. Table name is interpolated — callers must
+// use hardcoded literals (PRAGMA does not support bind parameters).
+type querier interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func tableHasColumn(q querier, table, column string) (bool, error) {
+	rows, err := q.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var dfltVal sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltVal, &pk); err == nil && name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 func (d *DB) migrateV1() error {
@@ -126,24 +157,11 @@ func (d *DB) migrateV2() error {
 		return fmt.Errorf("begin v2: %w", err)
 	}
 
-	// Check if sticky column already exists (handles partial migrations).
-	rows, err := tx.Query(`PRAGMA table_info(alerts)`)
+	hasSticky, err := tableHasColumn(tx, "alerts", "sticky")
 	if err != nil {
 		tx.Rollback()
 		return fmt.Errorf("table info v2: %w", err)
 	}
-	var hasSticky bool
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var dfltVal sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltVal, &pk); err == nil && name == "sticky" {
-			hasSticky = true
-		}
-	}
-	rows.Close()
 
 	if !hasSticky {
 		if _, err := tx.Exec(`ALTER TABLE alerts ADD COLUMN sticky BOOLEAN NOT NULL DEFAULT 0`); err != nil {
@@ -246,6 +264,33 @@ func (d *DB) migrateV5() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 5`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 5: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV6() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v6: %w", err)
+	}
+	hasPaneID, err := tableHasColumn(tx, "tool_states", "pane_id")
+	if err != nil {
+		tx.Rollback()
+		return fmt.Errorf("table info v6: %w", err)
+	}
+	if !hasPaneID {
+		if _, err := tx.Exec(`ALTER TABLE tool_states ADD COLUMN pane_id TEXT`); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migrate v6 add pane_id: %w", err)
+		}
+		if _, err := tx.Exec(`CREATE INDEX IF NOT EXISTS idx_tool_states_pane_id ON tool_states(pane_id) WHERE pane_id IS NOT NULL`); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migrate v6 index pane_id: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`PRAGMA user_version = 6`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 6: %w", err)
 	}
 	return tx.Commit()
 }

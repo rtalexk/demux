@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	demuxlog "github.com/rtalexk/demux/internal/log"
@@ -122,13 +123,14 @@ type ToolState struct {
 	Tool      string
 	Value     StateValue
 	Message   string
+	PaneID    string
 	Source    StateSource
 	UpdatedAt time.Time
 }
 
 // StateSet writes a state record for target, applying write-lock rules.
 // Returns ErrStateLocked (wrapped) if the write is rejected.
-func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource, force bool, ifState *StateValue) error {
+func (d *DB) StateSet(target, tool string, value StateValue, message string, source StateSource, force bool, ifState *StateValue, paneID string) error {
 	tx, err := d.sql.Begin()
 	if err != nil {
 		return fmt.Errorf("begin StateSet: %w", err)
@@ -180,15 +182,16 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 	}
 
 	_, err = tx.Exec(`
-		INSERT INTO tool_states (target, tool, value, message, source, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO tool_states (target, tool, value, message, source, pane_id, updated_at)
+		VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), CURRENT_TIMESTAMP)
 		ON CONFLICT(target) DO UPDATE SET
 			tool       = excluded.tool,
 			value      = excluded.value,
 			message    = excluded.message,
 			source     = excluded.source,
+			pane_id    = COALESCE(excluded.pane_id, tool_states.pane_id),
 			updated_at = excluded.updated_at
-	`, target, tool, int(value), message, int(source))
+	`, target, tool, int(value), message, int(source), paneID)
 	if err != nil {
 		return fmt.Errorf("upsert state: %w", err)
 	}
@@ -220,6 +223,48 @@ func (d *DB) StateDeleteIfResting(target string) error {
 	return err
 }
 
+// StateClearByPaneID removes the state record whose pane_id matches.
+// No-op if no record has that pane_id.
+func (d *DB) StateClearByPaneID(paneID string) error {
+	_, err := d.sql.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, paneID)
+	return err
+}
+
+// looksLikePaneTarget reports whether target is in "session:window.pane" format.
+// Used by StateGCOrphaned to skip session-level and window-level targets.
+func looksLikePaneTarget(target string) bool {
+	return strings.Contains(target, ":") && strings.Contains(target, ".")
+}
+
+// StateGCOrphaned deletes state records whose pane is no longer live.
+// For records with a pane_id: orphaned when pane_id is not in livePaneIDs.
+// For legacy records (pane_id empty) that look like "session:window.pane":
+// orphaned when target is not in livePaneTargets.
+// Session-level and window-level targets (no ".") are never deleted.
+// Returns the number of records deleted.
+func (d *DB) StateGCOrphaned(livePaneIDs map[string]bool, livePaneTargets map[string]bool) (int64, error) {
+	states, err := d.StateList(0, "")
+	if err != nil {
+		return 0, err
+	}
+	var deleted int64
+	for _, st := range states {
+		orphaned := false
+		if st.PaneID != "" {
+			orphaned = !livePaneIDs[st.PaneID]
+		} else if looksLikePaneTarget(st.Target) {
+			orphaned = !livePaneTargets[st.Target]
+		}
+		if orphaned {
+			if err := d.StateClear(st.Target); err != nil {
+				return deleted, fmt.Errorf("gc: clear %q: %w", st.Target, err)
+			}
+			deleted++
+		}
+	}
+	return deleted, nil
+}
+
 // StateDeleteBySession removes all state records for the given session.
 // It matches targets equal to name (bare) or prefixed with "name:" (session:window).
 // Returns the number of rows deleted.
@@ -237,12 +282,14 @@ func (d *DB) StateDeleteBySession(name string) (int64, error) {
 // StateByTarget returns the ToolState for target, or nil if no record exists (idle).
 func (d *DB) StateByTarget(target string) (*ToolState, error) {
 	row := d.sql.QueryRow(`
-		SELECT id, target, tool, value, message, source, updated_at
+		SELECT id, target, tool, value, message, pane_id, source, updated_at
 		FROM tool_states WHERE target = ?
 	`, target)
 	var st ToolState
 	var updatedAt string
-	err := row.Scan(&st.ID, &st.Target, &st.Tool, &st.Value, &st.Message, &st.Source, &updatedAt)
+	var paneID sql.NullString
+	err := row.Scan(&st.ID, &st.Target, &st.Tool, &st.Value, &st.Message, &paneID, &st.Source, &updatedAt)
+	st.PaneID = paneID.String
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -255,7 +302,7 @@ func (d *DB) StateByTarget(target string) (*ToolState, error) {
 
 // StateList returns all non-idle state records. Pass value=0 or tool="" to skip that filter.
 func (d *DB) StateList(value StateValue, tool string) ([]ToolState, error) {
-	q := `SELECT id, target, tool, value, message, source, updated_at FROM tool_states WHERE 1=1`
+	q := `SELECT id, target, tool, value, message, pane_id, source, updated_at FROM tool_states WHERE 1=1`
 	var args []any
 	if value != 0 {
 		q += ` AND value = ?`
@@ -277,9 +324,11 @@ func (d *DB) StateList(value StateValue, tool string) ([]ToolState, error) {
 	for rows.Next() {
 		var st ToolState
 		var updatedAt string
-		if err := rows.Scan(&st.ID, &st.Target, &st.Tool, &st.Value, &st.Message, &st.Source, &updatedAt); err != nil {
+		var paneID sql.NullString
+		if err := rows.Scan(&st.ID, &st.Target, &st.Tool, &st.Value, &st.Message, &paneID, &st.Source, &updatedAt); err != nil {
 			return nil, err
 		}
+		st.PaneID = paneID.String
 		st.UpdatedAt = parseTS(updatedAt)
 		states = append(states, st)
 	}
