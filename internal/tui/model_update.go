@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -151,31 +150,25 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// resolveStateTargets returns a copy of states with each state's Target replaced
-// by the current "session:window.pane" from the live pane list when a pane_id
-// match is found. Unmatched or legacy states keep their stored Target.
-//
-// The design spec describes a lazy write-back (UPDATE stored target in DB when
-// the resolved value differs). That is deliberately omitted: Phase 4's StateSet
-// stale-delete covers the common case, and a long-lived pane in "working" state
-// will have its stored target corrected on the next state write.
-func resolveStateTargets(states []db.ToolState, panes []tmux.Pane) []db.ToolState {
-	paneIDMap := tmux.PaneIDToTargetMap(panes)
-	out := make([]db.ToolState, len(states))
-	for i, st := range states {
-		if st.PaneID != "" {
-			if resolved, ok := paneIDMap[st.PaneID]; ok {
-				st.Target = resolved
-			}
+// buildNameToIDMap returns a map from session display name to stable session_id ($N).
+func buildNameToIDMap(panes []tmux.Pane) map[string]string {
+	m := make(map[string]string)
+	for _, p := range panes {
+		if p.SessionID != "" && m[p.Session] == "" {
+			m[p.Session] = p.SessionID
 		}
-		out[i] = st
 	}
-	return out
+	return m
 }
 
 func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.panes = msg.panes
-	m.states = resolveStateTargets(m.states, msg.panes) // re-resolve with fresh pane data
+	// Build display maps from fresh pane data.
+	m.paneIDMap = tmux.PaneIDToTargetMap(msg.panes)
+	m.windowIDMap = tmux.WindowIDToTargetMap(msg.panes)
+	m.sessionIDMap = tmux.SessionIDToNameMap(msg.panes)
+	m.nameToIDMap = buildNameToIDMap(msg.panes)
+	m.sidebar.SetNameToIDMap(m.nameToIDMap)
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -239,7 +232,7 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
-	m.states = resolveStateTargets(msg.states, m.panes)
+	m.states = msg.states
 	m.procList.SetStates(m.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -329,14 +322,6 @@ func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 	}
 }
 
-func (m *Model) stateMap() map[string]db.ToolState {
-	out := make(map[string]db.ToolState, len(m.states))
-	for _, s := range m.states {
-		out[s.Target] = s
-	}
-	return out
-}
-
 func (m *Model) updateDetailFromSelection() {
 	if m.focus == panelSidebar {
 		node := m.sidebar.Selected()
@@ -384,17 +369,18 @@ func (m *Model) detailForSidebarNode(node SidebarNode) DetailModel {
 		winCount:       len(windows),
 		paneCount:      paneCount,
 		procCount:      countProcsUnderCWD(m.procs, m.cwdMap, sessionCWD),
-		sessionStates:  statesForSession(m.states, node.Session),
+		sessionStates:  statesForSession(m.states, m.nameToIDMap[node.Session]),
+		paneIDMap:      m.paneIDMap,
+		windowIDMap:    m.windowIDMap,
+		sessionIDMap:   m.sessionIDMap,
 	}
 }
 
-// statesForSession returns all ToolState records whose Target matches or is prefixed by
-// "session:" (i.e. targets belonging to that session).
-func statesForSession(states []db.ToolState, session string) []db.ToolState {
-	prefix := session + ":"
+// statesForSession returns all ToolState records belonging to the given session ID.
+func statesForSession(states []db.ToolState, sessionID string) []db.ToolState {
 	var out []db.ToolState
 	for _, st := range states {
-		if st.Target == session || strings.HasPrefix(st.Target, prefix) {
+		if st.Target.SessionID == sessionID {
 			out = append(out, st)
 		}
 	}

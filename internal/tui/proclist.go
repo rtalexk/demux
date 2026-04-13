@@ -56,20 +56,18 @@ func (p *ProcListModel) SetStates(states []db.ToolState) {
 
 // stateForPane returns the state for the given pane, or nil.
 func (p ProcListModel) stateForPane(pane tmux.Pane) *db.ToolState {
-	key := pane.Target()
-	return activeStateFor(p.states, key)
+	return activeStateFor(p.states, "pane", pane.PaneID)
 }
 
-// stateForWindow returns the active state for a window-level target ("session:windowIndex"), or nil.
-func (p ProcListModel) stateForWindow(session string, windowIndex int) *db.ToolState {
-	key := fmt.Sprintf("%s:%d", session, windowIndex)
-	return activeStateFor(p.states, key)
+// stateForWindow returns the active state for a window-level target, or nil.
+func (p ProcListModel) stateForWindow(windowID string) *db.ToolState {
+	return activeStateFor(p.states, "window", windowID)
 }
 
-// activeStateFor returns the state matching target, or nil.
-func activeStateFor(states []db.ToolState, target string) *db.ToolState {
+// activeStateFor returns the state matching the target type and ID, or nil.
+func activeStateFor(states []db.ToolState, targetType, targetID string) *db.ToolState {
 	for i := range states {
-		if states[i].Target == target {
+		if states[i].Target.Type == targetType && states[i].Target.ID == targetID {
 			return &states[i]
 		}
 	}

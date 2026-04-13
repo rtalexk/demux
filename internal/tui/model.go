@@ -103,6 +103,12 @@ type Model struct {
 	procs   []proc.Process
 	cwdMap  map[int32]string // PID -> CWD, pre-fetched async
 
+	// Display maps built from panes on every refresh.
+	paneIDMap    map[string]string // %N → "session:wi.pi"
+	windowIDMap  map[string]string // @N → "session:wi"
+	sessionIDMap map[string]string // $N → "session_name"
+	nameToIDMap  map[string]string // "session_name" → $N
+
 	sidebar  SidebarModel
 	procList ProcListModel
 	detail   DetailModel
@@ -298,7 +304,7 @@ func (m Model) buildProcTitle() string {
 		procTitleSuffix = "  "
 	}
 	title := " [l] " + bc + procTitleSuffix
-	if st := activeStateFor(m.states, bc); st != nil {
+	if st := m.sidebar.stateForSession(bc); st != nil {
 		effective := *st
 		effective.Value = ageDrivenValue(*st, m.cfg.Tui.DoneIdleAfterSecs)
 		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective) + " "
