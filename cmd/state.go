@@ -179,17 +179,17 @@ func applyStateClear(d *db.DB) error {
 }
 
 type stateRow struct {
-	target  string
-	paneID  string
-	tool    string
-	value   string
-	message string
-	source  string
-	updated string
+	target   string
+	targetID string
+	tool     string
+	value    string
+	message  string
+	source   string
+	updated  string
 }
 
 func (r stateRow) Fields() []string {
-	return []string{r.target, r.paneID, r.tool, r.value, r.message, r.source, r.updated}
+	return []string{r.target, r.targetID, r.tool, r.value, r.message, r.source, r.updated}
 }
 
 // formatTarget resolves the display string for a Target from the live tmux maps.
@@ -251,17 +251,17 @@ func runStateList(cmd *cobra.Command, args []string) error {
 			tool = "-"
 		}
 		rows[i] = stateRow{
-			target:  formatTarget(st.Target, paneIDMap, windowIDMap, sessionIDMap),
-			paneID:  st.Target.PaneID,
-			tool:    tool,
-			value:   st.Value.String(),
-			message: st.Message,
-			source:  st.Source.String(),
-			updated: format.Age(st.UpdatedAt),
+			target:   formatTarget(st.Target, paneIDMap, windowIDMap, sessionIDMap),
+			targetID: st.Target.ID,
+			tool:     tool,
+			value:    st.Value.String(),
+			message:  st.Message,
+			source:   st.Source.String(),
+			updated:  format.Age(st.UpdatedAt),
 		}
 	}
 
-	headers := []string{"TARGET", "PANE_ID", "TOOL", "STATE", "MESSAGE", "SOURCE", "UPDATED"}
+	headers := []string{"TARGET", "TARGET_ID", "TOOL", "STATE", "MESSAGE", "SOURCE", "UPDATED"}
 	fmt.Println(format.Render(resolveFormat(cmd), headers, rows, isTTY()))
 	return nil
 }
