@@ -84,6 +84,7 @@ const tmuxHooksSnippet = `# demux tmux hooks
 #   Together they cover every way a pane can receive focus.
 #   Each hook targets the now-active pane and clears any done states on it and its
 #   parent window.
+#   after-kill-pane     — fires when a pane is closed; removes its state record.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Clears Demux done states when switching between panes within the same window.
@@ -97,6 +98,9 @@ set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #
 
 # Clears Demux done states when switching back from another application.
 set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} 2>/dev/null; true'"
+
+# Removes Demux state when a pane is closed (prevents stale state accumulation).
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{pane_id} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
