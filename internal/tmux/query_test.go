@@ -156,3 +156,27 @@ func TestParseCurrentTarget_NoTab(t *testing.T) {
 		t.Error("expected error for input with no tab")
 	}
 }
+
+func TestPaneIDToTargetMap(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "work", WindowIndex: 0, PaneIndex: 0, PaneID: "%1"},
+		{Session: "work", WindowIndex: 1, PaneIndex: 0, PaneID: "%2"},
+		{Session: "other", WindowIndex: 0, PaneIndex: 0, PaneID: "%3"},
+		{Session: "noid", WindowIndex: 0, PaneIndex: 0, PaneID: ""},
+	}
+
+	m := tmux.PaneIDToTargetMap(panes)
+
+	if m["%1"] != "work:0.0" {
+		t.Errorf("%%1: want work:0.0, got %q", m["%1"])
+	}
+	if m["%2"] != "work:1.0" {
+		t.Errorf("%%2: want work:1.0, got %q", m["%2"])
+	}
+	if m["%3"] != "other:0.0" {
+		t.Errorf("%%3: want other:0.0, got %q", m["%3"])
+	}
+	if _, ok := m[""]; ok {
+		t.Error("pane with empty PaneID should not appear in map")
+	}
+}
