@@ -437,7 +437,7 @@ func (m Model) handleProcListCollapse(msg tea.KeyMsg, procH int) (Model, tea.Cmd
 func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 	var target string
 	if pane := m.procList.SelectedPane(); pane != nil {
-		target = pane.Target()
+		target = pane.DisplayLabel()
 	} else if node := m.sidebar.Selected(); node != nil {
 		target = node.Session
 	}
@@ -582,7 +582,7 @@ func (m Model) showClearConfirm(t db.Target) Model {
 	if maxTargetLen < 20 {
 		maxTargetLen = 20
 	}
-	targetDisplay := targetDisplayStr(t, m.paneIDMap, m.windowIDMap, m.sessionIDMap)
+	targetDisplay := t.Format(m.paneIDMap, m.windowIDMap, m.sessionIDMap)
 	body := "  target: " + truncateTarget(targetDisplay, maxTargetLen)
 	if st != nil {
 		body += "\n  state:  " + st.Value.String()

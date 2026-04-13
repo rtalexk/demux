@@ -145,12 +145,6 @@ func inlineStat(label, value string) string {
 	return detailLabelStyle.Width(0).Render(label+":") + " " + detailValueStyle.Render(value)
 }
 
-// targetDisplayStr returns a compact display string for a state target.
-// Delegates to db.Target.Format using the provided display maps.
-func targetDisplayStr(t db.Target, paneIDMap, windowIDMap, sessionIDMap map[string]string) string {
-	return t.Format(paneIDMap, windowIDMap, sessionIDMap)
-}
-
 // renderStateSection builds detail lines for displayable states of the focused session.
 // Returns nil when there are no states to show.
 func (d DetailModel) renderStateSection() []string {
@@ -167,14 +161,14 @@ func (d DetailModel) renderStateSection() []string {
 	}
 	// Sort by display string for stable ordering.
 	sort.Slice(active, func(i, j int) bool {
-		di := targetDisplayStr(active[i].Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
-		dj := targetDisplayStr(active[j].Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		di := active[i].Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		dj := active[j].Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
 		return di < dj
 	})
 	lines := []string{""}
 	for _, st := range active {
 		icon := stateIcon(st.Value)
-		target := targetDisplayStr(st.Target, d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		target := st.Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
 		tool := st.Tool
 		if tool == "" {
 			tool = "-"
