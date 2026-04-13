@@ -150,24 +150,13 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
-// buildNameToIDMap returns a map from session display name to stable session_id ($N).
-func buildNameToIDMap(panes []tmux.Pane) map[string]string {
-	m := make(map[string]string)
-	for _, p := range panes {
-		if p.SessionID != "" && m[p.Session] == "" {
-			m[p.Session] = p.SessionID
-		}
-	}
-	return m
-}
-
 func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.panes = msg.panes
 	// Build display maps from fresh pane data.
 	m.paneIDMap = tmux.PaneIDToTargetMap(msg.panes)
 	m.windowIDMap = tmux.WindowIDToTargetMap(msg.panes)
 	m.sessionIDMap = tmux.SessionIDToNameMap(msg.panes)
-	m.nameToIDMap = buildNameToIDMap(msg.panes)
+	m.nameToIDMap = tmux.SessionNameToIDMap(msg.panes)
 	m.sidebar.SetNameToIDMap(m.nameToIDMap)
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
