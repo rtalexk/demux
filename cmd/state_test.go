@@ -10,7 +10,42 @@ import (
 // stateTarget format is now "%N", "@N", or "$N" (stable tmux IDs).
 // Tests use "%1" as a representative pane target.
 
+// saveStateVars snapshots all package-level state-command globals and restores
+// them via t.Cleanup. Call at the start of any test that sets these globals to
+// eliminate ordering dependencies between tests.
+func saveStateVars(t *testing.T) {
+	t.Helper()
+	prev := struct {
+		target, value, tool, message, source, ifState string
+		force                                         bool
+		clearTarget                                   string
+		clearYes                                      bool
+	}{
+		target:      stateTarget,
+		value:       stateValue,
+		tool:        stateTool,
+		message:     stateMessage,
+		source:      stateSource,
+		ifState:     stateIfState,
+		force:       stateForce,
+		clearTarget: clearTarget,
+		clearYes:    clearYes,
+	}
+	t.Cleanup(func() {
+		stateTarget = prev.target
+		stateValue = prev.value
+		stateTool = prev.tool
+		stateMessage = prev.message
+		stateSource = prev.source
+		stateIfState = prev.ifState
+		stateForce = prev.force
+		clearTarget = prev.clearTarget
+		clearYes = prev.clearYes
+	})
+}
+
 func TestStateSet_ToolWrite(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -32,6 +67,7 @@ func TestStateSet_ToolWrite(t *testing.T) {
 }
 
 func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -47,6 +83,7 @@ func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
 }
 
 func TestStateClear_FlaggedRequiresYes(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -71,6 +108,7 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 }
 
 func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -86,6 +124,7 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 }
 
 func TestStateSet_IdleIsValid(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -108,6 +147,7 @@ func TestStateSet_IdleIsValid(t *testing.T) {
 }
 
 func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -133,6 +173,7 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 }
 
 func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -157,6 +198,7 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 }
 
 func TestStateSet_IfState_InvalidValue(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -177,6 +219,7 @@ func TestStateSet_IfState_InvalidValue(t *testing.T) {
 }
 
 func TestStateSet_InvalidTargetID(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
@@ -197,6 +240,7 @@ func TestStateSet_InvalidTargetID(t *testing.T) {
 }
 
 func TestStateClear_InvalidTargetID(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
