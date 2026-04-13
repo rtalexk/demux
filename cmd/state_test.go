@@ -167,6 +167,36 @@ func TestStateSet_IfState_InvalidValue(t *testing.T) {
 	}
 }
 
+func TestResolveStateTarget_UsesResolvedWhenPaneIDMatches(t *testing.T) {
+	st := db.ToolState{Target: "work:1.0", PaneID: "%12"}
+	paneIDMap := map[string]string{"%12": "work:2.0"} // pane moved
+
+	got := resolveStateTarget(st, paneIDMap)
+	if got != "work:2.0" {
+		t.Errorf("want work:2.0, got %q", got)
+	}
+}
+
+func TestResolveStateTarget_FallsBackToTargetWhenNoPaneID(t *testing.T) {
+	st := db.ToolState{Target: "work:1.0", PaneID: ""}
+	paneIDMap := map[string]string{}
+
+	got := resolveStateTarget(st, paneIDMap)
+	if got != "work:1.0" {
+		t.Errorf("want work:1.0, got %q", got)
+	}
+}
+
+func TestResolveStateTarget_FallsBackWhenPaneIDNotInMap(t *testing.T) {
+	st := db.ToolState{Target: "work:1.0", PaneID: "%12"}
+	paneIDMap := map[string]string{} // tmux unavailable or pane truly gone
+
+	got := resolveStateTarget(st, paneIDMap)
+	if got != "work:1.0" {
+		t.Errorf("want work:1.0, got %q", got)
+	}
+}
+
 func TestStateSet_PaneIDFlag(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()

@@ -8,6 +8,7 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/format"
 	demuxlog "github.com/rtalexk/demux/internal/log"
+	"github.com/rtalexk/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
 
@@ -161,6 +162,18 @@ func (r stateRow) Fields() []string {
 	return []string{r.target, r.tool, r.value, r.message, r.source, r.updated}
 }
 
+// resolveStateTarget returns the current "session:window.pane" for a state,
+// using the live pane_id map when available. Falls back to the stored target
+// for legacy records (no pane_id) or when tmux is unavailable.
+func resolveStateTarget(st db.ToolState, paneIDMap map[string]string) string {
+	if st.PaneID != "" {
+		if resolved, ok := paneIDMap[st.PaneID]; ok {
+			return resolved
+		}
+	}
+	return st.Target
+}
+
 func runStateList(cmd *cobra.Command, args []string) error {
 	d, err := openDB()
 	if err != nil {
@@ -183,6 +196,13 @@ func runStateList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("state list: %w", err)
 	}
 
+	// Build pane_id → current target map for display resolution.
+	// Best-effort: if tmux is unavailable, fall back to stored targets.
+	paneIDMap := map[string]string{}
+	if panes, pErr := tmux.ListPanes(); pErr == nil {
+		paneIDMap = tmux.PaneIDToTargetMap(panes)
+	}
+
 	rows := make([]format.Row, len(states))
 	for i, st := range states {
 		tool := st.Tool
@@ -190,7 +210,7 @@ func runStateList(cmd *cobra.Command, args []string) error {
 			tool = "-"
 		}
 		rows[i] = stateRow{
-			target:  st.Target,
+			target:  resolveStateTarget(st, paneIDMap),
 			tool:    tool,
 			value:   st.Value.String(),
 			message: st.Message,
