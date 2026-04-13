@@ -189,7 +189,10 @@ func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
 
 	// Fetch session ID before killing the session.
 	var sessionID string
-	if panes, err := tmux.ListPanes(); err == nil {
+	var dbOut string
+	if panes, err := tmux.ListPanes(); err != nil {
+		dbOut = fmt.Sprintf("tmux unavailable (%v); run 'demux gc' to clean orphaned records", err)
+	} else {
 		for _, p := range panes {
 			if p.Session == name {
 				sessionID = p.SessionID
@@ -200,7 +203,9 @@ func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
 
 	tmuxOut := killTmuxSession(name)
 	configOut := removeSessionConfig(name, sessionRemoveFullPrivate)
-	dbOut := clearSessionStatesWithID(name, sessionID)
+	if dbOut == "" {
+		dbOut = clearSessionStatesWithID(name, sessionID)
+	}
 	todosOut := clearSessionTodos(name)
 
 	fmt.Printf("tmux:   %s\n", tmuxOut)
