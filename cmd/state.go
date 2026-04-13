@@ -97,25 +97,8 @@ func applyStateSet(d *db.DB) error {
 		return fmt.Errorf("invalid --target-id: %w", err)
 	}
 
-	// Resolve denormalized session/window IDs from tmux using the target ID
-	// directly, so cross-pane calls (--target-id %7 from pane %5) store the
-	// correct parent IDs rather than the caller's own context.
-	switch target.Type {
-	case db.TargetTypePane:
-		target.PaneID = target.ID
-		if windowID, sessionID, tmuxErr := tmuxParentIDs(target.ID); tmuxErr == nil {
-			target.WindowID = windowID
-			target.SessionID = sessionID
-		}
-		// Best-effort: if tmux fails, continue with partial Target
-	case db.TargetTypeWindow:
-		target.WindowID = target.ID
-		if _, sessionID, tmuxErr := tmuxParentIDs(target.ID); tmuxErr == nil {
-			target.SessionID = sessionID
-		}
-	case db.TargetTypeSession:
-		target.SessionID = target.ID
-	}
+	// Resolve denormalized parent IDs from tmux (best-effort; no-op on session targets).
+	target = resolveParentIDs(target)
 
 	src := db.SourceTool
 	if stateSource == "user" {

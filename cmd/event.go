@@ -53,24 +53,21 @@ var eventPaneFocusCmd = &cobra.Command{
 func applyPaneFocus(d *db.DB, paneID, windowID, sessionID string) error {
 	demuxlog.Debug("pane_focus", "pane_id", paneID, "window_id", windowID, "session_id", sessionID)
 
-	// Clear resting states at all three levels
-	for _, targetType := range []db.TargetType{db.TargetTypePane, db.TargetTypeWindow, db.TargetTypeSession} {
-		var targetID string
-		switch targetType {
-		case db.TargetTypePane:
-			targetID = paneID
-		case db.TargetTypeWindow:
-			targetID = windowID
-		case db.TargetTypeSession:
-			targetID = sessionID
-		}
-		if targetID == "" {
+	// Clear resting states at all three levels.
+	for _, item := range []struct {
+		typ db.TargetType
+		id  string
+	}{
+		{db.TargetTypePane, paneID},
+		{db.TargetTypeWindow, windowID},
+		{db.TargetTypeSession, sessionID},
+	} {
+		if item.id == "" {
 			continue
 		}
-
 		t := db.Target{
-			Type:      targetType,
-			ID:        targetID,
+			Type:      item.typ,
+			ID:        item.id,
 			PaneID:    paneID,
 			WindowID:  windowID,
 			SessionID: sessionID,
@@ -124,17 +121,7 @@ func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
 		return nil
 	}
 	// Resolve denormalized parent IDs (best-effort; no-op when tmux is unavailable).
-	switch t.Type {
-	case db.TargetTypePane:
-		if windowID, sessionID, tmuxErr := tmuxParentIDs(t.ID); tmuxErr == nil {
-			t.WindowID = windowID
-			t.SessionID = sessionID
-		}
-	case db.TargetTypeWindow:
-		if _, sessionID, tmuxErr := tmuxParentIDs(t.ID); tmuxErr == nil {
-			t.SessionID = sessionID
-		}
-	}
+	t = resolveParentIDs(t)
 	if err := d.StateSet(t, tool, db.StateError, message, db.SourceTool, true, nil); err != nil {
 		demuxlog.Error("hook_error: set state error failed", "target", t, "err", err)
 		return err

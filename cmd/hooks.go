@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -66,6 +67,23 @@ func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
 	return paneID, windowID, sessionID, err
 }
 
+// resolveParentIDs fills in parent window/session IDs on t by querying tmux.
+// Best-effort: returns t unchanged when tmux is unavailable or target is a session.
+func resolveParentIDs(t db.Target) db.Target {
+	switch t.Type {
+	case db.TargetTypePane:
+		if windowID, sessionID, err := tmuxParentIDs(t.ID); err == nil {
+			t.WindowID = windowID
+			t.SessionID = sessionID
+		}
+	case db.TargetTypeWindow:
+		if _, sessionID, err := tmuxParentIDs(t.ID); err == nil {
+			t.SessionID = sessionID
+		}
+	}
+	return t
+}
+
 // tmuxParentIDs queries tmux for the window_id and session_id of the given
 // stable target ID (%N pane or @N window). It uses the provided ID directly
 // so callers that know their target ID do not need to go through $TMUX_PANE.
@@ -108,7 +126,9 @@ set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id 
 set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
 
 # Removes Demux state when a pane is closed (prevents stale state accumulation).
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{pane_id} 2>/dev/null; true'"
+# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
+# the kill — using #{pane_id} here would clear the wrong pane's state.
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{hook_pane} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
