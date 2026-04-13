@@ -109,6 +109,26 @@ func applyHookError() error {
 	return nil
 }
 
+var eventPaneClosedPaneID string
+
+var eventPaneClosedCmd = &cobra.Command{
+	Use:   "pane_closed",
+	Short: "Clear state for a closed tmux pane (called by after-kill-pane hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return applyPaneClosed(d, eventPaneClosedPaneID)
+	},
+}
+
+func applyPaneClosed(d *db.DB, paneID string) error {
+	demuxlog.Debug("pane_closed", "pane_id", paneID)
+	return d.StateClearByPaneID(paneID)
+}
+
 func init() {
 	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusTarget, "target", "", "Pane target: session:window.pane (auto-detected if omitted)")
 
@@ -119,6 +139,9 @@ func init() {
 	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target)")
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd)
+	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")
+	eventPaneClosedCmd.MarkFlagRequired("pane")
+
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneClosedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

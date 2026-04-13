@@ -101,3 +101,26 @@ func TestPaneFocusClearsIdleStates(t *testing.T) {
 		t.Error("idle pane state should be cleared on focus")
 	}
 }
+
+func TestApplyPaneClosed_DeletesByPaneID(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "%7")
+	if err := applyPaneClosed(d, "%7"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("state should be deleted after pane_closed, got: %+v", st)
+	}
+}
+
+func TestApplyPaneClosed_NoopUnknownPane(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	if err := applyPaneClosed(d, "%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}
