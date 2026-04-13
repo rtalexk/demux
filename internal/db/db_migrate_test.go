@@ -11,7 +11,7 @@ func TestMigrateV3_CreatesToolStates(t *testing.T) {
 	}
 	defer d.Close()
 
-	_, err = d.sql.Exec(`INSERT INTO tool_states (target, tool, value, message, source) VALUES ('s:0:0', 'claude', 1, 'running', 1)`)
+	_, err = d.sql.Exec(`INSERT INTO tool_states (target_type, target_id, tool, value, message, source) VALUES ('pane', '%1', 'claude', 1, 'running', 1)`)
 	if err != nil {
 		t.Fatalf("tool_states table missing after migration: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestMigrateV6_AddsPaneIDColumn(t *testing.T) {
 	}
 }
 
-func TestMigrateV3_UserVersion(t *testing.T) {
+func TestMigrateV8_UserVersion(t *testing.T) {
 	d, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -57,25 +57,47 @@ func TestMigrateV3_UserVersion(t *testing.T) {
 	if err := d.sql.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		t.Fatalf("read user_version: %v", err)
 	}
-	if version != 7 {
-		t.Fatalf("expected user_version=7, got %d", version)
+	if version != 8 {
+		t.Fatalf("expected user_version=8, got %d", version)
 	}
 }
 
-func TestMigrateV7_PaneIDIndexIsUnique(t *testing.T) {
+func TestMigrateV8_TypeIDIndexIsUnique(t *testing.T) {
 	d, err := Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer d.Close()
 
-	// Insert two records with the same non-empty pane_id — must fail.
-	_, err1 := d.sql.Exec(`INSERT INTO tool_states (target, tool, value, message, source, pane_id) VALUES ('s:0.0', 'c', 1, '', 1, '%1')`)
-	_, err2 := d.sql.Exec(`INSERT INTO tool_states (target, tool, value, message, source, pane_id) VALUES ('s:1.0', 'c', 1, '', 1, '%1')`)
+	// Insert two records with the same (target_type, target_id) — must fail.
+	_, err1 := d.sql.Exec(`INSERT INTO tool_states (target_type, target_id, tool, value, message, source) VALUES ('pane', '%1', 'c', 1, '', 1)`)
+	_, err2 := d.sql.Exec(`INSERT INTO tool_states (target_type, target_id, tool, value, message, source) VALUES ('pane', '%1', 'c', 1, '', 1)`)
 	if err1 != nil {
 		t.Fatalf("first insert should succeed: %v", err1)
 	}
 	if err2 == nil {
-		t.Error("second insert with same pane_id should fail (UNIQUE constraint)")
+		t.Error("second insert with same (target_type, target_id) should fail (UNIQUE constraint)")
+	}
+}
+
+func TestMigrateV8_HasIndexes(t *testing.T) {
+	d, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+
+	indexes := []string{
+		"idx_tool_states_type_id",
+		"idx_tool_states_session",
+		"idx_tool_states_window",
+		"idx_tool_states_value",
+	}
+	for _, idxName := range indexes {
+		var name string
+		err := d.sql.QueryRow(`SELECT name FROM sqlite_master WHERE type='index' AND name=?`, idxName).Scan(&name)
+		if err != nil {
+			t.Errorf("index %q not found: %v", idxName, err)
+		}
 	}
 }
