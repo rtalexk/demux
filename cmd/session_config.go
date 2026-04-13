@@ -245,7 +245,17 @@ func clearSessionStates(name string) string {
 	}
 	defer database.Close()
 
-	n, err := database.StateDeleteBySession(name)
+	// Collect pane_ids for this session from live tmux (best-effort).
+	var sessionPaneIDs []string
+	if panes, err := tmux.ListPanes(); err == nil {
+		for _, p := range panes {
+			if p.Session == name && p.PaneID != "" {
+				sessionPaneIDs = append(sessionPaneIDs, p.PaneID)
+			}
+		}
+	}
+
+	n, err := database.StateDeleteBySessionWithPaneIDs(name, sessionPaneIDs)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}

@@ -301,6 +301,33 @@ func (d *DB) StateDeleteBySession(name string) (int64, error) {
 	return res.RowsAffected()
 }
 
+// StateDeleteBySessionWithPaneIDs removes all state records for the given session,
+// both by target prefix (existing behaviour) and by the provided pane IDs (catches
+// records whose target drifted after a pane move).
+// Returns the total number of rows deleted.
+func (d *DB) StateDeleteBySessionWithPaneIDs(name string, paneIDs []string) (int64, error) {
+	// Delete by target prefix first (original behaviour).
+	res, err := d.sql.Exec(
+		`DELETE FROM tool_states WHERE target = ? OR target LIKE ?`,
+		name, name+":%",
+	)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+
+	// Delete any remaining records for panes that belong to this session.
+	for _, pid := range paneIDs {
+		r, err := d.sql.Exec(`DELETE FROM tool_states WHERE pane_id = ?`, pid)
+		if err != nil {
+			return n, err
+		}
+		rows, _ := r.RowsAffected()
+		n += rows
+	}
+	return n, nil
+}
+
 // StateByTarget returns the ToolState for target, or nil if no record exists (idle).
 func (d *DB) StateByTarget(target string) (*ToolState, error) {
 	row := d.sql.QueryRow(`

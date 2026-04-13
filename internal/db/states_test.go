@@ -588,3 +588,31 @@ func TestStateDeleteIfRestingByPaneID_NoopWhenNotFound(t *testing.T) {
 		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
 	}
 }
+
+func TestStateDeleteBySessionWithPaneIDs_DeletesByPaneIDs(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Record whose target no longer has the session prefix (pane moved).
+	d.StateSet("other:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%7")
+	// Normal record.
+	d.StateSet("myapp:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%8")
+	// Unrelated session.
+	d.StateSet("other:1.0", "make", StateDone, "", SourceTool, false, nil, "%9")
+
+	// %7 and %8 belong to "myapp" per live tmux.
+	n, err := d.StateDeleteBySessionWithPaneIDs("myapp", []string{"%7", "%8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 deleted, got %d", n)
+	}
+
+	if st, _ := d.StateByTarget("other:0.0"); st != nil {
+		t.Error("stale-target record with matching pane_id should be deleted")
+	}
+	if st, _ := d.StateByTarget("other:1.0"); st == nil {
+		t.Error("unrelated pane should survive")
+	}
+}
