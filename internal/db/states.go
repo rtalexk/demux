@@ -339,7 +339,7 @@ func gcDeleteOrphaned(tx *sql.Tx, targetType TargetType, liveIDs map[string]bool
 	if len(liveIDs) == 0 {
 		res, err = tx.Exec(`DELETE FROM tool_states WHERE target_type = ?`, string(targetType))
 	} else {
-		args := make([]interface{}, 0, len(liveIDs)+1)
+		args := make([]any, 0, len(liveIDs)+1)
 		args = append(args, string(targetType))
 		placeholders := make([]string, 0, len(liveIDs))
 		for id := range liveIDs {
