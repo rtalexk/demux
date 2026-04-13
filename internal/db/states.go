@@ -289,24 +289,6 @@ func (d *DB) StateGCOrphaned(livePaneIDs map[string]bool, livePaneTargets map[st
 	return deleted, nil
 }
 
-// StateDeleteBySession removes all state records for the given session.
-// It matches targets equal to name (bare) or prefixed with "name:" (session:window).
-// Returns the number of rows deleted.
-//
-// Deprecated: the production path uses StateDeleteBySessionWithPaneIDs, which also
-// catches drifted-target records for panes that moved since the last state write.
-// This function is retained for callers that do not have a live pane list.
-func (d *DB) StateDeleteBySession(name string) (int64, error) {
-	res, err := d.sql.Exec(
-		`DELETE FROM tool_states WHERE target = ? OR target LIKE ?`,
-		name, name+":%",
-	)
-	if err != nil {
-		return 0, err
-	}
-	return res.RowsAffected()
-}
-
 // StateDeleteBySessionWithPaneIDs removes all state records for the given session,
 // both by target prefix (existing behaviour) and by the provided pane IDs (catches
 // records whose target drifted after a pane move).
