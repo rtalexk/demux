@@ -154,6 +154,11 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 // resolveStateTargets returns a copy of states with each state's Target replaced
 // by the current "session:window.pane" from the live pane list when a pane_id
 // match is found. Unmatched or legacy states keep their stored Target.
+//
+// The design spec describes a lazy write-back (UPDATE stored target in DB when
+// the resolved value differs). That is deliberately omitted: Phase 4's StateSet
+// stale-delete covers the common case, and a long-lived pane in "working" state
+// will have its stored target corrected on the next state write.
 func resolveStateTargets(states []db.ToolState, panes []tmux.Pane) []db.ToolState {
 	paneIDMap := tmux.PaneIDToTargetMap(panes)
 	out := make([]db.ToolState, len(states))

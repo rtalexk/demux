@@ -7,6 +7,22 @@ import (
 	"github.com/rtalexk/demux/internal/tmux"
 )
 
+func TestResolveStateTargets_NilPanes(t *testing.T) {
+	states := []db.ToolState{
+		{Target: "work:0.0", PaneID: "%1"},
+		{Target: "other:1.0", PaneID: ""},
+	}
+
+	// Must not panic; no matches possible so targets are unchanged.
+	resolved := resolveStateTargets(states, nil)
+	if resolved[0].Target != "work:0.0" {
+		t.Errorf("unmatched pane_id target should be unchanged, got %q", resolved[0].Target)
+	}
+	if resolved[1].Target != "other:1.0" {
+		t.Errorf("legacy target should be unchanged, got %q", resolved[1].Target)
+	}
+}
+
 func TestResolveStateTargets_UpdatesMovedPane(t *testing.T) {
 	states := []db.ToolState{
 		{Target: "work:1.0", PaneID: "%3"},
