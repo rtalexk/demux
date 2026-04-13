@@ -8,9 +8,27 @@ import (
 	"time"
 )
 
+// Session represents a tmux session.
+type Session struct {
+	ID       string // e.g. $1
+	Name     string
+	Activity time.Time
+}
+
+// Window represents a tmux window.
+type Window struct {
+	ID          string // e.g. @5
+	SessionID   string // e.g. $1
+	Session     string
+	WindowIndex int
+	Name        string
+}
+
 type Pane struct {
 	Session         string
+	SessionID       string // $N — new
 	WindowIndex     int
+	WindowID        string // @N — new
 	PaneIndex       int
 	CWD             string
 	PaneID          string // e.g. %12
@@ -27,7 +45,7 @@ func (p Pane) Target() string {
 // ListPanes runs tmux list-panes and returns all panes across all sessions.
 func ListPanes() ([]Pane, error) {
 	out, err := exec.Command("tmux", "list-panes", "-a",
-		"-F", "#{session_name}\t#{window_index}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}\t#{pane_pid}\t#{session_activity}",
+		"-F", "#{session_name}\t#{session_id}\t#{window_index}\t#{window_id}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}\t#{pane_pid}\t#{session_activity}",
 	).Output()
 	if err != nil {
 		return nil, fmt.Errorf("tmux list-panes: %w", err)
@@ -43,30 +61,32 @@ func ParsePanes(raw string) ([]Pane, error) {
 			continue
 		}
 		parts := strings.Split(line, "\t")
-		if len(parts) < 4 {
+		if len(parts) < 5 {
 			continue
 		}
-		wi, _ := strconv.Atoi(parts[1])
-		pi, _ := strconv.Atoi(parts[2])
+		wi, _ := strconv.Atoi(parts[2])
+		pi, _ := strconv.Atoi(parts[4])
 		p := Pane{
 			Session:     parts[0],
+			SessionID:   parts[1],
 			WindowIndex: wi,
+			WindowID:    parts[3],
 			PaneIndex:   pi,
-			CWD:         parts[3],
-		}
-		if len(parts) >= 5 {
-			p.PaneID = parts[4]
-		}
-		if len(parts) >= 6 {
-			p.WindowName = parts[5]
+			CWD:         parts[5],
 		}
 		if len(parts) >= 7 {
-			if pid, err := strconv.ParseInt(strings.TrimSpace(parts[6]), 10, 32); err == nil {
+			p.PaneID = parts[6]
+		}
+		if len(parts) >= 8 {
+			p.WindowName = parts[7]
+		}
+		if len(parts) >= 9 {
+			if pid, err := strconv.ParseInt(strings.TrimSpace(parts[8]), 10, 32); err == nil {
 				p.PanePID = int32(pid)
 			}
 		}
-		if len(parts) >= 8 {
-			if ts, err := strconv.ParseInt(strings.TrimSpace(parts[7]), 10, 64); err == nil {
+		if len(parts) >= 10 {
+			if ts, err := strconv.ParseInt(strings.TrimSpace(parts[9]), 10, 64); err == nil {
 				p.SessionActivity = ts
 			}
 		}
@@ -144,6 +164,30 @@ func PaneIDToTargetMap(panes []Pane) map[string]string {
 	for _, p := range panes {
 		if p.PaneID != "" {
 			m[p.PaneID] = p.Target()
+		}
+	}
+	return m
+}
+
+// WindowIDToTargetMap returns a map from window_id (@N) to "session:windowIndex"
+// for all panes with a non-empty WindowID in the provided slice.
+func WindowIDToTargetMap(panes []Pane) map[string]string {
+	m := make(map[string]string, len(panes))
+	for _, p := range panes {
+		if p.WindowID != "" {
+			m[p.WindowID] = fmt.Sprintf("%s:%d", p.Session, p.WindowIndex)
+		}
+	}
+	return m
+}
+
+// SessionIDToNameMap returns a map from session_id ($N) to session_name
+// for all panes with a non-empty SessionID in the provided slice.
+func SessionIDToNameMap(panes []Pane) map[string]string {
+	m := make(map[string]string, len(panes))
+	for _, p := range panes {
+		if p.SessionID != "" && m[p.SessionID] == "" {
+			m[p.SessionID] = p.Session
 		}
 	}
 	return m
