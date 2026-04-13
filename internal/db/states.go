@@ -169,6 +169,17 @@ func (d *DB) StateSet(target, tool string, value StateValue, message string, sou
 		}
 	}
 
+	// When a stable pane_id is provided, delete any stale record for this pane
+	// at a different target (handles panes that moved since last write).
+	if paneID != "" {
+		if _, err := tx.Exec(
+			`DELETE FROM tool_states WHERE pane_id = ? AND target != ?`,
+			paneID, target,
+		); err != nil {
+			return fmt.Errorf("delete stale pane record: %w", err)
+		}
+	}
+
 	// Apply lock rules for tool writes (skipped when force=true).
 	if !force && source == SourceTool && current != nil {
 		switch current.Value {

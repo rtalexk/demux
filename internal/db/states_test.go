@@ -499,6 +499,49 @@ func TestStateSet_EmptyPaneID(t *testing.T) {
 	}
 }
 
+func TestStateSet_UpdatesTargetWhenPaneMoved(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Pane %5 was at work:0.0.
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+
+	// Pane %5 has moved to work:1.0 — new state set with new target.
+	if err := d.StateSet("work:1.0", "claude", StateDone, "done", SourceTool, true, nil, "%5"); err != nil {
+		t.Fatalf("StateSet for moved pane should succeed: %v", err)
+	}
+
+	// Old target must be gone.
+	st0, _ := d.StateByTarget("work:0.0")
+	if st0 != nil {
+		t.Errorf("old target should be deleted when pane moves, got: %+v", st0)
+	}
+
+	// New target must have the state.
+	st1, _ := d.StateByTarget("work:1.0")
+	if st1 == nil || st1.Value != StateDone {
+		t.Errorf("new target should have done state, got: %+v", st1)
+	}
+	if st1.PaneID != "%5" {
+		t.Errorf("new record should carry pane_id %%5, got %q", st1.PaneID)
+	}
+}
+
+func TestStateSet_NoStaleDeleteWhenTargetUnchanged(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+	// Same target — should update in place without deleting/re-inserting.
+	if err := d.StateSet("work:0.0", "claude", StateDone, "done", SourceTool, true, nil, "%5"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("work:0.0")
+	if st == nil || st.Value != StateDone {
+		t.Errorf("same-target update should work, got: %+v", st)
+	}
+}
+
 func TestStateDeleteIfRestingByPaneID_DeletesDone(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
