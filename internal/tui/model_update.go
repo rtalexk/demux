@@ -151,8 +151,31 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// resolveStateTargets returns a copy of states with each state's Target replaced
+// by the current "session:window.pane" from the live pane list when a pane_id
+// match is found. Unmatched or legacy states keep their stored Target.
+//
+// The design spec describes a lazy write-back (UPDATE stored target in DB when
+// the resolved value differs). That is deliberately omitted: Phase 4's StateSet
+// stale-delete covers the common case, and a long-lived pane in "working" state
+// will have its stored target corrected on the next state write.
+func resolveStateTargets(states []db.ToolState, panes []tmux.Pane) []db.ToolState {
+	paneIDMap := tmux.PaneIDToTargetMap(panes)
+	out := make([]db.ToolState, len(states))
+	for i, st := range states {
+		if st.PaneID != "" {
+			if resolved, ok := paneIDMap[st.PaneID]; ok {
+				st.Target = resolved
+			}
+		}
+		out[i] = st
+	}
+	return out
+}
+
 func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.panes = msg.panes
+	m.states = resolveStateTargets(m.states, msg.panes) // re-resolve with fresh pane data
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -216,10 +239,10 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 }
 
 func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
-	m.states = msg.states
-	m.procList.SetStates(msg.states)
+	m.states = resolveStateTargets(msg.states, m.panes)
+	m.procList.SetStates(m.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
-	m.sidebar.SetData(merged, msg.states, m.gitInfo, m.cfg)
+	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
 	// Only apply startup focus once panes have landed (m.ready). If states
 	// arrived before panes, handlePanesMsg will apply focus when panes arrive.
 	if !m.startupFocusDone && m.ready {

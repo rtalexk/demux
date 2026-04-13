@@ -37,7 +37,7 @@ func TestPaneFocusClearsDoneStates(t *testing.T) {
 	d.StateSet("myses:0.1", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
 	d.StateSet("myses:0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
 
-	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
+	if err := applyPaneFocus(d, "myses:0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -56,7 +56,7 @@ func TestPaneFocusDoesNotClearNonDone(t *testing.T) {
 	defer d.Close()
 
 	d.StateSet("myses:0.1", "claude", db.StateError, "boom", db.SourceTool, false, nil, "")
-	applyPaneFocus(d, "myses:0.1")
+	applyPaneFocus(d, "myses:0.1", "")
 
 	st, _ := d.StateByTarget("myses:0.1")
 	if st == nil {
@@ -69,7 +69,7 @@ func TestPaneFocusDoesNotClearFlagged(t *testing.T) {
 	defer d.Close()
 
 	d.StateSet("myses:0.1", "", db.StateFlagged, "come back", db.SourceUser, false, nil, "")
-	applyPaneFocus(d, "myses:0.1")
+	applyPaneFocus(d, "myses:0.1", "")
 
 	st, _ := d.StateByTarget("myses:0.1")
 	if st == nil {
@@ -81,7 +81,7 @@ func TestPaneFocusNoStatesIsNoop(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	if err := applyPaneFocus(d, "work:2.3"); err != nil {
+	if err := applyPaneFocus(d, "work:2.3", ""); err != nil {
 		t.Fatalf("unexpected error on empty db: %v", err)
 	}
 }
@@ -92,13 +92,48 @@ func TestPaneFocusClearsIdleStates(t *testing.T) {
 
 	d.StateSet("myses:0.1", "claude", db.StateIdle, "available", db.SourceTool, false, nil, "")
 
-	if err := applyPaneFocus(d, "myses:0.1"); err != nil {
+	if err := applyPaneFocus(d, "myses:0.1", ""); err != nil {
 		t.Fatal(err)
 	}
 
 	st, _ := d.StateByTarget("myses:0.1")
 	if st != nil {
 		t.Error("idle pane state should be cleared on focus")
+	}
+}
+
+func TestApplyPaneFocus_ClearsByPaneID(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	// Pane %5 was at s:0.0 (stored target), but is now at s:1.0 (new target).
+	// The done state was written when pane was at s:0.0.
+	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "%5")
+
+	// pane_focus fires with new target s:1.0 and pane_id %5.
+	if err := applyPaneFocus(d, "s:1.0", "%5"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The state should be cleared via pane_id even though the target string didn't match.
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("state should be cleared by pane_id after pane moved, got: %+v", st)
+	}
+}
+
+func TestApplyPaneFocus_EmptyPaneIDFallsBackToTarget(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
+
+	if err := applyPaneFocus(d, "s:0.0", ""); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("legacy target should still be cleared when pane_id is empty, got: %+v", st)
 	}
 }
 

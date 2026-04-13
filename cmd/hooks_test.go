@@ -46,3 +46,9 @@ func TestTmuxHooksSnippet_ContainsAfterKillPane(t *testing.T) {
 		t.Error("hooks snippet after-kill-pane hook should call demux event pane_closed")
 	}
 }
+
+func TestTmuxHooksSnippet_PaneFocusIncludesPaneID(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "--pane-id #{pane_id}") {
+		t.Error("pane_focus hooks should pass --pane-id #{pane_id}")
+	}
+}

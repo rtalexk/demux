@@ -96,6 +96,12 @@ func (d *DB) migrate() error {
 		}
 		version = 6
 	}
+	if version < 7 {
+		if err := d.migrateV7(); err != nil {
+			return err
+		}
+		version = 7
+	}
 	return nil
 }
 
@@ -291,6 +297,27 @@ func (d *DB) migrateV6() error {
 	if _, err := tx.Exec(`PRAGMA user_version = 6`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("set version 6: %w", err)
+	}
+	return tx.Commit()
+}
+
+func (d *DB) migrateV7() error {
+	tx, err := d.sql.Begin()
+	if err != nil {
+		return fmt.Errorf("begin v7: %w", err)
+	}
+	// Replace the non-unique index from v6 with a unique one.
+	if _, err := tx.Exec(`DROP INDEX IF EXISTS idx_tool_states_pane_id`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("migrate v7 drop index: %w", err)
+	}
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tool_states_pane_id ON tool_states(pane_id) WHERE pane_id IS NOT NULL`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("migrate v7 unique index: %w", err)
+	}
+	if _, err := tx.Exec(`PRAGMA user_version = 7`); err != nil {
+		tx.Rollback()
+		return fmt.Errorf("set version 7: %w", err)
 	}
 	return tx.Commit()
 }

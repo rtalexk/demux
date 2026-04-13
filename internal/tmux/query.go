@@ -136,3 +136,15 @@ func CurrentTarget() (string, int, error) {
 func SwitchClient(target string) error {
 	return exec.Command("tmux", "switch-client", "-t", target).Run()
 }
+
+// PaneIDToTargetMap returns a map from pane_id (%N) to "session:windowIndex.paneIndex"
+// for all panes with a non-empty PaneID in the provided slice.
+func PaneIDToTargetMap(panes []Pane) map[string]string {
+	m := make(map[string]string, len(panes))
+	for _, p := range panes {
+		if p.PaneID != "" {
+			m[p.PaneID] = p.Target()
+		}
+	}
+	return m
+}

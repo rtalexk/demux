@@ -498,3 +498,170 @@ func TestStateSet_EmptyPaneID(t *testing.T) {
 		t.Errorf("expected empty PaneID, got %q", st.PaneID)
 	}
 }
+
+func TestStateSet_UpdatesTargetWhenPaneMoved(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Pane %5 was at work:0.0.
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+
+	// Pane %5 has moved to work:1.0 — new state set with new target.
+	if err := d.StateSet("work:1.0", "claude", StateDone, "done", SourceTool, true, nil, "%5"); err != nil {
+		t.Fatalf("StateSet for moved pane should succeed: %v", err)
+	}
+
+	// Old target must be gone.
+	st0, _ := d.StateByTarget("work:0.0")
+	if st0 != nil {
+		t.Errorf("old target should be deleted when pane moves, got: %+v", st0)
+	}
+
+	// New target must have the state.
+	st1, _ := d.StateByTarget("work:1.0")
+	if st1 == nil || st1.Value != StateDone {
+		t.Errorf("new target should have done state, got: %+v", st1)
+	}
+	if st1.PaneID != "%5" {
+		t.Errorf("new record should carry pane_id %%5, got %q", st1.PaneID)
+	}
+}
+
+func TestStateSet_NoStaleDeleteWhenTargetUnchanged(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+	// Same target — should update in place without deleting/re-inserting.
+	if err := d.StateSet("work:0.0", "claude", StateDone, "done", SourceTool, true, nil, "%5"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("work:0.0")
+	if st == nil || st.Value != StateDone {
+		t.Errorf("same-target update should work, got: %+v", st)
+	}
+}
+
+func TestStateSet_NoopDoesNotSkipStalePaneDelete(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Pane %5 was at work:0.0.
+	d.StateSet("work:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%5")
+	// work:1.0 already has a legacy record with the same (tool, value) — the
+	// no-op short-circuit would previously exit before reaching the stale-delete.
+	d.StateSet("work:1.0", "claude", StateWorking, "running", SourceTool, false, nil, "")
+
+	// Pane %5 has moved to work:1.0; same (tool, value) as the guard would trigger.
+	if err := d.StateSet("work:1.0", "claude", StateWorking, "still running", SourceTool, false, nil, "%5"); err != nil {
+		t.Fatalf("StateSet should succeed: %v", err)
+	}
+
+	// Stale record must be deleted even though the value did not change.
+	if st, _ := d.StateByTarget("work:0.0"); st != nil {
+		t.Errorf("stale pane record at work:0.0 should be deleted, got: %+v", st)
+	}
+	// New target must have the state.
+	if st, _ := d.StateByTarget("work:1.0"); st == nil || st.PaneID != "%5" {
+		t.Errorf("work:1.0 should carry pane_id %%5, got: %+v", st)
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_DeletesDone(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateDone, "finished", SourceTool, false, nil, "%7")
+	if err := d.StateDeleteIfRestingByPaneID("%7"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("done state should be deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_DeletesIdle(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateIdle, "available", SourceTool, false, nil, "%7")
+	d.StateDeleteIfRestingByPaneID("%7")
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("idle state should be deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_PreservesWorking(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%7")
+	d.StateDeleteIfRestingByPaneID("%7")
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil {
+		t.Error("working state should survive StateDeleteIfRestingByPaneID")
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_NoopWhenNotFound(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateDeleteIfRestingByPaneID("%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}
+
+func TestStateDeleteBySessionWithPaneIDs_EmptyPaneIDs(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("myapp:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%5")
+	d.StateSet("myapp:1.0", "make", StateDone, "", SourceTool, false, nil, "%6")
+	d.StateSet("other:0.0", "claude", StateDone, "", SourceTool, false, nil, "%7")
+
+	// nil paneIDs — should behave identically to StateDeleteBySession.
+	n, err := d.StateDeleteBySessionWithPaneIDs("myapp", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 deleted, got %d", n)
+	}
+	if st, _ := d.StateByTarget("myapp:0.0"); st != nil {
+		t.Error("myapp:0.0 should be deleted")
+	}
+	if st, _ := d.StateByTarget("other:0.0"); st == nil {
+		t.Error("unrelated session should survive")
+	}
+}
+
+func TestStateDeleteBySessionWithPaneIDs_DeletesByPaneIDs(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Record whose target no longer has the session prefix (pane moved).
+	d.StateSet("other:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%7")
+	// Normal record.
+	d.StateSet("myapp:0.0", "claude", StateWorking, "", SourceTool, false, nil, "%8")
+	// Unrelated session.
+	d.StateSet("other:1.0", "make", StateDone, "", SourceTool, false, nil, "%9")
+
+	// %7 and %8 belong to "myapp" per live tmux.
+	n, err := d.StateDeleteBySessionWithPaneIDs("myapp", []string{"%7", "%8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 deleted, got %d", n)
+	}
+
+	if st, _ := d.StateByTarget("other:0.0"); st != nil {
+		t.Error("stale-target record with matching pane_id should be deleted")
+	}
+	if st, _ := d.StateByTarget("other:1.0"); st == nil {
+		t.Error("unrelated pane should survive")
+	}
+}
