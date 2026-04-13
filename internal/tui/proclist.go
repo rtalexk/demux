@@ -56,7 +56,7 @@ func (p *ProcListModel) SetStates(states []db.ToolState) {
 
 // stateForPane returns the state for the given pane, or nil.
 func (p ProcListModel) stateForPane(pane tmux.Pane) *db.ToolState {
-	key := fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+	key := pane.Target()
 	return activeStateFor(p.states, key)
 }
 

@@ -1,27 +1,24 @@
 package cmd
 
 import (
-	"fmt"
 	"testing"
+
+	"github.com/rtalexk/demux/internal/tmux"
 )
 
 func TestBuildLivePaneMaps(t *testing.T) {
-	panes := []struct {
-		paneID  string
-		session string
-		winIdx  int
-		paneIdx int
-	}{
-		{"%1", "work", 0, 0},
-		{"%2", "work", 1, 0},
+	panes := []tmux.Pane{
+		{PaneID: "%1", Session: "work", WindowIndex: 0, PaneIndex: 0},
+		{PaneID: "%2", Session: "work", WindowIndex: 1, PaneIndex: 0},
 	}
 
 	liveIDs := map[string]bool{}
 	liveTargets := map[string]bool{}
 	for _, p := range panes {
-		liveIDs[p.paneID] = true
-		target := fmt.Sprintf("%s:%d.%d", p.session, p.winIdx, p.paneIdx)
-		liveTargets[target] = true
+		if p.PaneID != "" {
+			liveIDs[p.PaneID] = true
+		}
+		liveTargets[p.Target()] = true
 	}
 
 	if !liveIDs["%1"] || !liveIDs["%2"] {

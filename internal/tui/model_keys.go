@@ -439,7 +439,7 @@ func (m Model) handleProcListCollapse(msg tea.KeyMsg, procH int) (Model, tea.Cmd
 func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 	var target string
 	if pane := m.procList.SelectedPane(); pane != nil {
-		target = fmt.Sprintf("%s:%d.%d", pane.Session, pane.WindowIndex, pane.PaneIndex)
+		target = pane.Target()
 	} else if node := m.sidebar.Selected(); node != nil {
 		target = node.Session
 	}
@@ -544,7 +544,7 @@ func (m Model) procListStateTarget() string {
 	if node.IsWindowHeader {
 		return fmt.Sprintf("%s:%d", node.Pane.Session, node.Pane.WindowIndex)
 	}
-	return fmt.Sprintf("%s:%d.%d", node.Pane.Session, node.Pane.WindowIndex, node.Pane.PaneIndex)
+	return node.Pane.Target()
 }
 
 // clearCurrentState clears the state for the given target.

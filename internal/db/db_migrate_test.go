@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"testing"
 )
 
@@ -38,23 +37,11 @@ func TestMigrateV6_AddsPaneIDColumn(t *testing.T) {
 	}
 	defer d.Close()
 
-	rows, err := d.sql.Query(`PRAGMA table_info(tool_states)`)
+	ok, err := tableHasColumn(d.sql, "tool_states", "pane_id")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rows.Close()
-	var hasPaneID bool
-	for rows.Next() {
-		var cid int
-		var name, typ string
-		var notNull int
-		var dfltVal sql.NullString
-		var pk int
-		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltVal, &pk); err == nil && name == "pane_id" {
-			hasPaneID = true
-		}
-	}
-	if !hasPaneID {
+	if !ok {
 		t.Error("pane_id column not found in tool_states after migration")
 	}
 }

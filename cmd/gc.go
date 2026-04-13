@@ -30,7 +30,7 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 		if p.PaneID != "" {
 			livePaneIDs[p.PaneID] = true
 		}
-		target := fmt.Sprintf("%s:%d.%d", p.Session, p.WindowIndex, p.PaneIndex)
+		target := p.Target()
 		livePaneTargets[target] = true
 	}
 
