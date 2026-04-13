@@ -146,41 +146,9 @@ func inlineStat(label, value string) string {
 }
 
 // targetDisplayStr returns a compact display string for a state target.
-// For pane targets, formats as "win{wi}·p{pi}" using the paneIDMap lookup.
-// For window targets, formats as "win{wi}" using the windowIDMap lookup.
-// For session targets, returns the session name from sessionIDMap.
-// Falls back to the raw target ID when no map entry exists.
+// Delegates to db.Target.Format using the provided display maps.
 func targetDisplayStr(t db.Target, paneIDMap, windowIDMap, sessionIDMap map[string]string) string {
-	switch t.Type {
-	case "pane":
-		if full := paneIDMap[t.ID]; full != "" {
-			if idx := strings.Index(full, ":"); idx >= 0 {
-				rest := full[idx+1:]
-				parts := strings.SplitN(rest, ".", 2)
-				if len(parts) == 2 {
-					return "win" + parts[0] + "·p" + parts[1]
-				}
-				return rest
-			}
-			return full
-		}
-		return t.ID
-	case "window":
-		if full := windowIDMap[t.ID]; full != "" {
-			if idx := strings.Index(full, ":"); idx >= 0 {
-				return "win" + full[idx+1:]
-			}
-			return full
-		}
-		return t.ID
-	case "session":
-		if name := sessionIDMap[t.ID]; name != "" {
-			return name
-		}
-		return t.ID
-	default:
-		return t.ID
-	}
+	return t.Format(paneIDMap, windowIDMap, sessionIDMap)
 }
 
 // renderStateSection builds detail lines for displayable states of the focused session.

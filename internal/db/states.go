@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	demuxlog "github.com/rtalexk/demux/internal/log"
@@ -122,6 +123,45 @@ type Target struct {
 	SessionID string // $N — all record types
 	WindowID  string // @N — window and pane records
 	PaneID    string // %N — pane records only
+}
+
+// Format resolves the target to a compact human-readable display string using
+// live tmux ID→label maps. Falls back to the raw ID when no map entry exists.
+//
+// paneMap   maps %N → "session:windowIndex.paneIndex"
+// windowMap maps @N → "session:windowIndex"
+// sessionMap maps $N → session_name
+func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string {
+	switch t.Type {
+	case "pane":
+		if full := paneMap[t.ID]; full != "" {
+			if idx := strings.Index(full, ":"); idx >= 0 {
+				rest := full[idx+1:]
+				parts := strings.SplitN(rest, ".", 2)
+				if len(parts) == 2 {
+					return "win" + parts[0] + "·p" + parts[1]
+				}
+				return rest
+			}
+			return full
+		}
+		return t.ID
+	case "window":
+		if full := windowMap[t.ID]; full != "" {
+			if idx := strings.Index(full, ":"); idx >= 0 {
+				return "win" + full[idx+1:]
+			}
+			return full
+		}
+		return t.ID
+	case "session":
+		if name := sessionMap[t.ID]; name != "" {
+			return name
+		}
+		return t.ID
+	default:
+		return t.ID
+	}
 }
 
 // ParseTargetID infers the target type from the tmux ID prefix.
