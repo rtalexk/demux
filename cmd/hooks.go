@@ -62,17 +62,23 @@ func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
 	if paneID == "" {
 		return "", "", "", fmt.Errorf("TMUX_PANE not set")
 	}
+	windowID, sessionID, err = tmuxParentIDs(paneID)
+	return paneID, windowID, sessionID, err
+}
 
-	out, execErr := exec.Command("tmux", "display-message", "-t", paneID, "-p", "#{window_id}\t#{session_id}").Output()
+// tmuxParentIDs queries tmux for the window_id and session_id of the given
+// stable target ID (%N pane or @N window). It uses the provided ID directly
+// so callers that know their target ID do not need to go through $TMUX_PANE.
+func tmuxParentIDs(targetID string) (windowID, sessionID string, err error) {
+	out, execErr := exec.Command("tmux", "display-message", "-t", targetID, "-p", "#{window_id}\t#{session_id}").Output()
 	if execErr != nil {
-		return paneID, "", "", fmt.Errorf("get tmux pane IDs: %w", execErr)
+		return "", "", fmt.Errorf("get tmux parent IDs for %s: %w", targetID, execErr)
 	}
-
 	parts := strings.Split(strings.TrimSpace(string(out)), "\t")
 	if len(parts) < 2 {
-		return paneID, "", "", fmt.Errorf("unexpected format from tmux")
+		return "", "", fmt.Errorf("unexpected tmux output for %s", targetID)
 	}
-	return paneID, parts[0], parts[1], nil
+	return parts[0], parts[1], nil
 }
 
 const tmuxHooksSnippet = `# demux tmux hooks
