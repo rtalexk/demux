@@ -83,7 +83,7 @@ func TestFocusSearchOnOpen_false(t *testing.T) {
 // before the panesMsg (the race introduced by fetching both in Init).
 func TestStateSession_StatesBeforePanes(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWaiting},
 	}
 	m := focusTestModel("state_session")
 	m.height = 40
@@ -108,7 +108,7 @@ func TestStateSession_StatesBeforePanes(t *testing.T) {
 // in handleStatesMsg once m.ready is true.
 func TestStateSession_PanesBeforeStates(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWaiting},
 	}
 	m := focusTestModel("state_session")
 	m.height = 40
@@ -130,7 +130,7 @@ func TestStateSession_PanesBeforeStates(t *testing.T) {
 // state priority on the first panes render when states arrived first.
 func TestStartupSort_StatesBeforePanes(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "session", ID: "beta"}, Value: db.StateError},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateError},
 	}
 	m := focusTestModel("")
 	m.height = 40

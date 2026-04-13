@@ -11,9 +11,9 @@ import (
 
 func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
-		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateError}, // highest priority
-		{Target: db.Target{Type: "pane", ID: "%3", SessionID: "$1"}, Value: db.StateFlagged},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%2", SessionID: "$1"}, Value: db.StateError}, // highest priority
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%3", SessionID: "$1"}, Value: db.StateFlagged},
 	}
 	got := highestPriorityPaneTarget("$1", states)
 	if got != "%2" {
@@ -24,8 +24,8 @@ func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 func TestHighestPriorityPaneTarget_IncludesDone(t *testing.T) {
 	// Done has priority=2; Working has priority=0; Done wins.
 	states := []db.ToolState{
-		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateDone},
-		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateWorking},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1"}, Value: db.StateDone},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%2", SessionID: "$1"}, Value: db.StateWorking},
 	}
 	got := highestPriorityPaneTarget("$1", states)
 	if got != "%1" {
@@ -35,8 +35,8 @@ func TestHighestPriorityPaneTarget_IncludesDone(t *testing.T) {
 
 func TestHighestPriorityPaneTarget_ReturnsEmptyWhenOnlyIdle(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateIdle},
-		{Target: db.Target{Type: "pane", ID: "%2", SessionID: "$1"}, Value: db.StateIdle},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1"}, Value: db.StateIdle},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%2", SessionID: "$1"}, Value: db.StateIdle},
 	}
 	got := highestPriorityPaneTarget("$1", states)
 	if got != "" {
@@ -46,8 +46,8 @@ func TestHighestPriorityPaneTarget_ReturnsEmptyWhenOnlyIdle(t *testing.T) {
 
 func TestHighestPriorityPaneTarget_IgnoresOtherSessions(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "pane", ID: "%9", SessionID: "$9"}, Value: db.StateWaiting},
-		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%9", SessionID: "$9"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
 	}
 	got := highestPriorityPaneTarget("$1", states)
 	if got != "%1" {
@@ -57,8 +57,8 @@ func TestHighestPriorityPaneTarget_IgnoresOtherSessions(t *testing.T) {
 
 func TestHighestPriorityPaneTarget_IgnoresSessionTargets(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: "session", ID: "$1", SessionID: "$1"}, Value: db.StateError},
-		{Target: db.Target{Type: "pane", ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateError},
+		{Target: db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1"}, Value: db.StateWorking},
 	}
 	got := highestPriorityPaneTarget("$1", states)
 	// session target should be skipped; only pane target matters
@@ -78,7 +78,7 @@ func TestClearCurrentState_ClearsByTargetID(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	target := db.Target{Type: "pane", ID: "%5", SessionID: "$1", WindowID: "@1", PaneID: "%5"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%5", SessionID: "$1", WindowID: "@1", PaneID: "%5"}
 	_ = d.StateSet(target, "claude", db.StateWorking, "", db.SourceTool, false, nil)
 
 	m := Model{db: d}
@@ -95,7 +95,7 @@ func TestClearCurrentState_NoopForMissingTarget(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	target := db.Target{Type: "pane", ID: "%99", SessionID: "$1", WindowID: "@1", PaneID: "%99"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%99", SessionID: "$1", WindowID: "@1", PaneID: "%99"}
 
 	m := Model{db: d}
 	cmd := m.clearCurrentState(target)

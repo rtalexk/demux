@@ -57,9 +57,9 @@ func TestClearSessionStatesWithID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	myapp1 := db.Target{Type: "pane", ID: "%1", SessionID: "$1", WindowID: "@1", PaneID: "%1"}
-	myapp2 := db.Target{Type: "pane", ID: "%2", SessionID: "$1", WindowID: "@1", PaneID: "%2"}
-	other := db.Target{Type: "pane", ID: "%3", SessionID: "$2", WindowID: "@2", PaneID: "%3"}
+	myapp1 := db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1", WindowID: "@1", PaneID: "%1"}
+	myapp2 := db.Target{Type: db.TargetTypePane, ID: "%2", SessionID: "$1", WindowID: "@1", PaneID: "%2"}
+	other := db.Target{Type: db.TargetTypePane, ID: "%3", SessionID: "$2", WindowID: "@2", PaneID: "%3"}
 	d.StateSet(myapp1, "claude", db.StateWorking, "", db.SourceTool, false, nil)
 	d.StateSet(myapp2, "make", db.StateError, "fail", db.SourceTool, false, nil)
 	d.StateSet(other, "claude", db.StateDone, "ok", db.SourceTool, false, nil)

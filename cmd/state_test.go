@@ -87,7 +87,7 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	target := db.Target{Type: "pane", ID: "%1", PaneID: "%1"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
 	d.StateSet(target, "", db.StateFlagged, "note", db.SourceUser, false, nil)
 
 	clearTarget = "%1"
@@ -112,7 +112,7 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	target := db.Target{Type: "pane", ID: "%1", PaneID: "%1"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
 	d.StateSet(target, "claude", db.StateError, "boom", db.SourceTool, false, nil)
 
 	clearTarget = "%1"
@@ -152,7 +152,7 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 	defer d.Close()
 
 	// Pre-set state to done.
-	target := db.Target{Type: "pane", ID: "%1", PaneID: "%1"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
 	d.StateSet(target, "claude", db.StateDone, "finished", db.SourceTool, false, nil)
 
 	stateTarget = "%1"
@@ -177,7 +177,7 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	target := db.Target{Type: "pane", ID: "%1", PaneID: "%1"}
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
 	d.StateSet(target, "claude", db.StateWorking, "running", db.SourceTool, false, nil)
 
 	stateTarget = "%1"

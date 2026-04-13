@@ -7,11 +7,11 @@ import (
 )
 
 func paneTarget(paneID, windowID, sessionID string) db.Target {
-	return db.Target{Type: "pane", ID: paneID, PaneID: paneID, WindowID: windowID, SessionID: sessionID}
+	return db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID, WindowID: windowID, SessionID: sessionID}
 }
 
 func windowTarget(windowID, sessionID string) db.Target {
-	return db.Target{Type: "window", ID: windowID, WindowID: windowID, SessionID: sessionID}
+	return db.Target{Type: db.TargetTypeWindow, ID: windowID, WindowID: windowID, SessionID: sessionID}
 }
 
 func TestPaneFocusClearsDoneStates(t *testing.T) {
@@ -112,7 +112,7 @@ func TestApplyPaneClosed_DeletesPaneState(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	pt := db.Target{Type: "pane", ID: "%7", PaneID: "%7", WindowID: "@0", SessionID: "$0"}
+	pt := db.Target{Type: db.TargetTypePane, ID: "%7", PaneID: "%7", WindowID: "@0", SessionID: "$0"}
 	d.StateSet(pt, "claude", db.StateWorking, "", db.SourceTool, false, nil)
 	if err := applyPaneClosed(d, "%7"); err != nil {
 		t.Fatal(err)
