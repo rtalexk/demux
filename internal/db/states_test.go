@@ -498,3 +498,50 @@ func TestStateSet_EmptyPaneID(t *testing.T) {
 		t.Errorf("expected empty PaneID, got %q", st.PaneID)
 	}
 }
+
+func TestStateDeleteIfRestingByPaneID_DeletesDone(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateDone, "finished", SourceTool, false, nil, "%7")
+	if err := d.StateDeleteIfRestingByPaneID("%7"); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("done state should be deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_DeletesIdle(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateIdle, "available", SourceTool, false, nil, "%7")
+	d.StateDeleteIfRestingByPaneID("%7")
+	st, _ := d.StateByTarget("s:0.0")
+	if st != nil {
+		t.Errorf("idle state should be deleted by pane_id, got: %+v", st)
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_PreservesWorking(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	d.StateSet("s:0.0", "claude", StateWorking, "running", SourceTool, false, nil, "%7")
+	d.StateDeleteIfRestingByPaneID("%7")
+	st, _ := d.StateByTarget("s:0.0")
+	if st == nil {
+		t.Error("working state should survive StateDeleteIfRestingByPaneID")
+	}
+}
+
+func TestStateDeleteIfRestingByPaneID_NoopWhenNotFound(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	if err := d.StateDeleteIfRestingByPaneID("%99"); err != nil {
+		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
+	}
+}

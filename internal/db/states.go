@@ -230,6 +230,17 @@ func (d *DB) StateClearByPaneID(paneID string) error {
 	return err
 }
 
+// StateDeleteIfRestingByPaneID removes the state record when value is done or idle,
+// looking up by pane_id. Used by pane_focus when pane_id is available — handles
+// panes that have moved positions since the state was written.
+func (d *DB) StateDeleteIfRestingByPaneID(paneID string) error {
+	_, err := d.sql.Exec(
+		`DELETE FROM tool_states WHERE pane_id = ? AND value IN (?, ?)`,
+		paneID, int(StateDone), int(StateIdle),
+	)
+	return err
+}
+
 // looksLikePaneTarget reports whether target is in "session:window.pane" format.
 // Used by StateGCOrphaned to skip session-level and window-level targets.
 func looksLikePaneTarget(target string) bool {
