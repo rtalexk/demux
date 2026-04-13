@@ -30,7 +30,7 @@ func TestStateSet_BasicUpsert(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	if err := d.StateSet(target, "claude", StateWorking, "running tests", SourceTool, false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestStateSet_LockWorking_DifferentTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "claude", StateWorking, "", SourceTool, false, nil)
 	err := d.StateSet(target, "make", StateWorking, "", SourceTool, false, nil)
 	if err == nil {
@@ -67,7 +67,7 @@ func TestStateSet_LockWorking_SameTool(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "claude", StateWorking, "step 1", SourceTool, false, nil)
 	if err := d.StateSet(target, "claude", StateWorking, "step 2", SourceTool, false, nil); err != nil {
 		t.Errorf("same tool should not be locked: %v", err)
@@ -78,7 +78,7 @@ func TestStateSet_LockFlagged_BlocksAllTools(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "", StateFlagged, "come back", SourceUser, false, nil)
 	// same tool name should still be blocked
 	if err := d.StateSet(target, "claude", StateWorking, "", SourceTool, false, nil); err == nil {
@@ -90,7 +90,7 @@ func TestStateSet_ForceOverridesLock(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	// Flagged blocks tool writes normally.
 	d.StateSet(target, "", StateFlagged, "come back", SourceUser, false, nil)
 	if err := d.StateSet(target, "claude", StateWorking, "", SourceTool, true, nil); err != nil {
@@ -108,7 +108,7 @@ func TestStateSet_UserWriteAlwaysSucceeds(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "claude", StateWorking, "", SourceTool, false, nil)
 	if err := d.StateSet(target, "", StateFlagged, "note", SourceUser, false, nil); err != nil {
 		t.Errorf("user write should always succeed: %v", err)
@@ -119,7 +119,7 @@ func TestStateClear(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "claude", StateError, "boom", SourceTool, false, nil)
 	if err := d.StateClear(target); err != nil {
 		t.Fatal(err)
@@ -130,36 +130,12 @@ func TestStateClear(t *testing.T) {
 	}
 }
 
-func TestStateDeleteIfDone(t *testing.T) {
-	d, _ := Open(":memory:")
-	defer d.Close()
-
-	target1 := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
-	d.StateSet(target1, "claude", StateDone, "finished", SourceTool, false, nil)
-	if err := d.StateDeleteIfDone(target1); err != nil {
-		t.Fatal(err)
-	}
-	st, _ := d.StateByID(target1)
-	if st != nil {
-		t.Errorf("expected done state deleted, got: %+v", st)
-	}
-
-	// non-done states must not be deleted
-	target2 := Target{Type: "pane", ID: "%2", SessionID: "$0", WindowID: "@0", PaneID: "%2"}
-	d.StateSet(target2, "claude", StateError, "boom", SourceTool, false, nil)
-	d.StateDeleteIfDone(target2)
-	st2, _ := d.StateByID(target2)
-	if st2 == nil {
-		t.Error("non-done state should not be deleted by StateDeleteIfDone")
-	}
-}
-
 func TestStateDeleteIfResting(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
 	// done is cleared
-	target1 := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target1 := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target1, "claude", StateDone, "finished", SourceTool, false, nil)
 	d.StateDeleteIfResting(target1)
 	st, _ := d.StateByID(target1)
@@ -168,7 +144,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// idle is cleared
-	target2 := Target{Type: "pane", ID: "%2", SessionID: "$0", WindowID: "@0", PaneID: "%2"}
+	target2 := Target{Type: TargetTypePane, ID: "%2", SessionID: "$0", WindowID: "@0", PaneID: "%2"}
 	d.StateSet(target2, "claude", StateIdle, "available", SourceTool, false, nil)
 	d.StateDeleteIfResting(target2)
 	st2, _ := d.StateByID(target2)
@@ -177,7 +153,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// working is not cleared
-	target3 := Target{Type: "pane", ID: "%3", SessionID: "$0", WindowID: "@0", PaneID: "%3"}
+	target3 := Target{Type: TargetTypePane, ID: "%3", SessionID: "$0", WindowID: "@0", PaneID: "%3"}
 	d.StateSet(target3, "claude", StateWorking, "running", SourceTool, false, nil)
 	d.StateDeleteIfResting(target3)
 	st3, _ := d.StateByID(target3)
@@ -186,7 +162,7 @@ func TestStateDeleteIfResting(t *testing.T) {
 	}
 
 	// error is not cleared
-	target4 := Target{Type: "pane", ID: "%4", SessionID: "$0", WindowID: "@0", PaneID: "%4"}
+	target4 := Target{Type: TargetTypePane, ID: "%4", SessionID: "$0", WindowID: "@0", PaneID: "%4"}
 	d.StateSet(target4, "claude", StateError, "boom", SourceTool, false, nil)
 	d.StateDeleteIfResting(target4)
 	st4, _ := d.StateByID(target4)
@@ -199,8 +175,8 @@ func TestStateList(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	t1 := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
-	t2 := Target{Type: "pane", ID: "%2", SessionID: "$0", WindowID: "@0", PaneID: "%2"}
+	t1 := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	t2 := Target{Type: TargetTypePane, ID: "%2", SessionID: "$0", WindowID: "@0", PaneID: "%2"}
 	d.StateSet(t1, "claude", StateWorking, "", SourceTool, false, nil)
 	d.StateSet(t2, "make", StateError, "fail", SourceTool, false, nil)
 
@@ -235,7 +211,7 @@ func TestStateIdle_SetAndRetrieve(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	if err := d.StateSet(target, "claude", StateIdle, "available", SourceTool, false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -249,7 +225,7 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	// Set to done.
 	d.StateSet(target, "claude", StateDone, "finished", SourceTool, false, nil)
 
@@ -270,7 +246,7 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	d.StateSet(target, "claude", StateWorking, "running", SourceTool, false, nil)
 
 	ifWorking := StateWorking
@@ -287,7 +263,7 @@ func TestStateSet_IfState_NoopWhenNoRow(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	// No row exists. Passing ifState=StateIdle (6) should be a no-op because
 	// a missing row is treated as StateValue(0), not StateIdle.
 	ifIdle := StateIdle
@@ -305,8 +281,8 @@ func TestStateGCOrphaned_DeletesByType(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	pane1 := Target{Type: "pane", ID: "%12", SessionID: "$0", WindowID: "@0", PaneID: "%12"}
-	pane2 := Target{Type: "pane", ID: "%13", SessionID: "$0", WindowID: "@0", PaneID: "%13"}
+	pane1 := Target{Type: TargetTypePane, ID: "%12", SessionID: "$0", WindowID: "@0", PaneID: "%12"}
+	pane2 := Target{Type: TargetTypePane, ID: "%13", SessionID: "$0", WindowID: "@0", PaneID: "%13"}
 	d.StateSet(pane1, "claude", StateWorking, "", SourceTool, false, nil)
 	d.StateSet(pane2, "claude", StateWorking, "", SourceTool, false, nil)
 
@@ -334,8 +310,8 @@ func TestStateGCOrphaned_DeletesWindows(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	win1 := Target{Type: "window", ID: "@5", SessionID: "$0", WindowID: "@5"}
-	win2 := Target{Type: "window", ID: "@6", SessionID: "$0", WindowID: "@6"}
+	win1 := Target{Type: TargetTypeWindow, ID: "@5", SessionID: "$0", WindowID: "@5"}
+	win2 := Target{Type: TargetTypeWindow, ID: "@6", SessionID: "$0", WindowID: "@6"}
 	d.StateSet(win1, "claude", StateWorking, "", SourceTool, false, nil)
 	d.StateSet(win2, "claude", StateWorking, "", SourceTool, false, nil)
 
@@ -363,8 +339,8 @@ func TestStateGCOrphaned_DeletesSessions(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	sess1 := Target{Type: "session", ID: "$1", SessionID: "$1"}
-	sess2 := Target{Type: "session", ID: "$2", SessionID: "$2"}
+	sess1 := Target{Type: TargetTypeSession, ID: "$1", SessionID: "$1"}
+	sess2 := Target{Type: TargetTypeSession, ID: "$2", SessionID: "$2"}
 	d.StateSet(sess1, "claude", StateWorking, "", SourceTool, false, nil)
 	d.StateSet(sess2, "claude", StateWorking, "", SourceTool, false, nil)
 
@@ -388,13 +364,42 @@ func TestStateGCOrphaned_DeletesSessions(t *testing.T) {
 	}
 }
 
+func TestStateGCOrphaned_EmptyLiveSetsDeleteAll(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	pane := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	win := Target{Type: TargetTypeWindow, ID: "@1", SessionID: "$0", WindowID: "@1"}
+	d.StateSet(pane, "claude", StateWorking, "", SourceTool, false, nil)
+	d.StateSet(win, "claude", StateWorking, "", SourceTool, false, nil)
+
+	// All live sets empty: every record should be deleted.
+	n, err := d.StateGCOrphaned(
+		map[string]bool{},
+		map[string]bool{},
+		map[string]bool{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("expected 2 deleted, got %d", n)
+	}
+	if st, _ := d.StateByID(pane); st != nil {
+		t.Error("pane record should be deleted when live pane set is empty")
+	}
+	if st, _ := d.StateByID(win); st != nil {
+		t.Error("window record should be deleted when live window set is empty")
+	}
+}
+
 func TestStateDeleteBySession_DeletesAll(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	t1 := Target{Type: "pane", ID: "%5", SessionID: "$0", WindowID: "@0", PaneID: "%5"}
-	t2 := Target{Type: "pane", ID: "%6", SessionID: "$0", WindowID: "@0", PaneID: "%6"}
-	t3 := Target{Type: "pane", ID: "%7", SessionID: "$1", WindowID: "@1", PaneID: "%7"}
+	t1 := Target{Type: TargetTypePane, ID: "%5", SessionID: "$0", WindowID: "@0", PaneID: "%5"}
+	t2 := Target{Type: TargetTypePane, ID: "%6", SessionID: "$0", WindowID: "@0", PaneID: "%6"}
+	t3 := Target{Type: TargetTypePane, ID: "%7", SessionID: "$1", WindowID: "@1", PaneID: "%7"}
 
 	d.StateSet(t1, "claude", StateWorking, "", SourceTool, false, nil)
 	d.StateSet(t2, "make", StateDone, "", SourceTool, false, nil)
@@ -423,7 +428,7 @@ func TestStateSet_StoresPaneID(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	if err := d.StateSet(target, "claude", StateWorking, "running", SourceTool, false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -440,7 +445,7 @@ func TestStateSet_PreservesSessionWindowPaneIDs(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
 
-	target := Target{Type: "pane", ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
 	if err := d.StateSet(target, "claude", StateWorking, "running", SourceTool, false, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +469,7 @@ func TestStateSet_EmptySessionWindowPaneIDs(t *testing.T) {
 	defer d.Close()
 
 	// Session target has no WindowID or PaneID
-	target := Target{Type: "session", ID: "$0", SessionID: "$0"}
+	target := Target{Type: TargetTypeSession, ID: "$0", SessionID: "$0"}
 	if err := d.StateSet(target, "claude", StateWorking, "running", SourceTool, false, nil); err != nil {
 		t.Fatal(err)
 	}

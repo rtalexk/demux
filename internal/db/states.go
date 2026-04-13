@@ -283,16 +283,6 @@ func (d *DB) StateClear(t Target) error {
 	return err
 }
 
-// StateDeleteIfDone removes the state record only if the current value is done.
-// Used by event pane_focus to silently clear done states on navigation.
-func (d *DB) StateDeleteIfDone(t Target) error {
-	_, err := d.sql.Exec(
-		`DELETE FROM tool_states WHERE target_type = ? AND target_id = ? AND value = ?`,
-		t.Type, t.ID, int(StateDone),
-	)
-	return err
-}
-
 // StateDeleteIfResting removes the state record when value is done or idle.
 // Used by event pane_focus to clear resting states on navigation.
 func (d *DB) StateDeleteIfResting(t Target) error {
