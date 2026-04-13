@@ -17,6 +17,7 @@ var (
 )
 
 var eventPaneFocusTarget string
+var eventPaneFocusPaneID string
 
 var eventCmd = &cobra.Command{
 	Use:   "event",
@@ -28,9 +29,10 @@ var eventPaneFocusCmd = &cobra.Command{
 	Short: "Clear done states for the focused pane, its window, and its session",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := eventPaneFocusTarget
+		paneID := eventPaneFocusPaneID
 		if target == "" {
 			var err error
-			target, _, err = tmuxPaneTarget()
+			target, paneID, err = tmuxPaneTarget()
 			if err != nil {
 				return err
 			}
@@ -42,12 +44,12 @@ var eventPaneFocusCmd = &cobra.Command{
 		}
 		defer d.Close()
 
-		return applyPaneFocus(d, target)
+		return applyPaneFocus(d, target, paneID)
 	},
 }
 
-func applyPaneFocus(d *db.DB, paneTarget string) error {
-	demuxlog.Debug("pane_focus", "target", paneTarget)
+func applyPaneFocus(d *db.DB, paneTarget string, paneID string) error {
+	demuxlog.Debug("pane_focus", "target", paneTarget, "pane_id", paneID)
 	for _, target := range []string{
 		paneTarget,
 		windowTargetFromPane(paneTarget),
@@ -55,6 +57,13 @@ func applyPaneFocus(d *db.DB, paneTarget string) error {
 	} {
 		if err := d.StateDeleteIfResting(target); err != nil {
 			demuxlog.Error("pane_focus: delete resting state failed", "target", target, "err", err)
+			return err
+		}
+	}
+	// Also clear by pane_id: handles panes that moved since the state was written.
+	if paneID != "" {
+		if err := d.StateDeleteIfRestingByPaneID(paneID); err != nil {
+			demuxlog.Error("pane_focus: delete resting by pane_id failed", "pane_id", paneID, "err", err)
 			return err
 		}
 	}
@@ -131,6 +140,7 @@ func applyPaneClosed(d *db.DB, paneID string) error {
 
 func init() {
 	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusTarget, "target", "", "Pane target: session:window.pane (auto-detected if omitted)")
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusPaneID, "pane-id", "", "Stable pane ID (%N format) for clearing moved panes (optional, auto-detected if omitted)")
 
 	eventHookErrorCmd.Flags().StringVar(&hookErrorTarget, "target", "", "Pane target: session:window.pane (optional)")
 	eventHookErrorCmd.Flags().StringVar(&hookErrorHook, "hook", "", "Hook name that failed (e.g. Stop, PreToolUse)")
