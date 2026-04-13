@@ -275,17 +275,17 @@ States are stored in a local SQLite database and reflected in the sidebar and st
 <summary>Setting and clearing states</summary>
 
 ```bash
-# Mark a pane as working
-demux state set --target myproject:1.0 --state working --tool claude --message "on it"
+# Mark a pane as working (use the stable pane ID: %N)
+demux state set --target-id %5 --state working --tool claude --message "on it"
 
 # Mark as done
-demux state set --target myproject:1.0 --state done --tool claude --message "task complete"
+demux state set --target-id %5 --state done --tool claude --message "task complete"
 
 # Clear a state (return to idle)
-demux state clear --target myproject:1.0
+demux state clear --target-id %5
 
 # Clear a flagged state (requires --yes)
-demux state clear --target myproject:1.0 --yes
+demux state clear --target-id %5 --yes
 
 # List all active states
 demux state ls
@@ -301,7 +301,7 @@ Use `--if-state` to only update if the current state matches:
 
 ```bash
 # Only set to idle if currently done (avoids overwriting active states)
-demux state set --target myproject:1.0 --state idle --if-state done
+demux state set --target-id %5 --state idle --if-state done
 ```
 
 **Write lock**
@@ -309,7 +309,7 @@ demux state set --target myproject:1.0 --state idle --if-state done
 When a tool sets an active state (`working` or `waiting`), that pane is locked. Another tool cannot overwrite it unless `--force` is passed:
 
 ```bash
-demux state set --target myproject:1.0 --state working --tool other --force
+demux state set --target-id %5 --state working --tool other --force
 ```
 
 > [!WARNING]
@@ -320,7 +320,7 @@ demux state set --target myproject:1.0 --state working --tool other --force
 The `flagged` state is a user-facing bookmark. It can only be set with `--source user`:
 
 ```bash
-demux state set --target myproject:1.0 --state flagged --source user --message "review this"
+demux state set --target-id %5 --state flagged --source user --message "review this"
 ```
 
 In the TUI, press `F` on a target to flag it directly. Press `F` again to unflag it.
@@ -708,16 +708,16 @@ tmux source ~/.tmux.conf
 
 ```tmux
 # Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
 ```
 
 </details>
@@ -748,7 +748,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" --force || demux event hook_error --hook PreToolUse --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" --force || demux event hook_error --hook PreToolUse --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -759,7 +759,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state waiting --tool claude --message \"awaiting permission\" || demux event hook_error --hook Notification.permission_prompt --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state waiting --tool claude --message \"awaiting permission\" || demux event hook_error --hook Notification.permission_prompt --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -768,7 +768,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state waiting --tool claude --message \"mcp input needed\" || demux event hook_error --hook Notification.elicitation_dialog --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state waiting --tool claude --message \"mcp input needed\" || demux event hook_error --hook Notification.elicitation_dialog --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -779,7 +779,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" || demux event hook_error --hook SessionStart.resume --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" || demux event hook_error --hook SessionStart.resume --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -789,7 +789,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" || demux event hook_error --hook UserPromptSubmit --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" || demux event hook_error --hook UserPromptSubmit --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -799,7 +799,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state working --tool claude --message \"spawning agent\" || demux event hook_error --hook SubagentStart --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"spawning agent\" || demux event hook_error --hook SubagentStart --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -809,7 +809,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state working --tool claude --message \"subagent complete\" || demux event hook_error --hook SubagentStop --tool claude --target \"$T\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"subagent complete\" || demux event hook_error --hook SubagentStop --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -819,7 +819,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state done --tool claude --message \"task complete\" || demux event hook_error --hook Stop --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state done --tool claude --message \"task complete\" || demux event hook_error --hook Stop --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
@@ -830,7 +830,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state error --tool claude --message \"rate limited\" || demux event hook_error --hook StopFailure.rate_limit --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state error --tool claude --message \"rate limited\" || demux event hook_error --hook StopFailure.rate_limit --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
@@ -839,7 +839,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state error --tool claude --message \"auth failed\" || demux event hook_error --hook StopFailure.authentication_failed --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state error --tool claude --message \"auth failed\" || demux event hook_error --hook StopFailure.authentication_failed --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
@@ -847,7 +847,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "T=\"$(tmux display-message -t \"$TMUX_PANE\" -p '#S:#I.#P')\" && demux state set --target \"$T\" --pane-id \"$TMUX_PANE\" --state error --tool claude --message \"task failed\" || demux event hook_error --hook StopFailure --tool claude --target \"$T\" --message \"state set failed\" --set-state-error",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state error --tool claude --message \"task failed\" || demux event hook_error --hook StopFailure --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\" --set-state-error",
           },
         ],
       },
@@ -902,11 +902,11 @@ demux state ls                     # list active (non-idle) states
 demux state ls --state <value>     # filter by state
 demux state ls --tool <name>       # filter by tool
 
-demux state set   --target <session:window[.pane]> --state working|waiting|done|error|flagged
+demux state set   --target-id <%N|@N|$N> --state working|waiting|done|error|flagged
                   [--tool <name>] [--message <text>] [--source tool|user]
-                  [--force] [--if-state <value>] [--pane-id <%N>]
+                  [--force] [--if-state <value>]
 
-demux state clear --target <session:window[.pane]> [--yes]
+demux state clear --target-id <%N|@N|$N> [--yes]
 
 # Search
 demux query <term>                       # fuzzy search sessions, windows, processes
@@ -918,7 +918,7 @@ demux status --format text         # plain text summary
 
 # Hooks
 demux event pane_focus             # clear done states for the focused pane (used by tmux hooks)
-demux event pane_focus --target <session:window.pane> [--pane-id <%N>]
+demux event pane_focus [--pane-id <%N>] [--window-id <@N>] [--session-id <$N>]
 
 # Config
 demux config init                  # print default config to stdout
@@ -942,7 +942,7 @@ Or pass `--log-level` for a single invocation without touching the config:
 
 ```bash
 demux --log-level debug
-demux state set --target myproject:1.0 --state working --tool claude --log-level debug
+demux state set --target-id %5 --state working --tool claude --log-level debug
 ```
 
 Then tail the log in a separate pane:
@@ -1010,7 +1010,7 @@ tail -f /tmp/tmux-hooks.log
 If the log file gets entries but states are not clearing, run the `pane_focus` event manually to isolate whether the issue is in the hook firing or in demux itself:
 
 ```bash
-demux event pane_focus --target <session:window.pane> --log-level debug
+demux event pane_focus --pane-id %5 --log-level debug
 ```
 
 **Claude hooks not firing**
@@ -1061,7 +1061,7 @@ Old `color_alert_*` keys in `demux.toml` are silently ignored. Missing `color_st
 demux alert set --target "$TARGET" --reason "Running: $TOOL_NAME" --level warn
 
 # after
-demux state set --target "$TARGET" --state working --tool claude --message "Running: $TOOL_NAME" || true
+demux state set --target-id "$TMUX_PANE" --state working --tool claude --message "Running: $TOOL_NAME" || true
 ```
 
 </details>
