@@ -225,7 +225,7 @@ func highestPriorityPaneTarget(sessionID string, states []db.ToolState) string {
 	best := ""
 	bestPri := -1
 	for _, st := range states {
-		if st.Target.SessionID != sessionID || st.Target.Type == "session" {
+		if st.Target.SessionID != sessionID || st.Target.Type == db.TargetTypeSession {
 			continue
 		}
 		if !st.Value.IsDisplayable() {
@@ -328,7 +328,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.clearCurrentState(st.Target)
 			}
 			sessionID := m.nameToIDMap[node.Session]
-			t := db.Target{Type: "session", ID: sessionID, SessionID: sessionID}
+			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
 			return m, m.flagCurrentState(t)
 		}
 	case key.Matches(msg, keys.WatchSession.Binding):
@@ -341,7 +341,7 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.showClearConfirm(st.Target), nil
 			}
 			sessionID := m.nameToIDMap[node.Session]
-			t := db.Target{Type: "session", ID: sessionID, SessionID: sessionID}
+			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
 			return m.showClearConfirm(t), nil
 		}
 	}
@@ -541,16 +541,22 @@ func (m Model) procListStateIdentity() *db.Target {
 	}
 	pane := node.Pane
 	if node.IsWindowHeader {
+		if pane.WindowID == "" {
+			return nil
+		}
 		t := db.Target{
-			Type:      "window",
+			Type:      db.TargetTypeWindow,
 			ID:        pane.WindowID,
 			SessionID: pane.SessionID,
 			WindowID:  pane.WindowID,
 		}
 		return &t
 	}
+	if pane.PaneID == "" {
+		return nil
+	}
 	t := db.Target{
-		Type:      "pane",
+		Type:      db.TargetTypePane,
 		ID:        pane.PaneID,
 		SessionID: pane.SessionID,
 		WindowID:  pane.WindowID,

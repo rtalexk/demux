@@ -20,6 +20,15 @@ func parseTS(s string) time.Time {
 	return time.Time{}
 }
 
+// TargetType identifies the kind of tmux entity a state record is attached to.
+type TargetType string
+
+const (
+	TargetTypePane    TargetType = "pane"
+	TargetTypeWindow  TargetType = "window"
+	TargetTypeSession TargetType = "session"
+)
+
 // StateValue is the integer enum stored in tool_states.value.
 type StateValue int
 
@@ -118,11 +127,11 @@ var ErrStateLocked = errors.New("target locked")
 
 // Target represents the identity of a state record.
 type Target struct {
-	Type      string // "session", "window", "pane"
-	ID        string // $N, @N, %N
-	SessionID string // $N — all record types
-	WindowID  string // @N — window and pane records
-	PaneID    string // %N — pane records only
+	Type      TargetType // TargetTypePane, TargetTypeWindow, or TargetTypeSession
+	ID        string     // $N, @N, %N
+	SessionID string     // $N — all record types
+	WindowID  string     // @N — window and pane records
+	PaneID    string     // %N — pane records only
 }
 
 // Format resolves the target to a compact human-readable display string using
@@ -132,8 +141,11 @@ type Target struct {
 // windowMap maps @N → "session:windowIndex"
 // sessionMap maps $N → session_name
 func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string {
+	// Note: pane rendering strips the session prefix and produces "winN·pM"
+	// (compact form). This intentionally differs from formatTarget in cmd/state.go,
+	// which uses the full resolved path for tabular CLI output.
 	switch t.Type {
-	case "pane":
+	case TargetTypePane:
 		if full := paneMap[t.ID]; full != "" {
 			if idx := strings.Index(full, ":"); idx >= 0 {
 				rest := full[idx+1:]
@@ -146,7 +158,7 @@ func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string 
 			return full
 		}
 		return t.ID
-	case "window":
+	case TargetTypeWindow:
 		if full := windowMap[t.ID]; full != "" {
 			if idx := strings.Index(full, ":"); idx >= 0 {
 				return "win" + full[idx+1:]
@@ -154,7 +166,7 @@ func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string 
 			return full
 		}
 		return t.ID
-	case "session":
+	case TargetTypeSession:
 		if name := sessionMap[t.ID]; name != "" {
 			return name
 		}
@@ -172,11 +184,11 @@ func ParseTargetID(id string) (Target, error) {
 	}
 	switch id[0] {
 	case '%':
-		return Target{Type: "pane", ID: id, PaneID: id}, nil
+		return Target{Type: TargetTypePane, ID: id, PaneID: id}, nil
 	case '@':
-		return Target{Type: "window", ID: id, WindowID: id}, nil
+		return Target{Type: TargetTypeWindow, ID: id, WindowID: id}, nil
 	case '$':
-		return Target{Type: "session", ID: id, SessionID: id}, nil
+		return Target{Type: TargetTypeSession, ID: id, SessionID: id}, nil
 	default:
 		return Target{}, fmt.Errorf("invalid target ID prefix %q: must start with %%, @, or $", id[:1])
 	}
@@ -294,30 +306,56 @@ func (d *DB) StateDeleteIfResting(t Target) error {
 // StateGCOrphaned deletes state records whose target is no longer live.
 // Takes maps of live pane IDs, window IDs, and session IDs.
 // Returns the number of records deleted.
+// Uses one DELETE per target type rather than one per orphaned row.
 func (d *DB) StateGCOrphaned(livePaneIDs, liveWindowIDs, liveSessionIDs map[string]bool) (int64, error) {
-	states, err := d.StateList(0, "")
+	tx, err := d.sql.Begin()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("begin StateGCOrphaned: %w", err)
 	}
-	var deleted int64
-	for _, st := range states {
-		orphaned := false
-		switch st.Target.Type {
-		case "pane":
-			orphaned = !livePaneIDs[st.Target.ID]
-		case "window":
-			orphaned = !liveWindowIDs[st.Target.ID]
-		case "session":
-			orphaned = !liveSessionIDs[st.Target.ID]
+	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+
+	var total int64
+	for _, item := range []struct {
+		targetType TargetType
+		live       map[string]bool
+	}{
+		{TargetTypePane, livePaneIDs},
+		{TargetTypeWindow, liveWindowIDs},
+		{TargetTypeSession, liveSessionIDs},
+	} {
+		n, err := gcDeleteOrphaned(tx, item.targetType, item.live)
+		if err != nil {
+			return total, err
 		}
-		if orphaned {
-			if err := d.StateClear(st.Target); err != nil {
-				return deleted, fmt.Errorf("gc: clear %v: %w", st.Target, err)
-			}
-			deleted++
-		}
+		total += n
 	}
-	return deleted, nil
+	return total, tx.Commit()
+}
+
+// gcDeleteOrphaned removes records of the given target type whose ID is not in liveIDs.
+func gcDeleteOrphaned(tx *sql.Tx, targetType TargetType, liveIDs map[string]bool) (int64, error) {
+	var res sql.Result
+	var err error
+	if len(liveIDs) == 0 {
+		res, err = tx.Exec(`DELETE FROM tool_states WHERE target_type = ?`, string(targetType))
+	} else {
+		args := make([]interface{}, 0, len(liveIDs)+1)
+		args = append(args, string(targetType))
+		placeholders := make([]string, 0, len(liveIDs))
+		for id := range liveIDs {
+			placeholders = append(placeholders, "?")
+			args = append(args, id)
+		}
+		query := fmt.Sprintf(
+			`DELETE FROM tool_states WHERE target_type = ? AND target_id NOT IN (%s)`,
+			strings.Join(placeholders, ", "),
+		)
+		res, err = tx.Exec(query, args...)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("gc orphaned %s: %w", targetType, err)
+	}
+	return res.RowsAffected()
 }
 
 // StateDeleteBySession removes all state records for the given session.

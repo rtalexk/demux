@@ -44,7 +44,7 @@ func ancestorIsLastAtDepth(nodes []ProcListNode, pos, ancDepth int) bool {
 }
 
 // assignTreePrefixes fills TreePrefix and StatPrefix on every non-header node.
-// It must be called after p.nodes is fully built by SetWindowData or SetSessionData.
+// It must be called after p.nodes is fully built by SetSessionData.
 //
 // Connectors used:
 //

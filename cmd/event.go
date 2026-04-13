@@ -14,8 +14,8 @@ var (
 	hookErrorSetStateError bool
 )
 
-var eventPaneFocusPaneID    string
-var eventPaneFocusWindowID  string
+var eventPaneFocusPaneID string
+var eventPaneFocusWindowID string
 var eventPaneFocusSessionID string
 
 var eventCmd = &cobra.Command{
@@ -54,14 +54,14 @@ func applyPaneFocus(d *db.DB, paneID, windowID, sessionID string) error {
 	demuxlog.Debug("pane_focus", "pane_id", paneID, "window_id", windowID, "session_id", sessionID)
 
 	// Clear resting states at all three levels
-	for _, targetType := range []string{"pane", "window", "session"} {
+	for _, targetType := range []db.TargetType{db.TargetTypePane, db.TargetTypeWindow, db.TargetTypeSession} {
 		var targetID string
 		switch targetType {
-		case "pane":
+		case db.TargetTypePane:
 			targetID = paneID
-		case "window":
+		case db.TargetTypeWindow:
 			targetID = windowID
-		case "session":
+		case db.TargetTypeSession:
 			targetID = sessionID
 		}
 		if targetID == "" {
@@ -109,15 +109,35 @@ func applyHookError() error {
 			return err
 		}
 		defer d.Close()
-		t, parseErr := db.ParseTargetID(hookErrorTarget)
-		if parseErr != nil {
-			demuxlog.Warn("hook_error: invalid target id, skipping state set", "target", hookErrorTarget)
-			return nil
+		return applyHookErrorDB(d, hookErrorTarget, hookErrorTool, hookErrorHook, hookErrorMessage)
+	}
+	return nil
+}
+
+// applyHookErrorDB writes a StateError record for targetID. It resolves
+// parent IDs from tmux (best-effort) so the row is associated with its
+// session in the TUI even when no prior state record exists.
+func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
+	t, parseErr := db.ParseTargetID(targetID)
+	if parseErr != nil {
+		demuxlog.Warn("hook_error: invalid target id, skipping state set", "target", targetID, "hook", hook)
+		return nil
+	}
+	// Resolve denormalized parent IDs (best-effort; no-op when tmux is unavailable).
+	switch t.Type {
+	case db.TargetTypePane:
+		if windowID, sessionID, tmuxErr := tmuxParentIDs(t.ID); tmuxErr == nil {
+			t.WindowID = windowID
+			t.SessionID = sessionID
 		}
-		if err := d.StateSet(t, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil); err != nil {
-			demuxlog.Error("hook_error: set state error failed", "target", t, "err", err)
-			return err
+	case db.TargetTypeWindow:
+		if _, sessionID, tmuxErr := tmuxParentIDs(t.ID); tmuxErr == nil {
+			t.SessionID = sessionID
 		}
+	}
+	if err := d.StateSet(t, tool, db.StateError, message, db.SourceTool, true, nil); err != nil {
+		demuxlog.Error("hook_error: set state error failed", "target", t, "err", err)
+		return err
 	}
 	return nil
 }
@@ -139,7 +159,7 @@ var eventPaneClosedCmd = &cobra.Command{
 
 func applyPaneClosed(d *db.DB, paneID string) error {
 	demuxlog.Debug("pane_closed", "pane_id", paneID)
-	t := db.Target{Type: "pane", ID: paneID, PaneID: paneID}
+	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
 	return d.StateClear(t)
 }
 

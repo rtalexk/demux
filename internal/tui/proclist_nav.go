@@ -53,7 +53,7 @@ func (p *ProcListModel) cursorNodeKey() string {
 }
 
 // applyPendingSeek moves the cursor to the node matching pendingSeekKey, then
-// clears the field. Called at the end of each SetWindowData / SetSessionData.
+// clears the field. Called at the end of each SetSessionData.
 func (p *ProcListModel) applyPendingSeek() {
 	if p.pendingSeekKey == "" {
 		return
@@ -315,7 +315,7 @@ func (p *ProcListModel) GotoBottom() {
 
 // ToggleCollapse flips the collapsed state of the cursor node if it is a
 // depth-1 process with children. Returns true if a toggle occurred.
-// The caller must re-call SetWindowData to rebuild nodes after a toggle.
+// The caller must re-call SetSessionData to rebuild nodes after a toggle.
 func (p *ProcListModel) ToggleCollapse() bool {
 	if p.cursor < 0 || p.cursor >= len(p.nodes) {
 		return false
@@ -332,7 +332,7 @@ func (p *ProcListModel) ToggleCollapse() bool {
 }
 
 // Expand expands the focused depth-1 process node if it has children and is collapsed.
-// Returns true if a change occurred; the caller must re-call SetWindowData.
+// Returns true if a change occurred; the caller must re-call SetSessionData.
 func (p *ProcListModel) Expand() bool {
 	if p.cursor < 0 || p.cursor >= len(p.nodes) {
 		return false
@@ -382,7 +382,7 @@ func (p *ProcListModel) collapseDeep() (int, bool) {
 
 // Collapse collapses the focused node. For depth-1 nodes with children it collapses
 // directly; for nodes at any deeper depth it walks up to the ancestor depth-1 node, moves
-// the cursor there, and collapses it. Returns true if a change occurred; the caller must re-call SetWindowData.
+// the cursor there, and collapses it. Returns true if a change occurred; the caller must re-call SetSessionData.
 func (p *ProcListModel) Collapse() bool {
 	if p.cursor < 0 || p.cursor >= len(p.nodes) {
 		return false
@@ -407,7 +407,7 @@ func (p *ProcListModel) Collapse() bool {
 }
 
 // ExpandAll expands all depth-1 process nodes that have children.
-// Returns true if any change occurred; the caller must re-call SetWindowData.
+// Returns true if any change occurred; the caller must re-call SetSessionData.
 // pendingSeekKey is set so that applyPendingSeek can restore focus after
 // the rebuild changes indices.
 func (p *ProcListModel) ExpandAll() bool {
@@ -429,8 +429,8 @@ func (p *ProcListModel) ExpandAll() bool {
 }
 
 // CollapseAll collapses all depth-1 process nodes that have children.
-// Returns true if any change occurred; the caller must re-call SetWindowData.
-// pendingSeekKey is set so that applyPendingSeek (called by SetWindowData) can
+// Returns true if any change occurred; the caller must re-call SetSessionData.
+// pendingSeekKey is set so that applyPendingSeek (called by SetSessionData) can
 // restore focus to the same logical node after the rebuild changes indices.
 func (p *ProcListModel) CollapseAll() bool {
 	if p.collapsedPIDs == nil {

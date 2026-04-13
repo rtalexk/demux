@@ -168,7 +168,7 @@ func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 		if sessID != "" {
 			matches = st.Target.SessionID == sessID
 		} else {
-			matches = st.Target.Type == "session" && st.Target.ID == sess
+			matches = st.Target.Type == db.TargetTypeSession && st.Target.ID == sess
 		}
 		if !matches {
 			continue

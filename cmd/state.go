@@ -101,19 +101,19 @@ func applyStateSet(d *db.DB) error {
 	// directly, so cross-pane calls (--target-id %7 from pane %5) store the
 	// correct parent IDs rather than the caller's own context.
 	switch target.Type {
-	case "pane":
+	case db.TargetTypePane:
 		target.PaneID = target.ID
 		if windowID, sessionID, tmuxErr := tmuxParentIDs(target.ID); tmuxErr == nil {
 			target.WindowID = windowID
 			target.SessionID = sessionID
 		}
 		// Best-effort: if tmux fails, continue with partial Target
-	case "window":
+	case db.TargetTypeWindow:
 		target.WindowID = target.ID
 		if _, sessionID, tmuxErr := tmuxParentIDs(target.ID); tmuxErr == nil {
 			target.SessionID = sessionID
 		}
-	case "session":
+	case db.TargetTypeSession:
 		target.SessionID = target.ID
 	}
 
@@ -197,15 +197,15 @@ func (r stateRow) Fields() []string {
 // Falls back to the raw stable ID if not found in maps.
 func formatTarget(t db.Target, paneIDMap, windowIDMap, sessionIDMap map[string]string) string {
 	switch t.Type {
-	case "pane":
+	case db.TargetTypePane:
 		if resolved, ok := paneIDMap[t.ID]; ok {
 			return resolved
 		}
-	case "window":
+	case db.TargetTypeWindow:
 		if resolved, ok := windowIDMap[t.ID]; ok {
 			return resolved
 		}
-	case "session":
+	case db.TargetTypeSession:
 		if resolved, ok := sessionIDMap[t.ID]; ok {
 			return resolved
 		}
@@ -254,7 +254,7 @@ func runStateList(cmd *cobra.Command, args []string) error {
 		rows[i] = stateRow{
 			target:     formatTarget(st.Target, paneIDMap, windowIDMap, sessionIDMap),
 			targetID:   st.Target.ID,
-			targetType: st.Target.Type,
+			targetType: string(st.Target.Type),
 			tool:       tool,
 			value:      st.Value.String(),
 			message:    st.Message,
