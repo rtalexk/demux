@@ -8,22 +8,6 @@ import (
 	"time"
 )
 
-// Session represents a tmux session.
-type Session struct {
-	ID       string // e.g. $1
-	Name     string
-	Activity time.Time
-}
-
-// Window represents a tmux window.
-type Window struct {
-	ID          string // e.g. @5
-	SessionID   string // e.g. $1
-	Session     string
-	WindowIndex int
-	Name        string
-}
-
 type Pane struct {
 	Session         string
 	SessionID       string // $N — new
@@ -61,7 +45,7 @@ func ParsePanes(raw string) ([]Pane, error) {
 			continue
 		}
 		parts := strings.Split(line, "\t")
-		if len(parts) < 5 {
+		if len(parts) < 6 {
 			continue
 		}
 		wi, _ := strconv.Atoi(parts[2])
