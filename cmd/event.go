@@ -17,6 +17,7 @@ var (
 var eventPaneFocusPaneID string
 var eventPaneFocusWindowID string
 var eventPaneFocusSessionID string
+var eventPaneFocusTarget string // pre-v8: resolved to stable IDs via tmux
 
 var eventCmd = &cobra.Command{
 	Use:   "event",
@@ -31,13 +32,18 @@ var eventPaneFocusCmd = &cobra.Command{
 		windowID := eventPaneFocusWindowID
 		sessionID := eventPaneFocusSessionID
 
-		// Auto-detect if not provided
-		if paneID == "" {
-			var err error
-			paneID, windowID, sessionID, err = tmuxCurrentIDs()
-			if err != nil {
-				return err
-			}
+		var idErr error
+		switch {
+		case paneID != "":
+			// New hook: stable IDs provided directly.
+		case eventPaneFocusTarget != "":
+			// Pre-v8 hook: resolve "session:window.pane" to stable IDs.
+			paneID, windowID, sessionID, idErr = tmuxResolveTarget(eventPaneFocusTarget)
+		default:
+			paneID, windowID, sessionID, idErr = tmuxCurrentIDs()
+		}
+		if idErr != nil {
+			return idErr
 		}
 
 		d, err := openDB()
@@ -154,6 +160,9 @@ func init() {
 	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusPaneID, "pane-id", "", "Stable pane ID (%N format); auto-detected if omitted")
 	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusWindowID, "window-id", "", "Stable window ID (@N format); auto-detected if omitted")
 	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusSessionID, "session-id", "", "Stable session ID ($N format); auto-detected if omitted")
+	// --target accepted for backward compatibility with pre-v8 hook snippets; value is ignored.
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusTarget, "target", "", "")
+	_ = eventPaneFocusCmd.Flags().MarkHidden("target")
 
 	eventHookErrorCmd.Flags().StringVar(&hookErrorTarget, "target-id", "", "Target ID (%N, @N, or $N) (optional)")
 	eventHookErrorCmd.Flags().StringVar(&hookErrorHook, "hook", "", "Hook name that failed (e.g. Stop, PreToolUse)")

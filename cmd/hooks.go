@@ -99,6 +99,21 @@ func tmuxParentIDs(targetID string) (windowID, sessionID string, err error) {
 	return parts[0], parts[1], nil
 }
 
+// tmuxResolveTarget resolves any tmux target string (including human-readable
+// "session:window.pane" format) to stable pane, window, and session IDs.
+// Used to handle pre-v8 hook snippets that passed --target instead of --pane-id.
+func tmuxResolveTarget(target string) (paneID, windowID, sessionID string, err error) {
+	out, execErr := exec.Command("tmux", "display-message", "-t", target, "-p", "#{pane_id}\t#{window_id}\t#{session_id}").Output()
+	if execErr != nil {
+		return "", "", "", fmt.Errorf("resolve tmux target %q: %w", target, execErr)
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), "\t")
+	if len(parts) < 3 {
+		return "", "", "", fmt.Errorf("unexpected tmux output for %q", target)
+	}
+	return parts[0], parts[1], parts[2], nil
+}
+
 const tmuxHooksSnippet = `# demux tmux hooks
 # ──────────────────────────────────────────────────────────────────────────────
 # Paste the lines below into ~/.tmux.conf, then reload with:

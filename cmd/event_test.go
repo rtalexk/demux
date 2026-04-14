@@ -108,6 +108,25 @@ func TestApplyPaneFocus_ClearsByStableID(t *testing.T) {
 	}
 }
 
+func TestApplyPaneFocus_PaneOnlyIDClearsPaneState(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	// Old hook style: only pane-id is known (window-id/session-id empty).
+	// Pane-level state must still be cleared even without parent IDs.
+	pt := paneTarget("%5", "@1", "$0")
+	d.StateSet(pt, "claude", db.StateDone, "finished", db.SourceTool, false, nil)
+
+	if err := applyPaneFocus(d, "%5", "", ""); err != nil {
+		t.Fatal(err)
+	}
+
+	st, _ := d.StateByID(pt)
+	if st != nil {
+		t.Errorf("pane state should be cleared even when window/session IDs absent, got: %+v", st)
+	}
+}
+
 func TestApplyPaneClosed_DeletesPaneState(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
