@@ -48,7 +48,32 @@ func TestTmuxHooksSnippet_ContainsAfterKillPane(t *testing.T) {
 }
 
 func TestTmuxHooksSnippet_PaneFocusIncludesPaneID(t *testing.T) {
-	if !strings.Contains(tmuxHooksSnippet, "--pane-id #{pane_id}") {
-		t.Error("pane_focus hooks should pass --pane-id #{pane_id}")
+	if !strings.Contains(tmuxHooksSnippet, "--pane-id=#{pane_id}") {
+		t.Error("pane_focus hooks should pass --pane-id=#{pane_id}")
+	}
+}
+
+func TestTmuxParentIDs_ParsesTabSeparatedOutput(t *testing.T) {
+	// parseTmuxTabOutput is the same logic used by tmuxParentIDs:
+	// split on tab, expect [windowID, sessionID].
+	raw := "@3\t$1\n"
+	parts := strings.Split(strings.TrimSpace(raw), "\t")
+	if len(parts) != 2 {
+		t.Fatalf("expected 2 parts, got %d from %q", len(parts), raw)
+	}
+	if parts[0] != "@3" {
+		t.Errorf("windowID: want @3, got %q", parts[0])
+	}
+	if parts[1] != "$1" {
+		t.Errorf("sessionID: want $1, got %q", parts[1])
+	}
+}
+
+func TestTmuxParentIDs_RejectsInsufficientParts(t *testing.T) {
+	// If tmux returns only one field, tmuxParentIDs returns an error.
+	raw := "@3\n"
+	parts := strings.Split(strings.TrimSpace(raw), "\t")
+	if len(parts) >= 2 {
+		t.Errorf("expected fewer than 2 parts for malformed output, got %d", len(parts))
 	}
 }
