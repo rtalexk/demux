@@ -159,7 +159,6 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 	sessID := s.nameToID[sess]
 	var best *db.ToolState
-	found := false
 	bestPri := 0
 	for i := range s.states {
 		st := &s.states[i]
@@ -174,8 +173,7 @@ func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 			continue
 		}
 		pri := st.Value.Priority()
-		if !found || pri > bestPri {
-			found = true
+		if best == nil || pri > bestPri {
 			bestPri = pri
 			best = st
 		}
