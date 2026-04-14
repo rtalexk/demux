@@ -9,7 +9,7 @@ func TestParseTargetID_Pane(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseTargetID(%q) failed: %v", "%12", err)
 	}
-	if target.Type != "pane" {
+	if target.Type != TargetTypePane {
 		t.Errorf("type: want pane, got %q", target.Type)
 	}
 	if target.ID != "%12" {
@@ -25,7 +25,7 @@ func TestParseTargetID_Window(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseTargetID(%q) failed: %v", "@5", err)
 	}
-	if target.Type != "window" {
+	if target.Type != TargetTypeWindow {
 		t.Errorf("type: want window, got %q", target.Type)
 	}
 	if target.ID != "@5" {
@@ -41,7 +41,7 @@ func TestParseTargetID_Session(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseTargetID(%q) failed: %v", "$1", err)
 	}
-	if target.Type != "session" {
+	if target.Type != TargetTypeSession {
 		t.Errorf("type: want session, got %q", target.Type)
 	}
 	if target.ID != "$1" {
