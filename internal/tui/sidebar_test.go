@@ -429,8 +429,9 @@ func TestRebuildNodes_NoAlerts_AlphabeticalOrder(t *testing.T) {
 func TestRebuildNodes_SessionWithStateSortsFirst(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWorking},
 		},
 	}
 	s.rebuildNodes()
@@ -443,9 +444,10 @@ func TestRebuildNodes_HigherPriorityStateSortsFirst(t *testing.T) {
 	// error > working, so vem-main (error) must sort before dm-main (working)
 	s := SidebarModel{
 		sessions: makeSessions("dm-main", "vem-main"),
+		nameToID: map[string]string{"dm-main": "$1", "vem-main": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "dm-main"}, Value: db.StateWorking},
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "vem-main"}, Value: db.StateError},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateError},
 		},
 	}
 	s.rebuildNodes()
@@ -507,8 +509,9 @@ func TestRebuildNodes_LastSeenSort_ThenAlpha(t *testing.T) {
 func TestToggleAlertFilter_FilterOnHidesSessionsWithoutAlerts(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -561,8 +564,9 @@ func TestSetFilter_AllFiltersToggle(t *testing.T) {
 func TestToggleAlertFilter_ToggleOffRestoresAllSessions(t *testing.T) {
 	s := SidebarModel{
 		sessions: makeSessions("alpha", "beta"),
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWorking},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{}},
 	}
@@ -613,8 +617,9 @@ func TestFirstStateSession_ReturnsFirstWithState(t *testing.T) {
 			{DisplayName: "beta", IsLive: true},
 			{DisplayName: "gamma", IsLive: true},
 		},
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2", "gamma": "$3"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "gamma"}, Value: db.StateWaiting},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$3", SessionID: "$3"}, Value: db.StateWaiting},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"alphabetical"}}},
 	}
@@ -632,9 +637,10 @@ func TestFirstStateSession_PrioritySort(t *testing.T) {
 			{DisplayName: "alpha", IsLive: true},
 			{DisplayName: "beta", IsLive: true},
 		},
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateIdle},
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateError},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateIdle},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateError},
 		},
 		cfg: config.Config{Sidebar: config.SidebarConfig{Sort: []string{"priority", "alphabetical"}}},
 	}
@@ -740,8 +746,9 @@ func TestVisibleSessions_FilterPriority_HidesNoAlert(t *testing.T) {
 			{DisplayName: "alerted", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
+		nameToID: map[string]string{"alerted": "$1", "clean": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "alerted"}, Value: db.StateError},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateError},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -758,8 +765,9 @@ func TestFilterPriority_IncludesFlagged(t *testing.T) {
 			{DisplayName: "flagged", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
+		nameToID: map[string]string{"flagged": "$1", "clean": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "flagged"}, Value: db.StateFlagged},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateFlagged},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -776,8 +784,9 @@ func TestFilterPriority_ExcludesDone(t *testing.T) {
 			{DisplayName: "done-sess", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
+		nameToID: map[string]string{"done-sess": "$1", "clean": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "done-sess"}, Value: db.StateDone},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateDone},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
@@ -796,8 +805,9 @@ func TestFilterPriority_IncludesWorkingWhenFlagSet(t *testing.T) {
 			{DisplayName: "working-sess", IsLive: true},
 			{DisplayName: "clean", IsLive: true},
 		},
+		nameToID: map[string]string{"working-sess": "$1", "clean": "$2"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "working-sess"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWorking},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{Tui: config.TuiConfig{AttentionFilterIncludeWorking: true}},
@@ -813,8 +823,9 @@ func TestFilterPriority_ExcludesWorkingByDefault(t *testing.T) {
 		sessions: []session.Session{
 			{DisplayName: "working-sess", IsLive: true},
 		},
+		nameToID: map[string]string{"working-sess": "$1"},
 		states: []db.ToolState{
-			{Target: db.Target{Type: db.TargetTypeSession, ID: "working-sess"}, Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWorking},
 		},
 		filter: FilterPriority,
 		cfg:    config.Config{},
