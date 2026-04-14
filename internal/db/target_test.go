@@ -65,3 +65,62 @@ func TestParseTargetID_EmptyID(t *testing.T) {
 		t.Error("ParseTargetID() should fail on empty string")
 	}
 }
+
+func TestTargetFormat_Pane(t *testing.T) {
+	target := Target{Type: TargetTypePane, ID: "%3"}
+	paneMap := map[string]string{"%3": "mySession:1.0"}
+	got := target.Format(paneMap, nil, nil)
+	if got != "win1·p0" {
+		t.Errorf("Format() = %q, want %q", got, "win1·p0")
+	}
+}
+
+func TestTargetFormat_Pane_FallbackToRawID(t *testing.T) {
+	target := Target{Type: TargetTypePane, ID: "%3"}
+	got := target.Format(nil, nil, nil)
+	if got != "%3" {
+		t.Errorf("Format() = %q, want %q", got, "%3")
+	}
+}
+
+func TestTargetFormat_Window(t *testing.T) {
+	target := Target{Type: TargetTypeWindow, ID: "@2"}
+	windowMap := map[string]string{"@2": "mySession:3"}
+	got := target.Format(nil, windowMap, nil)
+	if got != "win3" {
+		t.Errorf("Format() = %q, want %q", got, "win3")
+	}
+}
+
+func TestTargetFormat_Window_FallbackToRawID(t *testing.T) {
+	target := Target{Type: TargetTypeWindow, ID: "@2"}
+	got := target.Format(nil, nil, nil)
+	if got != "@2" {
+		t.Errorf("Format() = %q, want %q", got, "@2")
+	}
+}
+
+func TestTargetFormat_Session(t *testing.T) {
+	target := Target{Type: TargetTypeSession, ID: "$1"}
+	sessionMap := map[string]string{"$1": "mySession"}
+	got := target.Format(nil, nil, sessionMap)
+	if got != "mySession" {
+		t.Errorf("Format() = %q, want %q", got, "mySession")
+	}
+}
+
+func TestTargetFormat_Session_FallbackToRawID(t *testing.T) {
+	target := Target{Type: TargetTypeSession, ID: "$1"}
+	got := target.Format(nil, nil, nil)
+	if got != "$1" {
+		t.Errorf("Format() = %q, want %q", got, "$1")
+	}
+}
+
+func TestTargetFormat_UnknownType(t *testing.T) {
+	target := Target{Type: "bogus", ID: "xyz"}
+	got := target.Format(nil, nil, nil)
+	if got != "xyz" {
+		t.Errorf("Format() = %q, want raw ID %q for unknown type", got, "xyz")
+	}
+}
