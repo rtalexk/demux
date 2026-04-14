@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -698,11 +699,19 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 	case ActionViewLogs:
 		paneID := m.actionMenu.target.Pane.PaneID
 		m.showActionMenu = false
-		script := fmt.Sprintf("tmux capture-pane -t %s -p -S -32768 | less -R", paneID)
-		return m, tea.ExecProcess(
-			exec.Command("tmux", "display-popup", "-E", "-w", "80%", "-h", "80%", script),
-			func(err error) tea.Msg { return nil },
-		)
+		return m, func() tea.Msg {
+			out, err := exec.Command("tmux", "capture-pane", "-t", paneID, "-p", "-S", "-32768").Output()
+			if err != nil {
+				return procActionMsg{"logs: " + err.Error()}
+			}
+			f, err := os.CreateTemp("", "demux-logs-*.log")
+			if err != nil {
+				return procActionMsg{"logs: " + err.Error()}
+			}
+			_, _ = f.Write(out)
+			_ = f.Close()
+			return openViewerMsg{path: f.Name()}
+		}
 
 	case ActionCopyPID:
 		val := fmt.Sprintf("%d", m.actionMenu.target.Proc.PID)
@@ -746,9 +755,21 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 
 	case ActionShowEnv:
 		pid := m.actionMenu.target.Proc.PID
+		m.showActionMenu = false
 		return m, func() tea.Msg {
 			lines, err := proc.Environ(pid)
-			return envResultMsg{lines: lines, err: err}
+			if err != nil {
+				return procActionMsg{"env: " + err.Error()}
+			}
+			f, err := os.CreateTemp("", "demux-env-*.txt")
+			if err != nil {
+				return procActionMsg{"env: " + err.Error()}
+			}
+			for _, l := range lines {
+				_, _ = fmt.Fprintln(f, l)
+			}
+			_ = f.Close()
+			return openViewerMsg{path: f.Name(), ftCmd: "set ft=sh"}
 		}
 
 	case ActionShowFullCmd:

@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -57,8 +58,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueryResultMsg(msg)
 	case searchDebounceMsg:
 		return m.handleSearchDebounceMsg(msg)
-	case envResultMsg:
-		return m.handleEnvResultMsg(msg)
+	case openViewerMsg:
+		return m.handleOpenViewerMsg(msg)
 	case procActionMsg:
 		m.statusMsg = msg.status
 		m.statusExp = time.Now().Add(3 * time.Second)
@@ -67,16 +68,27 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleEnvResultMsg(msg envResultMsg) (Model, tea.Cmd) {
-	if msg.err != nil {
-		m.statusMsg = "env: " + msg.err.Error()
-		m.statusExp = time.Now().Add(4 * time.Second)
-		return m, nil
+func (m Model) handleOpenViewerMsg(msg openViewerMsg) (Model, tea.Cmd) {
+	args := findViewer()
+	if msg.ftCmd != "" {
+		args = append(args, "-c", msg.ftCmd)
 	}
-	m.actionMenu.subPopup = SubPopupEnvVars
-	m.actionMenu.subLines = msg.lines
-	m.actionMenu.subScrollOff = 0
-	return m, nil
+	args = append(args, msg.path)
+	return m, tea.ExecProcess(exec.Command(args[0], args[1:]...), func(err error) tea.Msg {
+		_ = os.Remove(msg.path)
+		return nil
+	})
+}
+
+// findViewer returns the command+args for the best available read-only viewer:
+// nvim, vim, or vi (all accept -R for read-only mode).
+func findViewer() []string {
+	for _, ed := range []string{"nvim", "vim", "vi"} {
+		if _, err := exec.LookPath(ed); err == nil {
+			return []string{ed, "-R"}
+		}
+	}
+	return []string{"vi", "-R"}
 }
 
 // handleOverlays routes key messages to full-screen overlay handlers.

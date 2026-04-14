@@ -246,8 +246,8 @@ func TestActionMenu_SubPopup_EscReturnsToMenu(t *testing.T) {
 	m.showActionMenu = true
 	m.actionMenu = ActionMenuModel{
 		items:    []ActionItem{{ActionKill, "Kill"}},
-		subPopup: SubPopupEnvVars,
-		subLines: []string{"FOO=bar"},
+		subPopup: SubPopupFullCmd,
+		subLines: []string{"node", "server.js"},
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := result.(Model)

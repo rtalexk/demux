@@ -85,9 +85,13 @@ type gitResultMsg struct {
 }
 
 type searchDebounceMsg struct{ gen int }
-type envResultMsg struct {
-	lines []string
-	err   error
+
+// openViewerMsg carries the path to a temp file that should be opened in a
+// read-only terminal viewer (nvim/vim/vi -R).
+// ftCmd is an optional ex-command passed via -c (e.g. "set ft=sh").
+type openViewerMsg struct {
+	path  string
+	ftCmd string
 }
 
 // procActionMsg carries the result of an async process action (kill, restart, etc.)
@@ -340,7 +344,7 @@ func (m Model) applyOverlay(base string) string {
 		switch m.actionMenu.subPopup {
 		case SubPopupKillConfirm:
 			return overlayCenter(m.actionMenu.RenderKillConfirm(), base, m.width, m.height)
-		case SubPopupEnvVars, SubPopupFullCmd:
+		case SubPopupFullCmd:
 			return overlayCenter(m.actionMenu.RenderSubPopup(20), base, m.width, m.height)
 		default:
 			return overlayCenter(m.actionMenu.Render(), base, m.width, m.height)

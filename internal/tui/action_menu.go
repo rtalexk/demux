@@ -26,7 +26,6 @@ type SubPopupKind int
 const (
 	SubPopupNone SubPopupKind = iota
 	SubPopupKillConfirm
-	SubPopupEnvVars
 	SubPopupFullCmd
 )
 
@@ -138,8 +137,6 @@ func (a ActionMenuModel) RenderKillConfirm() string {
 func (a ActionMenuModel) RenderSubPopup(height int) string {
 	var title string
 	switch a.subPopup {
-	case SubPopupEnvVars:
-		title = fmt.Sprintf("Environment: %s (%d)", a.target.Proc.FriendlyName(), a.target.Proc.PID)
 	case SubPopupFullCmd:
 		title = fmt.Sprintf("Command: %s (%d)", a.target.Proc.FriendlyName(), a.target.Proc.PID)
 	default:
