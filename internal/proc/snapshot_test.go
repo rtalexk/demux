@@ -2,6 +2,7 @@ package proc_test
 
 import (
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/rtalexk/demux/internal/proc"
@@ -24,6 +25,33 @@ func TestSnapshot(t *testing.T) {
 	}
 	if !found {
 		t.Error("current process not found in snapshot")
+	}
+}
+
+func TestKill_InvalidPID(t *testing.T) {
+	err := proc.Kill(-999)
+	if err == nil {
+		t.Error("expected error killing invalid PID, got nil")
+	}
+}
+
+func TestEnviron_CurrentProcess(t *testing.T) {
+	if runtime.GOOS == "darwin" {
+		t.Skip("gopsutil Environ not implemented on macOS")
+	}
+	envs, err := proc.Environ(int32(os.Getpid()))
+	if err != nil {
+		t.Fatalf("Environ current process: %v", err)
+	}
+	if len(envs) == 0 {
+		t.Error("expected at least one env var for current process")
+	}
+}
+
+func TestEnviron_InvalidPID(t *testing.T) {
+	_, err := proc.Environ(-999)
+	if err == nil {
+		t.Error("expected error for invalid PID, got nil")
 	}
 }
 
