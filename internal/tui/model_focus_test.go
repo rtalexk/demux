@@ -18,9 +18,9 @@ func focusTestModel(focusOnOpen string) Model {
 
 func applyPanesMsg(m Model, currentSession string) (Model, tea.Cmd) {
 	panes := []tmux.Pane{
-		{Session: "alpha", WindowIndex: 0},
-		{Session: "alpha", WindowIndex: 1},
-		{Session: "beta", WindowIndex: 0},
+		{Session: "alpha", SessionID: "$1", WindowIndex: 0},
+		{Session: "alpha", SessionID: "$1", WindowIndex: 1},
+		{Session: "beta", SessionID: "$2", WindowIndex: 0},
 	}
 	msg := panesMsg{panes: panes, currentSession: currentSession}
 	updated, cmd := m.Update(msg)
@@ -83,7 +83,7 @@ func TestFocusSearchOnOpen_false(t *testing.T) {
 // before the panesMsg (the race introduced by fetching both in Init).
 func TestStateSession_StatesBeforePanes(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWaiting},
 	}
 	m := focusTestModel("state_session")
 	m.height = 40
@@ -108,7 +108,7 @@ func TestStateSession_StatesBeforePanes(t *testing.T) {
 // in handleStatesMsg once m.ready is true.
 func TestStateSession_PanesBeforeStates(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateWaiting},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWaiting},
 	}
 	m := focusTestModel("state_session")
 	m.height = 40
@@ -130,7 +130,7 @@ func TestStateSession_PanesBeforeStates(t *testing.T) {
 // state priority on the first panes render when states arrived first.
 func TestStartupSort_StatesBeforePanes(t *testing.T) {
 	states := []db.ToolState{
-		{Target: db.Target{Type: db.TargetTypeSession, ID: "beta"}, Value: db.StateError},
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateError},
 	}
 	m := focusTestModel("")
 	m.height = 40
