@@ -28,7 +28,7 @@ type ProcListNode struct {
 	Collapsed   bool    // true when children are hidden
 	AggCPU      float64 // CPU% summed across parent + all descendants
 	AggMemRSS   uint64  // MemRSS summed across parent + all descendants
-	// tree drawing (set by assignTreePrefixes after SetWindowData)
+	// tree drawing (set by assignTreePrefixes after SetSessionData)
 	TreePrefix string // line-1 prefix, e.g. "  ├─ " or "  └─ "
 	StatPrefix string // line-2 (stats) prefix, e.g. "  │  " or "     "
 }
