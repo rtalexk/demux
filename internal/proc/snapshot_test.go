@@ -2,7 +2,6 @@ package proc_test
 
 import (
 	"os"
-	"runtime"
 	"testing"
 
 	"github.com/rtalexk/demux/internal/proc"
@@ -36,9 +35,6 @@ func TestKill_InvalidPID(t *testing.T) {
 }
 
 func TestEnviron_CurrentProcess(t *testing.T) {
-	if runtime.GOOS == "darwin" {
-		t.Skip("gopsutil Environ not implemented on macOS")
-	}
 	envs, err := proc.Environ(int32(os.Getpid()))
 	if err != nil {
 		t.Fatalf("Environ current process: %v", err)

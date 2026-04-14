@@ -94,11 +94,7 @@ func Kill(pid int32) error {
 // Environ returns the environment variables for the process with the given PID.
 // Returns an error if the process does not exist or access is denied.
 func Environ(pid int32) ([]string, error) {
-	p, err := gops.NewProcess(pid)
-	if err != nil {
-		return nil, fmt.Errorf("process %d: %w", pid, err)
-	}
-	return p.Environ()
+	return environPlatform(pid)
 }
 
 func BuildTree(procs []Process) map[int32][]Process {
