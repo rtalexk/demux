@@ -126,24 +126,30 @@ const tmuxHooksSnippet = `# demux tmux hooks
 #   All three are needed: each navigation action fires a different hook.
 #   Together they cover every way a pane can receive focus.
 #   after-kill-pane     — fires when a pane is closed; removes its state record.
+#
+# Flag syntax note: flags use --flag=value (not --flag value). tmux expands
+# #{session_id} to the raw tmux ID (e.g. $8). The shell then expands $8 as a
+# positional parameter, which is empty. With --flag value, an empty expansion
+# leaves the flag with no argument and the command fails. With --flag=value, an
+# empty expansion produces --flag= (empty string), which is valid.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Removes Demux state when a pane is closed (prevents stale state accumulation).
 # #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
 # the kill — using #{pane_id} here would clear the wrong pane's state.
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{hook_pane} 2>/dev/null; true'"
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
