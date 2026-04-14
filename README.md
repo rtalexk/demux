@@ -702,22 +702,35 @@ Paste the output into `~/.tmux.conf` and reload:
 tmux source ~/.tmux.conf
 ```
 
+> [!CAUTION]
+> Use `--flag=value` syntax (not `--flag value`) in tmux hooks. tmux expands
+> `#{session_id}` to a raw ID like `$8`; the shell then treats `$8` as a
+> positional parameter, which is empty. With `--flag value` the empty expansion
+> leaves the flag without an argument and the command silently fails. With
+> `--flag=value` the empty expansion produces `--flag=` (empty string), which
+> is valid and handled correctly.
+
 <details>
 
 <summary>Tmux hook snippet</summary>
 
 ```tmux
+# Note: flags use --flag=value (not --flag value). tmux expands #{session_id} to a
+# raw ID like $8; the shell then treats $8 as a positional parameter (empty). With
+# --flag value an empty expansion leaves the flag with no argument. With --flag=value
+# an empty expansion produces --flag= (empty string), which is valid.
+
 # Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id #{pane_id} --window-id #{window_id} --session-id #{session_id} 2>/dev/null; true'"
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 ```
 
 </details>
