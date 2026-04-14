@@ -2,6 +2,9 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -683,14 +686,78 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 	case ActionKill:
 		m.actionMenu.subPopup = SubPopupKillConfirm
 		return m, nil
+
+	case ActionRestart:
+		paneID := m.actionMenu.target.Pane.PaneID
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			_ = exec.Command("tmux", "send-keys", "-t", paneID, "Up", "Enter").Run()
+			return nil
+		}
+
+	case ActionViewLogs:
+		paneID := m.actionMenu.target.Pane.PaneID
+		m.showActionMenu = false
+		script := fmt.Sprintf("tmux capture-pane -t %s -p -S -32768 | less -R", paneID)
+		return m, tea.ExecProcess(
+			exec.Command("tmux", "display-popup", "-E", "-w", "80%", "-h", "80%", script),
+			func(err error) tea.Msg { return nil },
+		)
+
+	case ActionCopyPID:
+		val := fmt.Sprintf("%d", m.actionMenu.target.Proc.PID)
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			_ = CopyToClipboard(val)
+			return procActionMsg{"copied PID " + val}
+		}
+
+	case ActionCopyCommand:
+		val := m.actionMenu.target.Proc.Cmdline
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			_ = CopyToClipboard(val)
+			return procActionMsg{"copied command"}
+		}
+
+	case ActionCopyCWD:
+		val := m.actionMenu.target.Pane.CWD
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			_ = CopyToClipboard(val)
+			return procActionMsg{"copied working directory"}
+		}
+
+	case ActionOpenBrowser:
+		port := m.actionMenu.target.Port
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			url := fmt.Sprintf("http://localhost:%d", port)
+			var cmd *exec.Cmd
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", url)
+			default:
+				cmd = exec.Command("xdg-open", url)
+			}
+			_ = cmd.Run()
+			return nil
+		}
+
 	case ActionShowEnv:
 		pid := m.actionMenu.target.Proc.PID
 		return m, func() tea.Msg {
 			lines, err := proc.Environ(pid)
 			return envResultMsg{lines: lines, err: err}
 		}
+
+	case ActionShowFullCmd:
+		lines := strings.Fields(m.actionMenu.target.Proc.Cmdline)
+		m.actionMenu.subPopup = SubPopupFullCmd
+		m.actionMenu.subLines = lines
+		m.actionMenu.subScrollOff = 0
+		return m, nil
 	}
-	// Remaining actions (restart, logs, copy, browser, full cmd) wired in next tasks.
 	return m, nil
 }
 
