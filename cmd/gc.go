@@ -39,6 +39,11 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 		}
 	}
 
+	if len(livePaneIDs) == 0 && len(liveWindowIDs) == 0 && len(liveSessionIDs) == 0 {
+		fmt.Println("No live tmux targets found; skipping GC to avoid data loss.")
+		return nil
+	}
+
 	d, err := openDB()
 	if err != nil {
 		return err
