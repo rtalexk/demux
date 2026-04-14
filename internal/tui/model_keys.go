@@ -328,6 +328,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, m.clearCurrentState(st.Target)
 			}
 			sessionID := m.nameToIDMap[node.Session]
+			if sessionID == "" {
+				break // session not live in tmux; no stable ID to flag
+			}
 			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
 			return m, m.flagCurrentState(t)
 		}
@@ -341,6 +344,9 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m.showClearConfirm(st.Target), nil
 			}
 			sessionID := m.nameToIDMap[node.Session]
+			if sessionID == "" {
+				break // session not live in tmux; nothing to clear
+			}
 			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
 			return m.showClearConfirm(t), nil
 		}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
+	demuxlog "github.com/rtalexk/demux/internal/log"
 	_ "modernc.org/sqlite"
 )
 
@@ -334,7 +335,13 @@ func (d *DB) migrateV8() error {
 		return fmt.Errorf("begin v8: %w", err)
 	}
 
-	// Drop the old table.
+	// Drop the old table. This is intentionally destructive: the old string
+	// target format cannot be backfilled with stable IDs without live tmux.
+	var rowCount int
+	_ = tx.QueryRow(`SELECT COUNT(*) FROM tool_states`).Scan(&rowCount)
+	if rowCount > 0 {
+		demuxlog.Warn("migrateV8: discarding pre-v8 state records (schema change requires stable tmux IDs)", "count", rowCount)
+	}
 	if _, err := tx.Exec(`DROP TABLE IF EXISTS tool_states`); err != nil {
 		tx.Rollback()
 		return fmt.Errorf("drop tool_states v8: %w", err)

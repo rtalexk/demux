@@ -731,6 +731,11 @@ set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=
 
 # Clears Demux done states when switching back from another application.
 set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
+
+# Removes Demux state when a pane is closed (prevents stale state accumulation).
+# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
+# the kill — using #{pane_id} here would clear the wrong pane's state.
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
 ```
 
 </details>

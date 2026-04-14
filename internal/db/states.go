@@ -264,9 +264,9 @@ func (d *DB) StateSet(t Target, tool string, value StateValue, message string, s
 			value      = excluded.value,
 			message    = excluded.message,
 			source     = excluded.source,
-			session_id = COALESCE(excluded.session_id, tool_states.session_id),
-			window_id  = COALESCE(excluded.window_id, tool_states.window_id),
-			pane_id    = COALESCE(excluded.pane_id, tool_states.pane_id),
+			session_id = COALESCE(NULLIF(excluded.session_id, ''), tool_states.session_id),
+			window_id  = COALESCE(NULLIF(excluded.window_id,  ''), tool_states.window_id),
+			pane_id    = COALESCE(NULLIF(excluded.pane_id,    ''), tool_states.pane_id),
 			updated_at = excluded.updated_at
 	`, t.Type, t.ID, t.SessionID, t.WindowID, t.PaneID, tool, int(value), message, int(source))
 	if err != nil {
