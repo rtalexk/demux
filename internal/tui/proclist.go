@@ -28,7 +28,7 @@ type ProcListNode struct {
 	Collapsed   bool    // true when children are hidden
 	AggCPU      float64 // CPU% summed across parent + all descendants
 	AggMemRSS   uint64  // MemRSS summed across parent + all descendants
-	// tree drawing (set by assignTreePrefixes after SetWindowData)
+	// tree drawing (set by assignTreePrefixes after SetSessionData)
 	TreePrefix string // line-1 prefix, e.g. "  ├─ " or "  └─ "
 	StatPrefix string // line-2 (stats) prefix, e.g. "  │  " or "     "
 }
@@ -40,7 +40,7 @@ type ProcListModel struct {
 	primaryCWD     string
 	curSession     string
 	curWindow      int
-	collapsedPIDs  map[int32]bool // persists collapse state across SetWindowData calls
+	collapsedPIDs  map[int32]bool // persists collapse state across SetSessionData rebuilds
 	pendingSeekKey string         // node identity to restore cursor after next rebuild
 	inSessionMode  bool           // true when displaying all windows of a session
 	cfg            config.Config
@@ -56,28 +56,23 @@ func (p *ProcListModel) SetStates(states []db.ToolState) {
 
 // stateForPane returns the state for the given pane, or nil.
 func (p ProcListModel) stateForPane(pane tmux.Pane) *db.ToolState {
-	key := pane.Target()
-	return activeStateFor(p.states, key)
+	return activeStateFor(p.states, db.TargetTypePane, pane.PaneID)
 }
 
-// stateForWindow returns the active state for a window-level target ("session:windowIndex"), or nil.
-func (p ProcListModel) stateForWindow(session string, windowIndex int) *db.ToolState {
-	key := fmt.Sprintf("%s:%d", session, windowIndex)
-	return activeStateFor(p.states, key)
+// stateForWindow returns the active state for a window-level target, or nil.
+func (p ProcListModel) stateForWindow(windowID string) *db.ToolState {
+	return activeStateFor(p.states, db.TargetTypeWindow, windowID)
 }
 
-// activeStateFor returns the state matching target, or nil.
-func activeStateFor(states []db.ToolState, target string) *db.ToolState {
+// activeStateFor returns the state matching the target type and ID, or nil.
+func activeStateFor(states []db.ToolState, targetType db.TargetType, targetID string) *db.ToolState {
 	for i := range states {
-		if states[i].Target == target {
+		if states[i].Target.Type == targetType && states[i].Target.ID == targetID {
 			return &states[i]
 		}
 	}
 	return nil
 }
-
-// TODO: single-window mode (SetWindowData) must be removed — selecting individual
-// windows from the sidebar is no longer a feature.
 
 // paneDirectChildren returns the immediate child processes for a pane.
 // When PanePID is set it reads directly from the tree; otherwise it falls
@@ -118,7 +113,7 @@ func depth1Meta(pr proc.Process, tree map[int32][]proc.Process, collapsedPIDs ma
 // buildProcNodesForPane builds ProcListNode entries for a single pane.
 // It collects direct children of the pane's shell process (or CWD-matched
 // processes when PanePID is 0) and recurses into their subtrees, applying
-// the same collapse/aggregate logic used by SetWindowData and SetSessionData.
+// the same collapse/aggregate logic used by SetSessionData.
 func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, collapsedPIDs map[int32]bool, primaryCWD string) []ProcListNode {
 	children := paneDirectChildren(pane, procs, cwdMap, tree)
 	seen := make(map[int32]bool)
@@ -190,40 +185,6 @@ func (p *ProcListModel) appendPaneNodes(pane tmux.Pane, displayPane tmux.Pane, w
 	if len(p.nodes) == headerIdx+1 {
 		p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
 	}
-}
-
-// SetWindowData rebuilds the node list from pre-fetched data.
-// procs is the process snapshot, cwdMap maps PID to CWD (pre-fetched),
-// gitInfo is keyed by "session:windowIndex:paneIndex" for deviant panes.
-func (p *ProcListModel) SetWindowData(panes []tmux.Pane, session string, windowIndex int, procs []proc.Process, cwdMap map[int32]string, gitInfo map[string]git.Info, cfg config.Config) {
-	p.cfg = cfg
-	p.inSessionMode = false
-	grouped := tmux.GroupBySessions(panes)
-	windows := grouped[session]
-	p.primaryCWD = tmux.PrimaryPaneCWD(windows[0])
-	wPanes := windows[windowIndex]
-
-	tree := proc.BuildTree(procs)
-
-	if p.collapsedPIDs == nil {
-		p.collapsedPIDs = make(map[int32]bool)
-	}
-
-	windowChanged := session != p.curSession || windowIndex != p.curWindow
-	p.curSession = session
-	p.curWindow = windowIndex
-	p.nodes = nil
-	if windowChanged {
-		p.cursor = 0
-		p.offset = 0
-		p.collapsedPIDs = make(map[int32]bool) // reset so new window's PIDs default to collapsed
-	}
-
-	for _, pane := range sortPanes(wPanes) {
-		p.appendPaneNodes(pane, pane, p.primaryCWD, procs, cwdMap, tree, gitInfo)
-	}
-	assignTreePrefixes(p.nodes)
-	p.applyPendingSeek()
 }
 
 // SetSessionData rebuilds the node list for all windows of a session.

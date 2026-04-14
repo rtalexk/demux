@@ -41,8 +41,8 @@ func TestBuildSessionProcCounts(t *testing.T) {
 	}
 }
 
-func TestClearSessionStates(t *testing.T) {
-	// Use a temp file so we can open a second handle after clearSessionStates
+func TestClearSessionStatesWithID(t *testing.T) {
+	// Use a temp file so we can open a second handle after clearSessionStatesWithID
 	// closes the first one.
 	f, err := os.CreateTemp("", "demux-test-*.db")
 	if err != nil {
@@ -57,18 +57,21 @@ func TestClearSessionStates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d.StateSet("myapp:0", "claude", db.StateWorking, "", db.SourceTool, false, nil, "")
-	d.StateSet("myapp:1", "make", db.StateError, "fail", db.SourceTool, false, nil, "")
-	d.StateSet("other:0", "claude", db.StateDone, "ok", db.SourceTool, false, nil, "")
+	myapp1 := db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1", WindowID: "@1", PaneID: "%1"}
+	myapp2 := db.Target{Type: db.TargetTypePane, ID: "%2", SessionID: "$1", WindowID: "@1", PaneID: "%2"}
+	other := db.Target{Type: db.TargetTypePane, ID: "%3", SessionID: "$2", WindowID: "@2", PaneID: "%3"}
+	d.StateSet(myapp1, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet(myapp2, "make", db.StateError, "fail", db.SourceTool, false, nil)
+	d.StateSet(other, "claude", db.StateDone, "ok", db.SourceTool, false, nil)
 	d.Close()
 
-	// Each clearSessionStates call opens and closes its own handle.
+	// Each clearSessionStatesWithID call opens and closes its own handle.
 	openHandles := func() (*db.DB, error) { return db.Open(dbPath) }
 	orig := openDB
 	openDB = openHandles
 	defer func() { openDB = orig }()
 
-	got := clearSessionStates("myapp")
+	got := clearSessionStatesWithID("myapp", "$1")
 	if got != "2 state(s) cleared" {
 		t.Errorf("got %q, want %q", got, "2 state(s) cleared")
 	}
@@ -79,13 +82,13 @@ func TestClearSessionStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d2.Close()
-	st, _ := d2.StateByTarget("other:0")
+	st, _ := d2.StateByID(other)
 	if st == nil {
-		t.Error("other:0 should not be deleted")
+		t.Error("other session state should not be deleted")
 	}
 }
 
-func TestClearSessionStates_NoneExist(t *testing.T) {
+func TestClearSessionStatesWithID_NoneExist(t *testing.T) {
 	d, err := db.Open(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -95,8 +98,24 @@ func TestClearSessionStates_NoneExist(t *testing.T) {
 	openDB = func() (*db.DB, error) { return d, nil }
 	defer func() { openDB = orig }()
 
-	got := clearSessionStates("ghost")
+	got := clearSessionStatesWithID("ghost", "$99")
 	if got != "0 state(s) cleared" {
 		t.Errorf("got %q, want %q", got, "0 state(s) cleared")
+	}
+}
+
+func TestClearSessionStatesWithID_EmptySessionIDSkips(t *testing.T) {
+	d, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	orig := openDB
+	openDB = func() (*db.DB, error) { return d, nil }
+	defer func() { openDB = orig }()
+
+	got := clearSessionStatesWithID("ghost", "")
+	if got != "session not found in tmux (skipped)" {
+		t.Errorf("got %q, want \"session not found in tmux (skipped)\"", got)
 	}
 }

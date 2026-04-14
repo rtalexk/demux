@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -55,20 +56,62 @@ func resolveAgent(name string) (agentDef, error) {
 	return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
 }
 
-// tmuxPaneTarget returns the current tmux target as "session:windowIndex.paneIndex"
-// and the stable pane ID (%N) from $TMUX_PANE.
-func tmuxPaneTarget() (target string, paneID string, err error) {
-	paneID = os.Getenv("TMUX_PANE") // already %N — set by tmux at process start
-	args := []string{"display-message", "-p", "#S:#I.#P"}
-	if paneID != "" {
-		args = []string{"display-message", "-t", paneID, "-p", "#S:#I.#P"}
+// tmuxCurrentIDs returns the stable pane, window, and session IDs for the
+// tmux pane that launched this process.
+func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
+	paneID = os.Getenv("TMUX_PANE") // $TMUX_PANE is set by tmux as %N
+	if paneID == "" {
+		return "", "", "", fmt.Errorf("TMUX_PANE not set")
 	}
-	out, execErr := exec.Command("tmux", args...).Output()
+	windowID, sessionID, err = tmuxParentIDs(paneID)
+	return paneID, windowID, sessionID, err
+}
+
+// resolveParentIDs fills in parent window/session IDs on t by querying tmux.
+// Best-effort: returns t unchanged when tmux is unavailable or target is a session.
+func resolveParentIDs(t db.Target) db.Target {
+	switch t.Type {
+	case db.TargetTypePane:
+		if windowID, sessionID, err := tmuxParentIDs(t.ID); err == nil {
+			t.WindowID = windowID
+			t.SessionID = sessionID
+		}
+	case db.TargetTypeWindow:
+		if _, sessionID, err := tmuxParentIDs(t.ID); err == nil {
+			t.SessionID = sessionID
+		}
+	}
+	return t
+}
+
+// tmuxParentIDs queries tmux for the window_id and session_id of the given
+// stable target ID (%N pane or @N window). It uses the provided ID directly
+// so callers that know their target ID do not need to go through $TMUX_PANE.
+func tmuxParentIDs(targetID string) (windowID, sessionID string, err error) {
+	out, execErr := exec.Command("tmux", "display-message", "-t", targetID, "-p", "#{window_id}\t#{session_id}").Output()
 	if execErr != nil {
-		return "", paneID, fmt.Errorf("get tmux pane target: %w", execErr)
+		return "", "", fmt.Errorf("get tmux parent IDs for %s: %w", targetID, execErr)
 	}
-	target = strings.TrimSpace(string(out))
-	return target, paneID, nil
+	parts := strings.Split(strings.TrimSpace(string(out)), "\t")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("unexpected tmux output for %s", targetID)
+	}
+	return parts[0], parts[1], nil
+}
+
+// tmuxResolveTarget resolves any tmux target string (including human-readable
+// "session:window.pane" format) to stable pane, window, and session IDs.
+// Used to handle pre-v8 hook snippets that passed --target instead of --pane-id.
+func tmuxResolveTarget(target string) (paneID, windowID, sessionID string, err error) {
+	out, execErr := exec.Command("tmux", "display-message", "-t", target, "-p", "#{pane_id}\t#{window_id}\t#{session_id}").Output()
+	if execErr != nil {
+		return "", "", "", fmt.Errorf("resolve tmux target %q: %w", target, execErr)
+	}
+	parts := strings.Split(strings.TrimSpace(string(out)), "\t")
+	if len(parts) < 3 {
+		return "", "", "", fmt.Errorf("unexpected tmux output for %q", target)
+	}
+	return parts[0], parts[1], parts[2], nil
 }
 
 const tmuxHooksSnippet = `# demux tmux hooks
@@ -82,25 +125,31 @@ const tmuxHooksSnippet = `# demux tmux hooks
 #   client-session-changed — fires when you switch to a different session.
 #   All three are needed: each navigation action fires a different hook.
 #   Together they cover every way a pane can receive focus.
-#   Each hook targets the now-active pane and clears any done states on it and its
-#   parent window.
 #   after-kill-pane     — fires when a pane is closed; removes its state record.
+#
+# Flag syntax note: flags use --flag=value (not --flag value). tmux expands
+# #{session_id} to the raw tmux ID (e.g. $8). The shell then expands $8 as a
+# positional parameter, which is empty. With --flag value, an empty expansion
+# leaves the flag with no argument and the command fails. With --flag=value, an
+# empty expansion produces --flag= (empty string), which is valid.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --target #{session_name}:#{window_index}.#{pane_index} --pane-id #{pane_id} 2>/dev/null; true'"
+set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
 
 # Removes Demux state when a pane is closed (prevents stale state accumulation).
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane #{pane_id} 2>/dev/null; true'"
+# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
+# the kill — using #{pane_id} here would clear the wrong pane's state.
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 

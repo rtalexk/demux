@@ -422,7 +422,7 @@ func (p ProcListModel) renderWindowHeader(node ProcListNode, selected bool, inne
 		pathStr = format.ShortenPath(node.Pane.CWD, p.cfg.PathAliases)
 	}
 
-	st := p.stateForWindow(node.Pane.Session, node.Pane.WindowIndex)
+	st := p.stateForWindow(node.Pane.WindowID)
 	if selected {
 		stateStr := p.selectedStateIndicator(st)
 		if stateStr != "" {

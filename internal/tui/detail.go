@@ -46,6 +46,11 @@ type DetailModel struct {
 	// session states (non-idle states for the focused session)
 	sessionStates []db.ToolState
 
+	// display maps for resolving stable IDs to human-readable targets
+	paneIDMap    map[string]string // %N → "session:wi.pi"
+	windowIDMap  map[string]string // @N → "session:wi"
+	sessionIDMap map[string]string // $N → session_name
+
 	// window
 	windowIndex int
 	windowPanes []tmux.Pane
@@ -154,20 +159,16 @@ func (d DetailModel) renderStateSection() []string {
 	if len(active) == 0 {
 		return nil
 	}
-	// Sort by target for stable ordering.
-	sort.Slice(active, func(i, j int) bool { return active[i].Target < active[j].Target })
+	// Sort by display string for stable ordering.
+	sort.Slice(active, func(i, j int) bool {
+		di := active[i].Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		dj := active[j].Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
+		return di < dj
+	})
 	lines := []string{""}
 	for _, st := range active {
 		icon := stateIcon(st.Value)
-		target := st.Target
-		// Strip session prefix: "mysess:1.0" → "win1·p0"
-		if prefix := d.session + ":"; strings.HasPrefix(target, prefix) {
-			rest := target[len(prefix):]
-			parts := strings.SplitN(rest, ".", 2)
-			if len(parts) == 2 {
-				target = "win" + parts[0] + "·p" + parts[1]
-			}
-		}
+		target := st.Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
 		tool := st.Tool
 		if tool == "" {
 			tool = "-"

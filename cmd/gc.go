@@ -25,13 +25,23 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 	}
 
 	livePaneIDs := make(map[string]bool, len(panes))
-	livePaneTargets := make(map[string]bool, len(panes))
+	liveWindowIDs := make(map[string]bool)
+	liveSessionIDs := make(map[string]bool)
 	for _, p := range panes {
 		if p.PaneID != "" {
 			livePaneIDs[p.PaneID] = true
 		}
-		target := p.Target()
-		livePaneTargets[target] = true
+		if p.WindowID != "" {
+			liveWindowIDs[p.WindowID] = true
+		}
+		if p.SessionID != "" {
+			liveSessionIDs[p.SessionID] = true
+		}
+	}
+
+	if len(livePaneIDs) == 0 && len(liveWindowIDs) == 0 && len(liveSessionIDs) == 0 {
+		fmt.Println("No live tmux targets found; skipping GC to avoid data loss.")
+		return nil
 	}
 
 	d, err := openDB()
@@ -40,7 +50,7 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 	}
 	defer d.Close()
 
-	n, err := d.StateGCOrphaned(livePaneIDs, livePaneTargets)
+	n, err := d.StateGCOrphaned(livePaneIDs, liveWindowIDs, liveSessionIDs)
 	if err != nil {
 		return fmt.Errorf("gc states: %w", err)
 	}

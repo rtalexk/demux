@@ -187,9 +187,25 @@ func init() {
 func runSessionRemoveFull(_ *cobra.Command, _ []string) error {
 	name := sessionRemoveFullName
 
+	// Fetch session ID before killing the session.
+	var sessionID string
+	var dbOut string
+	if panes, err := tmux.ListPanes(); err != nil {
+		dbOut = fmt.Sprintf("tmux unavailable (%v); run 'demux gc' to clean orphaned records", err)
+	} else {
+		for _, p := range panes {
+			if p.Session == name {
+				sessionID = p.SessionID
+				break
+			}
+		}
+	}
+
 	tmuxOut := killTmuxSession(name)
 	configOut := removeSessionConfig(name, sessionRemoveFullPrivate)
-	dbOut := clearSessionStates(name)
+	if dbOut == "" {
+		dbOut = clearSessionStatesWithID(name, sessionID)
+	}
 	todosOut := clearSessionTodos(name)
 
 	fmt.Printf("tmux:   %s\n", tmuxOut)
@@ -238,24 +254,19 @@ func removeSessionConfig(name string, private bool) string {
 	return "not found in sessions.toml or private.toml (skipped)"
 }
 
-func clearSessionStates(name string) string {
+func clearSessionStatesWithID(name, sessionID string) string {
 	database, err := openDB()
 	if err != nil {
 		return fmt.Sprintf("error opening db: %v", err)
 	}
 	defer database.Close()
 
-	// Collect pane_ids for this session from live tmux (best-effort).
-	var sessionPaneIDs []string
-	if panes, err := tmux.ListPanes(); err == nil {
-		for _, p := range panes {
-			if p.Session == name && p.PaneID != "" {
-				sessionPaneIDs = append(sessionPaneIDs, p.PaneID)
-			}
-		}
+	if sessionID == "" {
+		// Session not found in tmux; skip
+		return "session not found in tmux (skipped)"
 	}
 
-	n, err := database.StateDeleteBySessionWithPaneIDs(name, sessionPaneIDs)
+	n, err := database.StateDeleteBySession(sessionID)
 	if err != nil {
 		return fmt.Sprintf("error: %v", err)
 	}

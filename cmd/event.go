@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"strings"
-
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/spf13/cobra"
@@ -16,8 +14,10 @@ var (
 	hookErrorSetStateError bool
 )
 
-var eventPaneFocusTarget string
 var eventPaneFocusPaneID string
+var eventPaneFocusWindowID string
+var eventPaneFocusSessionID string
+var eventPaneFocusTarget string // pre-v8: resolved to stable IDs via tmux
 
 var eventCmd = &cobra.Command{
 	Use:   "event",
@@ -28,14 +28,22 @@ var eventPaneFocusCmd = &cobra.Command{
 	Use:   "pane_focus",
 	Short: "Clear done states for the focused pane, its window, and its session",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		target := eventPaneFocusTarget
 		paneID := eventPaneFocusPaneID
-		if target == "" {
-			var err error
-			target, paneID, err = tmuxPaneTarget()
-			if err != nil {
-				return err
-			}
+		windowID := eventPaneFocusWindowID
+		sessionID := eventPaneFocusSessionID
+
+		var idErr error
+		switch {
+		case paneID != "":
+			// New hook: stable IDs provided directly.
+		case eventPaneFocusTarget != "":
+			// Pre-v8 hook: resolve "session:window.pane" to stable IDs.
+			paneID, windowID, sessionID, idErr = tmuxResolveTarget(eventPaneFocusTarget)
+		default:
+			paneID, windowID, sessionID, idErr = tmuxCurrentIDs()
+		}
+		if idErr != nil {
+			return idErr
 		}
 
 		d, err := openDB()
@@ -44,44 +52,38 @@ var eventPaneFocusCmd = &cobra.Command{
 		}
 		defer d.Close()
 
-		return applyPaneFocus(d, target, paneID)
+		return applyPaneFocus(d, paneID, windowID, sessionID)
 	},
 }
 
-func applyPaneFocus(d *db.DB, paneTarget string, paneID string) error {
-	demuxlog.Debug("pane_focus", "target", paneTarget, "pane_id", paneID)
-	for _, target := range []string{
-		paneTarget,
-		windowTargetFromPane(paneTarget),
-		sessionTargetFromPane(paneTarget),
+func applyPaneFocus(d *db.DB, paneID, windowID, sessionID string) error {
+	demuxlog.Debug("pane_focus", "pane_id", paneID, "window_id", windowID, "session_id", sessionID)
+
+	// Clear resting states at all three levels.
+	for _, item := range []struct {
+		typ db.TargetType
+		id  string
+	}{
+		{db.TargetTypePane, paneID},
+		{db.TargetTypeWindow, windowID},
+		{db.TargetTypeSession, sessionID},
 	} {
-		if err := d.StateDeleteIfResting(target); err != nil {
-			demuxlog.Error("pane_focus: delete resting state failed", "target", target, "err", err)
-			return err
+		if item.id == "" {
+			continue
 		}
-	}
-	// Also clear by pane_id: handles panes that moved since the state was written.
-	if paneID != "" {
-		if err := d.StateDeleteIfRestingByPaneID(paneID); err != nil {
-			demuxlog.Error("pane_focus: delete resting by pane_id failed", "pane_id", paneID, "err", err)
+		t := db.Target{
+			Type:      item.typ,
+			ID:        item.id,
+			PaneID:    paneID,
+			WindowID:  windowID,
+			SessionID: sessionID,
+		}
+		if err := d.StateDeleteIfResting(t); err != nil {
+			demuxlog.Error("pane_focus: delete resting state failed", "target", t, "err", err)
 			return err
 		}
 	}
 	return nil
-}
-
-func windowTargetFromPane(paneTarget string) string {
-	if i := strings.LastIndex(paneTarget, "."); i != -1 {
-		return paneTarget[:i]
-	}
-	return paneTarget
-}
-
-func sessionTargetFromPane(paneTarget string) string {
-	if i := strings.Index(paneTarget, ":"); i != -1 {
-		return paneTarget[:i]
-	}
-	return paneTarget
 }
 
 var eventHookErrorCmd = &cobra.Command{
@@ -90,7 +92,7 @@ var eventHookErrorCmd = &cobra.Command{
 	Long: `Records a hook delivery failure to the log file. Use this as a fallback
 in hook scripts instead of '|| true' so failures are observable:
 
-  demux state set ... || demux event hook_error --hook Stop --target "$T" --message "state set failed" --set-state-error`,
+  demux state set ... || demux event hook_error --hook Stop --target-id "$T" --message "state set failed" --set-state-error`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return applyHookError()
 	},
@@ -110,10 +112,25 @@ func applyHookError() error {
 			return err
 		}
 		defer d.Close()
-		if err := d.StateSet(hookErrorTarget, hookErrorTool, db.StateError, hookErrorMessage, db.SourceTool, true, nil, ""); err != nil {
-			demuxlog.Error("hook_error: set state error failed", "target", hookErrorTarget, "err", err)
-			return err
-		}
+		return applyHookErrorDB(d, hookErrorTarget, hookErrorTool, hookErrorHook, hookErrorMessage)
+	}
+	return nil
+}
+
+// applyHookErrorDB writes a StateError record for targetID. It resolves
+// parent IDs from tmux (best-effort) so the row is associated with its
+// session in the TUI even when no prior state record exists.
+func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
+	t, parseErr := db.ParseTargetID(targetID)
+	if parseErr != nil {
+		demuxlog.Warn("hook_error: invalid target id, skipping state set", "target", targetID, "hook", hook)
+		return nil
+	}
+	// Resolve denormalized parent IDs (best-effort; no-op when tmux is unavailable).
+	t = resolveParentIDs(t)
+	if err := d.StateSet(t, tool, db.StateError, message, db.SourceTool, true, nil); err != nil {
+		demuxlog.Error("hook_error: set state error failed", "target", t, "err", err)
+		return err
 	}
 	return nil
 }
@@ -135,18 +152,23 @@ var eventPaneClosedCmd = &cobra.Command{
 
 func applyPaneClosed(d *db.DB, paneID string) error {
 	demuxlog.Debug("pane_closed", "pane_id", paneID)
-	return d.StateClearByPaneID(paneID)
+	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
+	return d.StateClear(t)
 }
 
 func init() {
-	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusTarget, "target", "", "Pane target: session:window.pane (auto-detected if omitted)")
-	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusPaneID, "pane-id", "", "Stable pane ID (%N format) for clearing moved panes (optional, auto-detected if omitted)")
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusPaneID, "pane-id", "", "Stable pane ID (%N format); auto-detected if omitted")
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusWindowID, "window-id", "", "Stable window ID (@N format); auto-detected if omitted")
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusSessionID, "session-id", "", "Stable session ID ($N format); auto-detected if omitted")
+	// --target accepted for backward compatibility with pre-v8 hook snippets; value is ignored.
+	eventPaneFocusCmd.Flags().StringVar(&eventPaneFocusTarget, "target", "", "")
+	_ = eventPaneFocusCmd.Flags().MarkHidden("target")
 
-	eventHookErrorCmd.Flags().StringVar(&hookErrorTarget, "target", "", "Pane target: session:window.pane (optional)")
+	eventHookErrorCmd.Flags().StringVar(&hookErrorTarget, "target-id", "", "Target ID (%N, @N, or $N) (optional)")
 	eventHookErrorCmd.Flags().StringVar(&hookErrorHook, "hook", "", "Hook name that failed (e.g. Stop, PreToolUse)")
 	eventHookErrorCmd.Flags().StringVar(&hookErrorTool, "tool", "", "Tool name (e.g. claude)")
 	eventHookErrorCmd.Flags().StringVar(&hookErrorMessage, "message", "", "Failure description")
-	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target)")
+	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target-id)")
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")

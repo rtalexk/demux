@@ -18,7 +18,7 @@ func TestBuildLivePaneMaps(t *testing.T) {
 		if p.PaneID != "" {
 			liveIDs[p.PaneID] = true
 		}
-		liveTargets[p.Target()] = true
+		liveTargets[p.DisplayLabel()] = true
 	}
 
 	if !liveIDs["%1"] || !liveIDs["%2"] {

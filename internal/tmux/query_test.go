@@ -7,9 +7,10 @@ import (
 )
 
 func TestParsePanes(t *testing.T) {
-	raw := "mysession\t0\t0\t/home/dev/project\t%1\teditor\n" +
-		"mysession\t0\t1\t/home/dev/project/ui\t%2\teditor\n" +
-		"mysession\t1\t0\t/home/dev/project\t%3\tserver\n"
+	// 10 fields: session_name, session_id, window_index, window_id, pane_index, cwd, pane_id, window_name, pane_pid, session_activity
+	raw := "mysession\t$1\t0\t@5\t0\t/home/dev/project\t%1\teditor\t1234\t1711652000\n" +
+		"mysession\t$1\t0\t@5\t1\t/home/dev/project/ui\t%2\teditor\t1235\t1711652000\n" +
+		"mysession\t$1\t1\t@6\t0\t/home/dev/project\t%3\tserver\t1236\t1711652000\n"
 
 	panes, err := tmux.ParsePanes(raw)
 	if err != nil {
@@ -20,6 +21,12 @@ func TestParsePanes(t *testing.T) {
 	}
 	if panes[0].Session != "mysession" {
 		t.Errorf("unexpected session: %s", panes[0].Session)
+	}
+	if panes[0].SessionID != "$1" {
+		t.Errorf("unexpected session id: %s", panes[0].SessionID)
+	}
+	if panes[0].WindowID != "@5" {
+		t.Errorf("unexpected window id: %s", panes[0].WindowID)
 	}
 	if panes[1].PaneIndex != 1 {
 		t.Errorf("unexpected pane index: %d", panes[1].PaneIndex)
@@ -69,8 +76,8 @@ func TestParsePanesEmpty(t *testing.T) {
 }
 
 func TestParsePanes_WithSessionActivity(t *testing.T) {
-	// 8 fields: session, window_index, pane_index, cwd, pane_id, window_name, pane_pid, session_activity
-	raw := "mysession\t0\t0\t/home/dev\t%1\teditor\t1234\t1711652000\n"
+	// 10 fields: session_name, session_id, window_index, window_id, pane_index, cwd, pane_id, window_name, pane_pid, session_activity
+	raw := "mysession\t$1\t0\t@5\t0\t/home/dev\t%1\teditor\t1234\t1711652000\n"
 	panes, err := tmux.ParsePanes(raw)
 	if err != nil {
 		t.Fatal(err)
@@ -84,8 +91,8 @@ func TestParsePanes_WithSessionActivity(t *testing.T) {
 }
 
 func TestParsePanes_WithoutSessionActivity_BackwardCompat(t *testing.T) {
-	// Old 7-field format (no session_activity) should still parse with SessionActivity=0
-	raw := "mysession\t0\t0\t/home/dev\t%1\teditor\t1234\n"
+	// 9-field format (no session_activity) should still parse with SessionActivity=0
+	raw := "mysession\t$1\t0\t@5\t0\t/home/dev\t%1\teditor\t1234\n"
 	panes, err := tmux.ParsePanes(raw)
 	if err != nil {
 		t.Fatal(err)
@@ -178,5 +185,42 @@ func TestPaneIDToTargetMap(t *testing.T) {
 	}
 	if _, ok := m[""]; ok {
 		t.Error("pane with empty PaneID should not appear in map")
+	}
+}
+
+func TestWindowIDToTargetMap(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "work", WindowIndex: 0, WindowID: "@5", PaneIndex: 0, PaneID: "%1"},
+		{Session: "work", WindowIndex: 1, WindowID: "@6", PaneIndex: 0, PaneID: "%2"},
+		{Session: "other", WindowIndex: 0, WindowID: "@7", PaneIndex: 0, PaneID: "%3"},
+	}
+
+	m := tmux.WindowIDToTargetMap(panes)
+
+	if m["@5"] != "work:0" {
+		t.Errorf("@5: want work:0, got %q", m["@5"])
+	}
+	if m["@6"] != "work:1" {
+		t.Errorf("@6: want work:1, got %q", m["@6"])
+	}
+	if m["@7"] != "other:0" {
+		t.Errorf("@7: want other:0, got %q", m["@7"])
+	}
+}
+
+func TestSessionIDToNameMap(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "work", SessionID: "$1", PaneID: "%1"},
+		{Session: "other", SessionID: "$2", PaneID: "%2"},
+		{Session: "work", SessionID: "$1", PaneID: "%3"},
+	}
+
+	m := tmux.SessionIDToNameMap(panes)
+
+	if m["$1"] != "work" {
+		t.Errorf("$1: want work, got %q", m["$1"])
+	}
+	if m["$2"] != "other" {
+		t.Errorf("$2: want other, got %q", m["$2"])
 	}
 }

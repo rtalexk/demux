@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -220,18 +218,14 @@ func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 	return m, m.fetchPanes()
 }
 
-// highestPriorityPaneTarget returns the Target of the highest-priority active
-// state for the given session, or "" when no qualifying state exists.
-// Only pane/window-level targets (those containing ":") are considered so the
-// caller can switch directly to the relevant pane. Idle states are excluded;
-// Done is included so the user can navigate to a recently-finished pane.
-// The target string is returned verbatim for tmux switch-client.
-func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string {
-	prefix := sessionName + ":"
+// highestPriorityPaneTarget returns the tmux target ID (%N or @N) of the
+// highest-priority active state for the given session ID, or "" when none
+// exists. Session-level states are skipped; idle states are excluded.
+func highestPriorityPaneTarget(sessionID string, states []db.ToolState) string {
 	best := ""
 	bestPri := -1
 	for _, st := range states {
-		if !strings.HasPrefix(st.Target, prefix) {
+		if st.Target.SessionID != sessionID || st.Target.Type == db.TargetTypeSession {
 			continue
 		}
 		if !st.Value.IsDisplayable() {
@@ -239,7 +233,7 @@ func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string
 		}
 		if pri := st.Value.Priority(); pri > bestPri {
 			bestPri = pri
-			best = st.Target
+			best = st.Target.ID
 		}
 	}
 	return best
@@ -248,7 +242,8 @@ func highestPriorityPaneTarget(sessionName string, states []db.ToolState) string
 // switchLiveSession switches the tmux client to the given session, landing on
 // the pane with the highest-priority active state when one exists.
 func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
-	target := highestPriorityPaneTarget(sessionName, m.states)
+	sessionID := m.nameToIDMap[sessionName]
+	target := highestPriorityPaneTarget(sessionID, m.states)
 	if target == "" {
 		target = sessionName
 	}
@@ -330,9 +325,11 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.FlagState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
 			if st := m.sidebar.stateForSession(node.Session); st != nil && st.Value == db.StateFlagged {
-				return m, m.clearCurrentState(st.Target, st.PaneID)
+				return m, m.clearCurrentState(st.Target)
 			}
-			return m, m.flagCurrentState(node.Session, "")
+			sessionID := m.nameToIDMap[node.Session]
+			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
+			return m, m.flagCurrentState(t)
 		}
 	case key.Matches(msg, keys.WatchSession.Binding):
 		if node := m.sidebar.Selected(); node != nil {
@@ -340,13 +337,12 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.ClearState.Binding):
 		if node := m.sidebar.Selected(); node != nil {
-			target := node.Session
-			paneID := ""
 			if st := m.sidebar.stateForSession(node.Session); st != nil {
-				target = st.Target
-				paneID = st.PaneID
+				return m.showClearConfirm(st.Target), nil
 			}
-			return m.showClearConfirm(target, paneID), nil
+			sessionID := m.nameToIDMap[node.Session]
+			t := db.Target{Type: db.TargetTypeSession, ID: sessionID, SessionID: sessionID}
+			return m.showClearConfirm(t), nil
 		}
 	}
 	return m.sidebarNavUpdate()
@@ -441,7 +437,7 @@ func (m Model) handleProcListCollapse(msg tea.KeyMsg, procH int) (Model, tea.Cmd
 func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 	var target string
 	if pane := m.procList.SelectedPane(); pane != nil {
-		target = pane.Target()
+		target = pane.DisplayLabel()
 	} else if node := m.sidebar.Selected(); node != nil {
 		target = node.Session
 	}
@@ -475,27 +471,19 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Esc.Binding):
 		m.focus = panelSidebar
 	case key.Matches(msg, keys.FlagState.Binding):
-		if target := m.procListStateTarget(); target != "" {
-			paneID := ""
-			if node := m.procList.SelectedNode(); node != nil && !node.IsWindowHeader {
-				paneID = node.Pane.PaneID
+		if t := m.procListStateIdentity(); t != nil {
+			if st := activeStateFor(m.states, t.Type, t.ID); st != nil && st.Value == db.StateFlagged {
+				return m, m.clearCurrentState(*t)
 			}
-			if st := activeStateFor(m.states, target); st != nil && st.Value == db.StateFlagged {
-				return m, m.clearCurrentState(target, paneID)
-			}
-			return m, m.flagCurrentState(target, paneID)
+			return m, m.flagCurrentState(*t)
 		}
 	case key.Matches(msg, keys.WatchSession.Binding):
 		if sess := m.procListSession(); sess != "" {
 			return m, m.watchCurrentSession(sess)
 		}
 	case key.Matches(msg, keys.ClearState.Binding):
-		if target := m.procListStateTarget(); target != "" {
-			paneID := ""
-			if node := m.procList.SelectedNode(); node != nil && !node.IsWindowHeader {
-				paneID = node.Pane.PaneID
-			}
-			return m.showClearConfirm(target, paneID), nil
+		if t := m.procListStateIdentity(); t != nil {
+			return m.showClearConfirm(*t), nil
 		}
 	case key.Matches(msg, keys.Kill.Binding):
 		// TODO: confirmation prompt
@@ -525,12 +513,11 @@ func (m Model) watchCurrentSession(session string) tea.Cmd {
 }
 
 // flagCurrentState sets the flagged state for the given target.
-// paneID is stored with the record so future clear/flag operations can find it after a pane move.
-func (m Model) flagCurrentState(target string, paneID string) tea.Cmd {
+func (m Model) flagCurrentState(t db.Target) tea.Cmd {
 	d := m.db
 	msg := m.cfg.Tui.FlagDefaultMessage
 	return func() tea.Msg {
-		_ = d.StateSet(target, "", db.StateFlagged, msg, db.SourceUser, false, nil, paneID)
+		_ = d.StateSet(t, "", db.StateFlagged, msg, db.SourceUser, false, nil)
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
@@ -545,43 +532,58 @@ func (m Model) procListSession() string {
 	return node.Pane.Session
 }
 
-// procListStateTarget returns the state target string for the currently selected
-// proc list node: "session:wi" for window headers, "session:wi.pi" for pane/proc nodes.
-func (m Model) procListStateTarget() string {
+// procListStateIdentity returns the typed Target for the currently selected
+// proc list node: window Target for window headers, pane Target for pane/proc nodes.
+func (m Model) procListStateIdentity() *db.Target {
 	node := m.procList.SelectedNode()
 	if node == nil {
-		return ""
+		return nil
 	}
+	pane := node.Pane
 	if node.IsWindowHeader {
-		return fmt.Sprintf("%s:%d", node.Pane.Session, node.Pane.WindowIndex)
+		if pane.WindowID == "" {
+			return nil
+		}
+		t := db.Target{
+			Type:      db.TargetTypeWindow,
+			ID:        pane.WindowID,
+			SessionID: pane.SessionID,
+			WindowID:  pane.WindowID,
+		}
+		return &t
 	}
-	return node.Pane.Target()
+	if pane.PaneID == "" {
+		return nil
+	}
+	t := db.Target{
+		Type:      db.TargetTypePane,
+		ID:        pane.PaneID,
+		SessionID: pane.SessionID,
+		WindowID:  pane.WindowID,
+		PaneID:    pane.PaneID,
+	}
+	return &t
 }
 
-// clearCurrentState clears the state for the given target.
-// When paneID is non-empty, clears by stable pane_id to handle moved panes.
-func (m Model) clearCurrentState(target string, paneID string) tea.Cmd {
+// clearCurrentState clears the state for the given typed target.
+func (m Model) clearCurrentState(t db.Target) tea.Cmd {
 	d := m.db
 	return func() tea.Msg {
-		if paneID != "" {
-			_ = d.StateClearByPaneID(paneID)
-		} else {
-			_ = d.StateClear(target)
-		}
+		_ = d.StateClear(t)
 		states, _ := d.StateList(0, "")
 		return statesMsg{states: states}
 	}
 }
 
 // showClearConfirm opens the confirmation overlay for clearing the state of target.
-// paneID is passed through to clearCurrentState so moved panes are handled correctly.
-func (m Model) showClearConfirm(target string, paneID string) Model {
-	st := activeStateFor(m.states, target)
+func (m Model) showClearConfirm(t db.Target) Model {
+	st := activeStateFor(m.states, t.Type, t.ID)
 	maxTargetLen := m.width/2 - 12 // leave room for label + border + padding
 	if maxTargetLen < 20 {
 		maxTargetLen = 20
 	}
-	body := "  target: " + truncateTarget(target, maxTargetLen)
+	targetDisplay := t.Format(m.paneIDMap, m.windowIDMap, m.sessionIDMap)
+	body := "  target: " + truncateTarget(targetDisplay, maxTargetLen)
 	if st != nil {
 		body += "\n  state:  " + st.Value.String()
 		if st.Message != "" {
@@ -596,7 +598,7 @@ func (m Model) showClearConfirm(target string, paneID string) Model {
 		prompt: "Clear state?",
 		body:   body,
 	}
-	m.confirmCmd = m.clearCurrentState(target, paneID)
+	m.confirmCmd = m.clearCurrentState(t)
 	m.showConfirm = true
 	return m
 }

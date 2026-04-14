@@ -7,11 +7,49 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 )
 
+// stateTarget format is now "%N", "@N", or "$N" (stable tmux IDs).
+// Tests use "%1" as a representative pane target.
+
+// saveStateVars snapshots all package-level state-command globals and restores
+// them via t.Cleanup. Call at the start of any test that sets these globals to
+// eliminate ordering dependencies between tests.
+func saveStateVars(t *testing.T) {
+	t.Helper()
+	prev := struct {
+		target, value, tool, message, source, ifState string
+		force                                         bool
+		clearTarget                                   string
+		clearYes                                      bool
+	}{
+		target:      stateTarget,
+		value:       stateValue,
+		tool:        stateTool,
+		message:     stateMessage,
+		source:      stateSource,
+		ifState:     stateIfState,
+		force:       stateForce,
+		clearTarget: clearTarget,
+		clearYes:    clearYes,
+	}
+	t.Cleanup(func() {
+		stateTarget = prev.target
+		stateValue = prev.value
+		stateTool = prev.tool
+		stateMessage = prev.message
+		stateSource = prev.source
+		stateIfState = prev.ifState
+		stateForce = prev.force
+		clearTarget = prev.clearTarget
+		clearYes = prev.clearYes
+	})
+}
+
 func TestStateSet_ToolWrite(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "working"
 	stateTool = "claude"
 	stateMessage = "running"
@@ -21,17 +59,19 @@ func TestStateSet_ToolWrite(t *testing.T) {
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0.0")
+	target, _ := db.ParseTargetID("%1")
+	st, _ := d.StateByID(target)
 	if st == nil || st.Value != db.StateWorking {
 		t.Errorf("expected working state, got: %+v", st)
 	}
 }
 
 func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "flagged"
 	stateTool = "claude"
 	stateSource = "tool"
@@ -43,12 +83,14 @@ func TestStateSet_FlaggedRequiresUserSource(t *testing.T) {
 }
 
 func TestStateClear_FlaggedRequiresYes(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "", db.StateFlagged, "note", db.SourceUser, false, nil, "")
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
+	d.StateSet(target, "", db.StateFlagged, "note", db.SourceUser, false, nil)
 
-	clearTarget = "s:0.0"
+	clearTarget = "%1"
 	clearYes = false
 
 	if err := applyStateClear(d); err == nil {
@@ -59,19 +101,21 @@ func TestStateClear_FlaggedRequiresYes(t *testing.T) {
 	if err := applyStateClear(d); err != nil {
 		t.Fatalf("with --yes should succeed: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0.0")
+	st, _ := d.StateByID(target)
 	if st != nil {
 		t.Error("state should be cleared")
 	}
 }
 
 func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "claude", db.StateError, "boom", db.SourceTool, false, nil, "")
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
+	d.StateSet(target, "claude", db.StateError, "boom", db.SourceTool, false, nil)
 
-	clearTarget = "s:0.0"
+	clearTarget = "%1"
 	clearYes = false
 
 	if err := applyStateClear(d); err != nil {
@@ -80,10 +124,11 @@ func TestStateClear_NonFlagged_NoYesRequired(t *testing.T) {
 }
 
 func TestStateSet_IdleIsValid(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "idle"
 	stateTool = "claude"
 	stateMessage = "available"
@@ -94,20 +139,23 @@ func TestStateSet_IdleIsValid(t *testing.T) {
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("--state idle should be valid: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0.0")
+	target, _ := db.ParseTargetID("%1")
+	st, _ := d.StateByID(target)
 	if st == nil || st.Value != db.StateIdle {
 		t.Errorf("expected idle state, got: %+v", st)
 	}
 }
 
 func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
 	// Pre-set state to done.
-	d.StateSet("s:0.0", "claude", db.StateDone, "finished", db.SourceTool, false, nil, "")
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
+	d.StateSet(target, "claude", db.StateDone, "finished", db.SourceTool, false, nil)
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "waiting"
 	stateTool = "claude"
 	stateMessage = "awaiting input"
@@ -118,19 +166,21 @@ func TestStateSet_IfState_NoopWhenMismatch(t *testing.T) {
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("--if-state mismatch should succeed silently: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0.0")
+	st, _ := d.StateByID(target)
 	if st == nil || st.Value != db.StateDone {
 		t.Errorf("state should remain done, got: %+v", st)
 	}
 }
 
 func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	d.StateSet("s:0.0", "claude", db.StateWorking, "running", db.SourceTool, false, nil, "")
+	target := db.Target{Type: db.TargetTypePane, ID: "%1", PaneID: "%1"}
+	d.StateSet(target, "claude", db.StateWorking, "running", db.SourceTool, false, nil)
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "done"
 	stateTool = "claude"
 	stateMessage = "task complete"
@@ -141,17 +191,18 @@ func TestStateSet_IfState_WritesWhenMatch(t *testing.T) {
 	if err := applyStateSet(d); err != nil {
 		t.Fatalf("--if-state match should write: %v", err)
 	}
-	st, _ := d.StateByTarget("s:0.0")
+	st, _ := d.StateByID(target)
 	if st == nil || st.Value != db.StateDone {
 		t.Errorf("expected done state, got: %+v", st)
 	}
 }
 
 func TestStateSet_IfState_InvalidValue(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0.0"
+	stateTarget = "%1"
 	stateValue = "working"
 	stateTool = "claude"
 	stateSource = "tool"
@@ -167,57 +218,37 @@ func TestStateSet_IfState_InvalidValue(t *testing.T) {
 	}
 }
 
-func TestResolveStateTarget_UsesResolvedWhenPaneIDMatches(t *testing.T) {
-	st := db.ToolState{Target: "work:1.0", PaneID: "%12"}
-	paneIDMap := map[string]string{"%12": "work:2.0"} // pane moved
-
-	got := resolveStateTarget(st, paneIDMap)
-	if got != "work:2.0" {
-		t.Errorf("want work:2.0, got %q", got)
-	}
-}
-
-func TestResolveStateTarget_FallsBackToTargetWhenNoPaneID(t *testing.T) {
-	st := db.ToolState{Target: "work:1.0", PaneID: ""}
-	paneIDMap := map[string]string{}
-
-	got := resolveStateTarget(st, paneIDMap)
-	if got != "work:1.0" {
-		t.Errorf("want work:1.0, got %q", got)
-	}
-}
-
-func TestResolveStateTarget_FallsBackWhenPaneIDNotInMap(t *testing.T) {
-	st := db.ToolState{Target: "work:1.0", PaneID: "%12"}
-	paneIDMap := map[string]string{} // tmux unavailable or pane truly gone
-
-	got := resolveStateTarget(st, paneIDMap)
-	if got != "work:1.0" {
-		t.Errorf("want work:1.0, got %q", got)
-	}
-}
-
-func TestStateSet_PaneIDFlag(t *testing.T) {
+func TestStateSet_InvalidTargetID(t *testing.T) {
+	saveStateVars(t)
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	stateTarget = "s:0.0"
+	stateTarget = "s:0.0" // old format — invalid
 	stateValue = "working"
 	stateTool = "claude"
-	stateMessage = "running"
 	stateSource = "tool"
 	stateForce = false
 	stateIfState = ""
-	statePaneID = "%42"
 
-	if err := applyStateSet(d); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	err := applyStateSet(d)
+	if err == nil {
+		t.Fatal("expected error for invalid --target-id format")
 	}
-	st, _ := d.StateByTarget("s:0.0")
-	if st == nil {
-		t.Fatal("expected state, got nil")
+	if !strings.Contains(err.Error(), "--target-id") {
+		t.Errorf("error should mention --target-id, got: %v", err)
 	}
-	if st.PaneID != "%42" {
-		t.Errorf("expected PaneID %%42, got %q", st.PaneID)
+}
+
+func TestStateClear_InvalidTargetID(t *testing.T) {
+	saveStateVars(t)
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	clearTarget = "s:0.0" // old format — invalid
+	clearYes = false
+
+	err := applyStateClear(d)
+	if err == nil {
+		t.Fatal("expected error for invalid --target-id format")
 	}
 }
