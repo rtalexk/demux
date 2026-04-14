@@ -60,7 +60,7 @@ func TestHelpRender_KeyBindings(t *testing.T) {
 		"G",         // goto bottom
 		"] / [",     // expand/collapse group
 		"} / {",     // expand/collapse all
-		"L",         // log popup (uppercase, was lowercase l)
+		"a",         // action menu
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected %q in help output:\n%s", want, out)

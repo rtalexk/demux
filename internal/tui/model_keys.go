@@ -50,6 +50,10 @@ func (m Model) handleNormalModeDefault(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.searchGen++
 		return m, nil
 	}
+	// 'a' is context-sensitive: action menu in proclist, FilterAll in sidebar.
+	if msg.String() == "a" && m.focus == panelProcList {
+		return m.openActionMenu(), nil
+	}
 	if newFilter, ok := resolveFilterKey(msg); ok {
 		sidebarVisibleRows := m.height - statusBarH - borderOverhead - searchBoxH
 		if sidebarVisibleRows < 1 {
@@ -491,12 +495,6 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if t := m.procListStateIdentity(); t != nil {
 			return m.showClearConfirm(*t), nil
 		}
-	case key.Matches(msg, keys.Kill.Binding):
-		// TODO: confirmation prompt
-	case key.Matches(msg, keys.Restart.Binding):
-		// TODO: restart via tmux send-keys Up Enter
-	case key.Matches(msg, keys.Log.Binding):
-		// TODO: tmux popup with scrollback
 	}
 	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
 	m.updateDetailFromSelection()
@@ -616,4 +614,20 @@ func (m Model) openSidebarSelected() (Model, tea.Cmd) {
 	}
 	sess := m.sidebar.FindSession(node.Session)
 	return m.launchOrSwitchSession(sess, node.Session)
+}
+
+// openActionMenu opens the action menu for the currently selected process node.
+// No-op when the cursor is not on a selectable process node.
+func (m Model) openActionMenu() Model {
+	node := m.procList.SelectedNode()
+	if node == nil {
+		return m
+	}
+	m.actionMenu = ActionMenuModel{
+		items:  buildActionItems(*node),
+		cursor: 0,
+		target: *node,
+	}
+	m.showActionMenu = true
+	return m
 }

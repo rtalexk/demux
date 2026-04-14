@@ -142,6 +142,9 @@ type Model struct {
 	itemSession string
 	itemInput   ItemInputModel
 
+	showActionMenu bool
+	actionMenu     ActionMenuModel
+
 	sessionsConfig session.SessionsConfig
 	configDir      string
 }

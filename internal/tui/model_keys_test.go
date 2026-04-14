@@ -6,8 +6,14 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/tmux"
 )
+
+func newTestModel(t *testing.T) Model {
+	t.Helper()
+	return New(config.Config{}, nil)
+}
 
 func TestHighestPriorityPaneTarget_ReturnsHighestPriorityPane(t *testing.T) {
 	states := []db.ToolState{
@@ -155,5 +161,32 @@ func TestProcListStateIdentity_EmptyWindowIDReturnsNil(t *testing.T) {
 	m.procList.cursor = 0
 	if got := m.procListStateIdentity(); got != nil {
 		t.Errorf("expected nil for empty WindowID, got %+v", got)
+	}
+}
+
+func TestHandleKey_ActionMenu_OpensOnA_InProcList(t *testing.T) {
+	m := newTestModel(t)
+	m.focus = panelProcList
+	m.procList.nodes = []ProcListNode{
+		{IsPaneHeader: true, Pane: tmux.Pane{PaneID: "%1", Session: "s"}},
+		{Proc: proc.Process{PID: 99, Name: "node", Cmdline: "node server.js"}, Depth: 1, Pane: tmux.Pane{PaneID: "%1"}},
+	}
+	m.procList.cursor = 1
+
+	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	got := result.(Model)
+	if !got.showActionMenu {
+		t.Error("expected showActionMenu=true after pressing 'a' in proclist")
+	}
+}
+
+func TestHandleKey_ActionMenu_DoesNotOpenOnA_InSidebar(t *testing.T) {
+	m := newTestModel(t)
+	m.focus = panelSidebar
+
+	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")})
+	got := result.(Model)
+	if got.showActionMenu {
+		t.Error("expected showActionMenu=false when 'a' pressed in sidebar focus")
 	}
 }
