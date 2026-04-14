@@ -85,6 +85,16 @@ type gitResultMsg struct {
 }
 
 type searchDebounceMsg struct{ gen int }
+type envResultMsg struct {
+	lines []string
+	err   error
+}
+
+// procActionMsg carries the result of an async process action (kill, restart, etc.)
+// for display in the status bar.
+type procActionMsg struct {
+	status string
+}
 type queryResultMsg struct {
 	result query.Result
 	gen    int
@@ -326,6 +336,16 @@ func (m Model) applyOverlay(base string) string {
 	if m.showConfirm {
 		return overlayCenter(m.confirm.Render(), base, m.width, m.height)
 	}
+	if m.showActionMenu {
+		switch m.actionMenu.subPopup {
+		case SubPopupKillConfirm:
+			return overlayCenter(m.actionMenu.RenderKillConfirm(), base, m.width, m.height)
+		case SubPopupEnvVars, SubPopupFullCmd:
+			return overlayCenter(m.actionMenu.RenderSubPopup(20), base, m.width, m.height)
+		default:
+			return overlayCenter(m.actionMenu.Render(), base, m.width, m.height)
+		}
+	}
 	return base
 }
 
@@ -344,7 +364,7 @@ func (m Model) buildStatusBar(width int) string {
 	} else if m.focus == panelSidebar {
 		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:states  ?:help  q:quit"
 	} else {
-		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
+		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  a:actions  q:quit"
 	}
 
 	spinnerStr := ""

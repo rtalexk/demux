@@ -57,7 +57,25 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueryResultMsg(msg)
 	case searchDebounceMsg:
 		return m.handleSearchDebounceMsg(msg)
+	case envResultMsg:
+		return m.handleEnvResultMsg(msg)
+	case procActionMsg:
+		m.statusMsg = msg.status
+		m.statusExp = time.Now().Add(3 * time.Second)
+		return m, nil
 	}
+	return m, nil
+}
+
+func (m Model) handleEnvResultMsg(msg envResultMsg) (Model, tea.Cmd) {
+	if msg.err != nil {
+		m.statusMsg = "env: " + msg.err.Error()
+		m.statusExp = time.Now().Add(4 * time.Second)
+		return m, nil
+	}
+	m.actionMenu.subPopup = SubPopupEnvVars
+	m.actionMenu.subLines = msg.lines
+	m.actionMenu.subScrollOff = 0
 	return m, nil
 }
 
@@ -80,6 +98,10 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 	if m.showConfirm {
 		mo, cmd := m.handleConfirmOverlay(msg)
 		return mo, cmd, true
+	}
+	if m.showActionMenu {
+		mo, cmd := m.handleActionMenuKey(msg.(tea.KeyMsg))
+		return mo.(Model), cmd, true
 	}
 	return m, nil, false
 }

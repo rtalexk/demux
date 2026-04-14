@@ -190,3 +190,71 @@ func TestHandleKey_ActionMenu_DoesNotOpenOnA_InSidebar(t *testing.T) {
 		t.Error("expected showActionMenu=false when 'a' pressed in sidebar focus")
 	}
 }
+
+func TestActionMenu_NavigateDown(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{
+		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}},
+		cursor: 0,
+	}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+	got := result.(Model)
+	if got.actionMenu.cursor != 1 {
+		t.Errorf("want cursor=1 after j, got %d", got.actionMenu.cursor)
+	}
+}
+
+func TestActionMenu_NavigateUp(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{
+		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}},
+		cursor: 1,
+	}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	got := result.(Model)
+	if got.actionMenu.cursor != 0 {
+		t.Errorf("want cursor=0 after k, got %d", got.actionMenu.cursor)
+	}
+}
+
+func TestActionMenu_EscCloses(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{items: []ActionItem{{ActionKill, "Kill"}}}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	got := result.(Model)
+	if got.showActionMenu {
+		t.Error("expected showActionMenu=false after Esc")
+	}
+}
+
+func TestActionMenu_QCloses(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{items: []ActionItem{{ActionKill, "Kill"}}}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	got := result.(Model)
+	if got.showActionMenu {
+		t.Error("expected showActionMenu=false after q")
+	}
+}
+
+func TestActionMenu_SubPopup_EscReturnsToMenu(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{
+		items:    []ActionItem{{ActionKill, "Kill"}},
+		subPopup: SubPopupEnvVars,
+		subLines: []string{"FOO=bar"},
+	}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	got := result.(Model)
+	if !got.showActionMenu {
+		t.Error("expected showActionMenu=true (action menu stays open after sub-popup close)")
+	}
+	if got.actionMenu.subPopup != SubPopupNone {
+		t.Errorf("expected subPopup=None after Esc, got %v", got.actionMenu.subPopup)
+	}
+}

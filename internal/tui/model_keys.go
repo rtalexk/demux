@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -614,6 +616,82 @@ func (m Model) openSidebarSelected() (Model, tea.Cmd) {
 	}
 	sess := m.sidebar.FindSession(node.Session)
 	return m.launchOrSwitchSession(sess, node.Session)
+}
+
+// handleActionMenuKey routes keys when the action menu (or a sub-popup) is open.
+func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.actionMenu.subPopup != SubPopupNone {
+		return m.handleSubPopupKey(msg)
+	}
+	switch {
+	case key.Matches(msg, keys.Down.Binding):
+		m.actionMenu.MoveDown()
+	case key.Matches(msg, keys.Up.Binding):
+		m.actionMenu.MoveUp()
+	case key.Matches(msg, keys.Enter.Binding):
+		return m.executeActionMenuItem()
+	case msg.String() == "q", key.Matches(msg, keys.Esc.Binding):
+		m.showActionMenu = false
+	}
+	return m, nil
+}
+
+// handleSubPopupKey routes keys when a sub-popup is open inside the action menu.
+func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.actionMenu.subPopup == SubPopupKillConfirm {
+		switch msg.String() {
+		case "y", "enter":
+			pid := m.actionMenu.target.Proc.PID
+			m.showActionMenu = false
+			m.actionMenu.subPopup = SubPopupNone
+			return m, func() tea.Msg {
+				if err := proc.Kill(pid); err != nil {
+					return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
+				}
+				return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
+			}
+		case "n":
+			m.actionMenu.subPopup = SubPopupNone
+			return m, nil
+		case "esc", "q":
+			m.actionMenu.subPopup = SubPopupNone
+			return m, nil
+		}
+		return m, nil
+	}
+	switch {
+	case key.Matches(msg, keys.Down.Binding):
+		m.actionMenu.SubScrollDown()
+	case key.Matches(msg, keys.Up.Binding):
+		m.actionMenu.SubScrollUp()
+	case msg.String() == "q", key.Matches(msg, keys.Esc.Binding):
+		m.actionMenu.subPopup = SubPopupNone
+		m.actionMenu.subLines = nil
+		m.actionMenu.subScrollOff = 0
+	}
+	return m, nil
+}
+
+// executeActionMenuItem executes the currently selected action menu item.
+// Individual action implementations are added in subsequent tasks.
+func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
+	item := m.actionMenu.Selected()
+	if item == nil {
+		return m, nil
+	}
+	switch item.Kind {
+	case ActionKill:
+		m.actionMenu.subPopup = SubPopupKillConfirm
+		return m, nil
+	case ActionShowEnv:
+		pid := m.actionMenu.target.Proc.PID
+		return m, func() tea.Msg {
+			lines, err := proc.Environ(pid)
+			return envResultMsg{lines: lines, err: err}
+		}
+	}
+	// Remaining actions (restart, logs, copy, browser, full cmd) wired in next tasks.
+	return m, nil
 }
 
 // openActionMenu opens the action menu for the currently selected process node.
