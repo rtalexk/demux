@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 type YankField struct {
@@ -16,23 +18,48 @@ type YankField struct {
 type YankModel struct {
 	fields []YankField
 	cursor int
+	title  string
 }
 
-func (y *YankModel) SetFields(fields []YankField) {
+func (y *YankModel) SetFields(fields []YankField, title string) {
 	y.fields = fields
 	y.cursor = 0
+	y.title = title
+}
+
+func (y YankModel) FieldByKey(k string) (YankField, bool) {
+	for _, f := range y.fields {
+		if f.Key == k {
+			return f, true
+		}
+	}
+	return YankField{}, false
 }
 
 func (y YankModel) Render() string {
-	var lines []string
+	maxW := 0
+	for _, f := range y.fields {
+		if w := lipgloss.Width(menuItemIndent + fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, f.Value)); w > maxW {
+			maxW = w
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(y.title)
+	sb.WriteString("\n\n")
 	for i, f := range y.fields {
 		line := fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, f.Value)
 		if i == y.cursor {
-			line = selectedBG.Render(line)
+			line = selectedBG.Width(maxW + menuItemTrailingPad).Render(menuItemIndent + line)
+		} else {
+			line = menuItemIndent + line
 		}
-		lines = append(lines, line)
+		sb.WriteString(line)
+		sb.WriteString("\n")
 	}
-	return yankStyle.Render(strings.Join(lines, "\n"))
+	sb.WriteString("\n")
+	sb.WriteString(hintStyle.Render("Enter / shortcut") + " copy   " + hintStyle.Render("Esc / q") + " close")
+	return confirmStyle.Render(sb.String())
 }
 
 func (y *YankModel) MoveUp() {

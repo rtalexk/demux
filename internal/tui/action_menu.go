@@ -3,10 +3,20 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 // cmdlineLongThreshold is the rune length above which "Show full command" appears in the action menu.
 const cmdlineLongThreshold = 60
+
+// menuItemIndent is the leading whitespace applied to every menu row so that
+// selected rows (rendered with selectedBG) stay horizontally aligned.
+const menuItemIndent = "  "
+
+// menuItemTrailingPad is the extra width added to the selected-row highlight
+// so the background extends slightly past the longest item text.
+const menuItemTrailingPad = 2
 
 // ActionKind identifies an action in the action menu.
 type ActionKind int
@@ -15,9 +25,6 @@ const (
 	ActionKill ActionKind = iota
 	ActionRestart
 	ActionViewLogs
-	ActionCopyPID
-	ActionCopyCommand
-	ActionCopyCWD
 	ActionOpenBrowser
 	ActionShowEnv
 	ActionShowFullCmd
@@ -53,13 +60,6 @@ func buildActionItems(node ProcListNode) []ActionItem {
 		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "x"},
 		{ActionRestart, "Re-run last cmd (Up+Enter)", "r"},
 		{ActionViewLogs, "View logs", "l"},
-		{ActionCopyPID, fmt.Sprintf("Copy PID (%d)", node.Proc.PID), "p"},
-	}
-	if node.Proc.Cmdline != "" {
-		items = append(items, ActionItem{ActionCopyCommand, "Copy command", "c"})
-	}
-	if node.Pane.CWD != "" {
-		items = append(items, ActionItem{ActionCopyCWD, "Copy working directory", "w"})
 	}
 	if node.Port > 0 {
 		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), "o"})
@@ -97,19 +97,30 @@ func (a *ActionMenuModel) Selected() *ActionItem {
 // Render returns the styled action menu popup string.
 func (a ActionMenuModel) Render() string {
 	title := fmt.Sprintf("Actions: %s (%d)", a.target.Proc.FriendlyName(), a.target.Proc.PID)
-	var sb strings.Builder
-	sb.WriteString(title)
-	sb.WriteString("\n\n")
+
+	type row struct{ prefix, label string }
+	rows := make([]row, len(a.items))
+	maxW := 0
 	for i, it := range a.items {
 		prefix := "    " // 4 chars to match "[x] " width
 		if it.Shortcut != "" {
 			prefix = "[" + it.Shortcut + "] "
 		}
-		line := prefix + it.Label
+		rows[i] = row{prefix, it.Label}
+		if w := lipgloss.Width(menuItemIndent + prefix + it.Label); w > maxW {
+			maxW = w
+		}
+	}
+
+	var sb strings.Builder
+	sb.WriteString(title)
+	sb.WriteString("\n\n")
+	for i, r := range rows {
+		line := r.prefix + r.label
 		if i == a.cursor {
-			line = selectedBG.Render("  " + line)
+			line = selectedBG.Width(maxW + menuItemTrailingPad).Render(menuItemIndent + line)
 		} else {
-			line = "  " + line
+			line = menuItemIndent + line
 		}
 		sb.WriteString(line)
 		sb.WriteString("\n")

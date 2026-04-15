@@ -33,7 +33,6 @@ var (
 	// Overlays
 	helpStyle     lipgloss.Style
 	helpDescStyle lipgloss.Style
-	yankStyle     lipgloss.Style
 	confirmStyle  lipgloss.Style
 
 	// Sidebar text
@@ -99,7 +98,6 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 
 	helpStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 	helpDescStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
-	yankStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 2)
 	confirmStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(t.ColorSession).Padding(1, 1)
 
 	sessionStyle = lipgloss.NewStyle().Bold(true).Foreground(t.ColorSession)

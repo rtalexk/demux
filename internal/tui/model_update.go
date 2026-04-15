@@ -319,7 +319,7 @@ func (m *Model) populateYankFields() {
 				{Key: "c", Label: "cmdline", Value: pr.Cmdline},
 				{Key: "d", Label: "CWD", Value: cwd},
 				{Key: "o", Label: "port", Value: portStr},
-			})
+			}, fmt.Sprintf("Yank: %s (%d)", pr.Name, pr.PID))
 			return
 		}
 	}
@@ -328,7 +328,7 @@ func (m *Model) populateYankFields() {
 		m.yank.SetFields([]YankField{
 			{Key: "n", Label: "session", Value: node.Session},
 			{Key: "t", Label: "target", Value: node.Session},
-		})
+		}, "Yank: "+node.Session)
 	}
 }
 
@@ -601,6 +601,13 @@ func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 			CopyToClipboard(val)
 			m.showYank = false
 			m.statusMsg = "yanked: " + val
+			m.statusExp = time.Now().Add(2 * time.Second)
+			return m, nil
+		}
+		if f, ok := m.yank.FieldByKey(msg.String()); ok {
+			CopyToClipboard(f.Value)
+			m.showYank = false
+			m.statusMsg = "yanked: " + f.Value
 			m.statusExp = time.Now().Add(2 * time.Second)
 			return m, nil
 		}

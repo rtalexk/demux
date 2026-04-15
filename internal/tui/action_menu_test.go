@@ -17,7 +17,7 @@ func TestBuildActionItems_AlwaysPresent(t *testing.T) {
 	for _, it := range items {
 		kinds[it.Kind] = true
 	}
-	for _, required := range []ActionKind{ActionKill, ActionRestart, ActionViewLogs, ActionCopyPID} {
+	for _, required := range []ActionKind{ActionKill, ActionRestart, ActionViewLogs} {
 		if !kinds[required] {
 			t.Errorf("expected action %v in items", required)
 		}
@@ -56,31 +56,6 @@ func TestBuildActionItems_NoPortNoOpenBrowser(t *testing.T) {
 	}
 }
 
-func TestBuildActionItems_NoCmdlineNoCopyCommand(t *testing.T) {
-	node := ProcListNode{
-		Proc: proc.Process{PID: 1, Name: "bash", Cmdline: ""},
-		Pane: tmux.Pane{PaneID: "%1"},
-	}
-	items := buildActionItems(node)
-	for _, it := range items {
-		if it.Kind == ActionCopyCommand {
-			t.Error("ActionCopyCommand should not appear when Cmdline is empty")
-		}
-	}
-}
-
-func TestBuildActionItems_NoCWDNoCopyCWD(t *testing.T) {
-	node := ProcListNode{
-		Proc: proc.Process{PID: 1, Name: "bash", Cmdline: "bash"},
-		Pane: tmux.Pane{PaneID: "%1", CWD: ""},
-	}
-	items := buildActionItems(node)
-	for _, it := range items {
-		if it.Kind == ActionCopyCWD {
-			t.Error("ActionCopyCWD should not appear when CWD is empty")
-		}
-	}
-}
 
 func TestActionMenuModel_Navigation(t *testing.T) {
 	m := ActionMenuModel{

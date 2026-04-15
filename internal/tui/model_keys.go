@@ -728,30 +728,6 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 			return openViewerMsg{path: f.Name()}
 		}
 
-	case ActionCopyPID:
-		val := fmt.Sprintf("%d", m.actionMenu.target.Proc.PID)
-		m.showActionMenu = false
-		return m, func() tea.Msg {
-			_ = CopyToClipboard(val)
-			return procActionMsg{"copied PID " + val}
-		}
-
-	case ActionCopyCommand:
-		val := m.actionMenu.target.Proc.Cmdline
-		m.showActionMenu = false
-		return m, func() tea.Msg {
-			_ = CopyToClipboard(val)
-			return procActionMsg{"copied command"}
-		}
-
-	case ActionCopyCWD:
-		val := m.actionMenu.target.Pane.CWD
-		m.showActionMenu = false
-		return m, func() tea.Msg {
-			_ = CopyToClipboard(val)
-			return procActionMsg{"copied working directory"}
-		}
-
 	case ActionOpenBrowser:
 		port := m.actionMenu.target.Port
 		m.showActionMenu = false

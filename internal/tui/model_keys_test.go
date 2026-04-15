@@ -331,15 +331,6 @@ func TestOpenActionMenu_RecoversSuppressedCWD(t *testing.T) {
 	m.focus = panelProcList
 
 	got := m.openActionMenu()
-	found := false
-	for _, it := range got.actionMenu.items {
-		if it.Kind == ActionCopyCWD {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected ActionCopyCWD in menu after CWD recovery from m.panes")
-	}
 	if got.actionMenu.target.Pane.CWD != "/real/cwd" {
 		t.Errorf("expected target CWD=/real/cwd, got %q", got.actionMenu.target.Pane.CWD)
 	}
