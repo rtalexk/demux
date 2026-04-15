@@ -72,10 +72,11 @@ func (y YankModel) displayValue(fieldIdx int, f YankField) string {
 }
 
 func (y YankModel) Render() string {
+	dvs := make([]string, len(y.fields))
 	maxW := 0
 	for i, f := range y.fields {
-		dv := y.displayValue(i, f)
-		if w := lipgloss.Width(menuItemIndent + fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, dv)); w > maxW {
+		dvs[i] = y.displayValue(i, f)
+		if w := lipgloss.Width(menuItemIndent + fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, dvs[i])); w > maxW {
 			maxW = w
 		}
 	}
@@ -84,8 +85,7 @@ func (y YankModel) Render() string {
 	sb.WriteString(y.title)
 	sb.WriteString("\n\n")
 	for i, f := range y.fields {
-		dv := y.displayValue(i, f)
-		line := fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, dv)
+		line := fmt.Sprintf("[%s] %-12s %s", f.Key, f.Label, dvs[i])
 		if i == y.cursor {
 			line = selectedBG.Width(maxW + menuItemTrailingPad).Render(menuItemIndent + line)
 		} else {
