@@ -20,7 +20,8 @@ func (m *Marquee) Reset() {
 	m.offset = 0
 }
 
-// Tick advances the scroll position by one rune.
+// Tick advances the scroll position by one rune position.
+// Cycle length is measured in rune count, not display columns.
 func (m *Marquee) Tick() {
 	m.offset++
 }
@@ -29,6 +30,9 @@ func (m *Marquee) Tick() {
 // If text fits within width it is returned unchanged.
 // The circular sequence is: text + 4 spaces + text (repeating).
 func (m Marquee) View(text string, width int) string {
+	if width <= 0 {
+		return ""
+	}
 	if runewidth.StringWidth(text) <= width {
 		return text
 	}
