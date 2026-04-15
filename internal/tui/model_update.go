@@ -17,6 +17,7 @@ import (
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
+	"strings"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -192,6 +193,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.sessionIDMap = tmux.SessionIDToNameMap(msg.panes)
 	m.nameToIDMap = tmux.SessionNameToIDMap(msg.panes)
 	m.sidebar.SetNameToIDMap(m.nameToIDMap)
+	healStateSessionIDs(m.states, m.paneIDMap, m.nameToIDMap)
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -256,6 +258,7 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 
 func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
 	m.states = msg.states
+	healStateSessionIDs(m.states, m.paneIDMap, m.nameToIDMap)
 	m.procList.SetStates(m.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -408,6 +411,35 @@ func statesForSession(states []db.ToolState, sessionID string) []db.ToolState {
 		}
 	}
 	return out
+}
+
+// healStateSessionIDs reconciles pane state records whose session_id is empty or
+// stale in the DB against the live paneIDMap + nameToIDMap. This corrects records
+// where resolveParentIDs failed at write time (e.g. SQLITE_BUSY) or where the
+// pane was joined into a new session after the state was written.
+//
+// Mutations are in-memory only; the DB is not touched here. StateRefreshParentIDs
+// (called from pane_focus events) persists corrections back to SQLite lazily.
+func healStateSessionIDs(states []db.ToolState, paneIDMap, nameToIDMap map[string]string) {
+	for i := range states {
+		if states[i].Target.Type != db.TargetTypePane {
+			continue
+		}
+		label, ok := paneIDMap[states[i].Target.ID]
+		if !ok {
+			continue // pane not in live map; leave as-is
+		}
+		colonIdx := strings.Index(label, ":")
+		if colonIdx <= 0 {
+			continue
+		}
+		sessName := label[:colonIdx]
+		sessID := nameToIDMap[sessName]
+		if sessID == "" || states[i].Target.SessionID == sessID {
+			continue // already correct
+		}
+		states[i].Target.SessionID = sessID
+	}
 }
 
 // countProcsUnderCWD counts processes whose working directory is sessionCWD or a descendant.
