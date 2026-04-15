@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -658,6 +657,10 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.executeActionByKind(ActionCopyCWD)
 	case "d":
 		return m.executeActionByKind(ActionShowEnv)
+	case "o":
+		return m.executeActionByKind(ActionOpenBrowser)
+	case "f":
+		return m.executeActionByKind(ActionShowFullCmd)
 	}
 	switch {
 	case key.Matches(msg, keys.Down.Binding):
@@ -706,16 +709,6 @@ func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
-	}
-	switch {
-	case key.Matches(msg, keys.Down.Binding):
-		m.actionMenu.SubScrollDown()
-	case key.Matches(msg, keys.Up.Binding):
-		m.actionMenu.SubScrollUp()
-	case msg.String() == "q", key.Matches(msg, keys.Esc.Binding):
-		m.actionMenu.subPopup = SubPopupNone
-		m.actionMenu.subLines = nil
-		m.actionMenu.subScrollOff = 0
 	}
 	return m, nil
 }
@@ -790,10 +783,12 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 			switch runtime.GOOS {
 			case "darwin":
 				cmd = exec.Command("open", url)
-			default:
+			case "linux":
 				cmd = exec.Command("xdg-open", url)
 			}
-			_ = cmd.Run()
+			if cmd != nil {
+				_ = cmd.Run()
+			}
 			return nil
 		}
 
@@ -817,11 +812,17 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 		}
 
 	case ActionShowFullCmd:
-		lines := strings.Fields(m.actionMenu.target.Proc.Cmdline)
-		m.actionMenu.subPopup = SubPopupFullCmd
-		m.actionMenu.subLines = lines
-		m.actionMenu.subScrollOff = 0
-		return m, nil
+		cmdline := m.actionMenu.target.Proc.Cmdline
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			f, err := os.CreateTemp("", "demux-cmd-*.txt")
+			if err != nil {
+				return procActionMsg{"cmd: " + err.Error()}
+			}
+			_, _ = fmt.Fprintln(f, cmdline)
+			_ = f.Close()
+			return openViewerMsg{path: f.Name()}
+		}
 	}
 	return m, nil
 }
