@@ -6,7 +6,7 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 )
 
-const marqueeGap = 4 // spaces inserted between end of text and its circular restart
+const marqueeGap = 8 // spaces inserted between end of text and its circular restart
 
 // Marquee scrolls text horizontally in a circular loop.
 // Embed in a model; call Tick() each marquee tick and Reset() when the target text changes.

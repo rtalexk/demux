@@ -31,7 +31,7 @@ func TestMarqueeView_scroll(t *testing.T) {
 }
 
 func TestMarqueeView_gap(t *testing.T) {
-	// "ABCDEF" = 6 runes, gap = 4, cycle = 10
+	// "ABCDEF" = 6 runes, gap = 8, cycle = 14
 	// offset=6 → extended[6..8] are spaces
 	m := Marquee{offset: 6}
 	got := m.View("ABCDEF", 3)
@@ -41,8 +41,8 @@ func TestMarqueeView_gap(t *testing.T) {
 }
 
 func TestMarqueeView_wrap(t *testing.T) {
-	// offset=10 = one full cycle → back to start
-	m := Marquee{offset: 10}
+	// offset=14 = one full cycle → back to start
+	m := Marquee{offset: 14}
 	got := m.View("ABCDEF", 3)
 	if got != "ABC" {
 		t.Errorf("want %q, got %q", "ABC", got)
