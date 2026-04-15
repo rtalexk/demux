@@ -50,7 +50,7 @@ type ActionMenuModel struct {
 // Only actions applicable to the node's context are included.
 func buildActionItems(node ProcListNode) []ActionItem {
 	items := []ActionItem{
-		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "K"},
+		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "x"},
 		{ActionRestart, "Restart process", "r"},
 		{ActionViewLogs, "View logs", "l"},
 		{ActionCopyPID, fmt.Sprintf("Copy PID (%d)", node.Proc.PID), "p"},

@@ -51,6 +51,7 @@ type keyMap struct {
 	ProcEnter         keyDef // display-only: Enter for process list
 	ProcOpen          keyDef // display-only: o/ctrl+o for process list
 	ActionMenu        keyDef
+	KillProc          keyDef
 }
 
 var keys = keyMap{
@@ -103,6 +104,7 @@ var keys = keyMap{
 	ProcEnter:         keyDef{key.NewBinding(key.WithHelp("Enter", "toggle expand / collapse")), "Process list", 4},
 	ProcOpen:          keyDef{key.NewBinding(key.WithHelp("o / ctrl+o", "attach to pane")), "Process list", 5},
 	ActionMenu:        keyDef{key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "action menu")), "Process list", 6},
+	KillProc:          keyDef{key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "kill process (confirm)")), "Process list", 7},
 }
 
 // allKeyDefs returns the ordered list of keyDefs for help menu rendering.
@@ -120,6 +122,6 @@ func allKeyDefs() []keyDef {
 		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter, keys.WatchFilter,
 		// Process list
 		keys.JumpUpDown, keys.ExpandCollapse, keys.ExpandCollapseAll,
-		keys.ProcEnter, keys.ProcOpen, keys.ActionMenu,
+		keys.ProcEnter, keys.ProcOpen, keys.ActionMenu, keys.KillProc,
 	}
 }

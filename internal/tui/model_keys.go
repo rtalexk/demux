@@ -479,6 +479,22 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
+	case msg.String() == "x":
+		if node := m.procList.SelectedNode(); node != nil && node.Proc.PID != 0 {
+			pid := node.Proc.PID
+			name := node.Proc.FriendlyName()
+			m.confirm = ConfirmModel{
+				prompt: fmt.Sprintf("Kill %s (PID %d)?", name, pid),
+			}
+			m.confirmCmd = func() tea.Msg {
+				if err := proc.Kill(pid); err != nil {
+					return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
+				}
+				return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
+			}
+			m.showConfirm = true
+			return m, nil
+		}
 	case key.Matches(msg, keys.Open.Binding):
 		nm, cmd := m.handleProcListOpen()
 		nm.procList.clampOffset(procH - 2)
@@ -628,7 +644,7 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSubPopupKey(msg)
 	}
 	switch msg.String() {
-	case "K":
+	case "x":
 		return m.executeActionByKind(ActionKill)
 	case "r":
 		return m.executeActionByKind(ActionRestart)

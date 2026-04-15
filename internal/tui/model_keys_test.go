@@ -241,25 +241,59 @@ func TestActionMenu_QCloses(t *testing.T) {
 	}
 }
 
-func TestActionMenu_ShortcutK_TriggersKill(t *testing.T) {
+func TestActionMenu_ShortcutX_TriggersKill(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
 	m.actionMenu = ActionMenuModel{
 		items: []ActionItem{
-			{Kind: ActionKill, Label: "Kill", Shortcut: "K"},
+			{Kind: ActionKill, Label: "Kill", Shortcut: "x"},
 			{Kind: ActionRestart, Label: "Restart", Shortcut: "r"},
 		},
 		cursor: 1, // cursor starts on Restart
 		target: ProcListNode{Proc: proc.Process{PID: 42, Name: "node"}, Pane: tmux.Pane{PaneID: "%1"}},
 	}
-	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
 	got := result.(Model)
-	// K should jump cursor to Kill (index 0) and open kill confirm sub-popup
+	// x should jump cursor to Kill (index 0) and open kill confirm sub-popup
 	if got.actionMenu.subPopup != SubPopupKillConfirm {
-		t.Errorf("expected SubPopupKillConfirm after 'K', got %v", got.actionMenu.subPopup)
+		t.Errorf("expected SubPopupKillConfirm after 'x', got %v", got.actionMenu.subPopup)
 	}
 	if got.actionMenu.cursor != 0 {
-		t.Errorf("expected cursor=0 (Kill item) after 'K', got %d", got.actionMenu.cursor)
+		t.Errorf("expected cursor=0 (Kill item) after 'x', got %d", got.actionMenu.cursor)
+	}
+}
+
+func TestProcList_X_OpensKillConfirm(t *testing.T) {
+	m := newTestModel(t)
+	m.focus = panelProcList
+	m.procList.nodes = []ProcListNode{
+		{IsPaneHeader: true, Pane: tmux.Pane{PaneID: "%1", Session: "s"}},
+		{Proc: proc.Process{PID: 77, Name: "node", Cmdline: "node server.js"}, Depth: 1, Pane: tmux.Pane{PaneID: "%1"}},
+	}
+	m.procList.cursor = 1
+
+	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	got := result.(Model)
+	if !got.showConfirm {
+		t.Error("expected showConfirm=true after 'x' on process node")
+	}
+	if got.confirmCmd == nil {
+		t.Error("expected confirmCmd to be set")
+	}
+}
+
+func TestProcList_X_NoopOnPaneHeader(t *testing.T) {
+	m := newTestModel(t)
+	m.focus = panelProcList
+	m.procList.nodes = []ProcListNode{
+		{IsPaneHeader: true, Pane: tmux.Pane{PaneID: "%1", Session: "s"}},
+	}
+	m.procList.cursor = 0
+
+	result, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
+	got := result.(Model)
+	if got.showConfirm {
+		t.Error("expected showConfirm=false when 'x' pressed on pane header (no process)")
 	}
 }
 
