@@ -484,3 +484,90 @@ func TestStateSet_EmptySessionWindowPaneIDs(t *testing.T) {
 		t.Errorf("expected empty PaneID, got %q", st.Target.PaneID)
 	}
 }
+
+func TestStateRefreshParentIDs_Updates(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	if err := d.StateSet(target, "claude", StateWorking, "", SourceTool, false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pane moved to a different session/window.
+	if err := d.StateRefreshParentIDs("%1", "@1", "$1"); err != nil {
+		t.Fatal(err)
+	}
+
+	st, err := d.StateByID(Target{Type: TargetTypePane, ID: "%1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.Target.SessionID != "$1" {
+		t.Errorf("expected SessionID $1, got %q", st.Target.SessionID)
+	}
+	if st.Target.WindowID != "@1" {
+		t.Errorf("expected WindowID @1, got %q", st.Target.WindowID)
+	}
+}
+
+func TestStateRefreshParentIDs_NoopWhenMatch(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	target := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	if err := d.StateSet(target, "claude", StateWorking, "", SourceTool, false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// IDs already match; no update should occur.
+	if err := d.StateRefreshParentIDs("%1", "@0", "$0"); err != nil {
+		t.Fatal(err)
+	}
+
+	st, _ := d.StateByID(Target{Type: TargetTypePane, ID: "%1"})
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.Target.SessionID != "$0" || st.Target.WindowID != "@0" {
+		t.Errorf("IDs should be unchanged, got session=%q window=%q", st.Target.SessionID, st.Target.WindowID)
+	}
+}
+
+func TestStateRefreshParentIDs_NoopWhenNoRow(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// No row exists for %99; should not error.
+	if err := d.StateRefreshParentIDs("%99", "@0", "$0"); err != nil {
+		t.Fatalf("expected no error for missing row, got: %v", err)
+	}
+}
+
+func TestStateSet_ParentIDMissing_WritesThrough(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Write initial state with empty session_id (simulates a failed resolveParentIDs).
+	bare := Target{Type: TargetTypePane, ID: "%1", SessionID: "", WindowID: "", PaneID: "%1"}
+	if err := d.StateSet(bare, "claude", StateWorking, "step 1", SourceTool, false, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second write has same value+tool but provides the session_id — must write through.
+	withIDs := Target{Type: TargetTypePane, ID: "%1", SessionID: "$0", WindowID: "@0", PaneID: "%1"}
+	if err := d.StateSet(withIDs, "claude", StateWorking, "step 1", SourceTool, false, nil); err != nil {
+		t.Fatalf("parentIDMissing write-through should not error: %v", err)
+	}
+
+	st, _ := d.StateByID(Target{Type: TargetTypePane, ID: "%1"})
+	if st == nil {
+		t.Fatal("expected state, got nil")
+	}
+	if st.Target.SessionID != "$0" {
+		t.Errorf("expected SessionID $0 after write-through, got %q", st.Target.SessionID)
+	}
+}
