@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// cmdlineLongThreshold is the rune length above which "Show full command" appears in the action menu.
+const cmdlineLongThreshold = 60
+
 // ActionKind identifies an action in the action menu.
 type ActionKind int
 
@@ -62,7 +65,7 @@ func buildActionItems(node ProcListNode) []ActionItem {
 		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), "o"})
 	}
 	items = append(items, ActionItem{ActionShowEnv, "Show environment", "d"})
-	if len([]rune(node.Proc.Cmdline)) > 60 {
+	if len([]rune(node.Proc.Cmdline)) > cmdlineLongThreshold {
 		items = append(items, ActionItem{ActionShowFullCmd, "Show full command", "f"})
 	}
 	return items

@@ -19,6 +19,10 @@ import (
 const (
 	dirDown = 1
 	dirUp   = -1
+
+	// tmuxScrollbackLines is the number of lines passed to tmux capture-pane -S.
+	// Negative value = capture from that many lines above the visible area.
+	tmuxScrollbackLines = "-32768"
 )
 
 // resolveFilterKey maps a key message to a SidebarFilter.
@@ -485,12 +489,7 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirm = ConfirmModel{
 				prompt: fmt.Sprintf("Kill %s (PID %d)?", name, pid),
 			}
-			m.confirmCmd = func() tea.Msg {
-				if err := proc.Kill(pid); err != nil {
-					return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
-				}
-				return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
-			}
+			m.confirmCmd = killProcCmd(pid)
 			m.showConfirm = true
 			return m, nil
 		}
@@ -637,30 +636,30 @@ func (m Model) openSidebarSelected() (Model, tea.Cmd) {
 	return m.launchOrSwitchSession(sess, node.Session)
 }
 
+// killProcCmd returns a tea.Cmd that sends SIGKILL to pid and reports the result
+// via procActionMsg. Shared by the direct-x handler and the action-menu kill path.
+func killProcCmd(pid int32) tea.Cmd {
+	return func() tea.Msg {
+		if err := proc.Kill(pid); err != nil {
+			return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
+		}
+		return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
+	}
+}
+
 // handleActionMenuKey routes keys when the action menu (or a sub-popup) is open.
 func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.actionMenu.subPopup != SubPopupNone {
 		return m.handleSubPopupKey(msg)
 	}
-	switch msg.String() {
-	case "x":
-		return m.executeActionByKind(ActionKill)
-	case "r":
-		return m.executeActionByKind(ActionRestart)
-	case "l":
-		return m.executeActionByKind(ActionViewLogs)
-	case "p":
-		return m.executeActionByKind(ActionCopyPID)
-	case "c":
-		return m.executeActionByKind(ActionCopyCommand)
-	case "w":
-		return m.executeActionByKind(ActionCopyCWD)
-	case "d":
-		return m.executeActionByKind(ActionShowEnv)
-	case "o":
-		return m.executeActionByKind(ActionOpenBrowser)
-	case "f":
-		return m.executeActionByKind(ActionShowFullCmd)
+	// Dispatch single-key shortcuts defined on each ActionItem. This avoids
+	// duplicating the shortcut mapping here and in buildActionItems.
+	pressed := msg.String()
+	for i, item := range m.actionMenu.items {
+		if item.Shortcut != "" && item.Shortcut == pressed {
+			m.actionMenu.cursor = i
+			return m.executeActionMenuItem()
+		}
 	}
 	switch {
 	case key.Matches(msg, keys.Down.Binding):
@@ -675,40 +674,19 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// executeActionByKind finds the item with the given kind and executes it.
-// No-op if the action is not present in the current menu (context-dependent items).
-func (m Model) executeActionByKind(kind ActionKind) (tea.Model, tea.Cmd) {
-	for i, item := range m.actionMenu.items {
-		if item.Kind == kind {
-			m.actionMenu.cursor = i
-			return m.executeActionMenuItem()
-		}
-	}
-	return m, nil
-}
-
 // handleSubPopupKey routes keys when a sub-popup is open inside the action menu.
 func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.actionMenu.subPopup == SubPopupKillConfirm {
+	switch m.actionMenu.subPopup {
+	case SubPopupKillConfirm:
 		switch msg.String() {
 		case "y", "enter":
 			pid := m.actionMenu.target.Proc.PID
 			m.showActionMenu = false
 			m.actionMenu.subPopup = SubPopupNone
-			return m, func() tea.Msg {
-				if err := proc.Kill(pid); err != nil {
-					return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
-				}
-				return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
-			}
-		case "n":
+			return m, killProcCmd(pid)
+		case "n", "esc", "q":
 			m.actionMenu.subPopup = SubPopupNone
-			return m, nil
-		case "esc", "q":
-			m.actionMenu.subPopup = SubPopupNone
-			return m, nil
 		}
-		return m, nil
 	}
 	return m, nil
 }
@@ -737,7 +715,7 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 		paneID := m.actionMenu.target.Pane.PaneID
 		m.showActionMenu = false
 		return m, func() tea.Msg {
-			out, err := exec.Command("tmux", "capture-pane", "-t", paneID, "-p", "-S", "-32768").Output()
+			out, err := exec.Command("tmux", "capture-pane", "-t", paneID, "-p", "-S", tmuxScrollbackLines).Output()
 			if err != nil {
 				return procActionMsg{"logs: " + err.Error()}
 			}
