@@ -341,14 +341,10 @@ func (m Model) applyOverlay(base string) string {
 		return overlayCenter(m.confirm.Render(), base, m.width, m.height)
 	}
 	if m.showActionMenu {
-		switch m.actionMenu.subPopup {
-		case SubPopupKillConfirm:
+		if m.actionMenu.subPopup == SubPopupKillConfirm {
 			return overlayCenter(m.actionMenu.RenderKillConfirm(), base, m.width, m.height)
-		case SubPopupFullCmd:
-			return overlayCenter(m.actionMenu.RenderSubPopup(20), base, m.width, m.height)
-		default:
-			return overlayCenter(m.actionMenu.Render(), base, m.width, m.height)
 		}
+		return overlayCenter(m.actionMenu.Render(), base, m.width, m.height)
 	}
 	return base
 }

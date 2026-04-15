@@ -26,7 +26,6 @@ type SubPopupKind int
 const (
 	SubPopupNone SubPopupKind = iota
 	SubPopupKillConfirm
-	SubPopupFullCmd
 )
 
 // ActionItem is a single entry in the action menu.
@@ -38,12 +37,10 @@ type ActionItem struct {
 
 // ActionMenuModel holds the state for the action menu and its sub-popups.
 type ActionMenuModel struct {
-	items        []ActionItem
-	cursor       int
-	target       ProcListNode
-	subPopup     SubPopupKind
-	subLines     []string // content lines for scrollable sub-popups
-	subScrollOff int
+	items    []ActionItem
+	cursor   int
+	target   ProcListNode
+	subPopup SubPopupKind
 }
 
 // buildActionItems constructs the dynamic action list for a given process node.
@@ -51,7 +48,7 @@ type ActionMenuModel struct {
 func buildActionItems(node ProcListNode) []ActionItem {
 	items := []ActionItem{
 		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "x"},
-		{ActionRestart, "Restart process", "r"},
+		{ActionRestart, "Re-run last cmd (Up+Enter)", "r"},
 		{ActionViewLogs, "View logs", "l"},
 		{ActionCopyPID, fmt.Sprintf("Copy PID (%d)", node.Proc.PID), "p"},
 	}
@@ -62,11 +59,11 @@ func buildActionItems(node ProcListNode) []ActionItem {
 		items = append(items, ActionItem{ActionCopyCWD, "Copy working directory", "w"})
 	}
 	if node.Port > 0 {
-		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), ""})
+		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), "o"})
 	}
 	items = append(items, ActionItem{ActionShowEnv, "Show environment", "d"})
 	if len([]rune(node.Proc.Cmdline)) > 60 {
-		items = append(items, ActionItem{ActionShowFullCmd, "Show full command", ""})
+		items = append(items, ActionItem{ActionShowFullCmd, "Show full command", "f"})
 	}
 	return items
 }
@@ -92,20 +89,6 @@ func (a *ActionMenuModel) Selected() *ActionItem {
 	}
 	it := a.items[a.cursor]
 	return &it
-}
-
-// SubScrollDown scrolls the sub-popup content down by one line.
-func (a *ActionMenuModel) SubScrollDown() {
-	if a.subScrollOff < len(a.subLines)-1 {
-		a.subScrollOff++
-	}
-}
-
-// SubScrollUp scrolls the sub-popup content up by one line.
-func (a *ActionMenuModel) SubScrollUp() {
-	if a.subScrollOff > 0 {
-		a.subScrollOff--
-	}
 }
 
 // Render returns the styled action menu popup string.
@@ -137,41 +120,4 @@ func (a ActionMenuModel) Render() string {
 func (a ActionMenuModel) RenderKillConfirm() string {
 	prompt := fmt.Sprintf("Kill %s (PID %d)?", a.target.Proc.FriendlyName(), a.target.Proc.PID)
 	return ConfirmModel{prompt: prompt}.Render()
-}
-
-// RenderSubPopup returns the styled sub-popup overlay for env vars or full command.
-// height is the number of visible content lines to show (0 = show all).
-func (a ActionMenuModel) RenderSubPopup(height int) string {
-	var title string
-	switch a.subPopup {
-	case SubPopupFullCmd:
-		title = fmt.Sprintf("Command: %s (%d)", a.target.Proc.FriendlyName(), a.target.Proc.PID)
-	default:
-		return ""
-	}
-
-	visible := a.subLines
-	if height > 0 && len(visible) > 0 {
-		start := a.subScrollOff
-		if start >= len(visible) {
-			start = 0
-		}
-		end := start + height
-		if end > len(visible) {
-			end = len(visible)
-		}
-		visible = visible[start:end]
-	}
-
-	var sb strings.Builder
-	sb.WriteString(title)
-	sb.WriteString("\n\n")
-	for _, l := range visible {
-		sb.WriteString("  ")
-		sb.WriteString(l)
-		sb.WriteString("\n")
-	}
-	sb.WriteString("\n")
-	sb.WriteString(hintStyle.Render("j / k") + " scroll   " + hintStyle.Render("Esc / q") + " back")
-	return confirmStyle.Render(sb.String())
 }

@@ -119,27 +119,3 @@ func TestActionMenuModel_SelectedItem(t *testing.T) {
 	}
 }
 
-func TestActionMenuModel_SubScroll(t *testing.T) {
-	m := ActionMenuModel{
-		subLines: []string{"a", "b", "c", "d"},
-	}
-	m.SubScrollDown()
-	if m.subScrollOff != 1 {
-		t.Errorf("want subScrollOff=1, got %d", m.subScrollOff)
-	}
-	m.SubScrollUp()
-	if m.subScrollOff != 0 {
-		t.Errorf("want subScrollOff=0 after SubScrollUp, got %d", m.subScrollOff)
-	}
-	// clamp at top
-	m.SubScrollUp()
-	if m.subScrollOff != 0 {
-		t.Errorf("want subScrollOff=0 (no wrap), got %d", m.subScrollOff)
-	}
-	// clamp at bottom
-	m.subScrollOff = 3
-	m.SubScrollDown()
-	if m.subScrollOff != 3 {
-		t.Errorf("want subScrollOff=3 (clamped at last), got %d", m.subScrollOff)
-	}
-}
