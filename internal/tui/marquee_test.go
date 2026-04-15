@@ -84,3 +84,11 @@ func TestMarqueeTick(t *testing.T) {
 		t.Errorf("after one Tick, want %q, got %q", "BCD", got)
 	}
 }
+
+func TestMarqueeView_zeroWidth(t *testing.T) {
+	var m Marquee
+	got := m.View("ABCDEF", 0)
+	if got != "" {
+		t.Errorf("want empty string for width=0, got %q", got)
+	}
+}

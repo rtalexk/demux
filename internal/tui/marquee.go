@@ -38,6 +38,7 @@ func (m Marquee) View(text string, width int) string {
 	}
 
 	runes := []rune(text)
+	// cycle is measured in rune count, not display columns (see Tick doc).
 	cycle := len(runes) + marqueeGap
 
 	// Build: text + gap + text  (sufficient for any offset+width window because width < len(runes))
