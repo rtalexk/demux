@@ -195,7 +195,7 @@ func TestActionMenu_NavigateDown(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
 	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}},
+		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 0,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
@@ -209,7 +209,7 @@ func TestActionMenu_NavigateUp(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
 	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}},
+		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 1,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
@@ -222,7 +222,7 @@ func TestActionMenu_NavigateUp(t *testing.T) {
 func TestActionMenu_EscCloses(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{items: []ActionItem{{ActionKill, "Kill"}}}
+	m.actionMenu = ActionMenuModel{items: []ActionItem{{Kind: ActionKill, Label: "Kill"}}}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := result.(Model)
 	if got.showActionMenu {
@@ -233,7 +233,7 @@ func TestActionMenu_EscCloses(t *testing.T) {
 func TestActionMenu_QCloses(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{items: []ActionItem{{ActionKill, "Kill"}}}
+	m.actionMenu = ActionMenuModel{items: []ActionItem{{Kind: ActionKill, Label: "Kill"}}}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	got := result.(Model)
 	if got.showActionMenu {
@@ -241,11 +241,81 @@ func TestActionMenu_QCloses(t *testing.T) {
 	}
 }
 
+func TestActionMenu_ShortcutK_TriggersKill(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{
+		items: []ActionItem{
+			{Kind: ActionKill, Label: "Kill", Shortcut: "K"},
+			{Kind: ActionRestart, Label: "Restart", Shortcut: "r"},
+		},
+		cursor: 1, // cursor starts on Restart
+		target: ProcListNode{Proc: proc.Process{PID: 42, Name: "node"}, Pane: tmux.Pane{PaneID: "%1"}},
+	}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("K")})
+	got := result.(Model)
+	// K should jump cursor to Kill (index 0) and open kill confirm sub-popup
+	if got.actionMenu.subPopup != SubPopupKillConfirm {
+		t.Errorf("expected SubPopupKillConfirm after 'K', got %v", got.actionMenu.subPopup)
+	}
+	if got.actionMenu.cursor != 0 {
+		t.Errorf("expected cursor=0 (Kill item) after 'K', got %d", got.actionMenu.cursor)
+	}
+}
+
+func TestActionMenu_ShortcutForMissingAction_IsNoop(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	// Menu has only Kill — pressing 'c' (CopyCommand, not in list) should be a no-op.
+	m.actionMenu = ActionMenuModel{
+		items:  []ActionItem{{Kind: ActionKill, Label: "Kill", Shortcut: "k"}},
+		cursor: 0,
+	}
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
+	got := result.(Model)
+	if !got.showActionMenu {
+		t.Error("expected menu to remain open after no-op shortcut")
+	}
+	if got.actionMenu.cursor != 0 {
+		t.Errorf("expected cursor unchanged at 0, got %d", got.actionMenu.cursor)
+	}
+}
+
+func TestOpenActionMenu_RecoversSuppressedCWD(t *testing.T) {
+	m := New(config.Default(), nil)
+	// Simulate a pane whose CWD was suppressed in displayPane (matches window CWD).
+	m.panes = []tmux.Pane{
+		{PaneID: "%1", Session: "s", CWD: "/real/cwd"},
+	}
+	m.procList.nodes = []ProcListNode{
+		{
+			IsPaneHeader: true,
+			Pane:         tmux.Pane{PaneID: "%1", Session: "s", CWD: ""}, // suppressed
+		},
+	}
+	m.procList.cursor = 0
+	m.focus = panelProcList
+
+	got := m.openActionMenu()
+	found := false
+	for _, it := range got.actionMenu.items {
+		if it.Kind == ActionCopyCWD {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected ActionCopyCWD in menu after CWD recovery from m.panes")
+	}
+	if got.actionMenu.target.Pane.CWD != "/real/cwd" {
+		t.Errorf("expected target CWD=/real/cwd, got %q", got.actionMenu.target.Pane.CWD)
+	}
+}
+
 func TestActionMenu_SubPopup_EscReturnsToMenu(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
 	m.actionMenu = ActionMenuModel{
-		items:    []ActionItem{{ActionKill, "Kill"}},
+		items:    []ActionItem{{Kind: ActionKill, Label: "Kill"}},
 		subPopup: SubPopupFullCmd,
 		subLines: []string{"node", "server.js"},
 	}

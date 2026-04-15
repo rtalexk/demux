@@ -31,8 +31,9 @@ const (
 
 // ActionItem is a single entry in the action menu.
 type ActionItem struct {
-	Kind  ActionKind
-	Label string
+	Kind     ActionKind
+	Label    string
+	Shortcut string // single-key shortcut shown in the menu (empty = none)
 }
 
 // ActionMenuModel holds the state for the action menu and its sub-popups.
@@ -49,23 +50,23 @@ type ActionMenuModel struct {
 // Only actions applicable to the node's context are included.
 func buildActionItems(node ProcListNode) []ActionItem {
 	items := []ActionItem{
-		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName())},
-		{ActionRestart, "Restart process"},
-		{ActionViewLogs, "View logs"},
-		{ActionCopyPID, fmt.Sprintf("Copy PID (%d)", node.Proc.PID)},
+		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "K"},
+		{ActionRestart, "Restart process", "r"},
+		{ActionViewLogs, "View logs", "l"},
+		{ActionCopyPID, fmt.Sprintf("Copy PID (%d)", node.Proc.PID), "p"},
 	}
 	if node.Proc.Cmdline != "" {
-		items = append(items, ActionItem{ActionCopyCommand, "Copy command"})
+		items = append(items, ActionItem{ActionCopyCommand, "Copy command", "c"})
 	}
 	if node.Pane.CWD != "" {
-		items = append(items, ActionItem{ActionCopyCWD, "Copy working directory"})
+		items = append(items, ActionItem{ActionCopyCWD, "Copy working directory", "w"})
 	}
 	if node.Port > 0 {
-		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port)})
+		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), ""})
 	}
-	items = append(items, ActionItem{ActionShowEnv, "Show environment"})
+	items = append(items, ActionItem{ActionShowEnv, "Show environment", "d"})
 	if len([]rune(node.Proc.Cmdline)) > 60 {
-		items = append(items, ActionItem{ActionShowFullCmd, "Show full command"})
+		items = append(items, ActionItem{ActionShowFullCmd, "Show full command", ""})
 	}
 	return items
 }
@@ -114,15 +115,21 @@ func (a ActionMenuModel) Render() string {
 	sb.WriteString(title)
 	sb.WriteString("\n\n")
 	for i, it := range a.items {
-		line := "  " + it.Label
+		prefix := "    " // 4 chars to match "[x] " width
+		if it.Shortcut != "" {
+			prefix = "[" + it.Shortcut + "] "
+		}
+		line := prefix + it.Label
 		if i == a.cursor {
-			line = selectedBG.Render(line)
+			line = selectedBG.Render("  " + line)
+		} else {
+			line = "  " + line
 		}
 		sb.WriteString(line)
 		sb.WriteString("\n")
 	}
 	sb.WriteString("\n")
-	sb.WriteString(hintStyle.Render("Enter") + " select   " + hintStyle.Render("Esc / q") + " close")
+	sb.WriteString(hintStyle.Render("Enter / shortcut") + " select   " + hintStyle.Render("Esc / q") + " close")
 	return confirmStyle.Render(sb.String())
 }
 

@@ -84,7 +84,7 @@ func TestBuildActionItems_NoCWDNoCopyCWD(t *testing.T) {
 
 func TestActionMenuModel_Navigation(t *testing.T) {
 	m := ActionMenuModel{
-		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}, {ActionViewLogs, "Logs"}},
+		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}, {Kind: ActionViewLogs, Label: "Logs"}},
 		cursor: 0,
 	}
 	m.MoveDown()
@@ -110,7 +110,7 @@ func TestActionMenuModel_Navigation(t *testing.T) {
 
 func TestActionMenuModel_SelectedItem(t *testing.T) {
 	m := ActionMenuModel{
-		items:  []ActionItem{{ActionKill, "Kill"}, {ActionRestart, "Restart"}},
+		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 1,
 	}
 	got := m.Selected()

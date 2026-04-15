@@ -627,6 +627,22 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.actionMenu.subPopup != SubPopupNone {
 		return m.handleSubPopupKey(msg)
 	}
+	switch msg.String() {
+	case "K":
+		return m.executeActionByKind(ActionKill)
+	case "r":
+		return m.executeActionByKind(ActionRestart)
+	case "l":
+		return m.executeActionByKind(ActionViewLogs)
+	case "p":
+		return m.executeActionByKind(ActionCopyPID)
+	case "c":
+		return m.executeActionByKind(ActionCopyCommand)
+	case "w":
+		return m.executeActionByKind(ActionCopyCWD)
+	case "d":
+		return m.executeActionByKind(ActionShowEnv)
+	}
 	switch {
 	case key.Matches(msg, keys.Down.Binding):
 		m.actionMenu.MoveDown()
@@ -636,6 +652,18 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.executeActionMenuItem()
 	case msg.String() == "q", key.Matches(msg, keys.Esc.Binding):
 		m.showActionMenu = false
+	}
+	return m, nil
+}
+
+// executeActionByKind finds the item with the given kind and executes it.
+// No-op if the action is not present in the current menu (context-dependent items).
+func (m Model) executeActionByKind(kind ActionKind) (tea.Model, tea.Cmd) {
+	for i, item := range m.actionMenu.items {
+		if item.Kind == kind {
+			m.actionMenu.cursor = i
+			return m.executeActionMenuItem()
+		}
 	}
 	return m, nil
 }
@@ -788,6 +816,22 @@ func (m Model) openActionMenu() Model {
 	node := m.procList.SelectedNode()
 	if node == nil {
 		return m
+	}
+	// displayPane suppresses CWD when it matches the window CWD. Recover the real
+	// value from the live pane list so Copy Working Directory is always available.
+	if node.Pane.CWD == "" && node.Pane.PaneID != "" {
+		for _, p := range m.panes {
+			if p.PaneID == node.Pane.PaneID {
+				node.Pane.CWD = p.CWD
+				break
+			}
+		}
+	}
+	// For process nodes prefer the live async CWD (may differ from pane CWD).
+	if node.Proc.PID != 0 {
+		if cwd := m.cwdMap[node.Proc.PID]; cwd != "" {
+			node.Pane.CWD = cwd
+		}
 	}
 	m.actionMenu = ActionMenuModel{
 		items:  buildActionItems(*node),
