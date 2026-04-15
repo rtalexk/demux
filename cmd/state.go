@@ -177,16 +177,33 @@ func (r stateRow) Fields() []string {
 }
 
 // formatTarget resolves the display string for a Target from the live tmux maps.
-// Falls back to the raw stable ID if not found in maps.
+// When the primary ID is not in the live map (orphaned or moved pane/window),
+// falls back to stored parent IDs from the DB row before returning the raw ID.
 func formatTarget(t db.Target, paneIDMap, windowIDMap, sessionIDMap map[string]string) string {
 	switch t.Type {
 	case db.TargetTypePane:
 		if resolved, ok := paneIDMap[t.ID]; ok {
 			return resolved
 		}
+		// Pane not in live map; try parent IDs stored in DB row.
+		if t.WindowID != "" {
+			if winLabel, ok := windowIDMap[t.WindowID]; ok {
+				return winLabel + ".?"
+			}
+		}
+		if t.SessionID != "" {
+			if sessName, ok := sessionIDMap[t.SessionID]; ok {
+				return sessName + ":?"
+			}
+		}
 	case db.TargetTypeWindow:
 		if resolved, ok := windowIDMap[t.ID]; ok {
 			return resolved
+		}
+		if t.SessionID != "" {
+			if sessName, ok := sessionIDMap[t.SessionID]; ok {
+				return sessName + ":?"
+			}
 		}
 	case db.TargetTypeSession:
 		if resolved, ok := sessionIDMap[t.ID]; ok {
