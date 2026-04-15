@@ -17,6 +17,12 @@ func tick(interval time.Duration) tea.Cmd {
 	})
 }
 
+func marqueeCmd() tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return marqueeTickMsg(t)
+	})
+}
+
 func resolveWindowSpecs(ids []string, templates map[string]session.WindowTemplate) []tmux.WindowSpec {
 	specs, unknown := session.ResolveWindowSpecs(ids, templates)
 	for _, id := range unknown {

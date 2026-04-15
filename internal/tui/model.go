@@ -51,6 +51,7 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 
 // Message types
 type tickMsg time.Time
+type marqueeTickMsg time.Time
 type panesMsg struct {
 	panes          []tmux.Pane
 	currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
@@ -192,7 +193,7 @@ func New(cfg config.Config, database *db.DB) Model {
 func (m Model) Init() tea.Cmd {
 	// Fetch panes and states in parallel so the first sidebar render uses
 	// correct state-based sort. Tick and procs are deferred until panesMsg arrives.
-	return tea.Batch(m.fetchPanes(), m.fetchStates())
+	return tea.Batch(m.fetchPanes(), m.fetchStates(), marqueeCmd())
 }
 
 func (m Model) View() string {

@@ -37,6 +37,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tickMsg:
 		return m.handleTickMsg(msg)
+	case marqueeTickMsg:
+		return m.handleMarqueeTickMsg()
 	case panesMsg:
 		return m.handlePanesMsg(msg)
 	case procDataMsg:
@@ -166,6 +168,16 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 		m.statusMsg = ""
 	}
 	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
+}
+
+func (m Model) handleMarqueeTickMsg() (Model, tea.Cmd) {
+	if m.focus == panelSidebar {
+		m.sidebar.TickMarquee()
+	}
+	if m.showYank {
+		m.yank.TickMarquee()
+	}
+	return m, marqueeCmd()
 }
 
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
