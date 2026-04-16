@@ -26,6 +26,17 @@ func (m *Marquee) Tick() {
 	m.offset++
 }
 
+// TickTracked advances the marquee, resetting if cursor moved since the last tick.
+// Pass the current cursor and a pointer to the last-seen cursor value (owned by the caller).
+func (m *Marquee) TickTracked(cursor int, last *int) {
+	if cursor != *last {
+		m.Reset()
+		*last = cursor
+		return
+	}
+	m.Tick()
+}
+
 // View returns exactly width display columns of text starting at the current offset.
 // If text fits within width it is returned unchanged.
 // The circular sequence is: text + marqueeGap spaces + text (repeating).

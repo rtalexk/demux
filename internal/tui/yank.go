@@ -10,21 +10,21 @@ import (
 	runewidth "github.com/mattn/go-runewidth"
 )
 
-type YankField struct {
+type yankField struct {
 	Key   string
 	Label string
 	Value string
 }
 
-type YankModel struct {
-	fields            []YankField
+type yankModel struct {
+	fields            []yankField
 	cursor            int
 	title             string
 	marquee           Marquee
 	lastMarqueeCursor int
 }
 
-func (y *YankModel) SetFields(fields []YankField, title string) {
+func (y *yankModel) SetFields(fields []yankField, title string) {
 	y.fields = fields
 	y.cursor = 0
 	y.title = title
@@ -33,22 +33,17 @@ func (y *YankModel) SetFields(fields []YankField, title string) {
 }
 
 // TickMarquee advances the yank marquee by one step, resetting on cursor change.
-func (y *YankModel) TickMarquee() {
-	if y.cursor != y.lastMarqueeCursor {
-		y.marquee.Reset()
-		y.lastMarqueeCursor = y.cursor
-		return
-	}
-	y.marquee.Tick()
+func (y *yankModel) TickMarquee() {
+	y.marquee.TickTracked(y.cursor, &y.lastMarqueeCursor)
 }
 
-func (y YankModel) FieldByKey(k string) (YankField, bool) {
+func (y yankModel) FieldByKey(k string) (yankField, bool) {
 	for _, f := range y.fields {
 		if f.Key == k {
 			return f, true
 		}
 	}
-	return YankField{}, false
+	return yankField{}, false
 }
 
 const yankValueMaxWidth = 60
@@ -57,7 +52,7 @@ const yankValueMaxWidth = 60
 // Values within yankValueMaxWidth are returned as-is.
 // For the cursor row, an overflowing value is shown as a scrolling marquee window.
 // For non-cursor rows, an overflowing value is statically truncated.
-func (y YankModel) displayValue(fieldIdx int, f YankField) string {
+func (y yankModel) displayValue(fieldIdx int, f yankField) string {
 	if runewidth.StringWidth(f.Value) <= yankValueMaxWidth {
 		return f.Value
 	}
@@ -77,7 +72,7 @@ func (y YankModel) displayValue(fieldIdx int, f YankField) string {
 	return string(runes[:lo]) + ellipsis
 }
 
-func (y YankModel) Render() string {
+func (y yankModel) Render() string {
 	dvs := make([]string, len(y.fields))
 	maxW := 0
 	for i, f := range y.fields {
@@ -105,19 +100,19 @@ func (y YankModel) Render() string {
 	return confirmStyle.Render(sb.String())
 }
 
-func (y *YankModel) MoveUp() {
+func (y *yankModel) MoveUp() {
 	if y.cursor > 0 {
 		y.cursor--
 	}
 }
 
-func (y *YankModel) MoveDown() {
+func (y *yankModel) MoveDown() {
 	if y.cursor < len(y.fields)-1 {
 		y.cursor++
 	}
 }
 
-func (y YankModel) SelectedValue() string {
+func (y yankModel) SelectedValue() string {
 	if y.cursor < len(y.fields) {
 		return y.fields[y.cursor].Value
 	}
@@ -126,9 +121,9 @@ func (y YankModel) SelectedValue() string {
 
 // clipboardFunc is the function used to copy text to the clipboard.
 // Overridable in tests.
-var clipboardFunc = CopyToClipboard
+var clipboardFunc = copyToClipboard
 
-func CopyToClipboard(text string) error {
+func copyToClipboard(text string) error {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":

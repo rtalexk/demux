@@ -1112,13 +1112,8 @@ func (s SidebarModel) Selected() *SidebarNode {
 }
 
 // TickMarquee advances the sidebar marquee by one step.
-// Automatically resets to offset 0 when the cursor has moved since the last tick,
-// producing a brief pause at the start of each new selection before scrolling begins.
+// Resets to offset 0 when the cursor has moved since the last tick,
+// producing a brief pause at each new selection before scrolling begins.
 func (s *SidebarModel) TickMarquee() {
-	if s.cursor != s.lastMarqueeCursor {
-		s.marquee.Reset()
-		s.lastMarqueeCursor = s.cursor
-		return
-	}
-	s.marquee.Tick()
+	s.marquee.TickTracked(s.cursor, &s.lastMarqueeCursor)
 }
