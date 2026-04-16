@@ -543,7 +543,21 @@ func (m Model) handleItemsMsg(msg itemsMsg) (Model, tea.Cmd) {
 	if msg.session != m.itemSession {
 		return m, nil // stale response
 	}
-	m.itemList = msg.items
+	// Sort todos before notes, preserving relative insertion order within each kind.
+	// The renderer groups by kind visually; keeping the flat list in the same order
+	// ensures cursor navigation matches what the user sees.
+	sorted := make([]db.Item, 0, len(msg.items))
+	for _, it := range msg.items {
+		if it.Kind == db.KindTodo {
+			sorted = append(sorted, it)
+		}
+	}
+	for _, it := range msg.items {
+		if it.Kind != db.KindTodo {
+			sorted = append(sorted, it)
+		}
+	}
+	m.itemList = sorted
 	if m.itemCursor >= len(m.itemList) {
 		if len(m.itemList) > 0 {
 			m.itemCursor = len(m.itemList) - 1
@@ -610,16 +624,22 @@ func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if key.Matches(msg, keys.Enter.Binding) {
 			val := m.yank.SelectedValue()
-			CopyToClipboard(val)
+			if err := clipboardFunc(val); err != nil {
+				m.statusMsg = "copy failed: " + err.Error()
+			} else {
+				m.statusMsg = "yanked: " + val
+			}
 			m.showYank = false
-			m.statusMsg = "yanked: " + val
 			m.statusExp = time.Now().Add(2 * time.Second)
 			return m, nil
 		}
 		if f, ok := m.yank.FieldByKey(msg.String()); ok {
-			CopyToClipboard(f.Value)
+			if err := clipboardFunc(f.Value); err != nil {
+				m.statusMsg = "copy failed: " + err.Error()
+			} else {
+				m.statusMsg = "yanked: " + f.Value
+			}
 			m.showYank = false
-			m.statusMsg = "yanked: " + f.Value
 			m.statusExp = time.Now().Add(2 * time.Second)
 			return m, nil
 		}
