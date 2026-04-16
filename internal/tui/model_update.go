@@ -3,7 +3,9 @@ package tui
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -35,6 +37,8 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tickMsg:
 		return m.handleTickMsg(msg)
+	case marqueeTickMsg:
+		return m.handleMarqueeTickMsg()
 	case panesMsg:
 		return m.handlePanesMsg(msg)
 	case procDataMsg:
@@ -57,8 +61,50 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleQueryResultMsg(msg)
 	case searchDebounceMsg:
 		return m.handleSearchDebounceMsg(msg)
+	case openViewerMsg:
+		return m.handleOpenViewerMsg(msg)
+	case procActionMsg:
+		m.statusMsg = msg.status
+		m.statusExp = time.Now().Add(statusExpMedium)
+		return m, nil
 	}
 	return m, nil
+}
+
+func (m Model) handleOpenViewerMsg(msg openViewerMsg) (Model, tea.Cmd) {
+	args := findViewer()
+	if msg.ftCmd != "" {
+		args = append(args, "-c", msg.ftCmd)
+	}
+	args = append(args, msg.path)
+	return m, tea.ExecProcess(exec.Command(args[0], args[1:]...), func(err error) tea.Msg {
+		_ = os.Remove(msg.path)
+		return nil
+	})
+}
+
+// findViewer returns the command+args for the best available read-only viewer:
+// nvim, vim, or vi (all accept -R for read-only mode).
+func findViewer() []string {
+	for _, ed := range []string{"nvim", "vim", "vi"} {
+		if _, err := exec.LookPath(ed); err == nil {
+			return []string{ed, "-R"}
+		}
+	}
+	return []string{"vi", "-R"}
+}
+
+// writeTempFile creates a temp file named by pattern, writes content into it,
+// and returns the path. The caller is responsible for removal (handleOpenViewerMsg
+// removes it after the viewer exits).
+func writeTempFile(pattern string, content []byte) (string, error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+	_, _ = f.Write(content)
+	_ = f.Close()
+	return f.Name(), nil
 }
 
 // handleOverlays routes key messages to full-screen overlay handlers.
@@ -75,10 +121,14 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 	}
 	if m.showYank {
 		mo, cmd := m.updateYank(msg)
-		return mo.(Model), cmd, true
+		return mo, cmd, true
 	}
 	if m.showConfirm {
 		mo, cmd := m.handleConfirmOverlay(msg)
+		return mo, cmd, true
+	}
+	if m.showActionMenu {
+		mo, cmd := m.handleActionMenuKey(msg.(tea.KeyMsg))
 		return mo, cmd, true
 	}
 	return m, nil, false
@@ -133,6 +183,16 @@ func (m Model) handleTickMsg(_ tickMsg) (Model, tea.Cmd) {
 	return m, tea.Batch(tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
 }
 
+func (m Model) handleMarqueeTickMsg() (Model, tea.Cmd) {
+	if m.focus == panelSidebar {
+		m.sidebar.TickMarquee()
+	}
+	if m.showYank {
+		m.yank.TickMarquee()
+	}
+	return m, marqueeCmd()
+}
+
 func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	if msg.gen != m.searchGen {
 		return m, nil
@@ -158,6 +218,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.sessionIDMap = tmux.SessionIDToNameMap(msg.panes)
 	m.nameToIDMap = tmux.SessionNameToIDMap(msg.panes)
 	m.sidebar.SetNameToIDMap(m.nameToIDMap)
+	healStateSessionIDs(m.states, m.paneIDMap, m.nameToIDMap)
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -222,6 +283,7 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 
 func (m Model) handleStatesMsg(msg statesMsg) (Model, tea.Cmd) {
 	m.states = msg.states
+	healStateSessionIDs(m.states, m.paneIDMap, m.nameToIDMap)
 	m.procList.SetStates(m.states)
 	merged := session.Merge(m.panes, m.sessionsConfig.Entries)
 	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
@@ -276,22 +338,22 @@ func (m *Model) populateYankFields() {
 			if selNode.Port > 0 {
 				portStr = fmt.Sprintf("%d", selNode.Port)
 			}
-			m.yank.SetFields([]YankField{
+			m.yank.SetFields([]yankField{
 				{Key: "p", Label: "PID", Value: fmt.Sprint(pr.PID)},
 				{Key: "n", Label: "name", Value: pr.Name},
 				{Key: "c", Label: "cmdline", Value: pr.Cmdline},
 				{Key: "d", Label: "CWD", Value: cwd},
 				{Key: "o", Label: "port", Value: portStr},
-			})
+			}, fmt.Sprintf("Yank: %s (%d)", pr.Name, pr.PID))
 			return
 		}
 	}
 	// session node from sidebar
 	if node := m.sidebar.Selected(); node != nil {
-		m.yank.SetFields([]YankField{
+		m.yank.SetFields([]yankField{
 			{Key: "n", Label: "session", Value: node.Session},
 			{Key: "t", Label: "target", Value: node.Session},
-		})
+		}, "Yank: "+node.Session)
 	}
 }
 
@@ -374,6 +436,35 @@ func statesForSession(states []db.ToolState, sessionID string) []db.ToolState {
 		}
 	}
 	return out
+}
+
+// healStateSessionIDs reconciles pane state records whose session_id is empty or
+// stale in the DB against the live paneIDMap + nameToIDMap. This corrects records
+// where resolveParentIDs failed at write time (e.g. SQLITE_BUSY) or where the
+// pane was joined into a new session after the state was written.
+//
+// Mutations are in-memory only; the DB is not touched here. StateRefreshParentIDs
+// (called from pane_focus events) persists corrections back to SQLite lazily.
+func healStateSessionIDs(states []db.ToolState, paneIDMap, nameToIDMap map[string]string) {
+	for i := range states {
+		if states[i].Target.Type != db.TargetTypePane {
+			continue
+		}
+		label, ok := paneIDMap[states[i].Target.ID]
+		if !ok {
+			continue // pane not in live map; leave as-is
+		}
+		colonIdx := strings.Index(label, ":")
+		if colonIdx <= 0 {
+			continue
+		}
+		sessName := label[:colonIdx]
+		sessID := nameToIDMap[sessName]
+		if sessID == "" || states[i].Target.SessionID == sessID {
+			continue // already correct
+		}
+		states[i].Target.SessionID = sessID
+	}
 }
 
 // countProcsUnderCWD counts processes whose working directory is sessionCWD or a descendant.
@@ -465,7 +556,21 @@ func (m Model) handleItemsMsg(msg itemsMsg) (Model, tea.Cmd) {
 	if msg.session != m.itemSession {
 		return m, nil // stale response
 	}
-	m.itemList = msg.items
+	// Sort todos before notes, preserving relative insertion order within each kind.
+	// The renderer groups by kind visually; keeping the flat list in the same order
+	// ensures cursor navigation matches what the user sees.
+	sorted := make([]db.Item, 0, len(msg.items))
+	for _, it := range msg.items {
+		if it.Kind == db.KindTodo {
+			sorted = append(sorted, it)
+		}
+	}
+	for _, it := range msg.items {
+		if it.Kind != db.KindTodo {
+			sorted = append(sorted, it)
+		}
+	}
+	m.itemList = sorted
 	if m.itemCursor >= len(m.itemList) {
 		if len(m.itemList) > 0 {
 			m.itemCursor = len(m.itemList) - 1
@@ -480,7 +585,7 @@ func (m Model) handleItemDeleteConfirmed(msg itemDeleteConfirmedMsg) (Model, tea
 	if err := m.db.ItemDelete(msg.id); err != nil {
 		demuxlog.Error("item delete failed", "id", msg.id, "err", err)
 		m.statusMsg = "error deleting item: " + err.Error()
-		m.statusExp = time.Now().Add(4 * time.Second)
+		m.statusExp = time.Now().Add(statusExpLong)
 	} else {
 		demuxlog.Info("item deleted", "id", msg.id, "session", msg.session)
 	}
@@ -491,14 +596,14 @@ func (m Model) handleItemEditorDoneMsg(msg itemEditorDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		demuxlog.Error("editor exited with error", "err", msg.err)
 		m.statusMsg = "editor error: " + msg.err.Error()
-		m.statusExp = time.Now().Add(4 * time.Second)
+		m.statusExp = time.Now().Add(statusExpLong)
 		return m, nil
 	}
 	if msg.tempFile != "" {
 		if err := syncItemsFromFile(m.db, msg.session, msg.tempFile); err != nil {
 			demuxlog.Error("item editor sync failed", "err", err)
 			m.statusMsg = "error syncing editor changes: " + err.Error()
-			m.statusExp = time.Now().Add(4 * time.Second)
+			m.statusExp = time.Now().Add(statusExpLong)
 		} else {
 			demuxlog.Info("editor changes synced", "session", msg.session)
 		}
@@ -523,7 +628,7 @@ func (m *Model) detailForProcNode(node ProcListNode) DetailModel {
 	}
 }
 
-func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateYank(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, keys.Esc.Binding) || msg.String() == "q" {
@@ -532,10 +637,23 @@ func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if key.Matches(msg, keys.Enter.Binding) {
 			val := m.yank.SelectedValue()
-			CopyToClipboard(val)
+			if err := clipboardFunc(val); err != nil {
+				m.statusMsg = "copy failed: " + err.Error()
+			} else {
+				m.statusMsg = "yanked: " + val
+			}
 			m.showYank = false
-			m.statusMsg = "yanked: " + val
-			m.statusExp = time.Now().Add(2 * time.Second)
+			m.statusExp = time.Now().Add(statusExpShort)
+			return m, nil
+		}
+		if f, ok := m.yank.FieldByKey(msg.String()); ok {
+			if err := clipboardFunc(f.Value); err != nil {
+				m.statusMsg = "copy failed: " + err.Error()
+			} else {
+				m.statusMsg = "yanked: " + f.Value
+			}
+			m.showYank = false
+			m.statusExp = time.Now().Add(statusExpShort)
 			return m, nil
 		}
 		switch msg.String() {

@@ -27,6 +27,30 @@ func TestSnapshot(t *testing.T) {
 	}
 }
 
+func TestKill_InvalidPID(t *testing.T) {
+	err := proc.Kill(-999)
+	if err == nil {
+		t.Error("expected error killing invalid PID, got nil")
+	}
+}
+
+func TestEnviron_CurrentProcess(t *testing.T) {
+	envs, err := proc.Environ(int32(os.Getpid()))
+	if err != nil {
+		t.Fatalf("Environ current process: %v", err)
+	}
+	if len(envs) == 0 {
+		t.Error("expected at least one env var for current process")
+	}
+}
+
+func TestEnviron_InvalidPID(t *testing.T) {
+	_, err := proc.Environ(-999)
+	if err == nil {
+		t.Error("expected error for invalid PID, got nil")
+	}
+}
+
 func TestBuildTree(t *testing.T) {
 	procs := []proc.Process{
 		{PID: 1, PPID: 0, Name: "init"},

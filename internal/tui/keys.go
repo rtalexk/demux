@@ -25,9 +25,6 @@ type keyMap struct {
 	Down              keyDef
 	Enter             keyDef
 	Esc               keyDef
-	Kill              keyDef
-	Restart           keyDef
-	Log               keyDef
 	JumpUpDown        keyDef // display-only combined entry
 	JumpUp            keyDef
 	JumpDown          keyDef
@@ -53,6 +50,8 @@ type keyMap struct {
 	ClearState        keyDef
 	ProcEnter         keyDef // display-only: Enter for process list
 	ProcOpen          keyDef // display-only: o/ctrl+o for process list
+	ActionMenu        keyDef
+	KillProc          keyDef
 }
 
 var keys = keyMap{
@@ -104,9 +103,8 @@ var keys = keyMap{
 	CollapseAll:       keyDef{key.NewBinding(key.WithKeys("{"), key.WithHelp("{", "collapse all")), "", 0},
 	ProcEnter:         keyDef{key.NewBinding(key.WithHelp("Enter", "toggle expand / collapse")), "Process list", 4},
 	ProcOpen:          keyDef{key.NewBinding(key.WithHelp("o / ctrl+o", "attach to pane")), "Process list", 5},
-	Kill:              keyDef{key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "kill process")), "Process list", 6},
-	Restart:           keyDef{key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "restart process")), "Process list", 7},
-	Log:               keyDef{key.NewBinding(key.WithKeys("L"), key.WithHelp("L", "open log popup")), "Process list", 8},
+	ActionMenu:        keyDef{key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "action menu")), "Process list", 6},
+	KillProc:          keyDef{key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "kill process (confirm)")), "Process list", 7},
 }
 
 // allKeyDefs returns the ordered list of keyDefs for help menu rendering.
@@ -124,6 +122,6 @@ func allKeyDefs() []keyDef {
 		keys.FilterTmux, keys.FilterAll, keys.FilterConfig, keys.FilterWorktree, keys.StateFilter, keys.WatchFilter,
 		// Process list
 		keys.JumpUpDown, keys.ExpandCollapse, keys.ExpandCollapseAll,
-		keys.ProcEnter, keys.ProcOpen, keys.Kill, keys.Restart, keys.Log,
+		keys.ProcEnter, keys.ProcOpen, keys.ActionMenu, keys.KillProc,
 	}
 }

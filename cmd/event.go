@@ -83,6 +83,14 @@ func applyPaneFocus(d *db.DB, paneID, windowID, sessionID string) error {
 			return err
 		}
 	}
+
+	// Keep pane parent IDs fresh so TUI navigation stays accurate after moves
+	// (e.g., break-pane, join-pane across sessions). Non-fatal: log and continue.
+	if paneID != "" && windowID != "" && sessionID != "" {
+		if err := d.StateRefreshParentIDs(paneID, windowID, sessionID); err != nil {
+			demuxlog.Error("pane_focus: refresh parent IDs failed", "pane_id", paneID, "err", err)
+		}
+	}
 	return nil
 }
 

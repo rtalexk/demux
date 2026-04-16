@@ -53,24 +53,26 @@ type SidebarNode struct {
 }
 
 type SidebarModel struct {
-	nodes         []SidebarNode
-	cursor        int
-	offset        int // viewport scroll offset
-	visibleRows   int // last known visible row count; used by CursorDown/CursorUp
-	sessions      []session.Session
-	states        []db.ToolState
-	nameToID      map[string]string // session display name → session_id ($N)
-	gitInfo       map[string]git.Info
-	cfg           config.Config
-	filter        SidebarFilter
-	prevSession   string // selected session before last filter switch; restored on toggle-off
-	filterHint    string
-	queryResult   query.Result
-	launchErr     string // shown inline when last launch attempt failed
-	activeSession string // tmux session the user is currently attached to
-	watches       map[string]struct{}
-	itemSessions  map[string]struct{} // sessions with open (unchecked) TODOs
-	noteSessions  map[string]struct{} // sessions with at least one note
+	nodes             []SidebarNode
+	cursor            int
+	offset            int // viewport scroll offset
+	visibleRows       int // last known visible row count; used by CursorDown/CursorUp
+	sessions          []session.Session
+	states            []db.ToolState
+	nameToID          map[string]string // session display name → session_id ($N)
+	gitInfo           map[string]git.Info
+	cfg               config.Config
+	filter            SidebarFilter
+	prevSession       string // selected session before last filter switch; restored on toggle-off
+	filterHint        string
+	queryResult       query.Result
+	launchErr         string // shown inline when last launch attempt failed
+	activeSession     string // tmux session the user is currently attached to
+	watches           map[string]struct{}
+	itemSessions      map[string]struct{} // sessions with open (unchecked) TODOs
+	noteSessions      map[string]struct{} // sessions with at least one note
+	marquee           Marquee
+	lastMarqueeCursor int
 }
 
 func (s *SidebarModel) SetData(sessions []session.Session, states []db.ToolState, gitInfo map[string]git.Info, cfg config.Config) {
@@ -153,6 +155,36 @@ func (s *SidebarModel) SetFilter(f SidebarFilter, visibleRows int) {
 // ActiveFilter returns the current active filter.
 func (s SidebarModel) ActiveFilter() SidebarFilter {
 	return s.filter
+}
+
+// sessionTargetStateFor returns the highest-priority ToolState whose target IS the
+// session itself (TargetTypeSession). Pane and window states are excluded. Use this
+// for the Proclist title where only session-level annotations should be displayed.
+func (s *SidebarModel) sessionTargetStateFor(sess string) *db.ToolState {
+	sessID := s.nameToID[sess]
+	var best *db.ToolState
+	bestPri := 0
+	for i := range s.states {
+		st := &s.states[i]
+		if st.Target.Type != db.TargetTypeSession {
+			continue
+		}
+		var matches bool
+		if sessID != "" {
+			matches = st.Target.SessionID == sessID
+		} else {
+			matches = st.Target.ID == sess
+		}
+		if !matches {
+			continue
+		}
+		pri := st.Value.Priority()
+		if best == nil || pri > bestPri {
+			bestPri = pri
+			best = st
+		}
+	}
+	return best
 }
 
 // stateForSession returns the highest-priority ToolState for the session, or nil if none.
@@ -781,7 +813,12 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	if maxName < minRowWidth {
 		maxName = minRowWidth
 	}
-	nameStr := truncateSessionName(node.Session, maxName)
+	var nameStr string
+	if selected && focused && runewidth.StringWidth(node.Session) > maxName {
+		nameStr = s.marquee.View(node.Session, maxName)
+	} else {
+		nameStr = truncateSessionName(node.Session, maxName)
+	}
 
 	// Compute gap: active session gets the directional indicator; others get a space.
 	gap := " "
@@ -1072,4 +1109,11 @@ func (s SidebarModel) Selected() *SidebarNode {
 	}
 	n := s.nodes[s.cursor]
 	return &n
+}
+
+// TickMarquee advances the sidebar marquee by one step.
+// Resets to offset 0 when the cursor has moved since the last tick,
+// producing a brief pause at each new selection before scrolling begins.
+func (s *SidebarModel) TickMarquee() {
+	s.marquee.TickTracked(s.cursor, &s.lastMarqueeCursor)
 }

@@ -157,6 +157,19 @@ func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string 
 			}
 			return full
 		}
+		// Pane not in live map (orphaned or moved); use stored parent IDs as fallback.
+		if t.WindowID != "" {
+			if full := windowMap[t.WindowID]; full != "" {
+				if idx := strings.Index(full, ":"); idx >= 0 {
+					return "win" + full[idx+1:] + "·?"
+				}
+			}
+		}
+		if t.SessionID != "" {
+			if name := sessionMap[t.SessionID]; name != "" {
+				return name + ":?"
+			}
+		}
 		return t.ID
 	case TargetTypeWindow:
 		if full := windowMap[t.ID]; full != "" {
@@ -164,6 +177,12 @@ func (t Target) Format(paneMap, windowMap, sessionMap map[string]string) string 
 				return "win" + full[idx+1:]
 			}
 			return full
+		}
+		// Window not in live map; fall back to session name.
+		if t.SessionID != "" {
+			if name := sessionMap[t.SessionID]; name != "" {
+				return name + ":?"
+			}
 		}
 		return t.ID
 	case TargetTypeSession:
@@ -216,9 +235,9 @@ func (d *DB) StateSet(t Target, tool string, value StateValue, message string, s
 
 	// Read current record within the transaction.
 	var current *ToolState
-	row := tx.QueryRow(`SELECT tool, value, source FROM tool_states WHERE target_type = ? AND target_id = ?`, t.Type, t.ID)
+	row := tx.QueryRow(`SELECT tool, value, source, session_id FROM tool_states WHERE target_type = ? AND target_id = ?`, t.Type, t.ID)
 	var cur ToolState
-	err = row.Scan(&cur.Tool, &cur.Value, &cur.Source)
+	err = row.Scan(&cur.Tool, &cur.Value, &cur.Source, &cur.Target.SessionID)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("read current state: %w", err)
 	}
@@ -228,7 +247,10 @@ func (d *DB) StateSet(t Target, tool string, value StateValue, message string, s
 
 	// No-op if value and tool are unchanged (avoids redundant DB writes from
 	// high-frequency hooks like PreToolUse firing working→working repeatedly).
-	if ifState == nil && current != nil && current.Value == value && current.Tool == tool {
+	// Exception: allow the write through when session_id is unset in the DB but
+	// the caller provides one — the upsert's COALESCE logic will populate it.
+	parentIDMissing := current != nil && current.Target.SessionID == "" && t.SessionID != ""
+	if ifState == nil && current != nil && current.Value == value && current.Tool == tool && !parentIDMissing {
 		demuxlog.Debug("state set skipped: no change", "target_type", t.Type, "target_id", t.ID, "tool", tool, "state", value)
 		return tx.Rollback()
 	}
@@ -346,6 +368,23 @@ func gcDeleteOrphaned(tx *sql.Tx, targetType TargetType, liveIDs map[string]bool
 		return 0, fmt.Errorf("gc orphaned %s: %w", targetType, err)
 	}
 	return res.RowsAffected()
+}
+
+// StateRefreshParentIDs updates session_id and window_id for a pane record when
+// the pane has moved (e.g., break-pane, move-pane to a different session or
+// window). Called on every pane_focus event so the DB stays in sync with the
+// live tmux layout without requiring an explicit state set.
+//
+// updated_at is intentionally left unchanged so state age display is unaffected.
+// No-op when no record exists for paneID or when the stored IDs already match.
+func (d *DB) StateRefreshParentIDs(paneID, windowID, sessionID string) error {
+	_, err := d.sql.Exec(`
+		UPDATE tool_states
+		SET session_id = ?, window_id = ?
+		WHERE target_type = 'pane' AND target_id = ?
+		  AND (session_id IS NOT ? OR window_id IS NOT ?)
+	`, sessionID, windowID, paneID, sessionID, windowID)
+	return err
 }
 
 // StateDeleteBySession removes all state records for the given session.

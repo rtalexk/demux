@@ -827,7 +827,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"subagent complete\" || demux event hook_error --hook SubagentStop --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"subagent complete\" --if-state working || demux event hook_error --hook SubagentStop --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },

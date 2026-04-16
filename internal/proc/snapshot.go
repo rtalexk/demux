@@ -82,6 +82,21 @@ func (p Process) FriendlyName() string {
 	return base
 }
 
+// Kill sends SIGKILL to the process with the given PID.
+func Kill(pid int32) error {
+	p, err := gops.NewProcess(pid)
+	if err != nil {
+		return fmt.Errorf("process %d: %w", pid, err)
+	}
+	return p.Kill()
+}
+
+// Environ returns the environment variables for the process with the given PID.
+// Returns an error if the process does not exist or access is denied.
+func Environ(pid int32) ([]string, error) {
+	return environPlatform(pid)
+}
+
 func BuildTree(procs []Process) map[int32][]Process {
 	tree := make(map[int32][]Process, len(procs))
 	for _, p := range procs {

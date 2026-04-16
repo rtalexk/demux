@@ -1,11 +1,16 @@
 package tui
 
 import (
+	"fmt"
+	"os/exec"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -14,6 +19,13 @@ import (
 const (
 	dirDown = 1
 	dirUp   = -1
+
+	// tmuxScrollbackLines is the number of lines passed to tmux capture-pane -S.
+	// Negative value = capture from that many lines above the visible area.
+	tmuxScrollbackLines = "-32768"
+
+	// clearConfirmTargetReserve accounts for the "  target: " label (10 chars), border (1), and padding (1).
+	clearConfirmTargetReserve = 12
 )
 
 // resolveFilterKey maps a key message to a SidebarFilter.
@@ -49,6 +61,10 @@ func (m Model) handleNormalModeDefault(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.procList.SetSearchQuery(query.ParsedQuery{}, query.Result{})
 		m.searchGen++
 		return m, nil
+	}
+	// 'a' is context-sensitive: action menu in proclist, FilterAll in sidebar.
+	if msg.String() == "a" && m.focus == panelProcList {
+		return m.openActionMenu(), nil
 	}
 	if newFilter, ok := resolveFilterKey(msg); ok {
 		sidebarVisibleRows := m.height - statusBarH - borderOverhead - searchBoxH
@@ -201,14 +217,14 @@ func (m Model) handleSearchInputUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 	if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
 		m.statusMsg = "launch failed: " + err.Error()
-		m.statusExp = time.Now().Add(5 * time.Second)
+		m.statusExp = time.Now().Add(statusExpError)
 		m.sidebar.SetLaunchErr(err.Error())
 		return m, nil
 	}
 	if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
 		if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
 			m.statusMsg = "window setup failed: " + err.Error()
-			m.statusExp = time.Now().Add(5 * time.Second)
+			m.statusExp = time.Now().Add(statusExpError)
 		}
 	}
 	m.sidebar.ClearLaunchErr()
@@ -356,22 +372,8 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // procListDimensions computes procH and detailH for the current model state.
 func (m Model) procListDimensions() (procH, detailH int) {
-	contentH := m.height - 1
-	innerW := m.width - m.cfg.Sidebar.Width - 2
-	if innerW < 1 {
-		innerW = 1
-	}
-	detailContent := m.detail.ContentLines(innerW)
-	detailH = detailContent + 2
-	if detailH < 4 {
-		detailH = 4
-	}
-	maxDetailH := contentH - 4
-	if detailH > maxDetailH {
-		detailH = maxDetailH
-	}
-	procH = contentH - detailH
-	return procH, detailH
+	dims := m.buildLayoutDims()
+	return dims.procH, dims.detailH
 }
 
 // afterCollapse performs the shared post-toggle update after an expand/collapse operation:
@@ -469,6 +471,17 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
+	case msg.String() == "x":
+		if node := m.procList.SelectedNode(); node != nil && node.Proc.PID != 0 {
+			pid := node.Proc.PID
+			name := node.Proc.FriendlyName()
+			m.confirm = ConfirmModel{
+				prompt: fmt.Sprintf("Kill %s (PID %d)?", name, pid),
+			}
+			m.confirmCmd = killProcCmd(pid)
+			m.showConfirm = true
+			return m, nil
+		}
 	case key.Matches(msg, keys.Open.Binding):
 		nm, cmd := m.handleProcListOpen()
 		nm.procList.clampOffset(procH - 2)
@@ -491,12 +504,6 @@ func (m Model) handleProcListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if t := m.procListStateIdentity(); t != nil {
 			return m.showClearConfirm(*t), nil
 		}
-	case key.Matches(msg, keys.Kill.Binding):
-		// TODO: confirmation prompt
-	case key.Matches(msg, keys.Restart.Binding):
-		// TODO: restart via tmux send-keys Up Enter
-	case key.Matches(msg, keys.Log.Binding):
-		// TODO: tmux popup with scrollback
 	}
 	m.procList.clampOffset(procH - 2) // procH includes border; pass inner content height
 	m.updateDetailFromSelection()
@@ -584,7 +591,7 @@ func (m Model) clearCurrentState(t db.Target) tea.Cmd {
 // showClearConfirm opens the confirmation overlay for clearing the state of target.
 func (m Model) showClearConfirm(t db.Target) Model {
 	st := activeStateFor(m.states, t.Type, t.ID)
-	maxTargetLen := m.width/2 - 12 // leave room for label + border + padding
+	maxTargetLen := m.width/2 - clearConfirmTargetReserve
 	if maxTargetLen < 20 {
 		maxTargetLen = 20
 	}
@@ -616,4 +623,179 @@ func (m Model) openSidebarSelected() (Model, tea.Cmd) {
 	}
 	sess := m.sidebar.FindSession(node.Session)
 	return m.launchOrSwitchSession(sess, node.Session)
+}
+
+// killProcCmd returns a tea.Cmd that sends SIGKILL to pid and reports the result
+// via procActionMsg. Shared by the direct-x handler and the action-menu kill path.
+func killProcCmd(pid int32) tea.Cmd {
+	return func() tea.Msg {
+		if err := proc.Kill(pid); err != nil {
+			return procActionMsg{fmt.Sprintf("kill %d: %v", pid, err)}
+		}
+		return procActionMsg{fmt.Sprintf("killed PID %d", pid)}
+	}
+}
+
+// handleActionMenuKey routes keys when the action menu (or a sub-popup) is open.
+func (m Model) handleActionMenuKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.actionMenu.subPopup != SubPopupNone {
+		return m.handleSubPopupKey(msg)
+	}
+	// Dispatch single-key shortcuts defined on each actionItem. This avoids
+	// duplicating the shortcut mapping here and in buildActionItems.
+	pressed := msg.String()
+	for i, item := range m.actionMenu.items {
+		if item.Shortcut != "" && item.Shortcut == pressed {
+			m.actionMenu.cursor = i
+			return m.executeActionMenuItem()
+		}
+	}
+	switch {
+	case key.Matches(msg, keys.Down.Binding):
+		m.actionMenu.MoveDown()
+	case key.Matches(msg, keys.Up.Binding):
+		m.actionMenu.MoveUp()
+	case key.Matches(msg, keys.Enter.Binding):
+		return m.executeActionMenuItem()
+	case msg.String() == "q", key.Matches(msg, keys.Esc.Binding):
+		m.showActionMenu = false
+	}
+	return m, nil
+}
+
+// handleSubPopupKey routes keys when a sub-popup is open inside the action menu.
+func (m Model) handleSubPopupKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	switch m.actionMenu.subPopup {
+	case SubPopupKillConfirm:
+		switch msg.String() {
+		case "y", "enter":
+			pid := m.actionMenu.target.Proc.PID
+			m.showActionMenu = false
+			m.actionMenu.subPopup = SubPopupNone
+			return m, killProcCmd(pid)
+		case "n", "esc", "q":
+			m.actionMenu.subPopup = SubPopupNone
+		}
+	}
+	return m, nil
+}
+
+// executeActionMenuItem executes the currently selected action menu item.
+func (m Model) executeActionMenuItem() (Model, tea.Cmd) {
+	item := m.actionMenu.Selected()
+	if item == nil {
+		return m, nil
+	}
+	switch item.Kind {
+	case ActionKill:
+		m.actionMenu.subPopup = SubPopupKillConfirm
+		return m, nil
+
+	case ActionRestart:
+		paneID := m.actionMenu.target.Pane.PaneID
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			if err := exec.Command("tmux", "send-keys", "-t", paneID, "Up", "Enter").Run(); err != nil {
+				return procActionMsg{"restart failed: " + err.Error()}
+			}
+			return procActionMsg{"restart sent to " + paneID}
+		}
+
+	case ActionViewLogs:
+		paneID := m.actionMenu.target.Pane.PaneID
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			out, err := exec.Command("tmux", "capture-pane", "-t", paneID, "-p", "-S", tmuxScrollbackLines).Output()
+			if err != nil {
+				return procActionMsg{"logs: " + err.Error()}
+			}
+			path, err := writeTempFile("demux-logs-*.log", out)
+			if err != nil {
+				return procActionMsg{"logs: " + err.Error()}
+			}
+			return openViewerMsg{path: path}
+		}
+
+	case ActionOpenBrowser:
+		port := m.actionMenu.target.Port
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			url := fmt.Sprintf("http://localhost:%d", port)
+			var cmd *exec.Cmd
+			switch runtime.GOOS {
+			case "darwin":
+				cmd = exec.Command("open", url)
+			case "linux":
+				cmd = exec.Command("xdg-open", url)
+			default:
+				return procActionMsg{"open browser: unsupported on " + runtime.GOOS}
+			}
+			if err := cmd.Run(); err != nil {
+				return procActionMsg{"open browser: " + err.Error()}
+			}
+			return procActionMsg{"opened browser"}
+		}
+
+	case ActionShowEnv:
+		pid := m.actionMenu.target.Proc.PID
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			lines, err := proc.Environ(pid)
+			if err != nil {
+				return procActionMsg{"env: " + err.Error()}
+			}
+			path, err := writeTempFile("demux-env-*.txt", []byte(strings.Join(lines, "\n")+"\n"))
+			if err != nil {
+				return procActionMsg{"env: " + err.Error()}
+			}
+			return openViewerMsg{path: path, ftCmd: "set ft=sh"}
+		}
+
+	case ActionShowFullCmd:
+		cmdline := m.actionMenu.target.Proc.Cmdline
+		m.showActionMenu = false
+		return m, func() tea.Msg {
+			path, err := writeTempFile("demux-cmd-*.txt", []byte(cmdline+"\n"))
+			if err != nil {
+				return procActionMsg{"cmd: " + err.Error()}
+			}
+			return openViewerMsg{path: path}
+		}
+	}
+	return m, nil
+}
+
+// openActionMenu opens the action menu for the currently selected process node.
+// No-op when the cursor is not on a selectable process node.
+func (m Model) openActionMenu() Model {
+	node := m.procList.SelectedNode()
+	if node == nil {
+		return m
+	}
+	if node.IsPaneHeader || node.IsWindowHeader || node.Proc.PID == 0 {
+		return m
+	}
+	// displayPane suppresses CWD when it matches the window CWD. Recover the real
+	// value from the live pane list so Copy Working Directory is always available.
+	if node.Pane.CWD == "" && node.Pane.PaneID != "" {
+		for _, p := range m.panes {
+			if p.PaneID == node.Pane.PaneID {
+				node.Pane.CWD = p.CWD
+				break
+			}
+		}
+	}
+	// For process nodes prefer the live async CWD (may differ from pane CWD).
+	if node.Proc.PID != 0 {
+		if cwd := m.cwdMap[node.Proc.PID]; cwd != "" {
+			node.Pane.CWD = cwd
+		}
+	}
+	m.actionMenu = actionMenuModel{
+		items:  buildActionItems(*node),
+		cursor: 0,
+		target: *node,
+	}
+	m.showActionMenu = true
+	return m
 }

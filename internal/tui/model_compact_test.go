@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
 )
 
 func TestCompactView_OmitsProcList(t *testing.T) {
@@ -125,5 +126,73 @@ func TestCompactUpdate_FocusProcListIsNoop(t *testing.T) {
 
 	if updated.focus != panelSidebar {
 		t.Errorf("compact mode: pressing 'l' should not move focus off panelSidebar, got %v", updated.focus)
+	}
+}
+
+// setupModelWithSessionAndStates returns a Model with one sidebar session
+// "work" ($1) and the given states loaded.
+func setupModelWithSessionAndStates(states []db.ToolState) Model {
+	m := New(config.Default(), nil)
+	m.sidebar.nodes = []SidebarNode{{Session: "work"}}
+	m.sidebar.cursor = 0
+	m.sidebar.nameToID = map[string]string{"work": "$1"}
+	m.sidebar.states = states
+	return m
+}
+
+func TestBuildProcTitle_IgnoresPaneState(t *testing.T) {
+	// Pane state in session "$1" — must NOT appear in the Proclist title.
+	m := setupModelWithSessionAndStates([]db.ToolState{
+		{
+			Target:  db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1", PaneID: "%1"},
+			Value:   db.StateError,
+			Message: "PANE-STATE-MUST-NOT-APPEAR",
+		},
+	})
+
+	title := m.buildProcTitle()
+	if strings.Contains(title, "PANE-STATE-MUST-NOT-APPEAR") {
+		t.Error("buildProcTitle must not include pane state in session title")
+	}
+}
+
+func TestBuildProcTitle_ShowsSessionTargetState(t *testing.T) {
+	// Session-level state — MUST appear in the Proclist title.
+	m := setupModelWithSessionAndStates([]db.ToolState{
+		{
+			Target:  db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"},
+			Value:   db.StateWorking,
+			Message: "SESSION-STATE-MUST-APPEAR",
+		},
+	})
+
+	title := m.buildProcTitle()
+	if !strings.Contains(title, "SESSION-STATE-MUST-APPEAR") {
+		t.Errorf("buildProcTitle must show session-level state badge; title=%q", title)
+	}
+}
+
+func TestBuildProcTitle_PaneStateTakesPrecedenceButSessionTitleIgnoresIt(t *testing.T) {
+	// Pane has higher-priority state (error) than session (working).
+	// Sidebar would show error; title must only show the session-level working state.
+	m := setupModelWithSessionAndStates([]db.ToolState{
+		{
+			Target:  db.Target{Type: db.TargetTypePane, ID: "%1", SessionID: "$1", PaneID: "%1"},
+			Value:   db.StateError,
+			Message: "PANE-ERROR-MUST-NOT-APPEAR",
+		},
+		{
+			Target:  db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"},
+			Value:   db.StateWorking,
+			Message: "SESSION-WORKING-MUST-APPEAR",
+		},
+	})
+
+	title := m.buildProcTitle()
+	if strings.Contains(title, "PANE-ERROR-MUST-NOT-APPEAR") {
+		t.Error("buildProcTitle must not leak pane state into session title")
+	}
+	if !strings.Contains(title, "SESSION-WORKING-MUST-APPEAR") {
+		t.Errorf("buildProcTitle must show session-level state; title=%q", title)
 	}
 }

@@ -51,6 +51,7 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 
 // Message types
 type tickMsg time.Time
+type marqueeTickMsg time.Time
 type panesMsg struct {
 	panes          []tmux.Pane
 	currentSession string // populated by CurrentTarget(); used for startup focus in Task 4
@@ -85,6 +86,20 @@ type gitResultMsg struct {
 }
 
 type searchDebounceMsg struct{ gen int }
+
+// openViewerMsg carries the path to a temp file that should be opened in a
+// read-only terminal viewer (nvim/vim/vi -R).
+// ftCmd is an optional ex-command passed via -c (e.g. "set ft=sh").
+type openViewerMsg struct {
+	path  string
+	ftCmd string
+}
+
+// procActionMsg carries the result of an async process action (kill, restart, etc.)
+// for display in the status bar.
+type procActionMsg struct {
+	status string
+}
 type queryResultMsg struct {
 	result query.Result
 	gen    int
@@ -112,7 +127,7 @@ type Model struct {
 	sidebar  SidebarModel
 	procList ProcListModel
 	detail   DetailModel
-	yank     YankModel
+	yank     yankModel
 	help     HelpModel
 
 	showYank    bool
@@ -141,6 +156,9 @@ type Model struct {
 	itemCursor  int
 	itemSession string
 	itemInput   ItemInputModel
+
+	showActionMenu bool
+	actionMenu     actionMenuModel
 
 	sessionsConfig session.SessionsConfig
 	configDir      string
@@ -175,7 +193,7 @@ func New(cfg config.Config, database *db.DB) Model {
 func (m Model) Init() tea.Cmd {
 	// Fetch panes and states in parallel so the first sidebar render uses
 	// correct state-based sort. Tick and procs are deferred until panesMsg arrives.
-	return tea.Batch(m.fetchPanes(), m.fetchStates())
+	return tea.Batch(m.fetchPanes(), m.fetchStates(), marqueeCmd())
 }
 
 func (m Model) View() string {
@@ -267,8 +285,7 @@ func (m Model) buildLayoutDims() layoutDims {
 	innerW := procW - 2
 	detailContent := m.detail.ContentLines(innerW)
 	detailH := detailContent + 2
-	minDetailH := 4
-	maxDetailH := contentH - 4
+	maxDetailH := contentH - minDetailH
 	if detailH < minDetailH {
 		detailH = minDetailH
 	}
@@ -304,7 +321,7 @@ func (m Model) buildProcTitle() string {
 		procTitleSuffix = "  "
 	}
 	title := " [l] " + bc + procTitleSuffix
-	if st := m.sidebar.stateForSession(bc); st != nil {
+	if st := m.sidebar.sessionTargetStateFor(bc); st != nil {
 		effective := *st
 		effective.Value = ageDrivenValue(*st, m.cfg.Tui.DoneIdleAfterSecs)
 		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective) + " "
@@ -322,6 +339,12 @@ func (m Model) applyOverlay(base string) string {
 	}
 	if m.showConfirm {
 		return overlayCenter(m.confirm.Render(), base, m.width, m.height)
+	}
+	if m.showActionMenu {
+		if m.actionMenu.subPopup == SubPopupKillConfirm {
+			return overlayCenter(m.actionMenu.RenderKillConfirm(), base, m.width, m.height)
+		}
+		return overlayCenter(m.actionMenu.Render(), base, m.width, m.height)
 	}
 	return base
 }
@@ -341,7 +364,7 @@ func (m Model) buildStatusBar(width int) string {
 	} else if m.focus == panelSidebar {
 		statusBar = "  Tab:cycle  j/k:nav  Enter:select  !:states  ?:help  q:quit"
 	} else {
-		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  x:kill  r:restart  l:log  q:quit"
+		statusBar = "  Tab:cycle  j/k:nav  J/K:jump  a:actions  q:quit"
 	}
 
 	spinnerStr := ""
