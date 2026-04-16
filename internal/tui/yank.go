@@ -65,10 +65,16 @@ func (y YankModel) displayValue(fieldIdx int, f YankField) string {
 		return y.marquee.View(f.Value, yankValueMaxWidth)
 	}
 	runes := []rune(f.Value)
-	for runewidth.StringWidth(string(runes)) > yankValueMaxWidth-1 {
-		runes = runes[:len(runes)-1]
+	lo, hi := 0, len(runes)
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if runewidth.StringWidth(string(runes[:mid])) <= yankValueMaxWidth-1 {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
 	}
-	return string(runes) + ellipsis
+	return string(runes[:lo]) + ellipsis
 }
 
 func (y YankModel) Render() string {
@@ -117,6 +123,10 @@ func (y YankModel) SelectedValue() string {
 	}
 	return ""
 }
+
+// clipboardFunc is the function used to copy text to the clipboard.
+// Overridable in tests.
+var clipboardFunc = CopyToClipboard
 
 func CopyToClipboard(text string) error {
 	var cmd *exec.Cmd
