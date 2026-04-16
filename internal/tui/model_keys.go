@@ -692,7 +692,6 @@ func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // executeActionMenuItem executes the currently selected action menu item.
-// Individual action implementations are added in subsequent tasks.
 func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 	item := m.actionMenu.Selected()
 	if item == nil {
@@ -707,8 +706,10 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 		paneID := m.actionMenu.target.Pane.PaneID
 		m.showActionMenu = false
 		return m, func() tea.Msg {
-			_ = exec.Command("tmux", "send-keys", "-t", paneID, "Up", "Enter").Run()
-			return nil
+			if err := exec.Command("tmux", "send-keys", "-t", paneID, "Up", "Enter").Run(); err != nil {
+				return procActionMsg{"restart failed: " + err.Error()}
+			}
+			return procActionMsg{"restart sent to " + paneID}
 		}
 
 	case ActionViewLogs:
@@ -739,9 +740,11 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 				cmd = exec.Command("open", url)
 			case "linux":
 				cmd = exec.Command("xdg-open", url)
+			default:
+				return procActionMsg{"open browser: unsupported on " + runtime.GOOS}
 			}
-			if cmd != nil {
-				_ = cmd.Run()
+			if err := cmd.Run(); err != nil {
+				return procActionMsg{"open browser: " + err.Error()}
 			}
 			return nil
 		}
@@ -786,6 +789,9 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 func (m Model) openActionMenu() Model {
 	node := m.procList.SelectedNode()
 	if node == nil {
+		return m
+	}
+	if node.IsPaneHeader || node.IsWindowHeader || node.Proc.PID == 0 {
 		return m
 	}
 	// displayPane suppresses CWD when it matches the window CWD. Recover the real

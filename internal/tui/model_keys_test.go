@@ -317,14 +317,14 @@ func TestActionMenu_ShortcutForMissingAction_IsNoop(t *testing.T) {
 
 func TestOpenActionMenu_RecoversSuppressedCWD(t *testing.T) {
 	m := New(config.Default(), nil)
-	// Simulate a pane whose CWD was suppressed in displayPane (matches window CWD).
+	// Simulate a process node whose CWD was suppressed in displayPane (matches window CWD).
 	m.panes = []tmux.Pane{
 		{PaneID: "%1", Session: "s", CWD: "/real/cwd"},
 	}
 	m.procList.nodes = []ProcListNode{
 		{
-			IsPaneHeader: true,
-			Pane:         tmux.Pane{PaneID: "%1", Session: "s", CWD: ""}, // suppressed
+			Proc: proc.Process{PID: 42, Name: "node"},
+			Pane: tmux.Pane{PaneID: "%1", Session: "s", CWD: ""}, // suppressed
 		},
 	}
 	m.procList.cursor = 0
@@ -333,6 +333,59 @@ func TestOpenActionMenu_RecoversSuppressedCWD(t *testing.T) {
 	got := m.openActionMenu()
 	if got.actionMenu.target.Pane.CWD != "/real/cwd" {
 		t.Errorf("expected target CWD=/real/cwd, got %q", got.actionMenu.target.Pane.CWD)
+	}
+}
+
+func TestOpenActionMenu_NoopOnPaneHeader(t *testing.T) {
+	m := New(config.Default(), nil)
+	m.procList.nodes = []ProcListNode{
+		{IsPaneHeader: true, Pane: tmux.Pane{PaneID: "%1", Session: "s"}},
+	}
+	m.procList.cursor = 0
+	m.focus = panelProcList
+
+	got := m.openActionMenu()
+	if got.showActionMenu {
+		t.Error("expected showActionMenu=false for pane header node")
+	}
+}
+
+func TestOpenActionMenu_NoopOnWindowHeader(t *testing.T) {
+	m := New(config.Default(), nil)
+	m.procList.nodes = []ProcListNode{
+		{IsWindowHeader: true, Pane: tmux.Pane{PaneID: "%1"}},
+	}
+	m.procList.cursor = 0
+	m.focus = panelProcList
+
+	got := m.openActionMenu()
+	if got.showActionMenu {
+		t.Error("expected showActionMenu=false for window header node")
+	}
+}
+
+func TestExecuteActionMenuItem_Restart_ErrorReturnsProcActionMsg(t *testing.T) {
+	m := newTestModel(t)
+	m.showActionMenu = true
+	m.actionMenu = ActionMenuModel{
+		items:  []ActionItem{{Kind: ActionRestart, Label: "Restart", Shortcut: "r"}},
+		cursor: 0,
+		target: ProcListNode{
+			Proc: proc.Process{PID: 42, Name: "node"},
+			Pane: tmux.Pane{PaneID: "DEFINITELY-INVALID-PANE-ID-demux-test-xyz"},
+		},
+	}
+
+	_, cmd := m.executeActionMenuItem()
+	if cmd == nil {
+		t.Fatal("expected non-nil cmd from restart action")
+	}
+	msg := cmd()
+	if msg == nil {
+		t.Fatal("expected procActionMsg on tmux failure, got nil")
+	}
+	if _, ok := msg.(procActionMsg); !ok {
+		t.Errorf("expected procActionMsg, got %T: %v", msg, msg)
 	}
 }
 
