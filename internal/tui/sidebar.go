@@ -157,6 +157,36 @@ func (s SidebarModel) ActiveFilter() SidebarFilter {
 	return s.filter
 }
 
+// sessionTargetStateFor returns the highest-priority ToolState whose target IS the
+// session itself (TargetTypeSession). Pane and window states are excluded. Use this
+// for the Proclist title where only session-level annotations should be displayed.
+func (s *SidebarModel) sessionTargetStateFor(sess string) *db.ToolState {
+	sessID := s.nameToID[sess]
+	var best *db.ToolState
+	bestPri := 0
+	for i := range s.states {
+		st := &s.states[i]
+		if st.Target.Type != db.TargetTypeSession {
+			continue
+		}
+		var matches bool
+		if sessID != "" {
+			matches = st.Target.SessionID == sessID
+		} else {
+			matches = st.Target.ID == sess
+		}
+		if !matches {
+			continue
+		}
+		pri := st.Value.Priority()
+		if best == nil || pri > bestPri {
+			bestPri = pri
+			best = st
+		}
+	}
+	return best
+}
+
 // stateForSession returns the highest-priority ToolState for the session, or nil if none.
 func (s *SidebarModel) stateForSession(sess string) *db.ToolState {
 	sessID := s.nameToID[sess]
