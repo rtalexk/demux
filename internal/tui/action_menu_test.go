@@ -13,11 +13,11 @@ func TestBuildActionItems_AlwaysPresent(t *testing.T) {
 		Pane: tmux.Pane{CWD: "/home/user/app", PaneID: "%1"},
 	}
 	items := buildActionItems(node)
-	kinds := make(map[ActionKind]bool)
+	kinds := make(map[actionKind]bool)
 	for _, it := range items {
 		kinds[it.Kind] = true
 	}
-	for _, required := range []ActionKind{ActionKill, ActionRestart, ActionViewLogs} {
+	for _, required := range []actionKind{ActionKill, ActionRestart, ActionViewLogs} {
 		if !kinds[required] {
 			t.Errorf("expected action %v in items", required)
 		}
@@ -56,10 +56,9 @@ func TestBuildActionItems_NoPortNoOpenBrowser(t *testing.T) {
 	}
 }
 
-
 func TestActionMenuModel_Navigation(t *testing.T) {
-	m := ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}, {Kind: ActionViewLogs, Label: "Logs"}},
+	m := actionMenuModel{
+		items:  []actionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}, {Kind: ActionViewLogs, Label: "Logs"}},
 		cursor: 0,
 	}
 	m.MoveDown()
@@ -84,8 +83,8 @@ func TestActionMenuModel_Navigation(t *testing.T) {
 }
 
 func TestActionMenuModel_SelectedItem(t *testing.T) {
-	m := ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
+	m := actionMenuModel{
+		items:  []actionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 1,
 	}
 	got := m.Selected()
@@ -93,4 +92,3 @@ func TestActionMenuModel_SelectedItem(t *testing.T) {
 		t.Errorf("want ActionRestart, got %v", got)
 	}
 }
-

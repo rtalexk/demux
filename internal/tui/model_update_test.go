@@ -96,7 +96,7 @@ func TestUpdateYank_Enter_CopyError_ShowsFailedStatus(t *testing.T) {
 
 	m := New(config.Default(), nil)
 	m.showYank = true
-	m.yank.SetFields([]YankField{
+	m.yank.SetFields([]yankField{
 		{Key: "s", Label: "session", Value: "work"},
 	}, "Copy")
 

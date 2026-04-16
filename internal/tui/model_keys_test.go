@@ -194,8 +194,8 @@ func TestHandleKey_ActionMenu_DoesNotOpenOnA_InSidebar(t *testing.T) {
 func TestActionMenu_NavigateDown(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
+	m.actionMenu = actionMenuModel{
+		items:  []actionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 0,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
@@ -208,8 +208,8 @@ func TestActionMenu_NavigateDown(t *testing.T) {
 func TestActionMenu_NavigateUp(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
+	m.actionMenu = actionMenuModel{
+		items:  []actionItem{{Kind: ActionKill, Label: "Kill"}, {Kind: ActionRestart, Label: "Restart"}},
 		cursor: 1,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
@@ -222,7 +222,7 @@ func TestActionMenu_NavigateUp(t *testing.T) {
 func TestActionMenu_EscCloses(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{items: []ActionItem{{Kind: ActionKill, Label: "Kill"}}}
+	m.actionMenu = actionMenuModel{items: []actionItem{{Kind: ActionKill, Label: "Kill"}}}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	got := result.(Model)
 	if got.showActionMenu {
@@ -233,7 +233,7 @@ func TestActionMenu_EscCloses(t *testing.T) {
 func TestActionMenu_QCloses(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{items: []ActionItem{{Kind: ActionKill, Label: "Kill"}}}
+	m.actionMenu = actionMenuModel{items: []actionItem{{Kind: ActionKill, Label: "Kill"}}}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	got := result.(Model)
 	if got.showActionMenu {
@@ -244,8 +244,8 @@ func TestActionMenu_QCloses(t *testing.T) {
 func TestActionMenu_ShortcutX_TriggersKill(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{
-		items: []ActionItem{
+	m.actionMenu = actionMenuModel{
+		items: []actionItem{
 			{Kind: ActionKill, Label: "Kill", Shortcut: "x"},
 			{Kind: ActionRestart, Label: "Restart", Shortcut: "r"},
 		},
@@ -301,8 +301,8 @@ func TestActionMenu_ShortcutForMissingAction_IsNoop(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
 	// Menu has only Kill — pressing 'c' (CopyCommand, not in list) should be a no-op.
-	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionKill, Label: "Kill", Shortcut: "k"}},
+	m.actionMenu = actionMenuModel{
+		items:  []actionItem{{Kind: ActionKill, Label: "Kill", Shortcut: "k"}},
 		cursor: 0,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("c")})
@@ -367,8 +367,8 @@ func TestOpenActionMenu_NoopOnWindowHeader(t *testing.T) {
 func TestExecuteActionMenuItem_Restart_ErrorReturnsProcActionMsg(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{
-		items:  []ActionItem{{Kind: ActionRestart, Label: "Restart", Shortcut: "r"}},
+	m.actionMenu = actionMenuModel{
+		items:  []actionItem{{Kind: ActionRestart, Label: "Restart", Shortcut: "r"}},
 		cursor: 0,
 		target: ProcListNode{
 			Proc: proc.Process{PID: 42, Name: "node"},
@@ -392,8 +392,8 @@ func TestExecuteActionMenuItem_Restart_ErrorReturnsProcActionMsg(t *testing.T) {
 func TestActionMenu_SubPopup_EscReturnsToMenu(t *testing.T) {
 	m := newTestModel(t)
 	m.showActionMenu = true
-	m.actionMenu = ActionMenuModel{
-		items:    []ActionItem{{Kind: ActionKill, Label: "Kill"}},
+	m.actionMenu = actionMenuModel{
+		items:    []actionItem{{Kind: ActionKill, Label: "Kill"}},
 		subPopup: SubPopupKillConfirm,
 	}
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})

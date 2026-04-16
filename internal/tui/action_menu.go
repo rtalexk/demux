@@ -18,11 +18,15 @@ const menuItemIndent = "  "
 // so the background extends slightly past the longest item text.
 const menuItemTrailingPad = 2
 
-// ActionKind identifies an action in the action menu.
-type ActionKind int
+// menuItemNoShortcutPad is used as a fallback prefix when an action item has no shortcut,
+// to visually match the width of "[x] ".
+const menuItemNoShortcutPad = "    " // matches len("[x] ") width
+
+// actionKind identifies an action in the action menu.
+type actionKind int
 
 const (
-	ActionKill ActionKind = iota
+	ActionKill actionKind = iota
 	ActionRestart
 	ActionViewLogs
 	ActionOpenBrowser
@@ -30,63 +34,63 @@ const (
 	ActionShowFullCmd
 )
 
-// SubPopupKind identifies which sub-popup is currently open inside the action menu.
-type SubPopupKind int
+// subPopupKind identifies which sub-popup is currently open inside the action menu.
+type subPopupKind int
 
 const (
-	SubPopupNone SubPopupKind = iota
+	SubPopupNone subPopupKind = iota
 	SubPopupKillConfirm
 )
 
-// ActionItem is a single entry in the action menu.
-type ActionItem struct {
-	Kind     ActionKind
+// actionItem is a single entry in the action menu.
+type actionItem struct {
+	Kind     actionKind
 	Label    string
 	Shortcut string // single-key shortcut shown in the menu (empty = none)
 }
 
-// ActionMenuModel holds the state for the action menu and its sub-popups.
-type ActionMenuModel struct {
-	items    []ActionItem
+// actionMenuModel holds the state for the action menu and its sub-popups.
+type actionMenuModel struct {
+	items    []actionItem
 	cursor   int
 	target   ProcListNode
-	subPopup SubPopupKind
+	subPopup subPopupKind
 }
 
 // buildActionItems constructs the dynamic action list for a given process node.
 // Only actions applicable to the node's context are included.
-func buildActionItems(node ProcListNode) []ActionItem {
-	items := []ActionItem{
+func buildActionItems(node ProcListNode) []actionItem {
+	items := []actionItem{
 		{ActionKill, fmt.Sprintf("Kill process (%s)", node.Proc.FriendlyName()), "x"},
 		{ActionRestart, "Re-run last cmd (Up+Enter)", "r"},
 		{ActionViewLogs, "View logs", "l"},
 	}
 	if node.Port > 0 {
-		items = append(items, ActionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), "o"})
+		items = append(items, actionItem{ActionOpenBrowser, fmt.Sprintf("Open in browser (:%d)", node.Port), "o"})
 	}
-	items = append(items, ActionItem{ActionShowEnv, "Show environment", "d"})
+	items = append(items, actionItem{ActionShowEnv, "Show environment", "d"})
 	if len([]rune(node.Proc.Cmdline)) > cmdlineLongThreshold {
-		items = append(items, ActionItem{ActionShowFullCmd, "Show full command", "f"})
+		items = append(items, actionItem{ActionShowFullCmd, "Show full command", "f"})
 	}
 	return items
 }
 
 // MoveDown moves the cursor down by one, clamped at the last item.
-func (a *ActionMenuModel) MoveDown() {
+func (a *actionMenuModel) MoveDown() {
 	if a.cursor < len(a.items)-1 {
 		a.cursor++
 	}
 }
 
 // MoveUp moves the cursor up by one, clamped at zero.
-func (a *ActionMenuModel) MoveUp() {
+func (a *actionMenuModel) MoveUp() {
 	if a.cursor > 0 {
 		a.cursor--
 	}
 }
 
-// Selected returns the currently highlighted ActionItem, or nil when the list is empty.
-func (a *ActionMenuModel) Selected() *ActionItem {
+// Selected returns the currently highlighted actionItem, or nil when the list is empty.
+func (a *actionMenuModel) Selected() *actionItem {
 	if a.cursor < 0 || a.cursor >= len(a.items) {
 		return nil
 	}
@@ -95,14 +99,14 @@ func (a *ActionMenuModel) Selected() *ActionItem {
 }
 
 // Render returns the styled action menu popup string.
-func (a ActionMenuModel) Render() string {
+func (a actionMenuModel) Render() string {
 	title := fmt.Sprintf("Actions: %s (%d)", a.target.Proc.FriendlyName(), a.target.Proc.PID)
 
 	type row struct{ prefix, label string }
 	rows := make([]row, len(a.items))
 	maxW := 0
 	for i, it := range a.items {
-		prefix := "    " // 4 chars to match "[x] " width
+		prefix := menuItemNoShortcutPad
 		if it.Shortcut != "" {
 			prefix = "[" + it.Shortcut + "] "
 		}
@@ -131,7 +135,7 @@ func (a ActionMenuModel) Render() string {
 }
 
 // RenderKillConfirm returns the styled kill-confirmation sub-popup.
-func (a ActionMenuModel) RenderKillConfirm() string {
+func (a actionMenuModel) RenderKillConfirm() string {
 	prompt := fmt.Sprintf("Kill %s (PID %d)?", a.target.Proc.FriendlyName(), a.target.Proc.PID)
 	return ConfirmModel{prompt: prompt}.Render()
 }
