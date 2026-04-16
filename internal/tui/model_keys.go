@@ -2,9 +2,9 @@ package tui
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -709,13 +709,11 @@ func (m Model) executeActionMenuItem() (Model, tea.Cmd) {
 			if err != nil {
 				return procActionMsg{"logs: " + err.Error()}
 			}
-			f, err := os.CreateTemp("", "demux-logs-*.log")
+			path, err := writeTempFile("demux-logs-*.log", out)
 			if err != nil {
 				return procActionMsg{"logs: " + err.Error()}
 			}
-			_, _ = f.Write(out)
-			_ = f.Close()
-			return openViewerMsg{path: f.Name()}
+			return openViewerMsg{path: path}
 		}
 
 	case ActionOpenBrowser:
@@ -746,28 +744,22 @@ func (m Model) executeActionMenuItem() (Model, tea.Cmd) {
 			if err != nil {
 				return procActionMsg{"env: " + err.Error()}
 			}
-			f, err := os.CreateTemp("", "demux-env-*.txt")
+			path, err := writeTempFile("demux-env-*.txt", []byte(strings.Join(lines, "\n")+"\n"))
 			if err != nil {
 				return procActionMsg{"env: " + err.Error()}
 			}
-			for _, l := range lines {
-				_, _ = fmt.Fprintln(f, l)
-			}
-			_ = f.Close()
-			return openViewerMsg{path: f.Name(), ftCmd: "set ft=sh"}
+			return openViewerMsg{path: path, ftCmd: "set ft=sh"}
 		}
 
 	case ActionShowFullCmd:
 		cmdline := m.actionMenu.target.Proc.Cmdline
 		m.showActionMenu = false
 		return m, func() tea.Msg {
-			f, err := os.CreateTemp("", "demux-cmd-*.txt")
+			path, err := writeTempFile("demux-cmd-*.txt", []byte(cmdline+"\n"))
 			if err != nil {
 				return procActionMsg{"cmd: " + err.Error()}
 			}
-			_, _ = fmt.Fprintln(f, cmdline)
-			_ = f.Close()
-			return openViewerMsg{path: f.Name()}
+			return openViewerMsg{path: path}
 		}
 	}
 	return m, nil

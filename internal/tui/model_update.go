@@ -94,6 +94,19 @@ func findViewer() []string {
 	return []string{"vi", "-R"}
 }
 
+// writeTempFile creates a temp file named by pattern, writes content into it,
+// and returns the path. The caller is responsible for removal (handleOpenViewerMsg
+// removes it after the viewer exits).
+func writeTempFile(pattern string, content []byte) (string, error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
+		return "", err
+	}
+	_, _ = f.Write(content)
+	_ = f.Close()
+	return f.Name(), nil
+}
+
 // handleOverlays routes key messages to full-screen overlay handlers.
 // Returns (model, cmd, true) if the message was consumed by an overlay.
 // Non-key messages fall through so background updates (ticks, state fetches)
