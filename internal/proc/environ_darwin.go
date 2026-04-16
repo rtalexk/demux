@@ -28,7 +28,7 @@ func environPlatform(pid int32) ([]string, error) {
 	parts := bytes.Split(data[4:], []byte{0})
 
 	// parts[0] = executable path (skip)
-	// parts[1..nargs] = argv[1..argc-1] (skip)
+	// parts[1..nargs-1] = argv[1..argc-1] (skip); parts[nargs] = null separator (absorbed by i<=nargs)
 	// parts[nargs+1..] = environment variables
 	var envs []string
 	for i, part := range parts {

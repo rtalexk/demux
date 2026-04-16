@@ -28,7 +28,7 @@ func (m *Marquee) Tick() {
 
 // View returns exactly width display columns of text starting at the current offset.
 // If text fits within width it is returned unchanged.
-// The circular sequence is: text + 4 spaces + text (repeating).
+// The circular sequence is: text + marqueeGap spaces + text (repeating).
 func (m Marquee) View(text string, width int) string {
 	if width <= 0 {
 		return ""
