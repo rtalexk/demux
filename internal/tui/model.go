@@ -127,7 +127,7 @@ type Model struct {
 	sidebar  SidebarModel
 	procList ProcListModel
 	detail   DetailModel
-	yank     YankModel
+	yank     yankModel
 	help     HelpModel
 
 	showYank    bool
@@ -158,7 +158,7 @@ type Model struct {
 	itemInput   ItemInputModel
 
 	showActionMenu bool
-	actionMenu     ActionMenuModel
+	actionMenu     actionMenuModel
 
 	sessionsConfig session.SessionsConfig
 	configDir      string
@@ -285,8 +285,7 @@ func (m Model) buildLayoutDims() layoutDims {
 	innerW := procW - 2
 	detailContent := m.detail.ContentLines(innerW)
 	detailH := detailContent + 2
-	minDetailH := 4
-	maxDetailH := contentH - 4
+	maxDetailH := contentH - minDetailH
 	if detailH < minDetailH {
 		detailH = minDetailH
 	}

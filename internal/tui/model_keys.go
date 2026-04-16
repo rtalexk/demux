@@ -23,6 +23,9 @@ const (
 	// tmuxScrollbackLines is the number of lines passed to tmux capture-pane -S.
 	// Negative value = capture from that many lines above the visible area.
 	tmuxScrollbackLines = "-32768"
+
+	// clearConfirmTargetReserve accounts for the "  target: " label (10 chars), border (1), and padding (1).
+	clearConfirmTargetReserve = 12
 )
 
 // resolveFilterKey maps a key message to a SidebarFilter.
@@ -214,14 +217,14 @@ func (m Model) handleSearchInputUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 	if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
 		m.statusMsg = "launch failed: " + err.Error()
-		m.statusExp = time.Now().Add(5 * time.Second)
+		m.statusExp = time.Now().Add(statusExpError)
 		m.sidebar.SetLaunchErr(err.Error())
 		return m, nil
 	}
 	if specs := resolveWindowSpecs(sess.Config.Windows, m.sessionsConfig.WindowTemplates); len(specs) > 0 {
 		if err := tmux.CreateSessionWindows(sess.DisplayName, sess.Config.Path, specs); err != nil {
 			m.statusMsg = "window setup failed: " + err.Error()
-			m.statusExp = time.Now().Add(5 * time.Second)
+			m.statusExp = time.Now().Add(statusExpError)
 		}
 	}
 	m.sidebar.ClearLaunchErr()
@@ -369,22 +372,8 @@ func (m Model) handleSidebarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // procListDimensions computes procH and detailH for the current model state.
 func (m Model) procListDimensions() (procH, detailH int) {
-	contentH := m.height - 1
-	innerW := m.width - m.cfg.Sidebar.Width - 2
-	if innerW < 1 {
-		innerW = 1
-	}
-	detailContent := m.detail.ContentLines(innerW)
-	detailH = detailContent + 2
-	if detailH < 4 {
-		detailH = 4
-	}
-	maxDetailH := contentH - 4
-	if detailH > maxDetailH {
-		detailH = maxDetailH
-	}
-	procH = contentH - detailH
-	return procH, detailH
+	dims := m.buildLayoutDims()
+	return dims.procH, dims.detailH
 }
 
 // afterCollapse performs the shared post-toggle update after an expand/collapse operation:
@@ -602,7 +591,7 @@ func (m Model) clearCurrentState(t db.Target) tea.Cmd {
 // showClearConfirm opens the confirmation overlay for clearing the state of target.
 func (m Model) showClearConfirm(t db.Target) Model {
 	st := activeStateFor(m.states, t.Type, t.ID)
-	maxTargetLen := m.width/2 - 12 // leave room for label + border + padding
+	maxTargetLen := m.width/2 - clearConfirmTargetReserve
 	if maxTargetLen < 20 {
 		maxTargetLen = 20
 	}
@@ -648,11 +637,11 @@ func killProcCmd(pid int32) tea.Cmd {
 }
 
 // handleActionMenuKey routes keys when the action menu (or a sub-popup) is open.
-func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleActionMenuKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	if m.actionMenu.subPopup != SubPopupNone {
 		return m.handleSubPopupKey(msg)
 	}
-	// Dispatch single-key shortcuts defined on each ActionItem. This avoids
+	// Dispatch single-key shortcuts defined on each actionItem. This avoids
 	// duplicating the shortcut mapping here and in buildActionItems.
 	pressed := msg.String()
 	for i, item := range m.actionMenu.items {
@@ -675,7 +664,7 @@ func (m Model) handleActionMenuKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleSubPopupKey routes keys when a sub-popup is open inside the action menu.
-func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) handleSubPopupKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch m.actionMenu.subPopup {
 	case SubPopupKillConfirm:
 		switch msg.String() {
@@ -692,7 +681,7 @@ func (m Model) handleSubPopupKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // executeActionMenuItem executes the currently selected action menu item.
-func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
+func (m Model) executeActionMenuItem() (Model, tea.Cmd) {
 	item := m.actionMenu.Selected()
 	if item == nil {
 		return m, nil
@@ -746,7 +735,7 @@ func (m Model) executeActionMenuItem() (tea.Model, tea.Cmd) {
 			if err := cmd.Run(); err != nil {
 				return procActionMsg{"open browser: " + err.Error()}
 			}
-			return nil
+			return procActionMsg{"opened browser"}
 		}
 
 	case ActionShowEnv:
@@ -810,7 +799,7 @@ func (m Model) openActionMenu() Model {
 			node.Pane.CWD = cwd
 		}
 	}
-	m.actionMenu = ActionMenuModel{
+	m.actionMenu = actionMenuModel{
 		items:  buildActionItems(*node),
 		cursor: 0,
 		target: *node,

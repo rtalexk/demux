@@ -65,7 +65,7 @@ func (m Model) handleMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleOpenViewerMsg(msg)
 	case procActionMsg:
 		m.statusMsg = msg.status
-		m.statusExp = time.Now().Add(3 * time.Second)
+		m.statusExp = time.Now().Add(statusExpMedium)
 		return m, nil
 	}
 	return m, nil
@@ -108,7 +108,7 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 	}
 	if m.showYank {
 		mo, cmd := m.updateYank(msg)
-		return mo.(Model), cmd, true
+		return mo, cmd, true
 	}
 	if m.showConfirm {
 		mo, cmd := m.handleConfirmOverlay(msg)
@@ -116,7 +116,7 @@ func (m Model) handleOverlays(msg tea.Msg) (Model, tea.Cmd, bool) {
 	}
 	if m.showActionMenu {
 		mo, cmd := m.handleActionMenuKey(msg.(tea.KeyMsg))
-		return mo.(Model), cmd, true
+		return mo, cmd, true
 	}
 	return m, nil, false
 }
@@ -325,7 +325,7 @@ func (m *Model) populateYankFields() {
 			if selNode.Port > 0 {
 				portStr = fmt.Sprintf("%d", selNode.Port)
 			}
-			m.yank.SetFields([]YankField{
+			m.yank.SetFields([]yankField{
 				{Key: "p", Label: "PID", Value: fmt.Sprint(pr.PID)},
 				{Key: "n", Label: "name", Value: pr.Name},
 				{Key: "c", Label: "cmdline", Value: pr.Cmdline},
@@ -337,7 +337,7 @@ func (m *Model) populateYankFields() {
 	}
 	// session node from sidebar
 	if node := m.sidebar.Selected(); node != nil {
-		m.yank.SetFields([]YankField{
+		m.yank.SetFields([]yankField{
 			{Key: "n", Label: "session", Value: node.Session},
 			{Key: "t", Label: "target", Value: node.Session},
 		}, "Yank: "+node.Session)
@@ -572,7 +572,7 @@ func (m Model) handleItemDeleteConfirmed(msg itemDeleteConfirmedMsg) (Model, tea
 	if err := m.db.ItemDelete(msg.id); err != nil {
 		demuxlog.Error("item delete failed", "id", msg.id, "err", err)
 		m.statusMsg = "error deleting item: " + err.Error()
-		m.statusExp = time.Now().Add(4 * time.Second)
+		m.statusExp = time.Now().Add(statusExpLong)
 	} else {
 		demuxlog.Info("item deleted", "id", msg.id, "session", msg.session)
 	}
@@ -583,14 +583,14 @@ func (m Model) handleItemEditorDoneMsg(msg itemEditorDoneMsg) (Model, tea.Cmd) {
 	if msg.err != nil {
 		demuxlog.Error("editor exited with error", "err", msg.err)
 		m.statusMsg = "editor error: " + msg.err.Error()
-		m.statusExp = time.Now().Add(4 * time.Second)
+		m.statusExp = time.Now().Add(statusExpLong)
 		return m, nil
 	}
 	if msg.tempFile != "" {
 		if err := syncItemsFromFile(m.db, msg.session, msg.tempFile); err != nil {
 			demuxlog.Error("item editor sync failed", "err", err)
 			m.statusMsg = "error syncing editor changes: " + err.Error()
-			m.statusExp = time.Now().Add(4 * time.Second)
+			m.statusExp = time.Now().Add(statusExpLong)
 		} else {
 			demuxlog.Info("editor changes synced", "session", msg.session)
 		}
@@ -615,7 +615,7 @@ func (m *Model) detailForProcNode(node ProcListNode) DetailModel {
 	}
 }
 
-func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) updateYank(msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if key.Matches(msg, keys.Esc.Binding) || msg.String() == "q" {
@@ -630,7 +630,7 @@ func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statusMsg = "yanked: " + val
 			}
 			m.showYank = false
-			m.statusExp = time.Now().Add(2 * time.Second)
+			m.statusExp = time.Now().Add(statusExpShort)
 			return m, nil
 		}
 		if f, ok := m.yank.FieldByKey(msg.String()); ok {
@@ -640,7 +640,7 @@ func (m Model) updateYank(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statusMsg = "yanked: " + f.Value
 			}
 			m.showYank = false
-			m.statusExp = time.Now().Add(2 * time.Second)
+			m.statusExp = time.Now().Add(statusExpShort)
 			return m, nil
 		}
 		switch msg.String() {

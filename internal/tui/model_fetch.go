@@ -18,7 +18,7 @@ func tick(interval time.Duration) tea.Cmd {
 }
 
 func marqueeCmd() tea.Cmd {
-	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+	return tea.Tick(marqueeTick, func(t time.Time) tea.Msg {
 		return marqueeTickMsg(t)
 	})
 }
@@ -120,7 +120,7 @@ func (m Model) scheduleProcFetch() tea.Cmd {
 // scheduleDelayedProcFetch schedules a proc snapshot after 2s, tagged with the current generation.
 func (m Model) scheduleDelayedProcFetch() tea.Cmd {
 	fetch := makeProcFetch(m.procGen)
-	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
+	return tea.Tick(procPollInterval, func(_ time.Time) tea.Msg {
 		return fetch()
 	})
 }
@@ -138,7 +138,7 @@ func fetchGit(k, dir string, timeoutMs int) tea.Cmd {
 
 func debounceSearch(gen int) tea.Cmd {
 	return func() tea.Msg {
-		time.Sleep(150 * time.Millisecond)
+		time.Sleep(searchDebounceInterval)
 		return searchDebounceMsg{gen: gen}
 	}
 }
