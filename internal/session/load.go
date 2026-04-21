@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -43,6 +44,7 @@ func LoadConfigSessions(configDir string) (SessionsConfig, error) {
 				fmt.Fprintf(os.Stderr, "demux: skipping session with missing name/path in %s\n", name)
 				continue
 			}
+			e.Path = expandTilde(e.Path)
 			dn := e.DisplayName()
 			if i, ok := seen[dn]; ok {
 				fmt.Fprintf(os.Stderr, "demux: duplicate session %q in %s (overrides previous)\n", dn, name)
@@ -57,6 +59,21 @@ func LoadConfigSessions(configDir string) (SessionsConfig, error) {
 
 	cfg.WindowTemplates = resolveWindowTemplates(rawTemplates)
 	return cfg, nil
+}
+
+// expandTilde replaces a leading "~/" with the user's home directory.
+func expandTilde(path string) string {
+	if !strings.HasPrefix(path, "~/") && path != "~" {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	return filepath.Join(home, path[2:])
 }
 
 // resolveWindowTemplates builds an id-keyed map of WindowTemplate with
