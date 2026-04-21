@@ -153,6 +153,26 @@ windows = ["editor", "generic"]
 	}
 }
 
+func TestLoadConfigSessions_TildeExpanded(t *testing.T) {
+	dir := t.TempDir()
+	writeTOML(t, dir, "sessions.toml", `
+[[session]]
+name = "home"
+path = "~/"
+`)
+	cfg, err := LoadConfigSessions(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(cfg.Entries))
+	}
+	home, _ := os.UserHomeDir()
+	if cfg.Entries[0].Path != home {
+		t.Errorf("tilde not expanded: got %q, want %q", cfg.Entries[0].Path, home)
+	}
+}
+
 func TestLoadConfigSessions_WindowTemplateOverride(t *testing.T) {
 	dir := t.TempDir()
 	writeTOML(t, dir, "sessions.toml", `
