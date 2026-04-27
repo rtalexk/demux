@@ -686,6 +686,28 @@ replace = "~"
 
 </details>
 
+<details>
+
+<summary>Connecting to sessions</summary>
+
+`demux session connect` attaches or switches to a session. Pass a name or use `--fuzzy` to pick interactively via fzf.
+
+```bash
+demux session connect myproject        # connect by exact name
+demux session connect --fuzzy          # pick via fzf
+```
+
+Behavior depends on context:
+
+- Inside tmux: runs `tmux switch-client -t <name>`.
+- Outside tmux: replaces the current process with `tmux attach-session -t <name>`.
+
+If the named session is configured in `sessions.toml` or `private.toml` but not yet running, demux creates it (applying window templates) before connecting.
+
+`--fuzzy` and a positional name are mutually exclusive. Pressing Esc in fzf exits silently with code 1.
+
+</details>
+
 ## Hooks
 
 ### Tmux
@@ -901,6 +923,8 @@ demux session config-get  --name <n>
 demux session config-remove --name <n> [--private]
 demux session remove      --name <n> [--private]   # kills tmux + removes config + clears states
 demux session create-windows --session <n> --windows <ids>
+demux session connect <name>           # attach or switch to a session
+demux session connect --fuzzy          # pick session via fzf
 
 # Windows
 demux windows --session <n>        # list windows in a session
