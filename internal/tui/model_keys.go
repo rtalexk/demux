@@ -215,7 +215,7 @@ func (m Model) handleSearchInputUpdate(msg tea.KeyMsg) (Model, tea.Cmd) {
 // launchConfigSession creates a new tmux session from a config-only session entry.
 // Returns the updated model and a command (nil on launch failure, fetchPanes or tea.Quit on success).
 func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
-	if err := tmux.NewSession(sess.DisplayName, sess.Config.Path); err != nil {
+	if err := tmux.NewSessionDetached(sess.DisplayName, sess.Config.Path); err != nil {
 		m.statusMsg = "launch failed: " + err.Error()
 		m.statusExp = time.Now().Add(statusExpError)
 		m.sidebar.SetLaunchErr(err.Error())
@@ -226,6 +226,12 @@ func (m Model) launchConfigSession(sess *session.Session) (Model, tea.Cmd) {
 			m.statusMsg = "window setup failed: " + err.Error()
 			m.statusExp = time.Now().Add(statusExpError)
 		}
+	}
+	if err := tmux.Connect(sess.DisplayName); err != nil {
+		m.statusMsg = "connect failed: " + err.Error()
+		m.statusExp = time.Now().Add(statusExpError)
+		m.sidebar.SetLaunchErr(err.Error())
+		return m, nil
 	}
 	m.sidebar.ClearLaunchErr()
 	if m.popupMode {
