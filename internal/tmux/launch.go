@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
 // WindowSpec describes a window to create inside a tmux session.
@@ -12,10 +13,10 @@ type WindowSpec struct {
 	AfterCreateCmd string
 }
 
-// NewSession creates a detached tmux session named `name` rooted at `path`,
-// then switches the client to it. Returns an error if name or path is empty,
-// or if the path does not exist on disk.
-func NewSession(name, path string) error {
+// NewSessionDetached creates a detached tmux session named `name` rooted at
+// `path`. It does NOT switch or attach the client. Returns an error if name
+// or path is empty, or if the path does not exist on disk.
+func NewSessionDetached(name, path string) error {
 	if name == "" {
 		return fmt.Errorf("session name is required")
 	}
@@ -28,10 +29,41 @@ func NewSession(name, path string) error {
 	if err := exec.Command("tmux", "new-session", "-d", "-s", name, "-c", path).Run(); err != nil {
 		return fmt.Errorf("tmux new-session: %w", err)
 	}
-	if err := exec.Command("tmux", "switch-client", "-t", name).Run(); err != nil {
-		return fmt.Errorf("tmux switch-client: %w", err)
+	return nil
+}
+
+// Connect attaches the current process to the named tmux session, picking
+// the right verb based on $TMUX:
+//   - inside tmux ($TMUX set): runs `tmux switch-client -t name`.
+//   - outside tmux: replaces the current process with `tmux attach-session -t name`
+//     via syscall.Exec, so the user lands directly in tmux.
+func Connect(name string) error {
+	insideTmux := os.Getenv("TMUX") != ""
+	args := resolveConnectArgs(insideTmux, name)
+	if insideTmux {
+		if err := exec.Command("tmux", args...).Run(); err != nil {
+			return fmt.Errorf("tmux %s: %w", args[0], err)
+		}
+		return nil
+	}
+	tmuxPath, err := exec.LookPath("tmux")
+	if err != nil {
+		return fmt.Errorf("tmux not found in PATH: %w", err)
+	}
+	argv := append([]string{"tmux"}, args...)
+	if err := syscall.Exec(tmuxPath, argv, os.Environ()); err != nil {
+		return fmt.Errorf("tmux attach-session: %w", err)
 	}
 	return nil
+}
+
+// resolveConnectArgs returns the tmux subcommand and args for Connect,
+// based on whether the caller is currently inside a tmux client.
+func resolveConnectArgs(insideTmux bool, name string) []string {
+	if insideTmux {
+		return []string{"switch-client", "-t", name}
+	}
+	return []string{"attach-session", "-t", name}
 }
 
 // CreateSessionWindows configures windows for an existing tmux session.
