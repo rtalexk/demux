@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/rtalexk/demux/internal/tmux"
@@ -96,4 +97,19 @@ func Merge(panes []tmux.Pane, entries []ConfigEntry) []Session {
 	}
 
 	return sessions
+}
+
+// LaunchAndConnectConfigSession launches a new session from config and connects to it.
+// It creates a detached session, sets up windows, and connects the client.
+func LaunchAndConnectConfigSession(name, path string, windowIDs []string, templates map[string]WindowTemplate) error {
+	if err := tmux.NewSessionDetached(name, path); err != nil {
+		return err
+	}
+	specs, _ := ResolveWindowSpecs(windowIDs, templates)
+	if len(specs) > 0 {
+		if err := tmux.CreateSessionWindows(name, path, specs); err != nil {
+			return fmt.Errorf("window setup: %w", err)
+		}
+	}
+	return tmux.Connect(name)
 }
