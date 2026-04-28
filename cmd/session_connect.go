@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +13,18 @@ import (
 	"github.com/rtalexk/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
+
+var errFzfAborted = errors.New("fzf: aborted")
+
+// SilentExitError signals termination without printing an error.
+// Used for user-initiated exits like fzf cancellation.
+type SilentExitError struct {
+	code int
+}
+
+func (e *SilentExitError) Error() string {
+	return ""
+}
 
 var sessionConnectFuzzy bool
 
@@ -36,13 +49,16 @@ func runSessionConnect(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	sessions, err := loadMergedSessions()
+	sessions, scfg, err := loadMergedSessions()
 	if err != nil {
 		return err
 	}
 
 	if name == "" {
 		name, err = pickSessionFuzzy(sessions)
+		if errors.Is(err, errFzfAborted) {
+			return &SilentExitError{code: 1}
+		}
 		if err != nil {
 			return err
 		}
@@ -53,7 +69,7 @@ func runSessionConnect(_ *cobra.Command, args []string) error {
 		return err
 	}
 
-	return dispatchConnect(target)
+	return dispatchConnect(target, scfg)
 }
 
 func validateConnectArgs(name string, fuzzy bool) error {
@@ -75,20 +91,17 @@ func resolveConnectTarget(sessions []session.Session, name string) (*session.Ses
 	return nil, fmt.Errorf("session %q not found", name)
 }
 
-func loadMergedSessions() ([]session.Session, error) {
-	panes, err := tmux.ListPanes()
-	if err != nil {
-		return nil, fmt.Errorf("tmux not available: %w", err)
-	}
+func loadMergedSessions() ([]session.Session, session.SessionsConfig, error) {
+	panes, _ := tmux.ListPanes()  // Soft fallback: zero live sessions on error
 	cfgPath, err := config.DefaultPath()
 	if err != nil {
-		return nil, fmt.Errorf("config dir: %w", err)
+		return nil, session.SessionsConfig{}, fmt.Errorf("config dir: %w", err)
 	}
 	scfg, err := session.LoadConfigSessions(filepath.Dir(cfgPath))
 	if err != nil {
-		return nil, err
+		return nil, session.SessionsConfig{}, err
 	}
-	return session.Merge(panes, scfg.Entries), nil
+	return session.Merge(panes, scfg.Entries), scfg, nil
 }
 
 func pickSessionFuzzy(sessions []session.Session) (string, error) {
@@ -99,19 +112,18 @@ func pickSessionFuzzy(sessions []session.Session) (string, error) {
 		return "", fmt.Errorf("no sessions to pick from")
 	}
 
-	var sb strings.Builder
-	for _, s := range sessions {
-		sb.WriteString(s.DisplayName)
-		sb.WriteByte('\n')
+	names := make([]string, len(sessions))
+	for i, s := range sessions {
+		names[i] = s.DisplayName
 	}
 
 	cmd := exec.Command("fzf", "--prompt", "session> ", "--height", "40%")
-	cmd.Stdin = strings.NewReader(sb.String())
+	cmd.Stdin = strings.NewReader(strings.Join(names, "\n") + "\n")
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && ee.ExitCode() == 130 {
-			os.Exit(1)
+			return "", errFzfAborted
 		}
 		return "", fmt.Errorf("fzf: %w", err)
 	}
@@ -122,33 +134,17 @@ func pickSessionFuzzy(sessions []session.Session) (string, error) {
 	return pick, nil
 }
 
-func dispatchConnect(target *session.Session) error {
+func dispatchConnect(target *session.Session, scfg session.SessionsConfig) error {
 	if target.IsLive {
 		return tmux.Connect(target.DisplayName)
 	}
-	if target.IsConfig {
+	if target.IsConfig && target.Config != nil {
 		ce := target.Config
-		if err := tmux.NewSessionDetached(ce.Name, ce.Path); err != nil {
-			return err
-		}
-		cfgPath, err := config.DefaultPath()
-		if err != nil {
-			return fmt.Errorf("config dir: %w", err)
-		}
-		scfg, err := session.LoadConfigSessions(filepath.Dir(cfgPath))
-		if err != nil {
-			return err
-		}
-		specs, unknown := session.ResolveWindowSpecs(ce.Windows, scfg.WindowTemplates)
+		_, unknown := session.ResolveWindowSpecs(ce.Windows, scfg.WindowTemplates)
 		for _, id := range unknown {
 			fmt.Fprintf(os.Stderr, "demux: unknown window_template id %q (skipped)\n", id)
 		}
-		if len(specs) > 0 {
-			if err := tmux.CreateSessionWindows(ce.Name, ce.Path, specs); err != nil {
-				return fmt.Errorf("window setup: %w", err)
-			}
-		}
-		return tmux.Connect(ce.Name)
+		return session.LaunchAndConnectConfigSession(ce.Name, ce.Path, ce.Windows, scfg.WindowTemplates)
 	}
 	return fmt.Errorf("session %q is neither live nor in config", target.DisplayName)
 }
