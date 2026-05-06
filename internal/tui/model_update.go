@@ -15,6 +15,7 @@ import (
 	"github.com/rtalexk/demux/internal/git"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/proc"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -273,6 +274,15 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 	}
 	m.procs = msg.procs
 	m.cwdMap = msg.cwdMap
+	if len(m.cfg.Sidebar.Processes) > 0 {
+		patterns := make([]procmatch.Pattern, 0, len(m.cfg.Sidebar.Processes))
+		for _, p := range m.cfg.Sidebar.Processes {
+			patterns = append(patterns, procmatch.Pattern{
+				Match: p.Match, Label: p.Label, FG: p.FG, BG: p.BG,
+			})
+		}
+		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns))
+	}
 	if node := m.sidebar.Selected(); node != nil {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}
