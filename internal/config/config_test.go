@@ -505,3 +505,58 @@ active_session_icon = "@"
 		t.Errorf("expected @, got %q", cfg.Sidebar.ActiveSessionIcon)
 	}
 }
+
+func TestLoad_SidebarProcesses(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = "claude*"
+label = "🤖"
+
+[[sidebar.processes]]
+match = "node*"
+label = "node"
+fg = "#abcdef"
+bg = "#101010"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(cfg.Sidebar.Processes))
+	}
+	if cfg.Sidebar.Processes[0].Match != "claude*" || cfg.Sidebar.Processes[0].Label != "🤖" {
+		t.Fatalf("entry 0 mismatch: %+v", cfg.Sidebar.Processes[0])
+	}
+	if cfg.Sidebar.Processes[1].FG != "#abcdef" || cfg.Sidebar.Processes[1].BG != "#101010" {
+		t.Fatalf("entry 1 colours mismatch: %+v", cfg.Sidebar.Processes[1])
+	}
+}
+
+func TestLoad_ProcLabelThemeKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[theme]
+color_proc_label_fg = "#111111"
+color_proc_label_bg = "#222222"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Theme.ColorProcLabelFG != "#111111" {
+		t.Fatalf("fg mismatch: %q", cfg.Theme.ColorProcLabelFG)
+	}
+	if cfg.Theme.ColorProcLabelBG != "#222222" {
+		t.Fatalf("bg mismatch: %q", cfg.Theme.ColorProcLabelBG)
+	}
+}

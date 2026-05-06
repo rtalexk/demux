@@ -72,6 +72,9 @@ type ThemeConfig struct {
 	ColorProcEditor string `toml:"color_proc_editor"`
 	ColorProcChild  string `toml:"color_proc_child"`
 
+	ColorProcLabelFG string `toml:"color_proc_label_fg"`
+	ColorProcLabelBG string `toml:"color_proc_label_bg"`
+
 	ColorGitDirty  string `toml:"color_git_dirty"`
 	ColorGitBehind string `toml:"color_git_behind"`
 	ColorGitAhead  string `toml:"color_git_ahead"`
@@ -126,16 +129,27 @@ type ProcessesConfig struct {
 	Shells  []string `toml:"shells"`
 }
 
+// ProcessLabel declares a sidebar process indicator: a glob-matched process
+// is rendered using Label, optionally styled with FG/BG. Empty colours fall
+// back to the theme defaults (ColorProcLabelFG / ColorProcLabelBG).
+type ProcessLabel struct {
+	Match string `toml:"match"`
+	Label string `toml:"label"`
+	FG    string `toml:"fg"`
+	BG    string `toml:"bg"`
+}
+
 type SidebarConfig struct {
-	DefaultFilter     string   `toml:"default_filter"`
-	FocusOnOpen       string   `toml:"focus_on_open"`
-	FocusSearchOnOpen bool     `toml:"focus_search_on_open"`
-	SearchSort        string   `toml:"search_sort"`
-	ShowLastSeen      bool     `toml:"show_last_seen"`
-	ActiveSessionIcon string   `toml:"active_session_icon"`
-	Sort              []string `toml:"sort"`
-	SwitchFocus       string   `toml:"switch_focus"`
-	Width             int      `toml:"width"`
+	DefaultFilter     string         `toml:"default_filter"`
+	FocusOnOpen       string         `toml:"focus_on_open"`
+	FocusSearchOnOpen bool           `toml:"focus_search_on_open"`
+	SearchSort        string         `toml:"search_sort"`
+	ShowLastSeen      bool           `toml:"show_last_seen"`
+	ActiveSessionIcon string         `toml:"active_session_icon"`
+	Sort              []string       `toml:"sort"`
+	SwitchFocus       string         `toml:"switch_focus"`
+	Width             int            `toml:"width"`
+	Processes         []ProcessLabel `toml:"processes"`
 }
 
 type ProcessListConfig struct {
@@ -223,6 +237,9 @@ func Default() Config {
 			ColorProcServer: "#89dceb",
 			ColorProcEditor: "#b4befe",
 			ColorProcChild:  "#a6adc8",
+
+			ColorProcLabelFG: "#cdd6f4",
+			ColorProcLabelBG: "",
 
 			ColorGitDirty:  "#f9e2af",
 			ColorGitBehind: "#74c7ec",
