@@ -1320,3 +1320,17 @@ func TestSidebar_SetProcLabels(t *testing.T) {
 		t.Fatalf("expected node, got %q", got)
 	}
 }
+
+func TestSidebar_ProcLabelIndicator(t *testing.T) {
+	var s SidebarModel
+	s.procLabels = map[string]procmatch.Label{
+		"sess-a": {Text: "node"},
+	}
+	got := s.procLabelIndicator(SidebarNode{Session: "sess-a"}, false, false)
+	if !strings.Contains(stripANSI(got), "node") {
+		t.Fatalf("expected rendered indicator to include 'node', got %q", got)
+	}
+	if blank := s.procLabelIndicator(SidebarNode{Session: "no-match"}, false, false); blank != "" {
+		t.Fatalf("expected empty for unmatched session, got %q", blank)
+	}
+}

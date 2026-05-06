@@ -28,6 +28,9 @@ type Theme struct {
 	ColorProcEditor lipgloss.Color
 	ColorProcChild  lipgloss.Color
 
+	ColorProcLabelFG lipgloss.Color
+	ColorProcLabelBG lipgloss.Color
+
 	// Git status
 	ColorGitDirty  lipgloss.Color
 	ColorGitBehind lipgloss.Color
@@ -96,6 +99,9 @@ func ThemeFromConfig(tc config.ThemeConfig) Theme {
 		ColorProcServer: lipgloss.Color(tc.ColorProcServer),
 		ColorProcEditor: lipgloss.Color(tc.ColorProcEditor),
 		ColorProcChild:  lipgloss.Color(tc.ColorProcChild),
+
+		ColorProcLabelFG: lipgloss.Color(tc.ColorProcLabelFG),
+		ColorProcLabelBG: lipgloss.Color(tc.ColorProcLabelBG),
 
 		ColorGitDirty:  lipgloss.Color(tc.ColorGitDirty),
 		ColorGitBehind: lipgloss.Color(tc.ColorGitBehind),

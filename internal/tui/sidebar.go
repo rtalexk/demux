@@ -637,6 +637,35 @@ func sessionIcon(sess session.Session) string {
 	return sessionIconStyle.Render(icon)
 }
 
+// procLabelIndicator renders the configured sidebar process label for a
+// session row. Returns "" when the session has no match. When the row is
+// selected and focused, the selection background overrides the per-entry bg.
+func (s SidebarModel) procLabelIndicator(node SidebarNode, selected, focused bool) string {
+	lbl, ok := s.procLabels[node.Session]
+	if !ok {
+		return ""
+	}
+	style := lipgloss.NewStyle()
+	fg := lipgloss.Color(lbl.FG)
+	if fg == "" {
+		fg = activeTheme.ColorProcLabelFG
+	}
+	if fg != "" {
+		style = style.Foreground(fg)
+	}
+	bg := lipgloss.Color(lbl.BG)
+	if bg == "" {
+		bg = activeTheme.ColorProcLabelBG
+	}
+	if selected && focused {
+		bg = activeTheme.ColorSelected
+	}
+	if bg != "" {
+		style = style.Background(bg)
+	}
+	return style.Render(lbl.Text)
+}
+
 // gitIndicator returns the rendered git status indicator for a sidebar row, or "".
 func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) string {
 	info, ok := s.gitInfo[node.Session]
