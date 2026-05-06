@@ -538,6 +538,41 @@ bg = "#101010"
 	}
 }
 
+func TestLoad_FiltersInvalidProcesses(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = ""
+label = "noop"
+
+[[sidebar.processes]]
+match = "node*"
+label = ""
+
+[[sidebar.processes]]
+match = "["
+label = "broken"
+
+[[sidebar.processes]]
+match = "claude*"
+label = "🤖"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 1 {
+		t.Fatalf("expected only the valid entry, got %d: %+v", len(cfg.Sidebar.Processes), cfg.Sidebar.Processes)
+	}
+	if cfg.Sidebar.Processes[0].Match != "claude*" {
+		t.Fatalf("expected claude entry, got %+v", cfg.Sidebar.Processes[0])
+	}
+}
+
 func TestLoad_ProcLabelThemeKeys(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demux.toml")

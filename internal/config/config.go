@@ -324,6 +324,21 @@ func Load(path string) (Config, error) {
 		return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
 	})
 	cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
+
+	filteredProcs := cfg.Sidebar.Processes[:0]
+	for _, p := range cfg.Sidebar.Processes {
+		if p.Match == "" || p.Label == "" {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with empty match/label: %+v\n", p)
+			continue
+		}
+		if _, err := filepath.Match(p.Match, ""); err != nil {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with bad glob %q: %v\n", p.Match, err)
+			continue
+		}
+		filteredProcs = append(filteredProcs, p)
+	}
+	cfg.Sidebar.Processes = filteredProcs
+
 	return cfg, nil
 }
 
