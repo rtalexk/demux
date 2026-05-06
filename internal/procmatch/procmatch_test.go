@@ -5,6 +5,7 @@ import (
 
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/procmatch"
+	"github.com/rtalexk/demux/internal/tmux"
 )
 
 func TestPatternZeroValue(t *testing.T) {
@@ -86,5 +87,139 @@ func TestMatchProcess_LabelCarriesColors(t *testing.T) {
 	got, ok := procmatch.MatchProcess(p, patterns)
 	if !ok || got.Text != "py" || got.FG != "#fff" || got.BG != "#000" {
 		t.Fatalf("expected colors propagated, got=%+v ok=%v", got, ok)
+	}
+}
+
+func makeProc(pid, ppid int32, name, cmd string) proc.Process {
+	return proc.Process{PID: pid, PPID: ppid, Name: name, Cmdline: cmd}
+}
+
+func TestMatch_LevelZeroPaneRoot(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "claude", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "claude*", Label: "🤖"}}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "🤖" {
+		t.Fatalf("expected 🤖, got %+v", got)
+	}
+}
+
+func TestMatch_LevelOneChildWhenRootUnmatched(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "make", ""),
+		makeProc(101, 100, "node", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "n" {
+		t.Fatalf("expected child match, got %+v", got)
+	}
+}
+
+func TestMatch_ParentPrecedenceSkipsChildren(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "nvim", ""),
+		makeProc(101, 100, "node", ""),
+	}
+	patterns := []procmatch.Pattern{
+		{Match: "nvim*", Label: "nvim"},
+		{Match: "node*", Label: "node"},
+	}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "nvim" {
+		t.Fatalf("expected parent to win, got %+v", got)
+	}
+}
+
+func TestMatch_TopCountWinsAcrossPanes(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "s1", PanePID: 100},
+		{Session: "s1", PanePID: 200},
+		{Session: "s1", PanePID: 300},
+	}
+	procs := []proc.Process{
+		makeProc(100, 1, "node", ""),
+		makeProc(200, 1, "node", ""),
+		makeProc(300, 1, "uv", ""),
+	}
+	patterns := []procmatch.Pattern{
+		{Match: "node*", Label: "node"},
+		{Match: "uv*", Label: "py"},
+	}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected highest-count node, got %+v", got)
+	}
+}
+
+func TestMatch_TieBreakByDeclarationOrder(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "s1", PanePID: 100},
+		{Session: "s1", PanePID: 200},
+	}
+	procs := []proc.Process{
+		makeProc(100, 1, "node", ""),
+		makeProc(200, 1, "uv", ""),
+	}
+	patterns := []procmatch.Pattern{
+		{Match: "uv*", Label: "py"},
+		{Match: "node*", Label: "node"},
+	}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "py" {
+		t.Fatalf("expected declaration-order tiebreak, got %+v", got)
+	}
+}
+
+func TestMatch_NoDescentBeyondLevelOne(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "make", ""),
+		makeProc(101, 100, "node", ""),
+		makeProc(102, 101, "uv", ""),
+		makeProc(103, 102, "python", ""),
+	}
+	patterns := []procmatch.Pattern{
+		{Match: "uv*", Label: "py"},
+		{Match: "node*", Label: "node"},
+	}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected level-1 node, got %+v", got)
+	}
+}
+
+func TestMatch_PaneWithNoRootProcSkipped(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "s1", PanePID: 999},
+		{Session: "s1", PanePID: 100},
+	}
+	procs := []proc.Process{
+		makeProc(100, 1, "node", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
+	got := procmatch.Match(panes, procs, patterns)
+	if got["s1"].Text != "n" {
+		t.Fatalf("expected node from valid pane, got %+v", got)
+	}
+}
+
+func TestMatch_NoMatchProducesNoEntry(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{makeProc(100, 1, "zsh", "")}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
+	got := procmatch.Match(panes, procs, patterns)
+	if _, ok := got["s1"]; ok {
+		t.Fatalf("expected no entry for s1, got %+v", got)
+	}
+}
+
+func TestMatch_EmptyInputs(t *testing.T) {
+	if got := procmatch.Match(nil, nil, nil); len(got) != 0 {
+		t.Fatalf("expected empty map, got %+v", got)
 	}
 }
