@@ -473,6 +473,50 @@ enabled = false                     # show PR info in the detail panel
 
 </details>
 
+### Sidebar process labels
+
+Render a small text label on each sidebar row to surface what kind of process is running in that session. Useful when you want to see at a glance which sessions hold a Claude agent, a dev server, a Python virtualenv, etc.
+
+Configure via the `[[sidebar.processes]]` array in `demux.toml`:
+
+```toml
+[[sidebar.processes]]
+match = "claude*"
+label = "🤖"
+
+[[sidebar.processes]]
+match = "node*"
+label = "node"
+
+[[sidebar.processes]]
+match = "uv*"
+label = "py"
+fg = "#fee685"
+bg = "#3b3000"
+```
+
+**Fields**
+
+- `match`: a glob pattern (Go [`filepath.Match`](https://pkg.go.dev/path/filepath#Match) syntax, case-insensitive). Matched against the process name and any whitespace-separated token of its full command line, including the basename of each token.
+- `label`: the text rendered in the sidebar when the pattern matches.
+- `fg`, `bg` (optional): per-entry hex colors. When unset, fall back to the theme defaults `color_proc_label_fg` and `color_proc_label_bg`.
+
+**Match rules**
+
+- Each pane is inspected at level 0 (the pane root) first. If the root matches a pattern, the result wins for that pane and child processes are skipped.
+- If the root has no match, level 1 (direct children of the pane root) is inspected. The first child that matches a pattern wins.
+- Deeper descendants are never inspected.
+- Across a session's panes, the label with the highest occurrence count wins. On a count tie, the entry declared first in the array wins.
+- Sessions with zero matches show no proc label.
+
+**Render position**
+
+The proc label is the leftmost indicator on the sidebar row. Indicator order is `[proc] [git] [state] [todo] [last-seen] [watch]`.
+
+**Compact mode**
+
+The label renders in both full and compact mode. In compact mode the proc snapshot is fetched only when at least one `[[sidebar.processes]]` entry is configured; otherwise compact mode keeps its current zero-cost behavior.
+
 <details>
 
 <summary>Theme customization</summary>
@@ -503,6 +547,10 @@ color_proc_claude = "#cba6f7"
 color_proc_server = "#89dceb"
 color_proc_editor = "#b4befe"
 color_proc_child  = "#a6adc8"
+
+# Default fg/bg for sidebar process labels (per-entry [[sidebar.processes]] overrides win)
+color_proc_label_fg = "#cdd6f4"
+color_proc_label_bg = ""
 
 # Git status indicators
 color_git_dirty  = "#f9e2af"
