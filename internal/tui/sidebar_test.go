@@ -10,6 +10,7 @@ import (
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 )
@@ -1307,5 +1308,15 @@ func TestRenderSession_ActiveSessionSelectedFocused(t *testing.T) {
 	plain := stripANSI(row)
 	if !strings.Contains(plain, "►") {
 		t.Errorf("expected ► indicator for selected+focused active session, got: %q", plain)
+	}
+}
+
+func TestSidebar_SetProcLabels(t *testing.T) {
+	var s SidebarModel
+	s.SetProcLabels(map[string]procmatch.Label{
+		"sess-a": {Text: "node", FG: "#abc", BG: ""},
+	})
+	if got := s.procLabels["sess-a"].Text; got != "node" {
+		t.Fatalf("expected node, got %q", got)
 	}
 }

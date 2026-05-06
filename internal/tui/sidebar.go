@@ -13,6 +13,7 @@ import (
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 )
@@ -71,6 +72,7 @@ type SidebarModel struct {
 	watches           map[string]struct{}
 	itemSessions      map[string]struct{} // sessions with open (unchecked) TODOs
 	noteSessions      map[string]struct{} // sessions with at least one note
+	procLabels        map[string]procmatch.Label
 	marquee           Marquee
 	lastMarqueeCursor int
 }
@@ -117,6 +119,11 @@ func (s *SidebarModel) SetNoteSessions(sessions []string) {
 	for _, name := range sessions {
 		s.noteSessions[name] = struct{}{}
 	}
+}
+
+// SetProcLabels updates the per-session sidebar process labels. Pass nil to clear.
+func (s *SidebarModel) SetProcLabels(labels map[string]procmatch.Label) {
+	s.procLabels = labels
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
