@@ -81,6 +81,26 @@ sort = ["priority", "last_seen", "alphabetical"]
 #   oldest   — navigate to oldest updated state window
 switch_focus = "default"
 
+# Sidebar process labels — render a single highest-count label per session.
+# Globs match either the process name or any whitespace-separated token of the
+# full cmdline (case-insensitive). Only the pane root and its direct children
+# are inspected; deeper procs are ignored. If a parent matches a pattern, its
+# children are skipped. On a count tie, the entry declared first wins.
+# Example:
+# [[sidebar.processes]]
+# match = "claude*"
+# label = "🤖"
+#
+# [[sidebar.processes]]
+# match = "node*"
+# label = "node"
+#
+# [[sidebar.processes]]
+# match = "uv*"
+# label = "py"
+# fg = "#fee685"
+# bg = "#3b3000"
+
 [process_list]
 # Right-align pane CWD paths in the process list, with a fill separator
 path_right_align = false
@@ -153,6 +173,10 @@ color_proc_claude = "#cba6f7"
 color_proc_server = "#89dceb"
 color_proc_editor = "#b4befe"
 color_proc_child  = "#a6adc8"
+
+# Default fg/bg for sidebar process labels (per-entry [[sidebar.processes]] overrides win)
+color_proc_label_fg = "#cdd6f4"
+color_proc_label_bg = ""
 
 # Git status indicators
 color_git_dirty  = "#f9e2af"
