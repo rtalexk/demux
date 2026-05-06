@@ -247,8 +247,13 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 			}
 		}
 		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
-		// If startup focus landed on a window node, kick off an initial proc fetch.
-		if node := m.sidebar.Selected(); node != nil {
+		// Kick off an initial proc fetch when:
+		//   - startup focus landed on a window node, OR
+		//   - compact mode is configured with sidebar.processes — the proc list
+		//     is hidden but the labels still need a snapshot.
+		hasNode := m.sidebar.Selected() != nil
+		needsProcsForLabels := m.cfg.Mode == "compact" && len(m.cfg.Sidebar.Processes) > 0 && len(m.sidebar.nodes) > 0
+		if hasNode || needsProcsForLabels {
 			m.procGen++
 			cmds = append(cmds, m.scheduleProcFetch())
 		}

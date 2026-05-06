@@ -8,6 +8,20 @@ import (
 	"github.com/rtalexk/demux/internal/tmux"
 )
 
+func TestModel_CompactSchedulesProcFetchWhenPatternsConfigured(t *testing.T) {
+	cfg := config.Default()
+	cfg.Mode = "compact"
+	cfg.Sidebar.Processes = []config.ProcessLabel{{Match: "node*", Label: "n"}}
+	m := New(cfg, nil)
+	msg := panesMsg{
+		panes: []tmux.Pane{{Session: "s1", PanePID: 100, PaneIndex: 0}},
+	}
+	_, cmd := m.handlePanesMsg(msg)
+	if cmd == nil {
+		t.Fatalf("expected commands batch including a proc fetch")
+	}
+}
+
 func TestModel_HandleProcDataMsg_PopulatesProcLabels(t *testing.T) {
 	cfg := config.Default()
 	cfg.Sidebar.Processes = []config.ProcessLabel{
