@@ -760,9 +760,12 @@ func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) st
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// Order: [git] [state] [todo] [last-seen] [watch]
+// Order: [proc] [git] [state] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
+	if ind := s.procLabelIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}

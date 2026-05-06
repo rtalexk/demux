@@ -1321,6 +1321,22 @@ func TestSidebar_SetProcLabels(t *testing.T) {
 	}
 }
 
+func TestSidebar_ProcLabelLeftmost(t *testing.T) {
+	var s SidebarModel
+	s.procLabels = map[string]procmatch.Label{
+		"sess-a": {Text: "node"},
+	}
+	s.gitInfo = map[string]git.Info{
+		"sess-a": {Ahead: 1},
+	}
+	got := stripANSI(s.sessionIndicators(SidebarNode{Session: "sess-a"}, false, false))
+	li := strings.Index(got, "node")
+	gi := strings.Index(got, gitAheadGlyph)
+	if li < 0 || gi < 0 || li > gi {
+		t.Fatalf("expected proc label before git indicator, got %q", got)
+	}
+}
+
 func TestSidebar_ProcLabelIndicator(t *testing.T) {
 	var s SidebarModel
 	s.procLabels = map[string]procmatch.Label{
