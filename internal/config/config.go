@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/rtalexk/demux/internal/procmatch"
 )
 
 var defaultSessionSortOrder = []string{"priority", "last_seen", "alphabetical"}
@@ -166,6 +167,26 @@ type ProcessLabel struct {
 	Label string     `toml:"label"`
 	FG    string     `toml:"fg"`
 	BG    string     `toml:"bg"`
+}
+
+// Patterns fans out a single ProcessLabel's globs into one procmatch.Pattern
+// per glob, all sharing the same Label/FG/BG.
+func (p ProcessLabel) Patterns() []procmatch.Pattern {
+	out := make([]procmatch.Pattern, 0, len(p.Match))
+	for _, g := range p.Match {
+		out = append(out, procmatch.Pattern{Match: g, Label: p.Label, FG: p.FG, BG: p.BG})
+	}
+	return out
+}
+
+// ProcessPatterns flattens every configured sidebar process label into a
+// single Pattern slice, preserving declaration order.
+func (s SidebarConfig) ProcessPatterns() []procmatch.Pattern {
+	var out []procmatch.Pattern
+	for _, p := range s.Processes {
+		out = append(out, p.Patterns()...)
+	}
+	return out
 }
 
 type SidebarConfig struct {

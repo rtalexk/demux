@@ -665,6 +665,9 @@ func (s SidebarModel) procLabelIndicator(node SidebarNode, selected, focused boo
 	}
 	fg, bg := resolveProcLabelColors(lbl, selected, focused)
 	style := lipgloss.NewStyle()
+	// Empty fg/bg means "leave the attribute unset" so the terminal's default
+	// (or the row's underlying background) shows through. Don't apply zero
+	// values — lipgloss would force them to black.
 	if fg != "" {
 		style = style.Foreground(fg)
 	}

@@ -24,14 +24,15 @@ type Label struct {
 	BG   string
 }
 
-// MatchProcess returns the Label of the first pattern whose lowered glob
-// matches either the lowered FriendlyName, any whitespace-separated token of
-// the lowered Cmdline, or the basename of such a token. Returns (Label{},
-// false) if no pattern matches. Patterns whose Match is not a valid glob are
-// skipped silently.
-func MatchProcess(p proc.Process, patterns []Pattern) (Label, bool) {
-	name := strings.ToLower(p.FriendlyName())
-	fields := strings.Fields(strings.ToLower(p.Cmdline))
+// normalizedPattern is a Pattern with the glob lower-cased once and
+// validated; invalid/empty entries are dropped during normalization.
+type normalizedPattern struct {
+	glob  string
+	label Label
+}
+
+func normalize(patterns []Pattern) []normalizedPattern {
+	out := make([]normalizedPattern, 0, len(patterns))
 	for _, pat := range patterns {
 		if pat.Match == "" || pat.Label == "" {
 			continue
@@ -40,21 +41,49 @@ func MatchProcess(p proc.Process, patterns []Pattern) (Label, bool) {
 		if _, err := filepath.Match(glob, ""); err != nil {
 			continue
 		}
-		if hit, _ := filepath.Match(glob, name); hit {
-			return Label{Text: pat.Label, FG: pat.FG, BG: pat.BG}, true
+		out = append(out, normalizedPattern{
+			glob:  glob,
+			label: Label{Text: pat.Label, FG: pat.FG, BG: pat.BG},
+		})
+	}
+	return out
+}
+
+func matchGlob(glob, candidate string) bool {
+	hit, _ := filepath.Match(glob, candidate)
+	return hit
+}
+
+// matchNormalized scans pre-normalized patterns against an already-lowered
+// name and lowered cmdline tokens. Returns the first pattern's label.
+func matchNormalized(name string, fields []string, patterns []normalizedPattern) (Label, bool) {
+	for _, pat := range patterns {
+		if matchGlob(pat.glob, name) {
+			return pat.label, true
 		}
 		for _, tok := range fields {
-			if hit, _ := filepath.Match(glob, tok); hit {
-				return Label{Text: pat.Label, FG: pat.FG, BG: pat.BG}, true
+			if matchGlob(pat.glob, tok) {
+				return pat.label, true
 			}
-			if base := filepath.Base(tok); base != tok {
-				if hit, _ := filepath.Match(glob, base); hit {
-					return Label{Text: pat.Label, FG: pat.FG, BG: pat.BG}, true
-				}
+			if base := filepath.Base(tok); base != tok && matchGlob(pat.glob, base) {
+				return pat.label, true
 			}
 		}
 	}
 	return Label{}, false
+}
+
+// MatchProcess returns the Label of the first pattern whose lowered glob
+// matches either the lowered FriendlyName, any whitespace-separated token of
+// the lowered Cmdline, or the basename of such a token. Returns (Label{},
+// false) if no pattern matches. Patterns whose Match is not a valid glob are
+// skipped silently.
+func MatchProcess(p proc.Process, patterns []Pattern) (Label, bool) {
+	return matchNormalized(
+		strings.ToLower(p.FriendlyName()),
+		strings.Fields(strings.ToLower(p.Cmdline)),
+		normalize(patterns),
+	)
 }
 
 // Match returns at most one Label per session. For each pane:
@@ -74,6 +103,11 @@ func MatchProcess(p proc.Process, patterns []Pattern) (Label, bool) {
 // Sessions with zero matched panes do not appear in the returned map.
 func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern, ignored []string) map[string]Label {
 	if len(panes) == 0 || len(procs) == 0 || len(patterns) == 0 {
+		return map[string]Label{}
+	}
+
+	normalized := normalize(patterns)
+	if len(normalized) == 0 {
 		return map[string]Label{}
 	}
 
@@ -123,6 +157,22 @@ func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern, ignored 
 		return effectiveChildren(root.PID)
 	}
 
+	matchProc := func(p proc.Process) (Label, bool) {
+		return matchNormalized(
+			strings.ToLower(p.FriendlyName()),
+			strings.Fields(strings.ToLower(p.Cmdline)),
+			normalized,
+		)
+	}
+	firstHit := func(procs []proc.Process) (Label, bool) {
+		for _, p := range procs {
+			if lbl, ok := matchProc(p); ok {
+				return lbl, true
+			}
+		}
+		return Label{}, false
+	}
+
 	patternRank := make(map[string]int, len(patterns))
 	for i, pat := range patterns {
 		if _, seen := patternRank[pat.Label]; !seen {
@@ -155,28 +205,13 @@ func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern, ignored 
 		if len(roots) == 0 {
 			continue
 		}
-		matched := false
-		for _, r := range roots {
-			if lbl, hit := MatchProcess(r, patterns); hit {
-				addHit(pane.Session, lbl)
-				matched = true
-				break
-			}
-		}
-		if matched {
+		if lbl, ok := firstHit(roots); ok {
+			addHit(pane.Session, lbl)
 			continue
 		}
 		for _, r := range roots {
-			children := effectiveChildren(r.PID)
-			found := false
-			for _, child := range children {
-				if lbl, hit := MatchProcess(child, patterns); hit {
-					addHit(pane.Session, lbl)
-					found = true
-					break
-				}
-			}
-			if found {
+			if lbl, ok := firstHit(effectiveChildren(r.PID)); ok {
+				addHit(pane.Session, lbl)
 				break
 			}
 		}
