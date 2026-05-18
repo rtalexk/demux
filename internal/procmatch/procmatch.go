@@ -58,17 +58,21 @@ func MatchProcess(p proc.Process, patterns []Pattern) (Label, bool) {
 }
 
 // Match returns at most one Label per session. For each pane:
-//   - Level 0 (pane root) is matched first; the first hit (in declaration
+//   - The effective level 0 is the pane root proc, descending past any proc
+//     whose FriendlyName is in ignored (case-insensitive). This mirrors the
+//     shell-promotion done by the proc list display, so a pane whose raw root
+//     is zsh -> make is treated as if make were the root.
+//   - Effective level 0 is matched first; the first hit (in declaration
 //     order) wins and children are not inspected.
-//   - Level 1 is inspected only when level 0 had no hit. The first child
-//     proc whose name or cmdline matches a pattern wins.
+//   - Effective level 1 is inspected only when level 0 had no hit. Children
+//     of an ignored proc are flattened up to the same effective depth.
 //
 // Across all matched panes for a session, the label with the highest
 // occurrence count is selected. Ties are broken by earliest declaration
 // order in patterns.
 //
 // Sessions with zero matched panes do not appear in the returned map.
-func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern) map[string]Label {
+func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern, ignored []string) map[string]Label {
 	if len(panes) == 0 || len(procs) == 0 || len(patterns) == 0 {
 		return map[string]Label{}
 	}
@@ -78,6 +82,45 @@ func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern) map[stri
 	for _, p := range procs {
 		byPID[p.PID] = p
 		childrenOf[p.PPID] = append(childrenOf[p.PPID], p)
+	}
+
+	ignoredSet := make(map[string]struct{}, len(ignored))
+	for _, n := range ignored {
+		ignoredSet[strings.ToLower(n)] = struct{}{}
+	}
+	isIgnored := func(p proc.Process) bool {
+		_, ok := ignoredSet[strings.ToLower(p.FriendlyName())]
+		return ok
+	}
+
+	// effectiveChildren flattens any direct child whose FriendlyName is in
+	// ignored, replacing it with its own direct children (recursively). The
+	// returned slice never contains an ignored proc.
+	var effectiveChildren func(pid int32) []proc.Process
+	effectiveChildren = func(pid int32) []proc.Process {
+		var out []proc.Process
+		for _, c := range childrenOf[pid] {
+			if isIgnored(c) {
+				out = append(out, effectiveChildren(c.PID)...)
+				continue
+			}
+			out = append(out, c)
+		}
+		return out
+	}
+
+	// effectiveRoots returns the pane's effective level-0 procs: either the
+	// raw root (if not ignored), or its flattened descendants past every
+	// ignored ancestor.
+	effectiveRoots := func(panePID int32) []proc.Process {
+		root, ok := byPID[panePID]
+		if !ok {
+			return nil
+		}
+		if !isIgnored(root) {
+			return []proc.Process{root}
+		}
+		return effectiveChildren(root.PID)
 	}
 
 	patternRank := make(map[string]int, len(patterns))
@@ -108,17 +151,32 @@ func Match(panes []tmux.Pane, procs []proc.Process, patterns []Pattern) map[stri
 	}
 
 	for _, pane := range panes {
-		root, ok := byPID[pane.PanePID]
-		if !ok {
+		roots := effectiveRoots(pane.PanePID)
+		if len(roots) == 0 {
 			continue
 		}
-		if lbl, hit := MatchProcess(root, patterns); hit {
-			addHit(pane.Session, lbl)
-			continue
-		}
-		for _, child := range childrenOf[pane.PanePID] {
-			if lbl, hit := MatchProcess(child, patterns); hit {
+		matched := false
+		for _, r := range roots {
+			if lbl, hit := MatchProcess(r, patterns); hit {
 				addHit(pane.Session, lbl)
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+		for _, r := range roots {
+			children := effectiveChildren(r.PID)
+			found := false
+			for _, child := range children {
+				if lbl, hit := MatchProcess(child, patterns); hit {
+					addHit(pane.Session, lbl)
+					found = true
+					break
+				}
+			}
+			if found {
 				break
 			}
 		}

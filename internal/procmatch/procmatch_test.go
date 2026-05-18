@@ -100,7 +100,7 @@ func TestMatch_LevelZeroPaneRoot(t *testing.T) {
 		makeProc(100, 1, "claude", ""),
 	}
 	patterns := []procmatch.Pattern{{Match: "claude*", Label: "🤖"}}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "🤖" {
 		t.Fatalf("expected 🤖, got %+v", got)
 	}
@@ -113,7 +113,7 @@ func TestMatch_LevelOneChildWhenRootUnmatched(t *testing.T) {
 		makeProc(101, 100, "node", ""),
 	}
 	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "n" {
 		t.Fatalf("expected child match, got %+v", got)
 	}
@@ -129,7 +129,7 @@ func TestMatch_ParentPrecedenceSkipsChildren(t *testing.T) {
 		{Match: "nvim*", Label: "nvim"},
 		{Match: "node*", Label: "node"},
 	}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "nvim" {
 		t.Fatalf("expected parent to win, got %+v", got)
 	}
@@ -150,7 +150,7 @@ func TestMatch_TopCountWinsAcrossPanes(t *testing.T) {
 		{Match: "node*", Label: "node"},
 		{Match: "uv*", Label: "py"},
 	}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "node" {
 		t.Fatalf("expected highest-count node, got %+v", got)
 	}
@@ -169,7 +169,7 @@ func TestMatch_TieBreakByDeclarationOrder(t *testing.T) {
 		{Match: "uv*", Label: "py"},
 		{Match: "node*", Label: "node"},
 	}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "py" {
 		t.Fatalf("expected declaration-order tiebreak, got %+v", got)
 	}
@@ -187,7 +187,7 @@ func TestMatch_NoDescentBeyondLevelOne(t *testing.T) {
 		{Match: "uv*", Label: "py"},
 		{Match: "node*", Label: "node"},
 	}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "node" {
 		t.Fatalf("expected level-1 node, got %+v", got)
 	}
@@ -202,7 +202,7 @@ func TestMatch_PaneWithNoRootProcSkipped(t *testing.T) {
 		makeProc(100, 1, "node", ""),
 	}
 	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if got["s1"].Text != "n" {
 		t.Fatalf("expected node from valid pane, got %+v", got)
 	}
@@ -212,14 +212,84 @@ func TestMatch_NoMatchProducesNoEntry(t *testing.T) {
 	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
 	procs := []proc.Process{makeProc(100, 1, "zsh", "")}
 	patterns := []procmatch.Pattern{{Match: "node*", Label: "n"}}
-	got := procmatch.Match(panes, procs, patterns)
+	got := procmatch.Match(panes, procs, patterns, nil)
 	if _, ok := got["s1"]; ok {
 		t.Fatalf("expected no entry for s1, got %+v", got)
 	}
 }
 
 func TestMatch_EmptyInputs(t *testing.T) {
-	if got := procmatch.Match(nil, nil, nil); len(got) != 0 {
+	if got := procmatch.Match(nil, nil, nil, nil); len(got) != 0 {
 		t.Fatalf("expected empty map, got %+v", got)
+	}
+}
+
+func TestMatch_IgnoredShellPromotesChildren(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "zsh", "-zsh"),
+		makeProc(101, 100, "make", "make dev"),
+		makeProc(102, 101, "node", "node server.js"),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "node"}}
+	got := procmatch.Match(panes, procs, patterns, []string{"zsh"})
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected node label after shell promoted, got %+v", got)
+	}
+}
+
+func TestMatch_IgnoredShellPreservesDepthCap(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "zsh", ""),
+		makeProc(101, 100, "make", ""),
+		makeProc(102, 101, "node", ""),
+		makeProc(103, 102, "uv", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "uv*", Label: "py"}}
+	got := procmatch.Match(panes, procs, patterns, []string{"zsh"})
+	if _, ok := got["s1"]; ok {
+		t.Fatalf("expected uv at effective depth 2 to be skipped, got %+v", got)
+	}
+}
+
+func TestMatch_IgnoredChainPromotedTransparently(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "zsh", ""),
+		makeProc(101, 100, "bash", ""),
+		makeProc(102, 101, "make", ""),
+		makeProc(103, 102, "node", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "node"}}
+	got := procmatch.Match(panes, procs, patterns, []string{"zsh", "bash"})
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected chained shell promotion, got %+v", got)
+	}
+}
+
+func TestMatch_IgnoredCaseInsensitive(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "Zsh", ""),
+		makeProc(101, 100, "node", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "node"}}
+	got := procmatch.Match(panes, procs, patterns, []string{"ZSH"})
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected case-insensitive ignored match, got %+v", got)
+	}
+}
+
+func TestMatch_NilIgnoredBehavesLikeBefore(t *testing.T) {
+	panes := []tmux.Pane{{Session: "s1", PanePID: 100}}
+	procs := []proc.Process{
+		makeProc(100, 1, "zsh", ""),
+		makeProc(101, 100, "node", ""),
+	}
+	patterns := []procmatch.Pattern{{Match: "node*", Label: "node"}}
+	got := procmatch.Match(panes, procs, patterns, nil)
+	if got["s1"].Text != "node" {
+		t.Fatalf("expected level-1 node hit with nil ignored, got %+v", got)
 	}
 }

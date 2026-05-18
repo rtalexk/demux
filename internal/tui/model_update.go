@@ -286,7 +286,7 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 				Match: p.Match, Label: p.Label, FG: p.FG, BG: p.BG,
 			})
 		}
-		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns))
+		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns, m.cfg.IgnoredProcesses))
 	}
 	if node := m.sidebar.Selected(); node != nil {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
