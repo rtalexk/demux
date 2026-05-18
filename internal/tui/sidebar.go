@@ -846,6 +846,9 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
+	if s.cfg.Sidebar.SessionView == config.SidebarViewCard {
+		return s.renderSessionCard(node, selected && focused, width)
+	}
 	indicators := s.sessionIndicators(node, selected, focused)
 
 	// Icon prefix: look up the session and render its icon.

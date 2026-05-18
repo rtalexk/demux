@@ -1520,3 +1520,21 @@ func TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns(t *testing.T
 			wFocused, wUnfocused, row2Focused, row2Unfocused)
 	}
 }
+
+func TestRenderSession_DispatchesByView(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	mkModel := func(view string) SidebarModel {
+		return SidebarModel{
+			cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: view, Width: 40}},
+			sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		}
+	}
+	rowOut := mkModel(config.SidebarViewRow).renderSession(SidebarNode{Session: "alpha"}, false, false, 40)
+	cardOut := mkModel(config.SidebarViewCard).renderSession(SidebarNode{Session: "alpha"}, false, false, 40)
+	if strings.Contains(rowOut, "\n") {
+		t.Errorf("row view should be single line: %q", rowOut)
+	}
+	if !strings.Contains(cardOut, "\n") {
+		t.Errorf("card view should be multi-line: %q", cardOut)
+	}
+}
