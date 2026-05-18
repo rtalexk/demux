@@ -637,28 +637,36 @@ func sessionIcon(sess session.Session) string {
 	return sessionIconStyle.Render(icon)
 }
 
+// resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
+// When selected and focused, both fg and bg are overridden to match the
+// selection row so the label stays readable against the selection bg.
+func resolveProcLabelColors(lbl procmatch.Label, selected, focused bool) (fg, bg lipgloss.Color) {
+	fg = lipgloss.Color(lbl.FG)
+	if fg == "" {
+		fg = activeTheme.ColorProcLabelFG
+	}
+	bg = lipgloss.Color(lbl.BG)
+	if bg == "" {
+		bg = activeTheme.ColorProcLabelBG
+	}
+	if selected && focused {
+		fg = activeTheme.ColorFgPrimary
+		bg = activeTheme.ColorSelected
+	}
+	return fg, bg
+}
+
 // procLabelIndicator renders the configured sidebar process label for a
-// session row. Returns "" when the session has no match. When the row is
-// selected and focused, the selection background overrides the per-entry bg.
+// session row. Returns "" when the session has no match.
 func (s SidebarModel) procLabelIndicator(node SidebarNode, selected, focused bool) string {
 	lbl, ok := s.procLabels[node.Session]
 	if !ok {
 		return ""
 	}
+	fg, bg := resolveProcLabelColors(lbl, selected, focused)
 	style := lipgloss.NewStyle()
-	fg := lipgloss.Color(lbl.FG)
-	if fg == "" {
-		fg = activeTheme.ColorProcLabelFG
-	}
 	if fg != "" {
 		style = style.Foreground(fg)
-	}
-	bg := lipgloss.Color(lbl.BG)
-	if bg == "" {
-		bg = activeTheme.ColorProcLabelBG
-	}
-	if selected && focused {
-		bg = activeTheme.ColorSelected
 	}
 	if bg != "" {
 		style = style.Background(bg)

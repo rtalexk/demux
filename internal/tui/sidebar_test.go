@@ -1350,3 +1350,37 @@ func TestSidebar_ProcLabelIndicator(t *testing.T) {
 		t.Fatalf("expected empty for unmatched session, got %q", blank)
 	}
 }
+
+func TestSidebar_ResolveProcLabelColors_FocusedOverridesPerEntry(t *testing.T) {
+	initStyles(Theme{
+		ColorFgPrimary: lipgloss.Color("#cdd6f4"),
+		ColorSelected:  lipgloss.Color("#2a2a4a"),
+	}, config.ProcessesConfig{}, nil)
+	lbl := procmatch.Label{Text: "node", FG: "#1e1e2e", BG: "#89dceb"}
+
+	fg, bg := resolveProcLabelColors(lbl, false, false)
+	if fg != lipgloss.Color("#1e1e2e") || bg != lipgloss.Color("#89dceb") {
+		t.Fatalf("unfocused should use entry colors, got fg=%v bg=%v", fg, bg)
+	}
+	fg, bg = resolveProcLabelColors(lbl, true, false)
+	if fg != lipgloss.Color("#1e1e2e") || bg != lipgloss.Color("#89dceb") {
+		t.Fatalf("selected-only should keep entry colors, got fg=%v bg=%v", fg, bg)
+	}
+	fg, bg = resolveProcLabelColors(lbl, true, true)
+	if fg != lipgloss.Color("#cdd6f4") || bg != lipgloss.Color("#2a2a4a") {
+		t.Fatalf("selected+focused should override to theme colors, got fg=%v bg=%v", fg, bg)
+	}
+}
+
+func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
+	initStyles(Theme{
+		ColorProcLabelFG: lipgloss.Color("#aaa"),
+		ColorProcLabelBG: lipgloss.Color("#222"),
+	}, config.ProcessesConfig{}, nil)
+	lbl := procmatch.Label{Text: "x"}
+
+	fg, bg := resolveProcLabelColors(lbl, false, false)
+	if fg != lipgloss.Color("#aaa") || bg != lipgloss.Color("#222") {
+		t.Fatalf("expected theme fallback, got fg=%v bg=%v", fg, bg)
+	}
+}
