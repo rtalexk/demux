@@ -489,7 +489,7 @@ match = "node*"
 label = "node"
 
 [[sidebar.processes]]
-match = "uv*"
+match = ["python*", "uvicorn", "uv"]
 label = "py"
 fg = "#fee685"
 bg = "#3b3000"
@@ -497,7 +497,7 @@ bg = "#3b3000"
 
 **Fields**
 
-- `match`: a glob pattern (Go [`filepath.Match`](https://pkg.go.dev/path/filepath#Match) syntax, case-insensitive). Matched against the process name and any whitespace-separated token of its full command line, including the basename of each token.
+- `match`: a glob pattern (Go [`filepath.Match`](https://pkg.go.dev/path/filepath#Match) syntax, case-insensitive), or an array of globs that share the same `label`/`fg`/`bg`. Matched against the process name and any whitespace-separated token of its full command line, including the basename of each token.
 - `label`: the text rendered in the sidebar when the pattern matches.
 - `fg`, `bg` (optional): per-entry hex colors. When unset, fall back to the theme defaults `color_proc_label_fg` and `color_proc_label_bg`.
 

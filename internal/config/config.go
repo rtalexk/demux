@@ -129,14 +129,43 @@ type ProcessesConfig struct {
 	Shells  []string `toml:"shells"`
 }
 
-// ProcessLabel declares a sidebar process indicator: a glob-matched process
-// is rendered using Label, optionally styled with FG/BG. Empty colours fall
-// back to the theme defaults (ColorProcLabelFG / ColorProcLabelBG).
+// StringList accepts either a TOML scalar string or an array of strings and
+// stores both as a []string. Used to let users supply one glob or many for a
+// single sidebar.processes entry without duplicating label/fg/bg.
+type StringList []string
+
+func (s *StringList) UnmarshalTOML(data interface{}) error {
+	switch v := data.(type) {
+	case string:
+		*s = StringList{v}
+		return nil
+	case []interface{}:
+		out := make(StringList, 0, len(v))
+		for i, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("element %d: expected string, got %T", i, item)
+			}
+			out = append(out, str)
+		}
+		*s = out
+		return nil
+	case nil:
+		*s = nil
+		return nil
+	}
+	return fmt.Errorf("expected string or []string, got %T", data)
+}
+
+// ProcessLabel declares a sidebar process indicator: any glob in Match (case-
+// insensitive) flags a process for Label rendering, optionally styled with
+// FG/BG. Empty colours fall back to the theme defaults (ColorProcLabelFG /
+// ColorProcLabelBG). Match accepts either a scalar string or an array.
 type ProcessLabel struct {
-	Match string `toml:"match"`
-	Label string `toml:"label"`
-	FG    string `toml:"fg"`
-	BG    string `toml:"bg"`
+	Match StringList `toml:"match"`
+	Label string     `toml:"label"`
+	FG    string     `toml:"fg"`
+	BG    string     `toml:"bg"`
 }
 
 type SidebarConfig struct {
@@ -327,14 +356,26 @@ func Load(path string) (Config, error) {
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {
-		if p.Match == "" || p.Label == "" {
+		if len(p.Match) == 0 || p.Label == "" {
 			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with empty match/label: %+v\n", p)
 			continue
 		}
-		if _, err := filepath.Match(p.Match, ""); err != nil {
-			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with bad glob %q: %v\n", p.Match, err)
+		validGlobs := p.Match[:0]
+		for _, glob := range p.Match {
+			if glob == "" {
+				continue
+			}
+			if _, err := filepath.Match(glob, ""); err != nil {
+				fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes glob %q: %v\n", glob, err)
+				continue
+			}
+			validGlobs = append(validGlobs, glob)
+		}
+		if len(validGlobs) == 0 {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with no valid globs: %+v\n", p)
 			continue
 		}
+		p.Match = validGlobs
 		filteredProcs = append(filteredProcs, p)
 	}
 	cfg.Sidebar.Processes = filteredProcs

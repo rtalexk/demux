@@ -86,6 +86,8 @@ switch_focus = "default"
 # full cmdline (case-insensitive). Only the pane root and its direct children
 # are inspected; deeper procs are ignored. If a parent matches a pattern, its
 # children are skipped. On a count tie, the entry declared first wins.
+# match accepts either a single glob string or an array of globs that share
+# the same label/fg/bg.
 # Example:
 # [[sidebar.processes]]
 # match = "claude*"
@@ -96,7 +98,7 @@ switch_focus = "default"
 # label = "node"
 #
 # [[sidebar.processes]]
-# match = "uv*"
+# match = ["python*", "uvicorn", "uv"]
 # label = "py"
 # fg = "#fee685"
 # bg = "#3b3000"

@@ -11,7 +11,7 @@ import (
 func TestModel_CompactSchedulesProcFetchWhenPatternsConfigured(t *testing.T) {
 	cfg := config.Default()
 	cfg.Mode = "compact"
-	cfg.Sidebar.Processes = []config.ProcessLabel{{Match: "node*", Label: "n"}}
+	cfg.Sidebar.Processes = []config.ProcessLabel{{Match: config.StringList{"node*"}, Label: "n"}}
 	m := New(cfg, nil)
 	msg := panesMsg{
 		panes: []tmux.Pane{{Session: "s1", PanePID: 100, PaneIndex: 0}},
@@ -25,7 +25,7 @@ func TestModel_CompactSchedulesProcFetchWhenPatternsConfigured(t *testing.T) {
 func TestModel_HandleProcDataMsg_PopulatesProcLabels(t *testing.T) {
 	cfg := config.Default()
 	cfg.Sidebar.Processes = []config.ProcessLabel{
-		{Match: "claude*", Label: "🤖"},
+		{Match: config.StringList{"claude*"}, Label: "🤖"},
 	}
 	m := New(cfg, nil)
 	m.panes = []tmux.Pane{{Session: "s1", PanePID: 100}}

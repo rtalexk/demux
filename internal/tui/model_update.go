@@ -282,9 +282,11 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 	if len(m.cfg.Sidebar.Processes) > 0 {
 		patterns := make([]procmatch.Pattern, 0, len(m.cfg.Sidebar.Processes))
 		for _, p := range m.cfg.Sidebar.Processes {
-			patterns = append(patterns, procmatch.Pattern{
-				Match: p.Match, Label: p.Label, FG: p.FG, BG: p.BG,
-			})
+			for _, glob := range p.Match {
+				patterns = append(patterns, procmatch.Pattern{
+					Match: glob, Label: p.Label, FG: p.FG, BG: p.BG,
+				})
+			}
 		}
 		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns, m.cfg.IgnoredProcesses))
 	}
