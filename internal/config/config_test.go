@@ -505,3 +505,182 @@ active_session_icon = "@"
 		t.Errorf("expected @, got %q", cfg.Sidebar.ActiveSessionIcon)
 	}
 }
+
+func TestLoad_SidebarProcesses_ScalarMatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = "claude*"
+label = "🤖"
+
+[[sidebar.processes]]
+match = "node*"
+label = "node"
+fg = "#abcdef"
+bg = "#101010"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(cfg.Sidebar.Processes))
+	}
+	if len(cfg.Sidebar.Processes[0].Match) != 1 || cfg.Sidebar.Processes[0].Match[0] != "claude*" || cfg.Sidebar.Processes[0].Label != "🤖" {
+		t.Fatalf("entry 0 mismatch: %+v", cfg.Sidebar.Processes[0])
+	}
+	if cfg.Sidebar.Processes[1].FG != "#abcdef" || cfg.Sidebar.Processes[1].BG != "#101010" {
+		t.Fatalf("entry 1 colours mismatch: %+v", cfg.Sidebar.Processes[1])
+	}
+}
+
+func TestLoad_SidebarProcesses_ArrayMatch(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = ["python*", "uvicorn", "uv"]
+label = "py"
+fg = "#1e1e2e"
+bg = "#a6e3a1"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(cfg.Sidebar.Processes))
+	}
+	got := cfg.Sidebar.Processes[0]
+	want := []string{"python*", "uvicorn", "uv"}
+	if len(got.Match) != len(want) {
+		t.Fatalf("expected %d globs, got %d: %+v", len(want), len(got.Match), got.Match)
+	}
+	for i, w := range want {
+		if got.Match[i] != w {
+			t.Fatalf("glob[%d] = %q, want %q", i, got.Match[i], w)
+		}
+	}
+	if got.Label != "py" || got.FG != "#1e1e2e" || got.BG != "#a6e3a1" {
+		t.Fatalf("entry mismatch: %+v", got)
+	}
+}
+
+func TestLoad_SidebarProcesses_ArrayMatch_DropsInvalidGlobs(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = ["python*", "[", "uvicorn"]
+label = "py"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 1 {
+		t.Fatalf("expected entry kept, got %d", len(cfg.Sidebar.Processes))
+	}
+	got := cfg.Sidebar.Processes[0].Match
+	want := []string{"python*", "uvicorn"}
+	if len(got) != len(want) {
+		t.Fatalf("expected bad glob filtered out, got %+v", got)
+	}
+	for i, w := range want {
+		if got[i] != w {
+			t.Fatalf("glob[%d] = %q, want %q", i, got[i], w)
+		}
+	}
+}
+
+func TestLoad_SidebarProcesses_ArrayMatch_AllInvalidDropsEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = ["[", "[bad"]
+label = "py"
+
+[[sidebar.processes]]
+match = ["python*"]
+label = "py"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 1 {
+		t.Fatalf("expected only valid entry, got %d", len(cfg.Sidebar.Processes))
+	}
+}
+
+func TestLoad_FiltersInvalidProcesses(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[[sidebar.processes]]
+match = ""
+label = "noop"
+
+[[sidebar.processes]]
+match = "node*"
+label = ""
+
+[[sidebar.processes]]
+match = "["
+label = "broken"
+
+[[sidebar.processes]]
+match = "claude*"
+label = "🤖"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Sidebar.Processes) != 1 {
+		t.Fatalf("expected only the valid entry, got %d: %+v", len(cfg.Sidebar.Processes), cfg.Sidebar.Processes)
+	}
+	if len(cfg.Sidebar.Processes[0].Match) != 1 || cfg.Sidebar.Processes[0].Match[0] != "claude*" {
+		t.Fatalf("expected claude entry, got %+v", cfg.Sidebar.Processes[0])
+	}
+}
+
+func TestLoad_ProcLabelThemeKeys(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := `
+[theme]
+color_proc_label_fg = "#111111"
+color_proc_label_bg = "#222222"
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Theme.ColorProcLabelFG != "#111111" {
+		t.Fatalf("fg mismatch: %q", cfg.Theme.ColorProcLabelFG)
+	}
+	if cfg.Theme.ColorProcLabelBG != "#222222" {
+		t.Fatalf("bg mismatch: %q", cfg.Theme.ColorProcLabelBG)
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/rtalexk/demux/internal/git"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/proc"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 	"github.com/rtalexk/demux/internal/tmux"
@@ -210,6 +211,20 @@ func (m Model) handleQueryResultMsg(msg queryResultMsg) (Model, tea.Cmd) {
 	return m, nil
 }
 
+// shouldKickInitialProcFetch reports whether the first proc snapshot must be
+// requested right after panes arrive. Two cases need it:
+//   - startup focus landed on a window node (proc list will render), OR
+//   - compact mode hides the proc list but sidebar.processes is configured,
+//     so the per-session labels still need a snapshot.
+func (m Model) shouldKickInitialProcFetch() bool {
+	if m.sidebar.Selected() != nil {
+		return true
+	}
+	return m.cfg.Mode == "compact" &&
+		len(m.cfg.Sidebar.Processes) > 0 &&
+		len(m.sidebar.nodes) > 0
+}
+
 func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.panes = msg.panes
 	// Build display maps from fresh pane data.
@@ -246,8 +261,7 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 			}
 		}
 		cmds = append(cmds, tick(time.Duration(m.cfg.RefreshIntervalMs)*time.Millisecond), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions())
-		// If startup focus landed on a window node, kick off an initial proc fetch.
-		if node := m.sidebar.Selected(); node != nil {
+		if m.shouldKickInitialProcFetch() {
 			m.procGen++
 			cmds = append(cmds, m.scheduleProcFetch())
 		}
@@ -273,6 +287,9 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 	}
 	m.procs = msg.procs
 	m.cwdMap = msg.cwdMap
+	if patterns := m.cfg.Sidebar.ProcessPatterns(); len(patterns) > 0 {
+		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns, m.cfg.IgnoredProcesses))
+	}
 	if node := m.sidebar.Selected(); node != nil {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}

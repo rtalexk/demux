@@ -13,6 +13,7 @@ import (
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 )
@@ -71,6 +72,7 @@ type SidebarModel struct {
 	watches           map[string]struct{}
 	itemSessions      map[string]struct{} // sessions with open (unchecked) TODOs
 	noteSessions      map[string]struct{} // sessions with at least one note
+	procLabels        map[string]procmatch.Label
 	marquee           Marquee
 	lastMarqueeCursor int
 }
@@ -117,6 +119,11 @@ func (s *SidebarModel) SetNoteSessions(sessions []string) {
 	for _, name := range sessions {
 		s.noteSessions[name] = struct{}{}
 	}
+}
+
+// SetProcLabels updates the per-session sidebar process labels. Pass nil to clear.
+func (s *SidebarModel) SetProcLabels(labels map[string]procmatch.Label) {
+	s.procLabels = labels
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
@@ -630,6 +637,46 @@ func sessionIcon(sess session.Session) string {
 	return sessionIconStyle.Render(icon)
 }
 
+// resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
+// When selected and focused, both fg and bg are overridden to match the
+// selection row so the label stays readable against the selection bg.
+func resolveProcLabelColors(lbl procmatch.Label, selected, focused bool) (fg, bg lipgloss.Color) {
+	fg = lipgloss.Color(lbl.FG)
+	if fg == "" {
+		fg = activeTheme.ColorProcLabelFG
+	}
+	bg = lipgloss.Color(lbl.BG)
+	if bg == "" {
+		bg = activeTheme.ColorProcLabelBG
+	}
+	if selected && focused {
+		fg = activeTheme.ColorFgPrimary
+		bg = activeTheme.ColorSelected
+	}
+	return fg, bg
+}
+
+// procLabelIndicator renders the configured sidebar process label for a
+// session row. Returns "" when the session has no match.
+func (s SidebarModel) procLabelIndicator(node SidebarNode, selected, focused bool) string {
+	lbl, ok := s.procLabels[node.Session]
+	if !ok {
+		return ""
+	}
+	fg, bg := resolveProcLabelColors(lbl, selected, focused)
+	style := lipgloss.NewStyle()
+	// Empty fg/bg means "leave the attribute unset" so the terminal's default
+	// (or the row's underlying background) shows through. Don't apply zero
+	// values — lipgloss would force them to black.
+	if fg != "" {
+		style = style.Foreground(fg)
+	}
+	if bg != "" {
+		style = style.Background(bg)
+	}
+	return style.Render(lbl.Text)
+}
+
 // gitIndicator returns the rendered git status indicator for a sidebar row, or "".
 func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) string {
 	info, ok := s.gitInfo[node.Session]
@@ -724,9 +771,12 @@ func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) st
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// Order: [git] [state] [todo] [last-seen] [watch]
+// Order: [proc] [git] [state] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
+	if ind := s.procLabelIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}

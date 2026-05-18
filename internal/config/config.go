@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/rtalexk/demux/internal/procmatch"
 )
 
 var defaultSessionSortOrder = []string{"priority", "last_seen", "alphabetical"}
@@ -72,6 +73,9 @@ type ThemeConfig struct {
 	ColorProcEditor string `toml:"color_proc_editor"`
 	ColorProcChild  string `toml:"color_proc_child"`
 
+	ColorProcLabelFG string `toml:"color_proc_label_fg"`
+	ColorProcLabelBG string `toml:"color_proc_label_bg"`
+
 	ColorGitDirty  string `toml:"color_git_dirty"`
 	ColorGitBehind string `toml:"color_git_behind"`
 	ColorGitAhead  string `toml:"color_git_ahead"`
@@ -126,16 +130,76 @@ type ProcessesConfig struct {
 	Shells  []string `toml:"shells"`
 }
 
+// StringList accepts either a TOML scalar string or an array of strings and
+// stores both as a []string. Used to let users supply one glob or many for a
+// single sidebar.processes entry without duplicating label/fg/bg.
+type StringList []string
+
+func (s *StringList) UnmarshalTOML(data interface{}) error {
+	switch v := data.(type) {
+	case string:
+		*s = StringList{v}
+		return nil
+	case []interface{}:
+		out := make(StringList, 0, len(v))
+		for i, item := range v {
+			str, ok := item.(string)
+			if !ok {
+				return fmt.Errorf("element %d: expected string, got %T", i, item)
+			}
+			out = append(out, str)
+		}
+		*s = out
+		return nil
+	case nil:
+		*s = nil
+		return nil
+	}
+	return fmt.Errorf("expected string or []string, got %T", data)
+}
+
+// ProcessLabel declares a sidebar process indicator: any glob in Match (case-
+// insensitive) flags a process for Label rendering, optionally styled with
+// FG/BG. Empty colours fall back to the theme defaults (ColorProcLabelFG /
+// ColorProcLabelBG). Match accepts either a scalar string or an array.
+type ProcessLabel struct {
+	Match StringList `toml:"match"`
+	Label string     `toml:"label"`
+	FG    string     `toml:"fg"`
+	BG    string     `toml:"bg"`
+}
+
+// Patterns fans out a single ProcessLabel's globs into one procmatch.Pattern
+// per glob, all sharing the same Label/FG/BG.
+func (p ProcessLabel) Patterns() []procmatch.Pattern {
+	out := make([]procmatch.Pattern, 0, len(p.Match))
+	for _, g := range p.Match {
+		out = append(out, procmatch.Pattern{Match: g, Label: p.Label, FG: p.FG, BG: p.BG})
+	}
+	return out
+}
+
+// ProcessPatterns flattens every configured sidebar process label into a
+// single Pattern slice, preserving declaration order.
+func (s SidebarConfig) ProcessPatterns() []procmatch.Pattern {
+	var out []procmatch.Pattern
+	for _, p := range s.Processes {
+		out = append(out, p.Patterns()...)
+	}
+	return out
+}
+
 type SidebarConfig struct {
-	DefaultFilter     string   `toml:"default_filter"`
-	FocusOnOpen       string   `toml:"focus_on_open"`
-	FocusSearchOnOpen bool     `toml:"focus_search_on_open"`
-	SearchSort        string   `toml:"search_sort"`
-	ShowLastSeen      bool     `toml:"show_last_seen"`
-	ActiveSessionIcon string   `toml:"active_session_icon"`
-	Sort              []string `toml:"sort"`
-	SwitchFocus       string   `toml:"switch_focus"`
-	Width             int      `toml:"width"`
+	DefaultFilter     string         `toml:"default_filter"`
+	FocusOnOpen       string         `toml:"focus_on_open"`
+	FocusSearchOnOpen bool           `toml:"focus_search_on_open"`
+	SearchSort        string         `toml:"search_sort"`
+	ShowLastSeen      bool           `toml:"show_last_seen"`
+	ActiveSessionIcon string         `toml:"active_session_icon"`
+	Sort              []string       `toml:"sort"`
+	SwitchFocus       string         `toml:"switch_focus"`
+	Width             int            `toml:"width"`
+	Processes         []ProcessLabel `toml:"processes"`
 }
 
 type ProcessListConfig struct {
@@ -224,6 +288,9 @@ func Default() Config {
 			ColorProcEditor: "#b4befe",
 			ColorProcChild:  "#a6adc8",
 
+			ColorProcLabelFG: "#cdd6f4",
+			ColorProcLabelBG: "",
+
 			ColorGitDirty:  "#f9e2af",
 			ColorGitBehind: "#74c7ec",
 			ColorGitAhead:  "#a6e3a1",
@@ -307,6 +374,33 @@ func Load(path string) (Config, error) {
 		return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
 	})
 	cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
+
+	filteredProcs := cfg.Sidebar.Processes[:0]
+	for _, p := range cfg.Sidebar.Processes {
+		if len(p.Match) == 0 || p.Label == "" {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with empty match/label: %+v\n", p)
+			continue
+		}
+		validGlobs := p.Match[:0]
+		for _, glob := range p.Match {
+			if glob == "" {
+				continue
+			}
+			if _, err := filepath.Match(glob, ""); err != nil {
+				fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes glob %q: %v\n", glob, err)
+				continue
+			}
+			validGlobs = append(validGlobs, glob)
+		}
+		if len(validGlobs) == 0 {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.processes entry with no valid globs: %+v\n", p)
+			continue
+		}
+		p.Match = validGlobs
+		filteredProcs = append(filteredProcs, p)
+	}
+	cfg.Sidebar.Processes = filteredProcs
+
 	return cfg, nil
 }
 

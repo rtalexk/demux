@@ -10,6 +10,7 @@ import (
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
+	"github.com/rtalexk/demux/internal/procmatch"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
 )
@@ -1307,5 +1308,79 @@ func TestRenderSession_ActiveSessionSelectedFocused(t *testing.T) {
 	plain := stripANSI(row)
 	if !strings.Contains(plain, "►") {
 		t.Errorf("expected ► indicator for selected+focused active session, got: %q", plain)
+	}
+}
+
+func TestSidebar_SetProcLabels(t *testing.T) {
+	var s SidebarModel
+	s.SetProcLabels(map[string]procmatch.Label{
+		"sess-a": {Text: "node", FG: "#abc", BG: ""},
+	})
+	if got := s.procLabels["sess-a"].Text; got != "node" {
+		t.Fatalf("expected node, got %q", got)
+	}
+}
+
+func TestSidebar_ProcLabelLeftmost(t *testing.T) {
+	var s SidebarModel
+	s.procLabels = map[string]procmatch.Label{
+		"sess-a": {Text: "node"},
+	}
+	s.gitInfo = map[string]git.Info{
+		"sess-a": {Ahead: 1},
+	}
+	got := stripANSI(s.sessionIndicators(SidebarNode{Session: "sess-a"}, false, false))
+	li := strings.Index(got, "node")
+	gi := strings.Index(got, gitAheadGlyph)
+	if li < 0 || gi < 0 || li > gi {
+		t.Fatalf("expected proc label before git indicator, got %q", got)
+	}
+}
+
+func TestSidebar_ProcLabelIndicator(t *testing.T) {
+	var s SidebarModel
+	s.procLabels = map[string]procmatch.Label{
+		"sess-a": {Text: "node"},
+	}
+	got := s.procLabelIndicator(SidebarNode{Session: "sess-a"}, false, false)
+	if !strings.Contains(stripANSI(got), "node") {
+		t.Fatalf("expected rendered indicator to include 'node', got %q", got)
+	}
+	if blank := s.procLabelIndicator(SidebarNode{Session: "no-match"}, false, false); blank != "" {
+		t.Fatalf("expected empty for unmatched session, got %q", blank)
+	}
+}
+
+func TestSidebar_ResolveProcLabelColors_FocusedOverridesPerEntry(t *testing.T) {
+	initStyles(Theme{
+		ColorFgPrimary: lipgloss.Color("#cdd6f4"),
+		ColorSelected:  lipgloss.Color("#2a2a4a"),
+	}, config.ProcessesConfig{}, nil)
+	lbl := procmatch.Label{Text: "node", FG: "#1e1e2e", BG: "#89dceb"}
+
+	fg, bg := resolveProcLabelColors(lbl, false, false)
+	if fg != lipgloss.Color("#1e1e2e") || bg != lipgloss.Color("#89dceb") {
+		t.Fatalf("unfocused should use entry colors, got fg=%v bg=%v", fg, bg)
+	}
+	fg, bg = resolveProcLabelColors(lbl, true, false)
+	if fg != lipgloss.Color("#1e1e2e") || bg != lipgloss.Color("#89dceb") {
+		t.Fatalf("selected-only should keep entry colors, got fg=%v bg=%v", fg, bg)
+	}
+	fg, bg = resolveProcLabelColors(lbl, true, true)
+	if fg != lipgloss.Color("#cdd6f4") || bg != lipgloss.Color("#2a2a4a") {
+		t.Fatalf("selected+focused should override to theme colors, got fg=%v bg=%v", fg, bg)
+	}
+}
+
+func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
+	initStyles(Theme{
+		ColorProcLabelFG: lipgloss.Color("#aaa"),
+		ColorProcLabelBG: lipgloss.Color("#222"),
+	}, config.ProcessesConfig{}, nil)
+	lbl := procmatch.Label{Text: "x"}
+
+	fg, bg := resolveProcLabelColors(lbl, false, false)
+	if fg != lipgloss.Color("#aaa") || bg != lipgloss.Color("#222") {
+		t.Fatalf("expected theme fallback, got fg=%v bg=%v", fg, bg)
 	}
 }
