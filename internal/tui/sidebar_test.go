@@ -1149,11 +1149,16 @@ func TestSidebarViewport(t *testing.T) {
 		{"all fit", 0, 0, 10, 5, 0, 10, false, false},
 		{"scroll below", 0, 0, 5, 10, 0, 4, false, true},
 		{"cursor before offset", 2, 5, 10, 10, 2, 9, true, false},
-		{"cursor past viewport", 8, 0, 5, 10, 4, 3, true, true},
+		// New variable-height algorithm advances offset until the cursor truly
+		// fits in the post-hint contentRows. Old algorithm snapped to 4 which
+		// put the cursor outside the visible range; new algorithm picks 6 so
+		// the four remaining nodes (6,7,8,9) fill the post-hint viewport.
+		{"cursor past viewport", 8, 0, 5, 10, 6, 4, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotOffset, gotContent, gotAbove, gotBelow := sidebarViewport(tt.cursor, tt.offset, tt.visRows, tt.nodeCount)
+			rowHeight := func(i int, isLast bool) int { return 1 }
+			gotOffset, gotContent, gotAbove, gotBelow := sidebarViewport(tt.cursor, tt.offset, tt.visRows, tt.nodeCount, rowHeight)
 			if gotOffset != tt.wantOffset {
 				t.Errorf("offset: got %d, want %d", gotOffset, tt.wantOffset)
 			}
@@ -1167,6 +1172,54 @@ func TestSidebarViewport(t *testing.T) {
 				t.Errorf("hasBelow: got %v, want %v", gotBelow, tt.wantBelow)
 			}
 		})
+	}
+}
+
+func TestSidebarViewport_CardMode_KeepsCursorVisible(t *testing.T) {
+	heightFn := func(i int, isLast bool) int {
+		if isLast {
+			return 2
+		}
+		return 3
+	}
+	offset, contentRows, hasAbove, hasBelow := sidebarViewport(3, 0, 8, 5, heightFn)
+	if offset == 0 {
+		t.Errorf("expected offset > 0 to bring cursor 3 into view, got %d", offset)
+	}
+	if contentRows < 1 {
+		t.Errorf("contentRows should be >= 1, got %d", contentRows)
+	}
+	_ = hasAbove
+	_ = hasBelow
+}
+
+func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// Visible rows: 3 + 3 + 2 = 8 (alpha card, beta card, gamma card with no trailing separator).
+	lines := s.buildSidebarLines(0, 8, false, false, false, 40, centered)
+	if len(lines) != 8 {
+		t.Fatalf("expected 8 lines, got %d: %v", len(lines), lines)
+	}
+	if strings.TrimSpace(stripANSI(lines[2])) != "" {
+		t.Errorf("line 2 should be blank separator, got %q", lines[2])
+	}
+	if strings.TrimSpace(stripANSI(lines[5])) != "" {
+		t.Errorf("line 5 should be blank separator, got %q", lines[5])
+	}
+	if strings.TrimSpace(stripANSI(lines[7])) == "" {
+		t.Errorf("line 7 (last card row 2) should not be blank: %q", lines[7])
 	}
 }
 

@@ -488,25 +488,65 @@ func (s *SidebarModel) rebuildNodes() {
 }
 
 // sidebarViewport computes adjusted offset, content row budget, and scroll hints.
-// Pure function — safe to call from the read-only View/Render method.
-func sidebarViewport(cursor, offset, visibleRows, nodeCount int) (adjOffset, contentRows int, hasAbove, hasBelow bool) {
+// Pure function, safe to call from the read-only View/Render method.
+//
+// height(i, isLast) returns the row cost of node i. Cursor and offset are
+// still node indices; the function adjusts them so the cursor's node fits
+// within the row budget.
+func sidebarViewport(cursor, offset, visibleRows, nodeCount int, height func(i int, isLast bool) int) (adjOffset, contentRows int, hasAbove, hasBelow bool) {
 	if cursor < offset {
 		offset = cursor
-	}
-	if cursor >= offset+visibleRows {
-		offset = cursor - visibleRows + 1
 	}
 	if offset < 0 {
 		offset = 0
 	}
-	hasAbove = offset > 0
-	contentRows = visibleRows
-	if hasAbove {
-		contentRows--
-	}
-	hasBelow = offset+contentRows < nodeCount
-	if hasBelow {
-		contentRows--
+	for {
+		hasAbove = offset > 0
+		contentRows = visibleRows
+		if hasAbove {
+			contentRows--
+		}
+		rows := 0
+		cursorFits := false
+		consumed := 0
+		for i := offset; i < nodeCount; i++ {
+			h := height(i, i == nodeCount-1)
+			if rows+h > contentRows {
+				break
+			}
+			rows += h
+			consumed = i + 1
+			if i == cursor {
+				cursorFits = true
+			}
+		}
+		hasBelow = consumed < nodeCount
+		if hasBelow {
+			if contentRows-1 < 1 {
+				contentRows = 1
+			} else {
+				contentRows--
+			}
+			rows = 0
+			cursorFits = false
+			consumed = 0
+			for i := offset; i < nodeCount; i++ {
+				h := height(i, i == nodeCount-1)
+				if rows+h > contentRows {
+					break
+				}
+				rows += h
+				consumed = i + 1
+				if i == cursor {
+					cursorFits = true
+				}
+			}
+			hasBelow = consumed < nodeCount
+		}
+		if cursorFits || offset >= cursor {
+			break
+		}
+		offset++
 	}
 	if contentRows < 1 {
 		contentRows = 1
@@ -528,7 +568,9 @@ func (s SidebarModel) emptyHintText() string {
 	}
 }
 
-// buildSidebarLines builds the list of rendered node lines for the sidebar content area.
+// buildSidebarLines builds the list of rendered node lines for the sidebar
+// content area. Honors per-node height (card mode emits a blank separator
+// after each session except the last visible one).
 func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBelow, focused bool, width int, centeredHint func(string) string) []string {
 	var lines []string
 	if hasAbove {
@@ -538,8 +580,21 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 	if end > len(s.nodes) {
 		end = len(s.nodes)
 	}
+	innerW := width - borderOverhead
+	blank := strings.Repeat(" ", innerW)
+	rowsLeft := contentRows
 	for i := offset; i < end; i++ {
-		lines = append(lines, s.renderNode(s.nodes[i], i == s.cursor, focused, width))
+		isLastVisible := (i == len(s.nodes)-1)
+		h := s.nodeHeight(s.nodes[i], isLastVisible)
+		if h > rowsLeft {
+			break
+		}
+		rendered := s.renderNode(s.nodes[i], i == s.cursor, focused, width)
+		lines = append(lines, strings.Split(rendered, "\n")...)
+		rowsLeft -= h
+		if s.cfg.Sidebar.SessionView == config.SidebarViewCard && !isLastVisible {
+			lines = append(lines, blank)
+		}
 	}
 	if hasBelow {
 		lines = append(lines, centeredHint(scrollHintBelow))
@@ -553,7 +608,10 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 		visibleRows = 1
 	}
 
-	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes))
+	heightFn := func(i int, isLast bool) int {
+		return s.nodeHeight(s.nodes[i], isLast)
+	}
+	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes), heightFn)
 
 	innerW := width - borderOverhead
 	centeredHint := func(text string) string {
@@ -1147,24 +1205,55 @@ func (s *SidebarModel) clampViewport(visibleRows int) {
 	if effective < 1 {
 		effective = 1
 	}
+	heightFn := func(i int, isLast bool) int { return s.nodeHeight(s.nodes[i], isLast) }
 	if s.cursor < s.offset {
 		s.offset = s.cursor
 	}
-	if s.cursor >= s.offset+effective {
-		s.offset = s.cursor - effective + 1
+	for s.offset < s.cursor {
+		rows := 0
+		fits := false
+		for i := s.offset; i < len(s.nodes); i++ {
+			h := heightFn(i, i == len(s.nodes)-1)
+			if rows+h > effective {
+				break
+			}
+			rows += h
+			if i == s.cursor {
+				fits = true
+				break
+			}
+		}
+		if fits {
+			break
+		}
+		s.offset++
 	}
 	// At the bottom of the list ▼ is absent; reclaim the freed row so the
-	// viewport fills without a trailing blank line.
+	// viewport fills without a trailing blank line. With offset > 0 we have
+	// visibleRows-1 rows of content (▲ present). Pull offset back as far as
+	// possible without dropping the cursor.
 	if s.offset > 0 {
-		contentRows := visibleRows - 1 // ▲ is present whenever offset > 0
-		if s.offset+contentRows >= len(s.nodes) {
-			newOffset := len(s.nodes) - contentRows
-			if newOffset < 0 {
-				newOffset = 0
+		contentRows := visibleRows - 1
+		if contentRows < 1 {
+			contentRows = 1
+		}
+		// Find smallest newOffset such that nodes [newOffset, len-1] fit in contentRows
+		// and newOffset <= cursor.
+		for newOffset := s.offset - 1; newOffset >= 0; newOffset-- {
+			rows := 0
+			fits := true
+			for i := newOffset; i < len(s.nodes); i++ {
+				h := heightFn(i, i == len(s.nodes)-1)
+				if rows+h > contentRows {
+					fits = false
+					break
+				}
+				rows += h
 			}
-			if s.cursor >= newOffset {
-				s.offset = newOffset
+			if !fits || newOffset > s.cursor {
+				break
 			}
+			s.offset = newOffset
 		}
 	}
 	if s.offset < 0 {
