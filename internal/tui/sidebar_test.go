@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	runewidth "github.com/mattn/go-runewidth"
+	"github.com/muesli/termenv"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
@@ -1429,38 +1430,35 @@ func TestRenderSessionCard_Unfocused_Basic(t *testing.T) {
 }
 
 func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
-	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff"), IconStateWorking: "⟳"}, config.ProcessesConfig{}, nil)
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	initStyles(Theme{
+		IconTmuxSession: "⊞", IconCfgSession: "⚙︎",
+		ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff"),
+	}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
 		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
-		sessions: []session.Session{{DisplayName: "alpha", IsLive: true, Activity: time.Now().Add(-5 * time.Minute)}},
-		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
 	}
-	// Verify both focus states produce a 2-row card with the session name on row 1.
-	// Row 1 focused expands its trailing pad to fill innerW; unfocused does not —
-	// that width difference is intentional. Row 2 must have equal display width
-	// across both states (tested exhaustively in TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns).
 	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, 40)
 	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
 	fLines := strings.Split(focused, "\n")
 	uLines := strings.Split(unfocused, "\n")
-	if len(fLines) != 2 {
-		t.Fatalf("expected 2 focused lines, got %d", len(fLines))
+	if len(fLines) != 2 || len(uLines) != 2 {
+		t.Fatalf("expected 2 lines each, got focused=%d unfocused=%d", len(fLines), len(uLines))
 	}
-	if len(uLines) != 2 {
-		t.Fatalf("expected 2 unfocused lines, got %d", len(uLines))
-	}
-	// Both rows must contain the session name.
-	for _, lines := range [][]string{fLines, uLines} {
-		if !strings.Contains(stripANSI(lines[0]), "alpha") {
-			t.Errorf("row 1 missing session name: %q", lines[0])
+	// Both focused rows must contain a SGR background code (\x1b[48...) for the
+	// selected background. Both unfocused rows must NOT.
+	const bgPrefix = "\x1b[48"
+	for i, l := range fLines {
+		if !strings.Contains(l, bgPrefix) {
+			t.Errorf("focused row %d missing background ANSI %q: %q", i+1, bgPrefix, l)
 		}
 	}
-	// Row 2 display widths must be equal across focus states.
-	wf := runewidth.StringWidth(stripANSI(fLines[1]))
-	wu := runewidth.StringWidth(stripANSI(uLines[1]))
-	if wf != wu {
-		t.Errorf("row 2: focused display width %d != unfocused %d (focused=%q unfocused=%q)",
-			wf, wu, fLines[1], uLines[1])
+	for i, l := range uLines {
+		if strings.Contains(l, bgPrefix) {
+			t.Errorf("unfocused row %d unexpectedly contains background ANSI %q: %q", i+1, bgPrefix, l)
+		}
 	}
 }
 
