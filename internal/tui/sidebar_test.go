@@ -1408,3 +1408,78 @@ func TestNodeHeight(t *testing.T) {
 		})
 	}
 }
+
+// --- renderSessionCard ---
+
+func TestRenderSessionCard_Unfocused_Basic(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	lines := strings.Split(out, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
+	}
+	if !strings.Contains(stripANSI(lines[0]), "alpha") {
+		t.Errorf("row 1 missing session name: %q", lines[0])
+	}
+}
+
+func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff")}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	// Compare focused vs unfocused output: focused must differ (highlight
+	// styling extends the background to the row's full inner width on both
+	// rows, so the rendered strings can't be identical).
+	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, 40)
+	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	fLines := strings.Split(focused, "\n")
+	uLines := strings.Split(unfocused, "\n")
+	if len(fLines) != 2 {
+		t.Fatalf("expected 2 focused lines, got %d", len(fLines))
+	}
+	if len(uLines) != 2 {
+		t.Fatalf("expected 2 unfocused lines, got %d", len(uLines))
+	}
+	for i := 0; i < 2; i++ {
+		if fLines[i] == uLines[i] {
+			t.Errorf("row %d: focused and unfocused output identical, expected highlight to differ: %q", i+1, fLines[i])
+		}
+	}
+}
+
+func TestRenderSessionCard_IdleStateBlanksLeftGroup(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateIdle: "○"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateIdle}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	row2 := strings.Split(out, "\n")[1]
+	if strings.Contains(stripANSI(row2), "idle") {
+		t.Errorf("row 2 should not show \"idle\" label: %q", row2)
+	}
+	if strings.Contains(stripANSI(row2), activeTheme.IconStateIdle) {
+		t.Errorf("row 2 should not show idle icon: %q", row2)
+	}
+}
+
+func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateWorking: "⟳"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	row2 := strings.Split(out, "\n")[1]
+	if !strings.Contains(stripANSI(row2), "working") {
+		t.Errorf("row 2 expected \"working\" label: %q", row2)
+	}
+}

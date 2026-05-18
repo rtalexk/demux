@@ -901,6 +901,172 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	return " " + gap + " " + iconPrefix + sessionStyle.Render(text)
 }
 
+// renderSessionCard renders a session as a two-row card.
+//
+//	Row 1: <focus(1)><active(1)> <session_icon> <session_name> <watch> <trail>
+//	Row 2: <focus(1)> <state_icon> <state_label> <gap> <proc> <git> <todo> <last_seen>
+//
+// Rows are joined with "\n". The blank separator row between cards is the
+// caller's responsibility (emitted by buildSidebarLines), so this renderer
+// stays usable in single-card contexts like the future sticky sidebar.
+//
+// focused == true means: the cursor is on this session AND the sidebar pane
+// has focus. The highlight background is applied to both content rows when
+// focused.
+func (s SidebarModel) renderSessionCard(node SidebarNode, focused bool, width int) string {
+	innerW := width - 2 // account for border overhead (matches single-row path)
+	if innerW < minRowWidth+4 {
+		innerW = minRowWidth + 4
+	}
+	row1 := s.renderCardRow1(node, focused, innerW)
+	row2 := s.renderCardRow2(node, focused, innerW)
+	return row1 + "\n" + row2
+}
+
+// renderCardRow1 builds row 1: focus + active + session icon + name + watch,
+// with the highlight background extended to the full innerW when focused.
+func (s SidebarModel) renderCardRow1(node SidebarNode, focused bool, innerW int) string {
+	// Active indicator slot (always 1 col so column alignment is stable).
+	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
+	if activeIcon == "" {
+		activeIcon = config.DefaultActiveSessionIcon
+	}
+	active := " "
+	if node.Session == s.activeSession {
+		if focused {
+			active = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(activeIcon)
+		} else {
+			active = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
+		}
+	} else if focused {
+		active = selectedBG.Render(active)
+	}
+
+	// Session icon.
+	iconPrefix := ""
+	if sess := s.FindSession(node.Session); sess != nil {
+		iconPrefix = sessionIcon(*sess) + " "
+	}
+	iconW := runewidth.StringWidth(stripANSI(iconPrefix))
+
+	// Watch slot (fixed width even when unwatched).
+	watch := s.watchIndicator(node, focused, focused)
+	watchW := runewidth.StringWidth(stripANSI(watch))
+
+	// Budget for name: total - focus(1) - active(1) - sep(1 between active & icon) - icon - sep(1) - watch - trail(1).
+	overhead := 1 /*focus*/ + 1 /*active*/ + 1 /*sep*/ + iconW + 1 /*sep*/ + watchW + 1 /*trail*/
+	maxName := innerW - overhead
+	if maxName < minRowWidth {
+		maxName = minRowWidth
+	}
+
+	var nameStr string
+	if focused && runewidth.StringWidth(node.Session) > maxName {
+		nameStr = s.marquee.View(node.Session, maxName)
+	} else {
+		nameStr = truncateSessionName(node.Session, maxName)
+	}
+
+	// Compute pad so highlight stretches to innerW on focus.
+	used := overhead + runewidth.StringWidth(stripANSI(nameStr))
+	pad := innerW - used
+	if pad < 0 {
+		pad = 0
+	}
+
+	if focused {
+		focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+		iconStyled := selectedBG.Render(iconPrefix)
+		nameStyled := selectedBG.Bold(true).Render(nameStr)
+		sep := selectedBG.Render(" ")
+		trail := selectedBG.Render(strings.Repeat(" ", pad+1)) // +1 for the trailing slot in overhead
+		return focusGl + active + sep + iconStyled + nameStyled + sep + watch + trail
+	}
+
+	focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
+	nameStyled := sessionStyle.Render(nameStr)
+	return focusGl + active + " " + iconPrefix + nameStyled + " " + watch
+}
+
+// renderCardRow2 builds row 2: focus + state-icon + state-label (left) and
+// proc/git/todo/last-seen (right), with justify-between spacing. When the
+// session is idle or has no state, the left state group is blank.
+func (s SidebarModel) renderCardRow2(node SidebarNode, focused bool, innerW int) string {
+	// Left group: state icon + label.
+	var leftIcon, leftLabel string
+	st := s.stateForSession(node.Session)
+	if st != nil {
+		value := ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
+		if value.IsDisplayable() {
+			if focused {
+				leftIcon = stateIconOnBG(value, activeTheme.ColorSelected)
+			} else {
+				leftIcon = stateIcon(value)
+			}
+			labelStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
+			if focused {
+				labelStyle = labelStyle.Background(activeTheme.ColorSelected)
+			}
+			leftLabel = labelStyle.Render(value.String())
+		}
+	}
+
+	// Right group: proc, git, todo, last-seen. Reuse existing helpers, joined
+	// by single space (styled when focused so the gap inherits the highlight).
+	var rightParts []string
+	if ind := s.procLabelIndicator(node, focused, focused); ind != "" {
+		rightParts = append(rightParts, ind)
+	}
+	if ind := s.gitIndicator(node, focused, focused); ind != "" {
+		rightParts = append(rightParts, ind)
+	}
+	if ind := s.itemIndicator(node, focused, focused); ind != "" {
+		rightParts = append(rightParts, ind)
+	}
+	if ind := s.lastSeenIndicator(node, focused, focused); ind != "" {
+		rightParts = append(rightParts, ind)
+	}
+	var right string
+	if focused {
+		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
+		right = strings.Join(rightParts, sep)
+	} else {
+		right = strings.Join(rightParts, " ")
+	}
+
+	// If state is blank, the icon column is still reserved as a space so right group alignment
+	// stays consistent regardless of state presence.
+	leftIconW := runewidth.StringWidth(stripANSI(leftIcon))
+	leftLabelW := runewidth.StringWidth(stripANSI(leftLabel))
+	if leftIconW == 0 {
+		leftIcon = " "
+		leftIconW = 1
+	}
+	rightW := runewidth.StringWidth(stripANSI(right))
+	used := 1 /*focus*/ + 1 /*sep*/ + leftIconW + 1 /*sep*/ + leftLabelW
+	gap := innerW - used - rightW - 1 /*trail*/
+	if gap < 1 {
+		gap = 1
+	}
+
+	if focused {
+		focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+		sep := selectedBG.Render(" ")
+		var leftIconStyled string
+		if leftLabel == "" {
+			leftIconStyled = selectedBG.Render(leftIcon)
+		} else {
+			leftIconStyled = leftIcon // stateIconOnBG already applied selected bg
+		}
+		gapStr := selectedBG.Render(strings.Repeat(" ", gap))
+		trail := selectedBG.Render(" ")
+		return focusGl + sep + leftIconStyled + sep + leftLabel + gapStr + right + trail
+	}
+
+	focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
+	return focusGl + " " + leftIcon + " " + leftLabel + strings.Repeat(" ", gap) + right
+}
+
 // formatAge returns a fixed-width 3-char age string for a session's last-seen
 // timestamp. Special cases: <15s → "now", <1m → "<1m". For longer durations:
 // ' Xm' / 'XXm' for minutes, ' Xh' / 'XXh' for hours, ' Xd' / 'XXd' for days.
