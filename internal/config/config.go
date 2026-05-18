@@ -199,6 +199,7 @@ type SidebarConfig struct {
 	Sort              []string       `toml:"sort"`
 	SwitchFocus       string         `toml:"switch_focus"`
 	Width             int            `toml:"width"`
+	SessionView       string         `toml:"session_view"`
 	Processes         []ProcessLabel `toml:"processes"`
 }
 
@@ -252,6 +253,7 @@ func Default() Config {
 			Width:             DefaultSidebarWidth,
 			ShowLastSeen:      true,
 			ActiveSessionIcon: DefaultActiveSessionIcon,
+			SessionView:       "row",
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
@@ -374,6 +376,16 @@ func Load(path string) (Config, error) {
 		return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
 	})
 	cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
+
+	switch cfg.Sidebar.SessionView {
+	case "row", "card":
+		// valid
+	default:
+		if cfg.Sidebar.SessionView != "" {
+			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.session_view %q: must be \"row\" or \"card\"\n", cfg.Sidebar.SessionView)
+		}
+		cfg.Sidebar.SessionView = "row"
+	}
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {

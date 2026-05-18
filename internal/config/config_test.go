@@ -684,3 +684,57 @@ color_proc_label_bg = "#222222"
 		t.Fatalf("bg mismatch: %q", cfg.Theme.ColorProcLabelBG)
 	}
 }
+
+func TestDefault_SidebarSessionView(t *testing.T) {
+	c := config.Default()
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected SessionView=\"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_Card(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := "[sidebar]\nsession_view = \"card\"\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "card" {
+		t.Errorf("expected \"card\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_InvalidFallsBackToRow(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := "[sidebar]\nsession_view = \"banana\"\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected fallback \"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_MissingDefaultsRow(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	if err := os.WriteFile(path, []byte("[sidebar]\nwidth = 40\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected default \"row\", got %q", c.Sidebar.SessionView)
+	}
+}
