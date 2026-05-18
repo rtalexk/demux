@@ -594,6 +594,19 @@ func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width
 	return s.renderSession(node, selected, focused, width)
 }
 
+// nodeHeight returns the viewport rows consumed by a session in the current
+// view. Card mode reserves 2 content rows; a trailing separator row adds 1
+// for every card except the last visible one.
+func (s SidebarModel) nodeHeight(_ SidebarNode, isLast bool) int {
+	if s.cfg.Sidebar.SessionView == config.SidebarViewCard {
+		if isLast {
+			return 2
+		}
+		return 3
+	}
+	return 1
+}
+
 // alignedRow builds a single sidebar line with the name on the left and
 // indicators right-aligned to availWidth. Both name and indicators are
 // measured by display-column width (runewidth) after stripping ANSI codes,

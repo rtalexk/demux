@@ -1384,3 +1384,27 @@ func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
 		t.Fatalf("expected theme fallback, got fg=%v bg=%v", fg, bg)
 	}
 }
+
+func TestNodeHeight(t *testing.T) {
+	cases := []struct {
+		name     string
+		view     string
+		isLast   bool
+		expected int
+	}{
+		{"row mode any", config.SidebarViewRow, false, 1},
+		{"row mode last", config.SidebarViewRow, true, 1},
+		{"card mode non-last", config.SidebarViewCard, false, 3},
+		{"card mode last", config.SidebarViewCard, true, 2},
+		{"empty defaults row", "", false, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SidebarModel{cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: tc.view}}}
+			got := s.nodeHeight(SidebarNode{Session: "x"}, tc.isLast)
+			if got != tc.expected {
+				t.Errorf("nodeHeight(view=%q, isLast=%v): got %d, want %d", tc.view, tc.isLast, got, tc.expected)
+			}
+		})
+	}
+}
