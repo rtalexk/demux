@@ -9,6 +9,12 @@ const (
 	DefaultSidebarWidth       = 35
 	DefaultActiveSessionIcon  = "►"
 
+	// SidebarViewRow and SidebarViewCard are the accepted values for
+	// SidebarConfig.SessionView.  TUI consumers should reference these
+	// constants rather than inline string literals.
+	SidebarViewRow  = "row"
+	SidebarViewCard = "card"
+
 	// MinRefreshIntervalMs is the minimum accepted value for RefreshIntervalMs.
 	MinRefreshIntervalMs = 100
 	// MinSidebarWidth is the minimum accepted value for Sidebar.Width.

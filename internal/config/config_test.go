@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -685,7 +686,7 @@ color_proc_label_bg = "#222222"
 	}
 }
 
-func TestDefault_SidebarSessionView(t *testing.T) {
+func TestDefaults_SidebarSessionView(t *testing.T) {
 	c := config.Default()
 	if c.Sidebar.SessionView != "row" {
 		t.Errorf("expected SessionView=\"row\", got %q", c.Sidebar.SessionView)
@@ -693,12 +694,7 @@ func TestDefault_SidebarSessionView(t *testing.T) {
 }
 
 func TestLoadFromFile_SessionView_Card(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "demux.toml")
-	body := "[sidebar]\nsession_view = \"card\"\n"
-	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
-		t.Fatal(err)
-	}
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"card\"\n")
 	c, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -709,12 +705,7 @@ func TestLoadFromFile_SessionView_Card(t *testing.T) {
 }
 
 func TestLoadFromFile_SessionView_InvalidFallsBackToRow(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "demux.toml")
-	body := "[sidebar]\nsession_view = \"banana\"\n"
-	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
-		t.Fatal(err)
-	}
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"banana\"\n")
 	c, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
@@ -725,16 +716,35 @@ func TestLoadFromFile_SessionView_InvalidFallsBackToRow(t *testing.T) {
 }
 
 func TestLoadFromFile_SessionView_MissingDefaultsRow(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "demux.toml")
-	if err := os.WriteFile(path, []byte("[sidebar]\nwidth = 40\n"), 0644); err != nil {
-		t.Fatal(err)
-	}
+	path := writeTempConfig(t, "[sidebar]\nwidth = 40\n")
 	c, err := config.Load(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.Sidebar.SessionView != "row" {
 		t.Errorf("expected default \"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_InvalidWarnsOnStderr(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	if _, err := config.Load(path); err != nil {
+		os.Stderr = origStderr
+		t.Fatal(err)
+	}
+	w.Close()
+	os.Stderr = origStderr
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(buf), `ignoring sidebar.session_view "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
 	}
 }
