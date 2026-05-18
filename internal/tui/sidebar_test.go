@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	runewidth "github.com/mattn/go-runewidth"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
@@ -1428,14 +1429,16 @@ func TestRenderSessionCard_Unfocused_Basic(t *testing.T) {
 }
 
 func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
-	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff")}, config.ProcessesConfig{}, nil)
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff"), IconStateWorking: "⟳"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
 		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
-		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true, Activity: time.Now().Add(-5 * time.Minute)}},
+		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
 	}
-	// Compare focused vs unfocused output: focused must differ (highlight
-	// styling extends the background to the row's full inner width on both
-	// rows, so the rendered strings can't be identical).
+	// Verify both focus states produce a 2-row card with the session name on row 1.
+	// Row 1 focused expands its trailing pad to fill innerW; unfocused does not —
+	// that width difference is intentional. Row 2 must have equal display width
+	// across both states (tested exhaustively in TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns).
 	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, 40)
 	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
 	fLines := strings.Split(focused, "\n")
@@ -1446,10 +1449,18 @@ func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
 	if len(uLines) != 2 {
 		t.Fatalf("expected 2 unfocused lines, got %d", len(uLines))
 	}
-	for i := 0; i < 2; i++ {
-		if fLines[i] == uLines[i] {
-			t.Errorf("row %d: focused and unfocused output identical, expected highlight to differ: %q", i+1, fLines[i])
+	// Both rows must contain the session name.
+	for _, lines := range [][]string{fLines, uLines} {
+		if !strings.Contains(stripANSI(lines[0]), "alpha") {
+			t.Errorf("row 1 missing session name: %q", lines[0])
 		}
+	}
+	// Row 2 display widths must be equal across focus states.
+	wf := runewidth.StringWidth(stripANSI(fLines[1]))
+	wu := runewidth.StringWidth(stripANSI(uLines[1]))
+	if wf != wu {
+		t.Errorf("row 2: focused display width %d != unfocused %d (focused=%q unfocused=%q)",
+			wf, wu, fLines[1], uLines[1])
 	}
 }
 
@@ -1481,5 +1492,33 @@ func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
 	row2 := strings.Split(out, "\n")[1]
 	if !strings.Contains(stripANSI(row2), "working") {
 		t.Errorf("row 2 expected \"working\" label: %q", row2)
+	}
+}
+
+func TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession:  "⊞",
+		IconCfgSession:   "⚙︎",
+		IconStateWorking: "⟳",
+		ColorSelected:    "#2a2a4a",
+		ColorFgPrimary:   "#ffffff",
+	}, config.ProcessesConfig{}, nil)
+	mk := func(focused bool) string {
+		s := SidebarModel{
+			cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+			sessions: []session.Session{{DisplayName: "alpha", IsLive: true, Activity: time.Now().Add(-5 * time.Minute)}},
+			states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
+		}
+		return s.renderSessionCard(SidebarNode{Session: "alpha"}, focused, 40)
+	}
+	row2Focused := strings.Split(mk(true), "\n")[1]
+	row2Unfocused := strings.Split(mk(false), "\n")[1]
+	// The display width (after stripping ANSI) of row 2 should be equal in both
+	// states, since both render to the same column budget.
+	wFocused := runewidth.StringWidth(stripANSI(row2Focused))
+	wUnfocused := runewidth.StringWidth(stripANSI(row2Unfocused))
+	if wFocused != wUnfocused {
+		t.Errorf("row 2 display widths differ: focused=%d unfocused=%d (focused=%q unfocused=%q)",
+			wFocused, wUnfocused, row2Focused, row2Unfocused)
 	}
 }

@@ -1044,7 +1044,11 @@ func (s SidebarModel) renderCardRow2(node SidebarNode, focused bool, innerW int)
 	}
 	rightW := runewidth.StringWidth(stripANSI(right))
 	used := 1 /*focus*/ + 1 /*sep*/ + leftIconW + 1 /*sep*/ + leftLabelW
-	gap := innerW - used - rightW - 1 /*trail*/
+	trailW := 0
+	if focused {
+		trailW = 1
+	}
+	gap := innerW - used - rightW - trailW
 	if gap < 1 {
 		gap = 1
 	}
