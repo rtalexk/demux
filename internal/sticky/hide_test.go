@@ -50,32 +50,38 @@ func TestHide_EnvSet_KillsPaneAndUnsets(t *testing.T) {
 	}
 }
 
-func TestHide_SlotsMode_RespawnsPlaceholder(t *testing.T) {
+func TestHide_SlotsMode_UninstallsAllSlots(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	// UninstallSlots scans all panes; active (%42) and three other slots.
+	f.outputs["list-panes -aF #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%42 1\n%50 1\n%60 1\n%99 \n"}
 	s := &Sticky{T: f, Slots: true}
 	if err := s.Hide(); err != nil {
 		t.Fatalf("Hide: %v", err)
 	}
-	var sawRespawn, sawKill, sawUnset bool
+	wantKills := map[string]bool{
+		"kill-pane -t %42": false,
+		"kill-pane -t %50": false,
+		"kill-pane -t %60": false,
+	}
+	var sawUnset bool
 	for _, r := range f.runs {
 		j := strings.Join(r, " ")
-		if j == "respawn-pane -k -t %42 demux sidebar slot" {
-			sawRespawn = true
+		if _, ok := wantKills[j]; ok {
+			wantKills[j] = true
 		}
-		if strings.HasPrefix(j, "kill-pane") {
-			sawKill = true
+		if strings.HasPrefix(j, "kill-pane -t %1") || strings.HasPrefix(j, "kill-pane -t %99") {
+			t.Errorf("kill-pane on non-slot pane: %q", j)
 		}
 		if j == "set-environment -gu DEMUX_STICKY_PANE__dev_ttys001" {
 			sawUnset = true
 		}
 	}
-	if !sawRespawn {
-		t.Errorf("expected respawn-pane to placeholder, got: %v", f.runs)
-	}
-	if sawKill {
-		t.Errorf("expected no kill-pane in slots mode, got: %v", f.runs)
+	for k, ok := range wantKills {
+		if !ok {
+			t.Errorf("missing expected kill-pane: %s", k)
+		}
 	}
 	if !sawUnset {
 		t.Errorf("expected env unset, got: %v", f.runs)

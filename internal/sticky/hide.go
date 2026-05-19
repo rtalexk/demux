@@ -1,12 +1,11 @@
 package sticky
 
-// Hide deactivates the sticky sidebar pane for the current client.
+// Hide tears down the sticky sidebar for the current client.
 //
-// In split mode the pane is killed. In slots mode the pane is respawned with
-// the slot placeholder so the slot stays in place (matching the rest of the
-// windows). The env var is always cleared so the next Show treats the
-// sidebar as inactive. Errors from kill-pane/respawn-pane (typically "pane
-// not found" after a manual kill) are tolerated.
+// In split mode the tracked pane is killed. In slots mode every slot pane on
+// the server is killed (including the active sidebar pane, which itself is
+// tagged @demux_slot). The env var is always cleared so the next Show
+// treats the sidebar as inactive. Errors from kill-pane are tolerated.
 func (s *Sticky) Hide() error {
 	tty, err := s.CurrentClientTTY()
 	if err != nil {
@@ -20,12 +19,10 @@ func (s *Sticky) Hide() error {
 	if !set {
 		return nil
 	}
-	if val != "" {
-		if s.Slots {
-			_ = s.T.Run("respawn-pane", "-k", "-t", val, SlotPlaceholderCmd)
-		} else {
-			_ = s.T.Run("kill-pane", "-t", val)
-		}
+	if s.Slots {
+		_ = s.UninstallSlots()
+	} else if val != "" {
+		_ = s.T.Run("kill-pane", "-t", val)
 	}
 	return s.UnsetEnv(key)
 }

@@ -704,7 +704,7 @@ Lifecycle for slots mode:
 
 ```bash
 demux sidebar show              # installs slots + activates current window's slot
-demux sidebar hide              # deactivates (slot stays as placeholder)
+demux sidebar hide              # removes every slot pane (full teardown)
 demux sidebar slots install     # idempotent: ensure every window has a slot
 demux sidebar slots uninstall   # remove every slot pane
 ```
