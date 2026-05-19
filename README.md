@@ -624,6 +624,73 @@ shells = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
 
 </details>
 
+## Sticky sidebar
+
+The sticky sidebar is a per-client tmux pane that runs `demux --sticky`
+(compact mode + card session view, with the quit binding disabled) and
+physically follows you between tmux sessions. It is created and dismissed
+through the `demux sidebar` subcommand and is **off by default**.
+
+### Lifecycle
+
+```bash
+demux sidebar toggle   # show if hidden, hide if shown
+demux sidebar show     # idempotent: create if missing
+demux sidebar hide     # idempotent: kill if present
+```
+
+All three require the invoking shell to be inside tmux (`$TMUX` set). Running
+them outside tmux exits with status 1.
+
+Internally, `demux sidebar follow` is invoked by a tmux hook on
+`client-session-changed`; it physically moves the existing pane (preserving
+its current width) into the newly attached session.
+
+### Enable the auto-show + follow hooks
+
+Run `demux hooks init --tool tmux` and paste the snippet into your
+`~/.tmux.conf`, then reload tmux:
+
+```bash
+demux hooks init --tool tmux >> ~/.tmux.conf
+tmux source ~/.tmux.conf
+```
+
+The snippet now includes two extra lines:
+
+- `set-hook -ga client-session-changed "run-shell 'demux sidebar follow ...'"`
+  moves the sidebar pane to whichever session you switch into.
+- `set-hook -ga client-attached "run-shell 'demux sidebar show ...'"`
+  creates the sidebar pane automatically when you attach a tmux client.
+
+If you prefer to manage the sidebar manually with `demux sidebar toggle`,
+remove the `client-attached` line. The `client-session-changed` line is
+required for the "follow" behavior; without it the sidebar stays in
+whichever session it was created in.
+
+### Configuration
+
+```toml
+[sidebar.sticky]
+# Initial width (columns) the first time the pane is created. After that,
+# resize it normally with tmux (e.g. `prefix + <` or mouse drag); the width
+# is preserved on every session move.
+width = 35
+```
+
+### Notes and limitations
+
+- The sticky sidebar is **per-client**: each attached client owns its own
+  pane. Two clients attached to the same session may end up with two sidebar
+  panes side by side; close either with `prefix x`.
+- The sidebar follows session switches, not window switches. Within a single
+  session, switching windows leaves the sidebar in whichever window it last
+  landed in.
+- Tmux 2.6 or newer is required (uses the `-f` flag on `split-window` /
+  `join-pane`).
+- `demux --sticky` is not intended for interactive standalone use; the quit
+  binding is disabled. Use `demux sidebar hide` to dismiss it.
+
 ## Sessions
 
 Define sessions in `~/.config/demux/sessions.toml`. Sensitive or machine-specific entries (e.g. paths that differ per machine) can go in `~/.config/demux/private.toml` instead, which you can safely exclude from version control.
