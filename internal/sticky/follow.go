@@ -64,12 +64,32 @@ func (s *Sticky) Follow() error {
 		if err := s.followSlotsMode(val, curr, width); err != nil {
 			return err
 		}
+		s.ejectFocusIfOnSidebar(val)
 		s.pokeRefresh(val)
 		return nil
 	}
 	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
+	s.ejectFocusIfOnSidebar(val)
 	s.pokeRefresh(val)
 	return nil
+}
+
+// ejectFocusIfOnSidebar moves the client focus to the next pane in the
+// current window when the sidebar pane is the active pane. Matches tmux's
+// `prefix + o`. Without this, sticky-mode users who left focus inside the
+// sidebar before switching tmux windows would still be inside the sidebar
+// after the follow.
+func (s *Sticky) ejectFocusIfOnSidebar(sidebarPane string) {
+	if sidebarPane == "" {
+		return
+	}
+	out, err := s.T.Output("display-message", "-p", "#{pane_id}")
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(out) == sidebarPane {
+		_ = s.T.Run("select-pane", "-t", ":.+")
+	}
 }
 
 // pokeRefresh sends F12 to the sticky pane. The TUI binds F12 (only
