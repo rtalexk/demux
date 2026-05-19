@@ -20,6 +20,11 @@ func (s *Sticky) Hide() error {
 		return nil
 	}
 	if s.Slots {
+		// Kill the active sidebar pane first so the user perceives an
+		// instant dismissal, then sweep the remaining placeholder slots.
+		if val != "" {
+			_ = s.T.Run("kill-pane", "-t", val)
+		}
 		_ = s.UninstallSlots()
 	} else if val != "" {
 		_ = s.T.Run("kill-pane", "-t", val)

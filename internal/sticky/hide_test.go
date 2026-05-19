@@ -50,37 +50,41 @@ func TestHide_EnvSet_KillsPaneAndUnsets(t *testing.T) {
 	}
 }
 
-func TestHide_SlotsMode_UninstallsAllSlots(t *testing.T) {
+func TestHide_SlotsMode_KillsActiveFirstThenSweeps(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
-	// UninstallSlots scans all panes; active (%42) and three other slots.
-	f.outputs["list-panes -aF #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%42 1\n%50 1\n%60 1\n%99 \n"}
+	// After active is killed, sweep finds only the remaining placeholders.
+	f.outputs["list-panes -aF #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%50 1\n%60 1\n%99 \n"}
 	s := &Sticky{T: f, Slots: true}
 	if err := s.Hide(); err != nil {
 		t.Fatalf("Hide: %v", err)
 	}
-	wantKills := map[string]bool{
-		"kill-pane -t %42": false,
-		"kill-pane -t %50": false,
-		"kill-pane -t %60": false,
-	}
+	// Find first kill-pane call: must target the active pane (%42).
+	var killOrder []string
 	var sawUnset bool
 	for _, r := range f.runs {
 		j := strings.Join(r, " ")
-		if _, ok := wantKills[j]; ok {
-			wantKills[j] = true
-		}
-		if strings.HasPrefix(j, "kill-pane -t %1") || strings.HasPrefix(j, "kill-pane -t %99") {
-			t.Errorf("kill-pane on non-slot pane: %q", j)
+		if strings.HasPrefix(j, "kill-pane -t ") {
+			killOrder = append(killOrder, strings.TrimPrefix(j, "kill-pane -t "))
 		}
 		if j == "set-environment -gu DEMUX_STICKY_PANE__dev_ttys001" {
 			sawUnset = true
 		}
 	}
-	for k, ok := range wantKills {
+	if len(killOrder) == 0 || killOrder[0] != "%42" {
+		t.Errorf("first kill must be active pane %%42, got order: %v", killOrder)
+	}
+	want := map[string]bool{"%42": false, "%50": false, "%60": false}
+	for _, p := range killOrder {
+		if _, ok := want[p]; !ok {
+			t.Errorf("unexpected kill target: %q", p)
+		}
+		want[p] = true
+	}
+	for k, ok := range want {
 		if !ok {
-			t.Errorf("missing expected kill-pane: %s", k)
+			t.Errorf("missing kill-pane for %s", k)
 		}
 	}
 	if !sawUnset {
