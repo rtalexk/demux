@@ -5,6 +5,7 @@
 package sticky
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -64,5 +65,57 @@ func EnvKey(tty string) string {
 	return envKeyPrefix + SanitizeTTY(tty)
 }
 
-// keep imports used
-var _ = fmt.Sprintf
+// ReadEnv reads a tmux server-global env var.
+// Returns (value, true, nil) when set, ("", false, nil) when unset, error on
+// any other tmux failure. Unset is detected by an "unknown variable" line in
+// tmux's stderr (matches tmux 2.6+ output).
+func (s *Sticky) ReadEnv(key string) (string, bool, error) {
+	out, err := s.T.Output("show-environment", "-g", key)
+	if err != nil {
+		if isUnknownVariableErr(err) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("tmux show-environment %s: %w", key, err)
+	}
+	line := strings.TrimSpace(out)
+	eq := strings.IndexByte(line, '=')
+	if eq < 0 {
+		if strings.HasPrefix(line, "-") {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("tmux show-environment: unexpected output %q", line)
+	}
+	return line[eq+1:], true, nil
+}
+
+// WriteEnv sets a tmux server-global env var.
+func (s *Sticky) WriteEnv(key, value string) error {
+	if err := s.T.Run("set-environment", "-g", key, value); err != nil {
+		return fmt.Errorf("tmux set-environment -g %s: %w", key, err)
+	}
+	return nil
+}
+
+// UnsetEnv clears a tmux server-global env var.
+func (s *Sticky) UnsetEnv(key string) error {
+	if err := s.T.Run("set-environment", "-gu", key); err != nil {
+		return fmt.Errorf("tmux set-environment -gu %s: %w", key, err)
+	}
+	return nil
+}
+
+// isUnknownVariableErr inspects an error from exec.Command.Output() to detect
+// tmux's "unknown variable: X" stderr line.
+func isUnknownVariableErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if strings.Contains(err.Error(), "unknown variable") {
+		return true
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && strings.Contains(string(exitErr.Stderr), "unknown variable") {
+		return true
+	}
+	return false
+}
