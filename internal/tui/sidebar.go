@@ -981,7 +981,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 // has focus. The highlight background is applied to both content rows when
 // focused.
 func (s SidebarModel) renderSessionCard(node SidebarNode, focused bool, width int) string {
-	innerW := width - 2 // account for border overhead (matches single-row path)
+	innerW := width - borderOverhead
 	if innerW < minRowWidth+4 {
 		innerW = minRowWidth + 4
 	}
@@ -1226,7 +1226,7 @@ func (s *SidebarModel) clampViewport(visibleRows int) {
 	// viewport fills without a trailing blank line. With offset > 0 we have
 	// visibleRows-1 rows of content (▲ present). Pull offset back as far as
 	// possible without dropping the cursor. The first loop above ensures
-	// s.offset <= s.cursor, so newOffset starts below s.cursor — no extra
+	// s.offset <= s.cursor, so newOffset starts at or below s.cursor; no extra
 	// cursor-bound guard is needed here.
 	if s.offset > 0 {
 		contentRows := visibleRows - 1
