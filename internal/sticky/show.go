@@ -99,8 +99,19 @@ func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
 	if err := s.WriteEnv(key, slot); err != nil {
 		return err
 	}
-	// Best-effort: install slots in remaining windows. Current already has
-	// one (@demux_slot=1), so it's skipped by EnsureSlotInWindow.
-	_ = s.InstallSlotsInAllWindows(opts.Width)
+	// Install slots only in the MRU-reserved set (capped at MRUMaxLen).
+	// Current window already has its own slot (the sidebar), so we pass it
+	// in explicitly so reconcile won't touch it.
+	parts := strings.SplitN(target, ":", 2)
+	currWindow := target
+	currSession := ""
+	if len(parts) == 2 {
+		currSession = parts[0]
+		currWindow = parts[1]
+	}
+	reserved, err := s.ComputeReservedWindows(currWindow, currSession)
+	if err == nil {
+		_ = s.ReconcileSlots(reserved, currWindow, opts.Width)
+	}
 	return nil
 }

@@ -93,9 +93,16 @@ func TestShow_SlotsMode_ActivatesCurrentSlotBeforeOtherWindows(t *testing.T) {
 	// Current window has no slot. After split + tag, list-panes returns it tagged.
 	f.outputs["list-panes -t $1:@7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%10 1\n"}
 	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%10\n"}
-	f.outputs["list-windows -aF #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n$1:@8\n"}
-	f.outputs["list-panes -t $1:@8 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%2 \n"}
-	f.outputs["split-window -f -h -b -d -l 35 -t $1:@8 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%11\n"}
+	// Reservation queries.
+	f.outputs["list-windows -aF #{window_id}"] = fakeReply{out: "@7\n@8\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@7 0\n@8 1\n"}
+	f.outputs["display-message -p #{client_last_session}"] = fakeReply{out: "\n"}
+	f.outputs["show-environment -g "+MRUEnvKey] = fakeReply{err: stderrExitError("unknown variable\n")}
+	// Reconcile: list slot panes - none yet for @8.
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@7 %10 1\n"}
+	// EnsureSlotInWindow for @8: list-panes shows no slot, split installs %11.
+	f.outputs["list-panes -t @8 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%2 \n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t @8 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%11\n"}
 	s := &Sticky{T: f, Slots: true}
 	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
 		t.Fatalf("Show: %v", err)

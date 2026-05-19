@@ -60,13 +60,17 @@ func (s *Sticky) Follow() error {
 	if len(currParts) < 2 {
 		return fmt.Errorf("unexpected current target %q", curr)
 	}
-	if paneWindow == currParts[1] {
-		return nil
-	}
+	currSession, currWindow := currParts[0], currParts[1]
 	widthStr, _ := s.T.Output("display-message", "-p", "-t", val, "#{pane_width}")
 	width, _ := strconv.Atoi(strings.TrimSpace(widthStr))
 	if width <= 0 {
 		width = config.DefaultStickySidebarWidth
+	}
+	if paneWindow == currWindow {
+		if s.Slots {
+			s.maintainSlotsBudget(currWindow, currSession, width)
+		}
+		return nil
 	}
 	if s.Slots {
 		if err := s.followSlotsMode(val, curr, width); err != nil {
@@ -74,12 +78,27 @@ func (s *Sticky) Follow() error {
 		}
 		s.ejectFocusIfOnSidebar(val)
 		s.pokeRefresh(val)
+		_ = s.PushMRU(paneWindow)
+		s.maintainSlotsBudget(currWindow, currSession, width)
 		return nil
 	}
 	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
 	s.ejectFocusIfOnSidebar(val)
 	s.pokeRefresh(val)
 	return nil
+}
+
+// maintainSlotsBudget prunes stale MRU entries, recomputes the reserved set
+// for currWindow/currSession, and reconciles slot panes so only reserved
+// windows hold placeholder slots. Best-effort: errors are swallowed so the
+// hook driving Follow never crashes navigation.
+func (s *Sticky) maintainSlotsBudget(currWindow, currSession string, width int) {
+	_ = s.PruneMRU()
+	reserved, err := s.ComputeReservedWindows(currWindow, currSession)
+	if err != nil {
+		return
+	}
+	_ = s.ReconcileSlots(reserved, currWindow, width)
 }
 
 // ejectFocusIfOnSidebar moves the client focus to the next pane in the

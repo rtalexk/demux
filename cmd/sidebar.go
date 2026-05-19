@@ -95,7 +95,7 @@ var sidebarSlotsUninstallCmd = &cobra.Command{
 
 var sidebarSlotsEnsureCmd = &cobra.Command{
 	Use:    "ensure",
-	Short:  "Internal: ensure the current window has a sidebar slot (called by tmux hook)",
+	Short:  "Internal: reconcile slot panes against the MRU budget (called by tmux hook)",
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := loadConfig()
@@ -111,7 +111,16 @@ var sidebarSlotsEnsureCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return s.EnsureSlotInWindow(strings.TrimSpace(target), cfg.Sidebar.Sticky.Width)
+		parts := strings.SplitN(strings.TrimSpace(target), ":", 2)
+		if len(parts) < 2 {
+			return nil
+		}
+		_ = s.PruneMRU()
+		reserved, err := s.ComputeReservedWindows(parts[1], parts[0])
+		if err != nil {
+			return err
+		}
+		return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
 	},
 }
 

@@ -13,8 +13,26 @@ import (
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
+	"github.com/rtalexk/demux/internal/sticky"
 	"github.com/rtalexk/demux/internal/tmux"
 )
+
+// stickyPrepareTarget pre-installs a slot pane in the window tmux would focus
+// when given target, so the after-select-window hook's follow can swap-pane
+// instead of split-window (avoiding a one-time flicker). No-op outside
+// sticky/slots mode or when the resolution fails. Best-effort.
+func (m Model) stickyPrepareTarget(target string) {
+	if target == "" || !m.cfg.StickyMode || !m.cfg.Sidebar.Sticky.Slots {
+		return
+	}
+	winID, err := tmux.ResolveWindowID(target)
+	if err != nil || winID == "" {
+		return
+	}
+	s := sticky.New()
+	s.Slots = true
+	_ = s.PrepareWindow(winID, m.cfg.Sidebar.Sticky.Width)
+}
 
 const (
 	dirDown = 1
@@ -278,6 +296,7 @@ func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
 	if target == "" {
 		target = sessionName
 	}
+	m.stickyPrepareTarget(target)
 	err := tmux.SwitchClient(target)
 	if err == nil && m.popupMode {
 		return m, tea.Quit
@@ -471,6 +490,7 @@ func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 		target = node.Session
 	}
 	if target != "" {
+		m.stickyPrepareTarget(target)
 		tmux.SwitchClient(target)
 		if m.popupMode {
 			return m, tea.Quit

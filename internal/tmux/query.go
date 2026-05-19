@@ -149,6 +149,21 @@ func SelectNextPane() error {
 	return exec.Command("tmux", "select-pane", "-t", ":.+").Run()
 }
 
+// ResolveWindowID returns the @N window id of the destination tmux would
+// focus when target is given to switch-client / select-window. Accepts any
+// target tmux understands: session name, session_id, "session:winidx",
+// "session:winidx.paneidx", %paneid, @windowid.
+func ResolveWindowID(target string) (string, error) {
+	if target == "" {
+		return "", fmt.Errorf("empty target")
+	}
+	out, err := exec.Command("tmux", "display-message", "-t", target, "-p", "#{window_id}").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // PaneIDToTargetMap returns a map from pane_id (%N) to display label "session:windowIndex.paneIndex"
 // for all panes with a non-empty PaneID in the provided slice.
 func PaneIDToTargetMap(panes []Pane) map[string]string {
