@@ -443,6 +443,7 @@ focus_search_on_open = false        # start with cursor in the search input
 default_filter = "t"                # t | a | c | w | !
 sort = ["priority", "last_seen", "alphabetical"]
 switch_focus = "default"            # default | newest | oldest
+session_view = "row"                # row | card  (card = two-row layout with separator between sessions)
 
 [process_list]
 path_right_align = false            # right-align pane CWD paths

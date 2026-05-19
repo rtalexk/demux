@@ -81,6 +81,9 @@ sort = ["priority", "last_seen", "alphabetical"]
 #   oldest   — navigate to oldest updated state window
 switch_focus = "default"
 
+# Session view: row (single row, default) | card (two-row with separator)
+session_view = "row"
+
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
 # full cmdline (case-insensitive). Only the pane root and its direct children
