@@ -75,23 +75,32 @@ func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 }
 
 func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
-	if err := s.InstallSlotsInAllWindows(opts.Width); err != nil {
-		return err
-	}
+	// Activate the current window's slot first so the user sees demux
+	// appear immediately, then create placeholder slots in the remaining
+	// windows in the background.
 	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
 	if err != nil {
 		return fmt.Errorf("tmux display-message current target: %w", err)
 	}
 	target = strings.TrimSpace(target)
+	if err := s.EnsureSlotInWindow(target, opts.Width); err != nil {
+		return err
+	}
 	slot, err := s.FindSlotInWindow(target)
 	if err != nil {
 		return err
 	}
 	if slot == "" {
-		return fmt.Errorf("no slot in current window after install")
+		return fmt.Errorf("no slot in current window after ensure")
 	}
 	if err := s.T.Run("respawn-pane", "-k", "-t", slot, opts.Cmd); err != nil {
 		return fmt.Errorf("tmux respawn-pane: %w", err)
 	}
-	return s.WriteEnv(key, slot)
+	if err := s.WriteEnv(key, slot); err != nil {
+		return err
+	}
+	// Best-effort: install slots in remaining windows. Current already has
+	// one (@demux_slot=1), so it's skipped by EnsureSlotInWindow.
+	_ = s.InstallSlotsInAllWindows(opts.Width)
+	return nil
 }
