@@ -104,6 +104,29 @@ func (s *Sticky) UnsetEnv(key string) error {
 	return nil
 }
 
+// PaneAlive returns true when paneID appears in `tmux list-panes -a`.
+func (s *Sticky) PaneAlive(paneID string) (bool, error) {
+	out, err := s.T.Output("list-panes", "-aF", "#{pane_id}")
+	if err != nil {
+		return false, fmt.Errorf("tmux list-panes: %w", err)
+	}
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) == paneID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// CurrentClientTTY returns the tmux #{client_tty} for the invoking client.
+func (s *Sticky) CurrentClientTTY() (string, error) {
+	out, err := s.T.Output("display-message", "-p", "#{client_tty}")
+	if err != nil {
+		return "", fmt.Errorf("tmux display-message #{client_tty}: %w", err)
+	}
+	return strings.TrimSpace(out), nil
+}
+
 // isUnknownVariableErr inspects an error from exec.Command.Output() to detect
 // tmux's "unknown variable: X" stderr line.
 func isUnknownVariableErr(err error) bool {

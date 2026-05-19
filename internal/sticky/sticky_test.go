@@ -128,6 +128,57 @@ func TestWriteEnv(t *testing.T) {
 	}
 }
 
+func TestPaneAlive_Found(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%1\n%42\n%3\n"}
+	s := &Sticky{T: f}
+	alive, err := s.PaneAlive("%42")
+	if err != nil || !alive {
+		t.Errorf("want alive=true, got alive=%v err=%v", alive, err)
+	}
+}
+
+func TestPaneAlive_NotFound(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%1\n%3\n"}
+	s := &Sticky{T: f}
+	alive, err := s.PaneAlive("%42")
+	if err != nil || alive {
+		t.Errorf("want alive=false, got alive=%v err=%v", alive, err)
+	}
+}
+
+func TestPaneAlive_TmuxFails(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{err: errors.New("server not running")}
+	s := &Sticky{T: f}
+	if _, err := s.PaneAlive("%42"); err == nil {
+		t.Error("expected error to surface")
+	}
+}
+
+func TestCurrentClientTTY(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	s := &Sticky{T: f}
+	tty, err := s.CurrentClientTTY()
+	if err != nil {
+		t.Fatalf("CurrentClientTTY: %v", err)
+	}
+	if tty != "/dev/ttys001" {
+		t.Errorf("tty: want /dev/ttys001, got %q", tty)
+	}
+}
+
+func TestCurrentClientTTY_NotInTmux(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{err: stderrExitError("no server running")}
+	s := &Sticky{T: f}
+	if _, err := s.CurrentClientTTY(); err == nil {
+		t.Error("expected error when tmux unavailable")
+	}
+}
+
 func TestUnsetEnv(t *testing.T) {
 	f := newFakeTmux()
 	s := &Sticky{T: f}
