@@ -678,7 +678,49 @@ and window it was created in.
 # resize it normally with tmux (e.g. `prefix + <` or mouse drag); the width
 # is preserved on every session move.
 width = 35
+# Opt in to slots mode (see below).
+slots = false
 ```
+
+### Slots mode (opt-in, no follow flicker)
+
+By default, `follow` uses `join-pane` to physically move the sidebar pane
+across sessions and windows. Tmux briefly redraws the destination layout,
+which shows up as a one-frame flicker.
+
+Set `[sidebar.sticky] slots = true` and the sidebar switches to a different
+strategy:
+
+- A **slot pane** is created in every window (one extra pane each, running
+  `demux sidebar slot` as a quiet placeholder).
+- Each slot is tagged with the tmux user option `@demux_slot=1` and titled
+  `demux-slot` so you can recognize it (visible if you have
+  `set -g pane-border-status top` in your tmux config).
+- On window/session switch, the active sidebar pane is **swapped** with the
+  destination window's slot via `swap-pane -d`. No layout rebuild, no
+  flicker. Width is preserved via a follow-up `resize-pane`.
+
+Lifecycle for slots mode:
+
+```bash
+demux sidebar show              # installs slots + activates current window's slot
+demux sidebar hide              # deactivates (slot stays as placeholder)
+demux sidebar slots install     # idempotent: ensure every window has a slot
+demux sidebar slots uninstall   # remove every slot pane
+```
+
+The tmux snippet from `demux hooks init --tool tmux` already includes an
+`after-new-window` hook that auto-creates a slot in any newly created window
+(no-op when `slots = false`).
+
+Trade-offs:
+
+- Cost: one extra pane per window. Each runs a tiny demux process that
+  ignores `SIGINT`/`SIGTERM` so casual Ctrl+C doesn't kill the slot. Use
+  `prefix x` (tmux kill-pane) or `demux sidebar slots uninstall` to remove.
+- Slots in windows whose pane layout doesn't naturally accommodate a left
+  column will resize the existing panes to make room. Run `slots uninstall`
+  to revert.
 
 ### Notes and limitations
 
@@ -686,7 +728,8 @@ width = 35
   pane. Two clients attached to the same session may end up with two sidebar
   panes side by side; close either with `prefix x`.
 - The sidebar follows both session and window switches; focus is preserved
-  on the user's previously active pane via the `-d` flag on `join-pane`.
+  on the user's previously active pane via the `-d` flag on `join-pane` /
+  `swap-pane`.
 - Tmux 2.6 or newer is required (uses the `-f` flag on `split-window` /
   `join-pane`).
 - `demux --sticky` is not intended for interactive standalone use; the quit
