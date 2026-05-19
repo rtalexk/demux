@@ -27,6 +27,13 @@ const (
 	MinSidebarWidth = 10
 	// MinGitTimeoutWarnMs is the threshold below which a git timeout warning is issued.
 	MinGitTimeoutWarnMs = 50
+
+	// DefaultStickySidebarWidth is the initial width (in columns) used the first
+	// time the sticky sidebar pane is created. After creation, the user resizes
+	// the pane normally; Follow preserves whatever width is current at move time.
+	DefaultStickySidebarWidth = 35
+	// MinStickySidebarWidth is the minimum accepted value for Sidebar.Sticky.Width.
+	MinStickySidebarWidth = 10
 )
 
 // TickInterval is the TUI refresh tick derived from the default refresh interval.

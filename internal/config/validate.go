@@ -55,6 +55,9 @@ func (c Config) Validate() []ValidationIssue {
 	if c.Sidebar.Width < MinSidebarWidth {
 		add("error", "sidebar.width", fmt.Sprintf("must be ≥ 10, got %d", c.Sidebar.Width))
 	}
+	if c.Sidebar.Sticky.Width < MinStickySidebarWidth {
+		add("error", "sidebar.sticky.width", fmt.Sprintf("must be ≥ %d, got %d", MinStickySidebarWidth, c.Sidebar.Sticky.Width))
+	}
 
 	// Git timeout
 	if c.Git.TimeoutMs > 0 && c.Git.TimeoutMs < MinGitTimeoutWarnMs {

@@ -239,21 +239,26 @@ func normalizeSessionView(value, key, emptyDefault string) string {
 	}
 }
 
+type SidebarStickyConfig struct {
+	Width int `toml:"width"`
+}
+
 type SidebarConfig struct {
-	DefaultFilter          string         `toml:"default_filter"`
-	FocusOnOpen            string         `toml:"focus_on_open"`
-	FocusSearchOnOpen      bool           `toml:"focus_search_on_open"`
-	SearchSort             string         `toml:"search_sort"`
-	ShowLastSeen           bool           `toml:"show_last_seen"`
-	ActiveSessionIcon      string         `toml:"active_session_icon"`
-	Sort                   []string       `toml:"sort"`
-	SwitchFocus            string         `toml:"switch_focus"`
-	Width                  int            `toml:"width"`
-	SessionView            string         `toml:"session_view"`
-	SessionViewModeCompact string         `toml:"session_view_mode_compact"`
-	SessionViewModeFull    string         `toml:"session_view_mode_full"`
-	CardSeparator          string         `toml:"card_separator"`
-	Processes              []ProcessLabel `toml:"processes"`
+	DefaultFilter          string              `toml:"default_filter"`
+	FocusOnOpen            string              `toml:"focus_on_open"`
+	FocusSearchOnOpen      bool                `toml:"focus_search_on_open"`
+	SearchSort             string              `toml:"search_sort"`
+	ShowLastSeen           bool                `toml:"show_last_seen"`
+	ActiveSessionIcon      string              `toml:"active_session_icon"`
+	Sort                   []string            `toml:"sort"`
+	SwitchFocus            string              `toml:"switch_focus"`
+	Width                  int                 `toml:"width"`
+	SessionView            string              `toml:"session_view"`
+	SessionViewModeCompact string              `toml:"session_view_mode_compact"`
+	SessionViewModeFull    string              `toml:"session_view_mode_full"`
+	CardSeparator          string              `toml:"card_separator"`
+	Processes              []ProcessLabel      `toml:"processes"`
+	Sticky                 SidebarStickyConfig `toml:"sticky"`
 }
 
 type ProcessListConfig struct {
@@ -308,6 +313,7 @@ func Default() Config {
 			ActiveSessionIcon: DefaultActiveSessionIcon,
 			SessionView:       SidebarViewRow,
 			CardSeparator:     CardSeparatorBlank,
+			Sticky:            SidebarStickyConfig{Width: DefaultStickySidebarWidth},
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
@@ -435,6 +441,13 @@ func Load(path string) (Config, error) {
 	cfg.Sidebar.SessionViewModeCompact = normalizeSessionView(cfg.Sidebar.SessionViewModeCompact, "sidebar.session_view_mode_compact", "")
 	cfg.Sidebar.SessionViewModeFull = normalizeSessionView(cfg.Sidebar.SessionViewModeFull, "sidebar.session_view_mode_full", "")
 	cfg.Sidebar.CardSeparator = normalizeCardSeparator(cfg.Sidebar.CardSeparator)
+
+	if cfg.Sidebar.Sticky.Width < MinStickySidebarWidth {
+		fmt.Fprintf(os.Stderr,
+			"demux: clamping sidebar.sticky.width %d below minimum %d; using %d\n",
+			cfg.Sidebar.Sticky.Width, MinStickySidebarWidth, MinStickySidebarWidth)
+		cfg.Sidebar.Sticky.Width = MinStickySidebarWidth
+	}
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {

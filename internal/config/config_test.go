@@ -837,6 +837,54 @@ func TestLoadFromFile_SessionViewModeInvalidWarnsAndClears(t *testing.T) {
 	}
 }
 
+func TestSidebarSticky_DefaultWidth(t *testing.T) {
+	cfg := config.Default()
+	if cfg.Sidebar.Sticky.Width != config.DefaultStickySidebarWidth {
+		t.Errorf("default sticky width: want %d, got %d", config.DefaultStickySidebarWidth, cfg.Sidebar.Sticky.Width)
+	}
+}
+
+func TestSidebarSticky_LoadOverridesDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := "[sidebar.sticky]\nwidth = 50\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Sidebar.Sticky.Width != 50 {
+		t.Errorf("override sticky width: want 50, got %d", cfg.Sidebar.Sticky.Width)
+	}
+}
+
+func TestSidebarSticky_LoadClampsBelowMinimum(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := "[sidebar.sticky]\nwidth = 4\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	defer func() { os.Stderr = origStderr }()
+	cfg, err := config.Load(path)
+	w.Close()
+	out, _ := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Sidebar.Sticky.Width != config.MinStickySidebarWidth {
+		t.Errorf("clamp: want %d, got %d", config.MinStickySidebarWidth, cfg.Sidebar.Sticky.Width)
+	}
+	if !strings.Contains(string(out), "sidebar.sticky.width") {
+		t.Errorf("expected stderr warning mentioning sidebar.sticky.width, got: %s", out)
+	}
+}
+
 func TestResolvedSessionView(t *testing.T) {
 	cases := []struct {
 		name     string
