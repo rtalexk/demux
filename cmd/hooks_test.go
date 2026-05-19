@@ -53,6 +53,27 @@ func TestTmuxHooksSnippet_PaneFocusIncludesPaneID(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_ContainsStickyFollowHook(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "client-session-changed") {
+		t.Error("snippet should still include client-session-changed hook")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "demux sidebar follow") {
+		t.Error("snippet should include 'demux sidebar follow' hook for sticky sidebar")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-session-changed") {
+		t.Error("sticky follow hook should use -ga (append), not -g (overwrite)")
+	}
+}
+
+func TestTmuxHooksSnippet_ContainsStickyAutoShowHook(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-attached") {
+		t.Error("snippet should include client-attached hook for sticky auto-show")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "demux sidebar show") {
+		t.Error("snippet should call 'demux sidebar show' on client-attached")
+	}
+}
+
 func TestTmuxParentIDs_ParsesTabSeparatedOutput(t *testing.T) {
 	// parseTmuxTabOutput is the same logic used by tmuxParentIDs:
 	// split on tab, expect [windowID, sessionID].
