@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
+	"github.com/rtalexk/demux/internal/sticky"
 	"github.com/spf13/cobra"
 )
 
@@ -161,7 +162,19 @@ var eventPaneClosedCmd = &cobra.Command{
 func applyPaneClosed(d *db.DB, paneID string) error {
 	demuxlog.Debug("pane_closed", "pane_id", paneID)
 	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
-	return d.StateClear(t)
+	if err := d.StateClear(t); err != nil {
+		return err
+	}
+	if err := sticky.ClearStickyEnvForPane(stickyTmuxForEvents(), paneID); err != nil {
+		demuxlog.Warn("pane_closed: sticky env cleanup failed", "pane_id", paneID, "err", err)
+	}
+	return nil
+}
+
+// stickyTmuxForEvents is a swappable real-tmux instance so tests can inject a
+// fake without going through global state.
+var stickyTmuxForEvents = func() sticky.Tmux {
+	return sticky.New().T
 }
 
 func init() {
