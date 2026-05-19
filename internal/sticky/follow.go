@@ -61,10 +61,25 @@ func (s *Sticky) Follow() error {
 		width = config.DefaultStickySidebarWidth
 	}
 	if s.Slots {
-		return s.followSlotsMode(val, curr, width)
+		if err := s.followSlotsMode(val, curr, width); err != nil {
+			return err
+		}
+		s.pokeRefresh(val)
+		return nil
 	}
 	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
+	s.pokeRefresh(val)
 	return nil
+}
+
+// pokeRefresh sends the TUI's force-refresh key ("R") to the sticky pane so
+// it picks up the new active session/window immediately instead of waiting
+// for its next refresh tick.
+func (s *Sticky) pokeRefresh(paneID string) {
+	if paneID == "" {
+		return
+	}
+	_ = s.T.Run("send-keys", "-t", paneID, "R")
 }
 
 // followSlotsMode swaps the active sidebar pane with the destination window's

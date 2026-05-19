@@ -176,6 +176,29 @@ func TestFollow_SlotsMode_NoSlotInTarget_CreatesOne(t *testing.T) {
 	}
 }
 
+func TestFollow_PokesRefreshAfterMove(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%42\n"}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$2:@9\n"}
+	f.outputs["display-message -p -t %42 #{window_id}"] = fakeReply{out: "@3\n"}
+	f.outputs["display-message -p -t %42 #{pane_width}"] = fakeReply{out: "48\n"}
+	s := &Sticky{T: f}
+	if err := s.Follow(); err != nil {
+		t.Fatalf("Follow: %v", err)
+	}
+	saw := false
+	for _, r := range f.runs {
+		if strings.Join(r, " ") == "send-keys -t %42 R" {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Errorf("expected send-keys -t %%42 R after move, got: %v", f.runs)
+	}
+}
+
 func TestFollow_JoinFailure_DoesNotPropagate(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
