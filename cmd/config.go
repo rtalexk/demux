@@ -81,8 +81,16 @@ sort = ["priority", "last_seen", "alphabetical"]
 #   oldest   — navigate to oldest updated state window
 switch_focus = "default"
 
-# Session view: row (single row, default) | card (two-row with separator)
+# Session view: row (single row, default) | card (two-row layout).
+# session_view is the fallback for both modes; the *_mode_* overrides win
+# when set. Use "" (or omit) to inherit from session_view.
 session_view = "row"
+session_view_mode_compact = ""
+session_view_mode_full = ""
+
+# Show a blank row between cards (card view only). Set to false for a denser
+# layout with no separator.
+card_separator = true
 
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
