@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	"github.com/rtalexk/demux/internal/sticky"
 	"github.com/spf13/cobra"
@@ -63,7 +65,23 @@ var sidebarFollowCmd = &cobra.Command{
 	},
 }
 
+var sidebarSlotCmd = &cobra.Command{
+	Use:    "slot",
+	Short:  "Internal: placeholder process for an inactive sticky sidebar slot",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+		fmt.Print("\x1b[2J\x1b[H\n\n")
+		fmt.Println("  demux sidebar slot")
+		fmt.Println()
+		fmt.Println("  Reserved by [sidebar.sticky] slots.")
+		fmt.Println("  Activate this window's slot with")
+		fmt.Println("  `demux sidebar show`.")
+		select {}
+	},
+}
+
 func init() {
-	sidebarCmd.AddCommand(sidebarShowCmd, sidebarHideCmd, sidebarToggleCmd, sidebarFollowCmd)
+	sidebarCmd.AddCommand(sidebarShowCmd, sidebarHideCmd, sidebarToggleCmd, sidebarFollowCmd, sidebarSlotCmd)
 	rootCmd.AddCommand(sidebarCmd)
 }

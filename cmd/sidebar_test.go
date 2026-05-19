@@ -28,3 +28,13 @@ func TestSidebarCmd_FollowIsHidden(t *testing.T) {
 		t.Errorf("follow should be hidden from --help")
 	}
 }
+
+func TestSidebarCmd_SlotIsHidden(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"sidebar", "slot"})
+	if cmd == nil {
+		t.Fatal("slot subcommand missing")
+	}
+	if !cmd.Hidden {
+		t.Errorf("slot should be hidden from --help")
+	}
+}
