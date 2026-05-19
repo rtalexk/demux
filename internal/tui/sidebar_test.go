@@ -1182,15 +1182,34 @@ func TestSidebarViewport_CardMode_KeepsCursorVisible(t *testing.T) {
 		}
 		return 3
 	}
-	offset, contentRows, hasAbove, hasBelow := sidebarViewport(3, 0, 8, 5, heightFn)
-	if offset == 0 {
-		t.Errorf("expected offset > 0 to bring cursor 3 into view, got %d", offset)
+	// Setup: 5 nodes with heights [3, 3, 3, 3, 2], cursor=3, visibleRows=8.
+	// The viewport must advance offset until the cursor fits inside the
+	// budget (which shrinks by 1 for ▲ and another 1 for ▼). With offset=2
+	// and contentRows=6 (8 - 1 ▲ - 1 ▼), heights [3, 3] from offset 2 sum to
+	// 6 and include cursor 3 — first offset where this works.
+	const cursor = 3
+	const nodeCount = 5
+	offset, contentRows, hasAbove, hasBelow := sidebarViewport(cursor, 0, 8, nodeCount, heightFn)
+	if offset != 2 {
+		t.Errorf("offset: got %d, want 2", offset)
 	}
-	if contentRows < 1 {
-		t.Errorf("contentRows should be >= 1, got %d", contentRows)
+	if contentRows != 6 {
+		t.Errorf("contentRows: got %d, want 6", contentRows)
 	}
-	_ = hasAbove
-	_ = hasBelow
+	if !hasAbove {
+		t.Errorf("hasAbove: got false, want true (offset > 0)")
+	}
+	if !hasBelow {
+		t.Errorf("hasBelow: got false, want true (nodes beyond visible)")
+	}
+	// Sanity check: cursor must fall within the range of fitting nodes.
+	consumed, cursorFits := countFit(offset, nodeCount, cursor, contentRows, heightFn)
+	if !cursorFits {
+		t.Errorf("cursor %d should fit in [%d, %d)", cursor, offset, consumed)
+	}
+	if cursor < offset || cursor >= consumed {
+		t.Errorf("cursor %d outside fitting range [%d, %d)", cursor, offset, consumed)
+	}
 }
 
 func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
@@ -1220,6 +1239,39 @@ func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 	}
 	if strings.TrimSpace(stripANSI(lines[7])) == "" {
 		t.Errorf("line 7 (last card row 2) should not be blank: %q", lines[7])
+	}
+}
+
+func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"}, {Session: "delta"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+			{DisplayName: "delta", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return "▼" }
+	// Render only first 2 cards with hasBelow=true. contentRows budget = 6 (2 cards × 3 rows each).
+	// Expected lines (with hasBelow appending the ▼ hint): alpha-r1, alpha-r2, blank, beta-r1, beta-r2, then ▼.
+	// No blank between beta-r2 and ▼.
+	lines := s.buildSidebarLines(0, 6, false, true, false, 40, centered)
+	if len(lines) != 6 {
+		t.Fatalf("expected 6 lines, got %d: %v", len(lines), lines)
+	}
+	if strings.TrimSpace(stripANSI(lines[2])) != "" {
+		t.Errorf("line 2 should be separator between cards, got %q", lines[2])
+	}
+	if strings.TrimSpace(stripANSI(lines[4])) == "" {
+		t.Errorf("line 4 (beta r2) should not be blank: %q", lines[4])
+	}
+	if !strings.Contains(lines[5], "▼") {
+		t.Errorf("line 5 should be ▼ hint, got %q", lines[5])
 	}
 }
 
