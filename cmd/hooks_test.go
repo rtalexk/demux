@@ -65,6 +65,12 @@ func TestTmuxHooksSnippet_ContainsStickyFollowHook(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_ContainsStickyWindowFollowHook(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga after-select-window") {
+		t.Error("snippet should include after-select-window -ga hook for sticky window follow")
+	}
+}
+
 func TestTmuxHooksSnippet_ContainsStickyAutoShowHook(t *testing.T) {
 	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-attached") {
 		t.Error("snippet should include client-attached hook for sticky auto-show")

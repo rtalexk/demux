@@ -151,8 +151,12 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_
 # the kill — using #{pane_id} here would clear the wrong pane's state.
 set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
 
-# Sticky sidebar - moves the demux sidebar pane to the newly attached session.
+# Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"
+
+# Sticky sidebar - moves the demux sidebar pane to the newly active window
+# (within the same session). join-pane uses -d so user focus is preserved.
+set-hook -ga after-select-window "run-shell 'demux sidebar follow 2>/dev/null; true'"
 
 # Sticky sidebar auto-show on client attach. Remove this line if you prefer
 # to toggle the sticky sidebar manually with 'demux sidebar toggle'.
