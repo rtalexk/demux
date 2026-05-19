@@ -582,7 +582,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 	rowsLeft := contentRows
 	for i := offset; i < end; i++ {
 		isLastInList := (i == len(s.nodes)-1)
-		h := s.nodeHeight(s.nodes[i], isLastInList)
+		h := s.nodeHeight(isLastInList)
 		if h > rowsLeft {
 			break
 		}
@@ -596,7 +596,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 			// includes the separator for non-last cards, so rowsLeft was already
 			// charged for it; skipping the append here over-subtracts rowsLeft by
 			// 1, but the loop is about to exit so no further damage.
-			nextH := s.nodeHeight(s.nodes[i+1], (i+1) == len(s.nodes)-1)
+			nextH := s.nodeHeight((i + 1) == len(s.nodes)-1)
 			if nextH <= rowsLeft {
 				lines = append(lines, sep)
 			}
@@ -614,9 +614,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 		visibleRows = 1
 	}
 
-	heightFn := func(i int, isLast bool) int {
-		return s.nodeHeight(s.nodes[i], isLast)
-	}
+	heightFn := func(_ int, isLast bool) int { return s.nodeHeight(isLast) }
 	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes), heightFn)
 
 	innerW := width - borderOverhead
@@ -681,7 +679,7 @@ func (s SidebarModel) cardSeparatorRow(innerW int) string {
 // nodeHeight returns the viewport rows consumed by a session in the current
 // view. Card mode reserves 2 content rows; a trailing separator row adds 1
 // for every card except the last visible one when card_separator is enabled.
-func (s SidebarModel) nodeHeight(_ SidebarNode, isLast bool) int {
+func (s SidebarModel) nodeHeight(isLast bool) int {
 	if s.cardView() {
 		if isLast || s.cfg.Sidebar.CardSeparator == config.CardSeparatorNone {
 			return 2
@@ -696,8 +694,8 @@ func (s SidebarModel) nodeHeight(_ SidebarNode, isLast bool) int {
 // measured by display-column width (runewidth) after stripping ANSI codes,
 // so multi-column glyphs (e.g. emoji) are accounted for correctly.
 func alignedRow(name, indicators string, availWidth int) string {
-	nameW := runewidth.StringWidth(stripANSI(name))
-	indW := runewidth.StringWidth(stripANSI(indicators))
+	nameW := visualWidth(name)
+	indW := visualWidth(indicators)
 	pad := availWidth - nameW - indW
 	if pad < 1 {
 		pad = 1
@@ -917,7 +915,7 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 		pad = 0
 	}
 	if focused {
-		indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+		indicatorGlyph := selectedSession.Render(focusGlyph)
 		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(selectedTrail)
 		name := selectedBG.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
 		spacer := selectedBG.Render(" ")
@@ -940,13 +938,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	if sess := s.FindSession(node.Session); sess != nil {
 		iconPrefix = sessionIcon(*sess) + " "
 	}
-	iconW := runewidth.StringWidth(stripANSI(iconPrefix))
-
-	// Resolve active icon early so its width can be accounted for in availW.
-	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
-	if activeIcon == "" {
-		activeIcon = config.DefaultActiveSessionIcon
-	}
+	iconW := visualWidth(iconPrefix)
 
 	// Row format: [focus(1)] [gap(1)] [active-slot(1)] [icon(iconW)] [name+indicators(availW)]
 	// The active-slot is always reserved (indicator or space) so the session icon
@@ -955,7 +947,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	if availW < minRowWidth {
 		availW = minRowWidth
 	}
-	indW := runewidth.StringWidth(stripANSI(indicators))
+	indW := visualWidth(indicators)
 	maxName := availW - indW
 	if indW > 0 {
 		maxName-- // alignedRow enforces pad>=1 separator; reserve it so truncation doesn't overflow
@@ -970,17 +962,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		nameStr = truncateSessionName(node.Session, maxName)
 	}
 
-	// Compute gap: active session gets the directional indicator; others get a space.
-	gap := " "
-	if node.Session == s.activeSession {
-		if selected && focused {
-			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(activeIcon)
-		} else {
-			gap = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
-		}
-	} else if selected && focused {
-		gap = selectedBG.Render(gap)
-	}
+	gap := s.activeIndicator(node, selected && focused)
 	if selected {
 		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
@@ -990,8 +972,8 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 
 // renderSessionCard renders a session as a two-row card.
 //
-//	Row 1: <focus(1)><active(1)> <session_icon> <session_name> <watch> <trail>
-//	Row 2: <focus(1)> <state_icon> <state_label> <gap> <proc> <git> <todo> <last_seen>
+//	header: <focus(1)><active(1)> <session_icon> <session_name> <watch> <trail>
+//	status: <focus(1)> <state_icon> <state_label> <gap> <proc> <git> <todo> <last_seen>
 //
 // Rows are joined with "\n". The blank separator row between cards is the
 // caller's responsibility (emitted by buildSidebarLines), so this renderer
@@ -1005,9 +987,9 @@ func (s SidebarModel) renderSessionCard(node SidebarNode, selected, focused bool
 	if innerW < minRowWidth+4 {
 		innerW = minRowWidth + 4
 	}
-	row1 := s.renderCardRow1(node, selected, focused, innerW)
-	row2 := s.renderCardRow2(node, selected, focused, innerW)
-	return row1 + "\n" + row2
+	header := s.renderCardHeader(node, selected, focused, innerW)
+	status := s.renderCardStatus(node, selected, focused, innerW)
+	return header + "\n" + status
 }
 
 // cardLeadingGlyph returns the column-0 glyph for a card row. Selected cards
@@ -1016,7 +998,7 @@ func (s SidebarModel) renderSessionCard(node SidebarNode, selected, focused bool
 func cardLeadingGlyph(selected, focused bool) string {
 	switch {
 	case focused:
-		return lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+		return selectedSession.Render(focusGlyph)
 	case selected:
 		return lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
 	default:
@@ -1024,35 +1006,50 @@ func cardLeadingGlyph(selected, focused bool) string {
 	}
 }
 
-// renderCardRow1 builds row 1: focus + active + session icon + name + watch,
-// with the highlight background extended to the full innerW when focused.
-func (s SidebarModel) renderCardRow1(node SidebarNode, selected, focused bool, innerW int) string {
-	// Active indicator slot (always 1 col so column alignment is stable).
-	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
-	if activeIcon == "" {
-		activeIcon = config.DefaultActiveSessionIcon
+// activeIconChar returns the configured active-session indicator, falling
+// back to the package default when unset.
+func (s SidebarModel) activeIconChar() string {
+	if icon := s.cfg.Sidebar.ActiveSessionIcon; icon != "" {
+		return icon
 	}
-	active := " "
+	return config.DefaultActiveSessionIcon
+}
+
+// activeIndicator returns the 1-col cell that goes in the "active session"
+// slot of a sidebar row. When the row represents the attached tmux session,
+// the configured icon is styled with the session color (with the selected
+// background when highlighted). Otherwise a plain space is returned, also
+// styled with the highlight background when highlighted so the slot blends
+// into the selection bar.
+func (s SidebarModel) activeIndicator(node SidebarNode, highlighted bool) string {
 	if node.Session == s.activeSession {
-		if focused {
-			active = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(activeIcon)
-		} else {
-			active = lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(activeIcon)
+		if highlighted {
+			return selectedSession.Render(s.activeIconChar())
 		}
-	} else if focused {
-		active = selectedBG.Render(active)
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(s.activeIconChar())
 	}
+	if highlighted {
+		return selectedBG.Render(" ")
+	}
+	return " "
+}
+
+// renderCardHeader builds the top row of a session card: focus + active +
+// session icon + name + watch, with the highlight background extended to the
+// full innerW when focused.
+func (s SidebarModel) renderCardHeader(node SidebarNode, selected, focused bool, innerW int) string {
+	active := s.activeIndicator(node, focused)
 
 	// Session icon.
 	iconPrefix := ""
 	if sess := s.FindSession(node.Session); sess != nil {
 		iconPrefix = sessionIcon(*sess) + " "
 	}
-	iconW := runewidth.StringWidth(stripANSI(iconPrefix))
+	iconW := visualWidth(iconPrefix)
 
 	// Watch slot (fixed width even when unwatched).
 	watch := s.watchIndicator(node, focused, focused)
-	watchW := runewidth.StringWidth(stripANSI(watch))
+	watchW := visualWidth(watch)
 
 	// Budget for name: total - focus(1) - active(1) - sep(1 between active & icon) - icon - sep(1) - watch - trail(1).
 	overhead := 1 /*focus*/ + 1 /*active*/ + 1 /*sep*/ + iconW + 1 /*sep*/ + watchW + 1 /*trail*/
@@ -1069,7 +1066,7 @@ func (s SidebarModel) renderCardRow1(node SidebarNode, selected, focused bool, i
 	}
 
 	// Compute pad so highlight stretches to innerW on focus.
-	used := overhead + runewidth.StringWidth(stripANSI(nameStr))
+	used := overhead + visualWidth(nameStr)
 	pad := innerW - used
 	if pad < 0 {
 		pad = 0
@@ -1088,10 +1085,11 @@ func (s SidebarModel) renderCardRow1(node SidebarNode, selected, focused bool, i
 	return focusGl + active + " " + iconPrefix + nameStyled + " " + watch
 }
 
-// renderCardRow2 builds row 2: focus + state-icon + state-label (left) and
-// proc/git/todo/last-seen (right), with justify-between spacing. When the
-// session is idle or has no state, the left state group is blank.
-func (s SidebarModel) renderCardRow2(node SidebarNode, selected, focused bool, innerW int) string {
+// renderCardStatus builds the bottom row of a session card: focus +
+// state-icon + state-label (left) and proc/git/todo/last-seen (right), with
+// justify-between spacing. When the session is idle or has no state, the
+// left state group is blank.
+func (s SidebarModel) renderCardStatus(node SidebarNode, selected, focused bool, innerW int) string {
 	// Left group: state icon + label.
 	var leftIcon, leftLabel string
 	st := s.stateForSession(node.Session)
@@ -1111,38 +1109,32 @@ func (s SidebarModel) renderCardRow2(node SidebarNode, selected, focused bool, i
 		}
 	}
 
-	// Right group: proc, git, todo, last-seen. Reuse existing helpers, joined
-	// by single space (styled when focused so the gap inherits the highlight).
+	// Right group: proc, git, todo, last-seen. Joined by a single space, styled
+	// when focused so the gap inherits the highlight.
+	indicatorFns := []func(SidebarNode, bool, bool) string{
+		s.procLabelIndicator, s.gitIndicator, s.itemIndicator, s.lastSeenIndicator,
+	}
 	var rightParts []string
-	if ind := s.procLabelIndicator(node, focused, focused); ind != "" {
-		rightParts = append(rightParts, ind)
+	for _, fn := range indicatorFns {
+		if ind := fn(node, focused, focused); ind != "" {
+			rightParts = append(rightParts, ind)
+		}
 	}
-	if ind := s.gitIndicator(node, focused, focused); ind != "" {
-		rightParts = append(rightParts, ind)
-	}
-	if ind := s.itemIndicator(node, focused, focused); ind != "" {
-		rightParts = append(rightParts, ind)
-	}
-	if ind := s.lastSeenIndicator(node, focused, focused); ind != "" {
-		rightParts = append(rightParts, ind)
-	}
-	var right string
+	sep := " "
 	if focused {
-		sep := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(" ")
-		right = strings.Join(rightParts, sep)
-	} else {
-		right = strings.Join(rightParts, " ")
+		sep = selectedBG.Render(" ")
 	}
+	right := strings.Join(rightParts, sep)
 
 	// If state is blank, the icon column is still reserved as a space so right group alignment
 	// stays consistent regardless of state presence.
-	leftIconW := runewidth.StringWidth(stripANSI(leftIcon))
-	leftLabelW := runewidth.StringWidth(stripANSI(leftLabel))
+	leftIconW := visualWidth(leftIcon)
+	leftLabelW := visualWidth(leftLabel)
 	if leftIconW == 0 {
 		leftIcon = " "
 		leftIconW = 1
 	}
-	rightW := runewidth.StringWidth(stripANSI(right))
+	rightW := visualWidth(right)
 	used := 1 /*focus*/ + 1 /*sep*/ + leftIconW + 1 /*sep*/ + leftLabelW
 	trailW := 1
 	gap := innerW - used - rightW - trailW
@@ -1240,7 +1232,7 @@ func (s *SidebarModel) clampViewport(visibleRows int) {
 	if effective < 1 {
 		effective = 1
 	}
-	heightFn := func(i int, isLast bool) int { return s.nodeHeight(s.nodes[i], isLast) }
+	heightFn := func(_ int, isLast bool) int { return s.nodeHeight(isLast) }
 	if s.cursor < s.offset {
 		s.offset = s.cursor
 	}

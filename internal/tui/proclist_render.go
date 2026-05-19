@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/format"
 	"github.com/rtalexk/demux/internal/proc"
@@ -583,6 +584,13 @@ func formatProcDuration(d time.Duration) string {
 	default:
 		return fmt.Sprintf("%ds", s)
 	}
+}
+
+// visualWidth returns the display-column width of s, ignoring ANSI escape
+// sequences. Use for layout math where the rendered width matters more than
+// the raw byte/rune count.
+func visualWidth(s string) int {
+	return runewidth.StringWidth(stripANSI(s))
 }
 
 func stripANSI(s string) string {

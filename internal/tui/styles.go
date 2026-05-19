@@ -58,6 +58,7 @@ var (
 
 	// Selection
 	selectedBG       lipgloss.Style
+	selectedSession  lipgloss.Style
 	selectedInactive lipgloss.Style
 
 	// Tree connectors
@@ -118,6 +119,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 	statValueStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 
 	selectedBG = lipgloss.NewStyle().Background(t.ColorSelected).Foreground(t.ColorFgPrimary)
+	selectedSession = lipgloss.NewStyle().Foreground(t.ColorSession).Background(t.ColorSelected)
 	selectedInactive = lipgloss.NewStyle().Foreground(t.ColorSession)
 
 	treeConnectorStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
