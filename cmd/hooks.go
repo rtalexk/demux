@@ -158,6 +158,11 @@ set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null
 # (within the same session). join-pane uses -d so user focus is preserved.
 set-hook -ga after-select-window "run-shell 'demux sidebar follow 2>/dev/null; true'"
 
+# Sticky sidebar (slots mode) - ensures every newly created window gets a
+# sidebar slot pane. No-op when [sidebar.sticky] slots = false or when no
+# slots have been installed yet.
+set-hook -ga after-new-window "run-shell 'demux sidebar slots ensure 2>/dev/null; true'"
+
 # Sticky sidebar auto-show on client attach. Remove this line if you prefer
 # to toggle the sticky sidebar manually with 'demux sidebar toggle'.
 set-hook -ga client-attached "run-shell 'demux sidebar show 2>/dev/null; true'"

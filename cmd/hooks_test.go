@@ -71,6 +71,15 @@ func TestTmuxHooksSnippet_ContainsStickyWindowFollowHook(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_ContainsStickySlotsEnsureHook(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga after-new-window") {
+		t.Error("snippet should include after-new-window -ga hook for slots ensure")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "demux sidebar slots ensure") {
+		t.Error("after-new-window hook should call 'demux sidebar slots ensure'")
+	}
+}
+
 func TestTmuxHooksSnippet_ContainsStickyAutoShowHook(t *testing.T) {
 	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-attached") {
 		t.Error("snippet should include client-attached hook for sticky auto-show")
