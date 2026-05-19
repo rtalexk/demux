@@ -748,3 +748,91 @@ func TestLoadFromFile_SessionView_InvalidWarnsOnStderr(t *testing.T) {
 		t.Errorf("expected stderr warning, got %q", string(buf))
 	}
 }
+
+func TestDefaults_CardSeparator(t *testing.T) {
+	c := config.Default()
+	if !c.Sidebar.CardSeparator {
+		t.Errorf("expected CardSeparator default true, got false")
+	}
+}
+
+func TestLoadFromFile_CardSeparator_False(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\ncard_separator = false\n")
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.CardSeparator {
+		t.Errorf("expected CardSeparator=false, got true")
+	}
+}
+
+func TestLoadFromFile_SessionViewModeOverrides(t *testing.T) {
+	path := writeTempConfig(t, `[sidebar]
+session_view = "row"
+session_view_mode_compact = "card"
+session_view_mode_full = "row"
+`)
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionViewModeCompact != "card" {
+		t.Errorf("compact override: got %q, want \"card\"", c.Sidebar.SessionViewModeCompact)
+	}
+	if c.Sidebar.SessionViewModeFull != "row" {
+		t.Errorf("full override: got %q, want \"row\"", c.Sidebar.SessionViewModeFull)
+	}
+}
+
+func TestLoadFromFile_SessionViewModeInvalidWarnsAndClears(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view_mode_compact = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	c, err := config.Load(path)
+	w.Close()
+	os.Stderr = origStderr
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf, _ := io.ReadAll(r)
+	if !strings.Contains(string(buf), `ignoring sidebar.session_view_mode_compact "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
+	}
+	if c.Sidebar.SessionViewModeCompact != "" {
+		t.Errorf("invalid override should clear to \"\", got %q", c.Sidebar.SessionViewModeCompact)
+	}
+}
+
+func TestResolvedSessionView(t *testing.T) {
+	cases := []struct {
+		name     string
+		base     string
+		compact  string
+		full     string
+		mode     string
+		expected string
+	}{
+		{"default empty all", "", "", "", "full", "row"},
+		{"base only", "card", "", "", "full", "card"},
+		{"compact override beats base", "row", "card", "", "compact", "card"},
+		{"full override beats base", "card", "", "row", "full", "row"},
+		{"compact override ignored in full mode", "row", "card", "", "full", "row"},
+		{"full override ignored in compact mode", "card", "", "row", "compact", "card"},
+		{"unknown mode falls through to base", "card", "", "", "weird", "card"},
+		{"unknown mode falls through to default", "", "", "", "weird", "row"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := config.SidebarConfig{
+				SessionView:            tc.base,
+				SessionViewModeCompact: tc.compact,
+				SessionViewModeFull:    tc.full,
+			}
+			if got := sc.ResolvedSessionView(tc.mode); got != tc.expected {
+				t.Errorf("ResolvedSessionView(mode=%q): got %q, want %q", tc.mode, got, tc.expected)
+			}
+		})
+	}
+}

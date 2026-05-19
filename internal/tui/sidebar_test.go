@@ -1215,7 +1215,7 @@ func TestSidebarViewport_CardMode_KeepsCursorVisible(t *testing.T) {
 func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
-		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: true, Width: 40}},
 		nodes: []SidebarNode{
 			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
 		},
@@ -1245,7 +1245,7 @@ func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
-		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: true, Width: 40}},
 		nodes: []SidebarNode{
 			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"}, {Session: "delta"},
 		},
@@ -1272,6 +1272,32 @@ func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
 	}
 	if !strings.Contains(lines[5], "▼") {
 		t.Errorf("line 5 should be ▼ hint, got %q", lines[5])
+	}
+}
+
+func TestBuildSidebarLines_CardMode_NoSeparatorWhenDisabled(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: false, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// With separators off, each card consumes exactly 2 rows: 3 cards × 2 = 6.
+	lines := s.buildSidebarLines(0, 6, false, false, false, 40, centered)
+	if len(lines) != 6 {
+		t.Fatalf("expected 6 lines, got %d: %v", len(lines), lines)
+	}
+	for i, l := range lines {
+		if strings.TrimSpace(stripANSI(l)) == "" {
+			t.Errorf("line %d unexpectedly blank: %q", i, l)
+		}
 	}
 }
 
@@ -1494,23 +1520,26 @@ func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
 
 func TestNodeHeight(t *testing.T) {
 	cases := []struct {
-		name     string
-		view     string
-		isLast   bool
-		expected int
+		name      string
+		view      string
+		separator bool
+		isLast    bool
+		expected  int
 	}{
-		{"row mode any", config.SidebarViewRow, false, 1},
-		{"row mode last", config.SidebarViewRow, true, 1},
-		{"card mode non-last", config.SidebarViewCard, false, 3},
-		{"card mode last", config.SidebarViewCard, true, 2},
-		{"empty defaults row", "", false, 1},
+		{"row mode any", config.SidebarViewRow, true, false, 1},
+		{"row mode last", config.SidebarViewRow, true, true, 1},
+		{"card mode non-last with separator", config.SidebarViewCard, true, false, 3},
+		{"card mode last with separator", config.SidebarViewCard, true, true, 2},
+		{"card mode non-last no separator", config.SidebarViewCard, false, false, 2},
+		{"card mode last no separator", config.SidebarViewCard, false, true, 2},
+		{"empty defaults row", "", true, false, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			s := SidebarModel{cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: tc.view}}}
+			s := SidebarModel{cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: tc.view, CardSeparator: tc.separator}}}
 			got := s.nodeHeight(SidebarNode{Session: "x"}, tc.isLast)
 			if got != tc.expected {
-				t.Errorf("nodeHeight(view=%q, isLast=%v): got %d, want %d", tc.view, tc.isLast, got, tc.expected)
+				t.Errorf("nodeHeight(view=%q, sep=%v, isLast=%v): got %d, want %d", tc.view, tc.separator, tc.isLast, got, tc.expected)
 			}
 		})
 	}

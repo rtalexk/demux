@@ -189,18 +189,56 @@ func (s SidebarConfig) ProcessPatterns() []procmatch.Pattern {
 	return out
 }
 
+// ResolvedSessionView returns the effective session view for the given top-level
+// mode. Mode-specific overrides win, then SessionView, then the row default.
+// Caller is expected to pass Config.Mode (e.g. "full" or "compact").
+func (s SidebarConfig) ResolvedSessionView(mode string) string {
+	switch mode {
+	case "compact":
+		if s.SessionViewModeCompact != "" {
+			return s.SessionViewModeCompact
+		}
+	case "full":
+		if s.SessionViewModeFull != "" {
+			return s.SessionViewModeFull
+		}
+	}
+	if s.SessionView != "" {
+		return s.SessionView
+	}
+	return SidebarViewRow
+}
+
+// normalizeSessionView validates a session_view-style value. Empty input
+// returns emptyDefault unchanged; an invalid non-empty value warns to stderr
+// and returns emptyDefault.
+func normalizeSessionView(value, key, emptyDefault string) string {
+	switch value {
+	case "":
+		return emptyDefault
+	case SidebarViewRow, SidebarViewCard:
+		return value
+	default:
+		fmt.Fprintf(os.Stderr, "demux: ignoring %s %q: must be \"row\" or \"card\"\n", key, value)
+		return emptyDefault
+	}
+}
+
 type SidebarConfig struct {
-	DefaultFilter     string         `toml:"default_filter"`
-	FocusOnOpen       string         `toml:"focus_on_open"`
-	FocusSearchOnOpen bool           `toml:"focus_search_on_open"`
-	SearchSort        string         `toml:"search_sort"`
-	ShowLastSeen      bool           `toml:"show_last_seen"`
-	ActiveSessionIcon string         `toml:"active_session_icon"`
-	Sort              []string       `toml:"sort"`
-	SwitchFocus       string         `toml:"switch_focus"`
-	Width             int            `toml:"width"`
-	SessionView       string         `toml:"session_view"`
-	Processes         []ProcessLabel `toml:"processes"`
+	DefaultFilter          string         `toml:"default_filter"`
+	FocusOnOpen            string         `toml:"focus_on_open"`
+	FocusSearchOnOpen      bool           `toml:"focus_search_on_open"`
+	SearchSort             string         `toml:"search_sort"`
+	ShowLastSeen           bool           `toml:"show_last_seen"`
+	ActiveSessionIcon      string         `toml:"active_session_icon"`
+	Sort                   []string       `toml:"sort"`
+	SwitchFocus            string         `toml:"switch_focus"`
+	Width                  int            `toml:"width"`
+	SessionView            string         `toml:"session_view"`
+	SessionViewModeCompact string         `toml:"session_view_mode_compact"`
+	SessionViewModeFull    string         `toml:"session_view_mode_full"`
+	CardSeparator          bool           `toml:"card_separator"`
+	Processes              []ProcessLabel `toml:"processes"`
 }
 
 type ProcessListConfig struct {
@@ -254,6 +292,7 @@ func Default() Config {
 			ShowLastSeen:      true,
 			ActiveSessionIcon: DefaultActiveSessionIcon,
 			SessionView:       SidebarViewRow,
+			CardSeparator:     true,
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
@@ -377,15 +416,9 @@ func Load(path string) (Config, error) {
 	})
 	cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
 
-	switch cfg.Sidebar.SessionView {
-	case SidebarViewRow, SidebarViewCard:
-		// valid
-	default:
-		if cfg.Sidebar.SessionView != "" {
-			fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.session_view %q: must be \"row\" or \"card\"\n", cfg.Sidebar.SessionView)
-		}
-		cfg.Sidebar.SessionView = SidebarViewRow
-	}
+	cfg.Sidebar.SessionView = normalizeSessionView(cfg.Sidebar.SessionView, "sidebar.session_view", SidebarViewRow)
+	cfg.Sidebar.SessionViewModeCompact = normalizeSessionView(cfg.Sidebar.SessionViewModeCompact, "sidebar.session_view_mode_compact", "")
+	cfg.Sidebar.SessionViewModeFull = normalizeSessionView(cfg.Sidebar.SessionViewModeFull, "sidebar.session_view_mode_full", "")
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {

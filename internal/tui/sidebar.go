@@ -589,7 +589,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 		rendered := s.renderNode(s.nodes[i], i == s.cursor, focused, width)
 		lines = append(lines, strings.Split(rendered, "\n")...)
 		rowsLeft -= h
-		if s.cfg.Sidebar.SessionView == config.SidebarViewCard && !isLastInList {
+		if s.cardView() && s.cfg.Sidebar.CardSeparator && !isLastInList {
 			// Only emit the separator if the next card will actually be rendered.
 			// Without this guard, scrolled-mid-list views produce a spurious blank
 			// between the last visible card and the ▼ scroll hint. nodeHeight
@@ -658,12 +658,18 @@ func (s SidebarModel) renderNode(node SidebarNode, selected, focused bool, width
 	return s.renderSession(node, selected, focused, width)
 }
 
+// cardView reports whether the resolved session view (taking into account the
+// per-mode overrides) is the card layout.
+func (s SidebarModel) cardView() bool {
+	return s.cfg.Sidebar.ResolvedSessionView(s.cfg.Mode) == config.SidebarViewCard
+}
+
 // nodeHeight returns the viewport rows consumed by a session in the current
-// view. Card mode reserves 2 content rows; a trailing separator row adds 1
-// for every card except the last visible one.
+// view. Card mode reserves 2 content rows; when sidebar.card_separator is on,
+// a trailing separator row adds 1 for every card except the last visible one.
 func (s SidebarModel) nodeHeight(_ SidebarNode, isLast bool) int {
-	if s.cfg.Sidebar.SessionView == config.SidebarViewCard {
-		if isLast {
+	if s.cardView() {
+		if isLast || !s.cfg.Sidebar.CardSeparator {
 			return 2
 		}
 		return 3
@@ -910,7 +916,7 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
-	if s.cfg.Sidebar.SessionView == config.SidebarViewCard {
+	if s.cardView() {
 		return s.renderSessionCard(node, selected && focused, width)
 	}
 	indicators := s.sessionIndicators(node, selected, focused)
