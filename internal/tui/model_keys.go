@@ -282,6 +282,12 @@ func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
 	if err == nil && m.popupMode {
 		return m, tea.Quit
 	}
+	if err == nil && m.cfg.StickyMode {
+		// In sticky mode the user wants 'o'/Enter to drop them out of the
+		// sidebar pane into the session content (otherwise focus stays in
+		// the sidebar). Equivalent to tmux's default `prefix + o`.
+		_ = tmux.SelectNextPane()
+	}
 	return m, nil
 }
 
