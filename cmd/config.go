@@ -88,9 +88,11 @@ session_view = "row"
 session_view_mode_compact = ""
 session_view_mode_full = ""
 
-# Show a blank row between cards (card view only). Set to false for a denser
-# layout with no separator.
-card_separator = true
+# Separator row between cards (card view only):
+#   none   — no row, denser layout
+#   blank  — empty row (default)
+#   rule   — horizontal rule ('─') in the border color
+card_separator = "blank"
 
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
