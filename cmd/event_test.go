@@ -135,7 +135,7 @@ func TestApplyPaneClosed_DeletesPaneState(t *testing.T) {
 
 	pt := db.Target{Type: db.TargetTypePane, ID: "%7", PaneID: "%7", WindowID: "@0", SessionID: "$0"}
 	d.StateSet(pt, "claude", db.StateWorking, "", db.SourceTool, false, nil)
-	if err := applyPaneClosed(d, "%7"); err != nil {
+	if err := applyPaneClosed(d, "%7", ""); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := d.StateByID(pt)
@@ -148,7 +148,7 @@ func TestApplyPaneClosed_NoopUnknownPane(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	if err := applyPaneClosed(d, "%99"); err != nil {
+	if err := applyPaneClosed(d, "%99", ""); err != nil {
 		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
 	}
 }
@@ -220,7 +220,7 @@ func TestApplyPaneClosed_ClearsStickyEnvVar(t *testing.T) {
 	stickyTmuxForEvents = func() sticky.Tmux { return fake }
 	defer func() { stickyTmuxForEvents = orig }()
 
-	if err := applyPaneClosed(d, "%42"); err != nil {
+	if err := applyPaneClosed(d, "%42", ""); err != nil {
 		t.Fatal(err)
 	}
 	sawUnset := false

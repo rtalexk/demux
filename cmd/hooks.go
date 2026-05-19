@@ -148,8 +148,10 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_
 
 # Removes Demux state when a pane is closed (prevents stale state accumulation).
 # #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
-# the kill — using #{pane_id} here would clear the wrong pane's state.
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
+# the kill - using #{pane_id} here would clear the wrong pane's state.
+# #{hook_window} lets demux detect a window left with only a sidebar slot pane
+# (e.g. the user closed the last non-slot pane) and clean it up.
+set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
 # Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"

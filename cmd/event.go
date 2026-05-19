@@ -145,6 +145,7 @@ func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
 }
 
 var eventPaneClosedPaneID string
+var eventPaneClosedWindowID string
 
 var eventPaneClosedCmd = &cobra.Command{
 	Use:   "pane_closed",
@@ -155,18 +156,24 @@ var eventPaneClosedCmd = &cobra.Command{
 			return err
 		}
 		defer d.Close()
-		return applyPaneClosed(d, eventPaneClosedPaneID)
+		return applyPaneClosed(d, eventPaneClosedPaneID, eventPaneClosedWindowID)
 	},
 }
 
-func applyPaneClosed(d *db.DB, paneID string) error {
-	demuxlog.Debug("pane_closed", "pane_id", paneID)
+func applyPaneClosed(d *db.DB, paneID, windowID string) error {
+	demuxlog.Debug("pane_closed", "pane_id", paneID, "window_id", windowID)
 	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
 	if err := d.StateClear(t); err != nil {
 		return err
 	}
-	if err := sticky.ClearStickyEnvForPane(stickyTmuxForEvents(), paneID); err != nil {
+	tmuxClient := stickyTmuxForEvents()
+	if err := sticky.ClearStickyEnvForPane(tmuxClient, paneID); err != nil {
 		demuxlog.Warn("pane_closed: sticky env cleanup failed", "pane_id", paneID, "err", err)
+	}
+	if windowID != "" {
+		if err := (&sticky.Sticky{T: tmuxClient}).HandleWindowAfterKill(windowID); err != nil {
+			demuxlog.Warn("pane_closed: orphan slot cleanup failed", "window_id", windowID, "err", err)
+		}
 	}
 	return nil
 }
@@ -193,6 +200,7 @@ func init() {
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")
+	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
 	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneClosedCmd)
