@@ -29,6 +29,25 @@ func TestSidebarCmd_FollowIsHidden(t *testing.T) {
 	}
 }
 
+func TestSidebarCmd_SlotsSubcommands(t *testing.T) {
+	for _, sub := range []string{"install", "uninstall", "ensure"} {
+		cmd, _, _ := rootCmd.Find([]string{"sidebar", "slots", sub})
+		if cmd == nil || cmd.Name() != sub {
+			t.Errorf("expected `demux sidebar slots %s`, got %v", sub, cmd)
+		}
+	}
+}
+
+func TestSidebarCmd_SlotsEnsureHidden(t *testing.T) {
+	cmd, _, _ := rootCmd.Find([]string{"sidebar", "slots", "ensure"})
+	if cmd == nil {
+		t.Fatal("ensure subcommand missing")
+	}
+	if !cmd.Hidden {
+		t.Errorf("slots ensure should be hidden from --help")
+	}
+}
+
 func TestSidebarCmd_SlotIsHidden(t *testing.T) {
 	cmd, _, _ := rootCmd.Find([]string{"sidebar", "slot"})
 	if cmd == nil {
