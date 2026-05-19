@@ -265,11 +265,14 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 			m.procGen++
 			cmds = append(cmds, m.scheduleProcFetch())
 		}
-	} else if m.cfg.StickyMode && msg.currentSession != "" && msg.currentSession != m.currentSession {
-		// In sticky mode, refocus the sidebar on the active session every time
-		// the user jumps to a different tmux session.
+	} else if m.cfg.StickyMode && msg.currentSession != "" &&
+		(m.pendingStickyRefocus || msg.currentSession != m.currentSession) {
+		// In sticky mode, refocus the sidebar on the active session whenever
+		// the user jumps to a different session OR a follow poke (F12) asks
+		// us to re-snap (covers same-session window switches).
 		m.currentSession = msg.currentSession
 		m.sidebar.FocusNode(m.currentSession, visibleRows)
+		m.pendingStickyRefocus = false
 	}
 	if m.cfg.Git.Enabled {
 		for sessionName, windows := range grouped {

@@ -190,12 +190,12 @@ func TestFollow_PokesRefreshAfterMove(t *testing.T) {
 	}
 	saw := false
 	for _, r := range f.runs {
-		if strings.Join(r, " ") == "send-keys -t %42 R" {
+		if strings.Join(r, " ") == "send-keys -t %42 F12" {
 			saw = true
 		}
 	}
 	if !saw {
-		t.Errorf("expected send-keys -t %%42 R after move, got: %v", f.runs)
+		t.Errorf("expected send-keys -t %%42 F12 after move, got: %v", f.runs)
 	}
 }
 

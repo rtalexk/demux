@@ -147,6 +147,11 @@ type Model struct {
 	currentSession   string
 	startupFocusDone bool
 
+	// pendingStickyRefocus is set by the sticky-mode follow poke (F12) and
+	// consumed on the next panesMsg to snap the sidebar cursor back to the
+	// active session. Avoids tying refocus to the periodic refresh tick.
+	pendingStickyRefocus bool
+
 	searchInput SearchInputModel
 	queryResult query.Result
 	searchGen   int

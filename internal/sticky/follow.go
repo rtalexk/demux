@@ -72,14 +72,17 @@ func (s *Sticky) Follow() error {
 	return nil
 }
 
-// pokeRefresh sends the TUI's force-refresh key ("R") to the sticky pane so
-// it picks up the new active session/window immediately instead of waiting
-// for its next refresh tick.
+// pokeRefresh sends F12 to the sticky pane. The TUI binds F12 (only
+// reachable via this poke; not in the user-facing key list) to a
+// refresh-plus-refocus action so the sidebar both picks up the new active
+// session immediately AND snaps the cursor back to it. The auto-refresh
+// tick still uses the plain refresh path so the user can browse the
+// sidebar between window switches without their cursor being yanked.
 func (s *Sticky) pokeRefresh(paneID string) {
 	if paneID == "" {
 		return
 	}
-	_ = s.T.Run("send-keys", "-t", paneID, "R")
+	_ = s.T.Run("send-keys", "-t", paneID, "F12")
 }
 
 // followSlotsMode swaps the active sidebar pane with the destination window's

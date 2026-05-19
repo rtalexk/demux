@@ -121,6 +121,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
+	case msg.Type == tea.KeyF12:
+		// Sticky-mode follow poke: force-refresh and refocus the sidebar
+		// on the now-active session on the resulting panesMsg.
+		if m.cfg.StickyMode {
+			m.pendingStickyRefocus = true
+			m.procGen++
+			return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
+		}
+		return m, nil
 	case msg.String() == "C":
 		// C toggles items mode globally regardless of focus.
 		// Not available in compact mode (no proclist panel to render into).
