@@ -4,16 +4,22 @@ import "time"
 
 // Exported defaults for use by other packages (e.g. TUI tick interval).
 const (
-	DefaultRefreshIntervalMs  = 3000
-	DefaultGitTimeoutMs       = 500
-	DefaultSidebarWidth       = 35
-	DefaultActiveSessionIcon  = "►"
+	DefaultRefreshIntervalMs = 3000
+	DefaultGitTimeoutMs      = 500
+	DefaultSidebarWidth      = 35
+	DefaultActiveSessionIcon = "►"
 
 	// SidebarViewRow and SidebarViewCard are the accepted values for
 	// SidebarConfig.SessionView.  TUI consumers should reference these
 	// constants rather than inline string literals.
 	SidebarViewRow  = "row"
 	SidebarViewCard = "card"
+
+	// CardSeparatorNone, CardSeparatorBlank, and CardSeparatorRule are the
+	// accepted values for SidebarConfig.CardSeparator.
+	CardSeparatorNone  = "none"
+	CardSeparatorBlank = "blank"
+	CardSeparatorRule  = "rule"
 
 	// MinRefreshIntervalMs is the minimum accepted value for RefreshIntervalMs.
 	MinRefreshIntervalMs = 100

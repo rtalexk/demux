@@ -751,19 +751,51 @@ func TestLoadFromFile_SessionView_InvalidWarnsOnStderr(t *testing.T) {
 
 func TestDefaults_CardSeparator(t *testing.T) {
 	c := config.Default()
-	if !c.Sidebar.CardSeparator {
-		t.Errorf("expected CardSeparator default true, got false")
+	if c.Sidebar.CardSeparator != config.CardSeparatorBlank {
+		t.Errorf("expected CardSeparator default %q, got %q", config.CardSeparatorBlank, c.Sidebar.CardSeparator)
 	}
 }
 
-func TestLoadFromFile_CardSeparator_False(t *testing.T) {
-	path := writeTempConfig(t, "[sidebar]\ncard_separator = false\n")
+func TestLoadFromFile_CardSeparator_Values(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"none", config.CardSeparatorNone},
+		{"blank", config.CardSeparatorBlank},
+		{"rule", config.CardSeparatorRule},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			path := writeTempConfig(t, "[sidebar]\ncard_separator = \""+tc.input+"\"\n")
+			c, err := config.Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Sidebar.CardSeparator != tc.expected {
+				t.Errorf("got %q, want %q", c.Sidebar.CardSeparator, tc.expected)
+			}
+		})
+	}
+}
+
+func TestLoadFromFile_CardSeparator_InvalidWarnsAndDefaults(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\ncard_separator = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
 	c, err := config.Load(path)
+	w.Close()
+	os.Stderr = origStderr
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Sidebar.CardSeparator {
-		t.Errorf("expected CardSeparator=false, got true")
+	buf, _ := io.ReadAll(r)
+	if !strings.Contains(string(buf), `ignoring sidebar.card_separator "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
+	}
+	if c.Sidebar.CardSeparator != config.CardSeparatorBlank {
+		t.Errorf("invalid value should fall back to %q, got %q", config.CardSeparatorBlank, c.Sidebar.CardSeparator)
 	}
 }
 

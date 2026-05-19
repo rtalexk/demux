@@ -1215,7 +1215,7 @@ func TestSidebarViewport_CardMode_KeepsCursorVisible(t *testing.T) {
 func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
-		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: true, Width: 40}},
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorBlank, Width: 40}},
 		nodes: []SidebarNode{
 			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
 		},
@@ -1245,7 +1245,7 @@ func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
-		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: true, Width: 40}},
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorBlank, Width: 40}},
 		nodes: []SidebarNode{
 			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"}, {Session: "delta"},
 		},
@@ -1278,7 +1278,7 @@ func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
 func TestBuildSidebarLines_CardMode_NoSeparatorWhenDisabled(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
-		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: false, Width: 40}},
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorNone, Width: 40}},
 		nodes: []SidebarNode{
 			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
 		},
@@ -1298,6 +1298,30 @@ func TestBuildSidebarLines_CardMode_NoSeparatorWhenDisabled(t *testing.T) {
 		if strings.TrimSpace(stripANSI(l)) == "" {
 			t.Errorf("line %d unexpectedly blank: %q", i, l)
 		}
+	}
+}
+
+func TestBuildSidebarLines_CardMode_RuleSeparator(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorBorder: lipgloss.Color("#313244")}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorRule, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// 2 cards: 3 + 2 = 5 rows.
+	lines := s.buildSidebarLines(0, 5, false, false, false, 40, centered)
+	if len(lines) != 5 {
+		t.Fatalf("expected 5 lines, got %d", len(lines))
+	}
+	// Separator is line index 2 (after alpha r1, r2). Must contain the rule glyph.
+	if !strings.Contains(stripANSI(lines[2]), "─") {
+		t.Errorf("line 2 should contain rule glyph, got %q", stripANSI(lines[2]))
 	}
 }
 
@@ -1522,17 +1546,18 @@ func TestNodeHeight(t *testing.T) {
 	cases := []struct {
 		name      string
 		view      string
-		separator bool
+		separator string
 		isLast    bool
 		expected  int
 	}{
-		{"row mode any", config.SidebarViewRow, true, false, 1},
-		{"row mode last", config.SidebarViewRow, true, true, 1},
-		{"card mode non-last with separator", config.SidebarViewCard, true, false, 3},
-		{"card mode last with separator", config.SidebarViewCard, true, true, 2},
-		{"card mode non-last no separator", config.SidebarViewCard, false, false, 2},
-		{"card mode last no separator", config.SidebarViewCard, false, true, 2},
-		{"empty defaults row", "", true, false, 1},
+		{"row mode any", config.SidebarViewRow, config.CardSeparatorBlank, false, 1},
+		{"row mode last", config.SidebarViewRow, config.CardSeparatorBlank, true, 1},
+		{"card mode non-last with blank separator", config.SidebarViewCard, config.CardSeparatorBlank, false, 3},
+		{"card mode non-last with rule separator", config.SidebarViewCard, config.CardSeparatorRule, false, 3},
+		{"card mode last with separator", config.SidebarViewCard, config.CardSeparatorBlank, true, 2},
+		{"card mode non-last no separator", config.SidebarViewCard, config.CardSeparatorNone, false, 2},
+		{"card mode last no separator", config.SidebarViewCard, config.CardSeparatorNone, true, 2},
+		{"empty defaults row", "", config.CardSeparatorBlank, false, 1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

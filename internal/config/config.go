@@ -209,6 +209,21 @@ func (s SidebarConfig) ResolvedSessionView(mode string) string {
 	return SidebarViewRow
 }
 
+// normalizeCardSeparator validates sidebar.card_separator. Empty defaults to
+// "blank" (preserving the previous behavior). An invalid value warns and
+// also defaults to "blank".
+func normalizeCardSeparator(value string) string {
+	switch value {
+	case "":
+		return CardSeparatorBlank
+	case CardSeparatorNone, CardSeparatorBlank, CardSeparatorRule:
+		return value
+	default:
+		fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.card_separator %q: must be \"none\", \"blank\", or \"rule\"\n", value)
+		return CardSeparatorBlank
+	}
+}
+
 // normalizeSessionView validates a session_view-style value. Empty input
 // returns emptyDefault unchanged; an invalid non-empty value warns to stderr
 // and returns emptyDefault.
@@ -237,7 +252,7 @@ type SidebarConfig struct {
 	SessionView            string         `toml:"session_view"`
 	SessionViewModeCompact string         `toml:"session_view_mode_compact"`
 	SessionViewModeFull    string         `toml:"session_view_mode_full"`
-	CardSeparator          bool           `toml:"card_separator"`
+	CardSeparator          string         `toml:"card_separator"`
 	Processes              []ProcessLabel `toml:"processes"`
 }
 
@@ -292,7 +307,7 @@ func Default() Config {
 			ShowLastSeen:      true,
 			ActiveSessionIcon: DefaultActiveSessionIcon,
 			SessionView:       SidebarViewRow,
-			CardSeparator:     true,
+			CardSeparator:     CardSeparatorBlank,
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
@@ -419,6 +434,7 @@ func Load(path string) (Config, error) {
 	cfg.Sidebar.SessionView = normalizeSessionView(cfg.Sidebar.SessionView, "sidebar.session_view", SidebarViewRow)
 	cfg.Sidebar.SessionViewModeCompact = normalizeSessionView(cfg.Sidebar.SessionViewModeCompact, "sidebar.session_view_mode_compact", "")
 	cfg.Sidebar.SessionViewModeFull = normalizeSessionView(cfg.Sidebar.SessionViewModeFull, "sidebar.session_view_mode_full", "")
+	cfg.Sidebar.CardSeparator = normalizeCardSeparator(cfg.Sidebar.CardSeparator)
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {

@@ -578,7 +578,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 		end = len(s.nodes)
 	}
 	innerW := width - borderOverhead
-	blank := strings.Repeat(" ", innerW)
+	sep := s.cardSeparatorRow(innerW)
 	rowsLeft := contentRows
 	for i := offset; i < end; i++ {
 		isLastInList := (i == len(s.nodes)-1)
@@ -589,16 +589,16 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 		rendered := s.renderNode(s.nodes[i], i == s.cursor, focused, width)
 		lines = append(lines, strings.Split(rendered, "\n")...)
 		rowsLeft -= h
-		if s.cardView() && s.cfg.Sidebar.CardSeparator && !isLastInList {
+		if s.cardView() && sep != "" && !isLastInList {
 			// Only emit the separator if the next card will actually be rendered.
-			// Without this guard, scrolled-mid-list views produce a spurious blank
+			// Without this guard, scrolled-mid-list views produce a spurious row
 			// between the last visible card and the ▼ scroll hint. nodeHeight
 			// includes the separator for non-last cards, so rowsLeft was already
 			// charged for it; skipping the append here over-subtracts rowsLeft by
 			// 1, but the loop is about to exit so no further damage.
 			nextH := s.nodeHeight(s.nodes[i+1], (i+1) == len(s.nodes)-1)
 			if nextH <= rowsLeft {
-				lines = append(lines, blank)
+				lines = append(lines, sep)
 			}
 		}
 	}
@@ -664,12 +664,26 @@ func (s SidebarModel) cardView() bool {
 	return s.cfg.Sidebar.ResolvedSessionView(s.cfg.Mode) == config.SidebarViewCard
 }
 
+// cardSeparatorRow returns the row rendered between cards in card view. It
+// returns "" when separators are disabled, a row of spaces for "blank", and a
+// styled horizontal rule for "rule".
+func (s SidebarModel) cardSeparatorRow(innerW int) string {
+	switch s.cfg.Sidebar.CardSeparator {
+	case config.CardSeparatorNone:
+		return ""
+	case config.CardSeparatorRule:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorBorder).Render(strings.Repeat("─", innerW))
+	default:
+		return strings.Repeat(" ", innerW)
+	}
+}
+
 // nodeHeight returns the viewport rows consumed by a session in the current
-// view. Card mode reserves 2 content rows; when sidebar.card_separator is on,
-// a trailing separator row adds 1 for every card except the last visible one.
+// view. Card mode reserves 2 content rows; a trailing separator row adds 1
+// for every card except the last visible one when card_separator is enabled.
 func (s SidebarModel) nodeHeight(_ SidebarNode, isLast bool) int {
 	if s.cardView() {
-		if isLast || !s.cfg.Sidebar.CardSeparator {
+		if isLast || s.cfg.Sidebar.CardSeparator == config.CardSeparatorNone {
 			return 2
 		}
 		return 3
