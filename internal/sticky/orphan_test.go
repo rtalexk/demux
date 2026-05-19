@@ -159,6 +159,52 @@ func TestHandleWindowAfterKill_OrphanSidebar_SingleWindowInSession_NoOp(t *testi
 	}
 }
 
+func TestHandleWindowAfterKill_SplitModeOrphanSidebar_MovesToLastActive(t *testing.T) {
+	f := newFakeTmux()
+	// Split mode: lone pane has no @demux_slot tag but IS the active sidebar.
+	f.outputs["list-panes -t @5 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%50 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%50\n"}
+	f.outputs["display-message -t @5 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@5 0\n@3 1\n"}
+	// Target @3 in split mode has no slot pane.
+	f.outputs["list-panes -t @3 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%30 \n%31 \n"}
+	f.outputs["display-message -p -t %50 #{pane_width}"] = fakeReply{out: "35\n"}
+
+	s := &Sticky{T: f}
+	if err := s.HandleWindowAfterKill("@5"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if strings.HasPrefix(j, "kill-pane") {
+			t.Errorf("split mode: did not expect any kill-pane, got: %v", f.runs)
+		}
+	}
+	if !ranCmd(f, "join-pane -f -h -b -d -l 35 -s %50 -t @3") {
+		t.Errorf("split mode: expected join-pane moving sidebar %%50 into @3, got: %v", f.runs)
+	}
+	if !ranCmd(f, "select-window -t @3") {
+		t.Errorf("split mode: expected select-window -t @3, got: %v", f.runs)
+	}
+}
+
+func TestHandleWindowAfterKill_SingleUntrackedPane_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	// Lone pane is NOT a slot AND NOT the tracked sidebar - leave alone.
+	f.outputs["list-panes -t @5 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%50 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%99\n"}
+	s := &Sticky{T: f}
+	if err := s.HandleWindowAfterKill("@5"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if strings.HasPrefix(j, "kill-pane") || strings.HasPrefix(j, "join-pane") || strings.HasPrefix(j, "select-window") {
+			t.Errorf("expected no mutations for untracked single pane, got: %v", f.runs)
+		}
+	}
+}
+
 func TestHandleWindowAfterKill_OrphanSidebar_NoTargetSlot_StillJoins(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["list-panes -t @5 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%50 1\n"}

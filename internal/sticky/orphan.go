@@ -8,21 +8,23 @@ import (
 )
 
 // HandleWindowAfterKill is invoked from the after-kill-pane hook with the
-// window id where the kill happened. When that window is left with only a
-// sidebar slot pane (i.e. the user closed the last non-slot pane), we close
-// the window cleanly so a useless slot-only window does not linger:
+// window id where the kill happened. When that window is left with only one
+// pane that is either an active sidebar pane (split mode) or a sidebar slot
+// pane (slots mode), we close the window cleanly so a useless slot-only or
+// sidebar-only window does not linger:
 //
-//   - If the orphan slot is the active sidebar for some client (its pane id
+//   - If the lone pane is the active sidebar for some client (its pane id
 //     appears as a DEMUX_STICKY_PANE_* env value), the sidebar pane is moved
 //     into the last-active sibling window via join-pane. The source window
 //     auto-closes because it ends up with zero panes.
-//   - Otherwise the orphan is a placeholder; it is killed outright and the
-//     source window closes naturally.
+//   - Otherwise, if the lone pane is a slot (placeholder, slots mode), it is
+//     killed outright and the source window closes naturally.
+//   - Otherwise (a regular pane unrelated to sticky), it is left alone.
 //
 // No-op when windowID is empty, when list-panes errors (window already gone),
-// when the window has more than one pane or its lone pane is not a slot, or
-// when the session has no sibling window to receive the sidebar (closing the
-// last window would terminate the session).
+// when the window has more than one pane, or when the session has no sibling
+// window to receive the sidebar (closing the last window would terminate the
+// session).
 func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 	if windowID == "" {
 		return nil
@@ -46,9 +48,10 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 			slot = strings.TrimSpace(parts[1])
 		}
 	}
-	if count != 1 || slot != "1" {
+	if count != 1 {
 		return nil
 	}
+	isSlot := slot == "1"
 
 	isSidebar := false
 	if envOut, err := s.T.Output("show-environment", "-g"); err == nil {
@@ -69,7 +72,9 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 	}
 
 	if !isSidebar {
-		_ = s.T.Run("kill-pane", "-t", orphan)
+		if isSlot {
+			_ = s.T.Run("kill-pane", "-t", orphan)
+		}
 		return nil
 	}
 
