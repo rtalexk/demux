@@ -179,6 +179,33 @@ func TestCurrentClientTTY_NotInTmux(t *testing.T) {
 	}
 }
 
+func TestCheckTmuxVersion(t *testing.T) {
+	cases := map[string]bool{
+		"tmux 3.3a\n":     true,
+		"tmux 3.4\n":      true,
+		"tmux 2.6\n":      true,
+		"tmux 2.5\n":      false,
+		"tmux 1.8\n":      false,
+		"tmux next-3.5\n": true,
+		"":                true,
+	}
+	for in, expectOK := range cases {
+		err := checkTmuxVersion(in)
+		if (err == nil) != expectOK {
+			t.Errorf("checkTmuxVersion(%q): expectOK=%v, got err=%v", in, expectOK, err)
+		}
+	}
+}
+
+func TestVersionOK_UsesTmuxV(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3a\n"}
+	s := &Sticky{T: f}
+	if err := s.VersionOK(); err != nil {
+		t.Errorf("VersionOK: %v", err)
+	}
+}
+
 func TestUnsetEnv(t *testing.T) {
 	f := newFakeTmux()
 	s := &Sticky{T: f}

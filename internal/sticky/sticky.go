@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -102,6 +103,49 @@ func (s *Sticky) UnsetEnv(key string) error {
 		return fmt.Errorf("tmux set-environment -gu %s: %w", key, err)
 	}
 	return nil
+}
+
+// VersionOK returns nil when the available tmux binary is >= 2.6, which is
+// required for the -f flag on split-window and join-pane.
+func (s *Sticky) VersionOK() error {
+	out, err := s.T.Output("-V")
+	if err != nil {
+		return fmt.Errorf("tmux -V: %w", err)
+	}
+	return checkTmuxVersion(out)
+}
+
+// checkTmuxVersion parses output like "tmux 3.3a\n" and returns an error when
+// the version is older than 2.6. Unparseable inputs (next-* builds, empty
+// output) succeed.
+func checkTmuxVersion(out string) error {
+	s := strings.TrimSpace(out)
+	s = strings.TrimPrefix(s, "tmux ")
+	if s == "" || strings.HasPrefix(s, "next-") {
+		return nil
+	}
+	end := len(s)
+	for end > 0 {
+		r := s[end-1]
+		if (r >= '0' && r <= '9') || r == '.' {
+			break
+		}
+		end--
+	}
+	s = s[:end]
+	parts := strings.SplitN(s, ".", 3)
+	if len(parts) < 2 {
+		return nil
+	}
+	major, err1 := strconv.Atoi(parts[0])
+	minor, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil {
+		return nil
+	}
+	if major > 2 || (major == 2 && minor >= 6) {
+		return nil
+	}
+	return fmt.Errorf("tmux %d.%d is too old; sticky sidebar requires tmux >= 2.6", major, minor)
 }
 
 // PaneAlive returns true when paneID appears in `tmux list-panes -a`.
