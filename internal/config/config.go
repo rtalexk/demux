@@ -240,7 +240,8 @@ func normalizeSessionView(value, key, emptyDefault string) string {
 }
 
 type SidebarStickyConfig struct {
-	Width int `toml:"width"`
+	Width int  `toml:"width"`
+	Slots bool `toml:"slots"`
 }
 
 type SidebarConfig struct {
