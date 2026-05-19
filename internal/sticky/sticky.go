@@ -22,11 +22,30 @@ type Tmux interface {
 type realTmux struct{}
 
 func (realTmux) Run(args ...string) error {
-	return exec.Command("tmux", args...).Run()
+	cmd := exec.Command("tmux", args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
 }
 
 func (realTmux) Output(args ...string) (string, error) {
-	out, err := exec.Command("tmux", args...).Output()
+	cmd := exec.Command("tmux", args...)
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if msg != "" {
+			return string(out), fmt.Errorf("%w: %s", err, msg)
+		}
+	}
 	return string(out), err
 }
 
