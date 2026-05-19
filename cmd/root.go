@@ -16,6 +16,7 @@ import (
 var formatFlag string
 var compactFlag bool
 var searchFlag bool
+var stickyFlag bool
 var logLevelFlag string
 
 var rootCmd = &cobra.Command{
@@ -60,6 +61,13 @@ var rootCmd = &cobra.Command{
 		if searchFlag {
 			cfg.Sidebar.FocusSearchOnOpen = true
 		}
+		if stickyFlag {
+			cfg.Mode = "compact"
+			cfg.Sidebar.SessionView = config.SidebarViewCard
+			cfg.Sidebar.SessionViewModeCompact = config.SidebarViewCard
+			cfg.Sidebar.SessionViewModeFull = config.SidebarViewCard
+			cfg.StickyMode = true
+		}
 		dbPath, err := db.DefaultPath()
 		if err != nil {
 			return err
@@ -90,6 +98,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "", "Log level: off|error|warn|info|debug (overrides config)")
 	rootCmd.PersistentFlags().BoolVar(&compactFlag, "compact", false, "Launch in compact mode (sidebar + search only)")
 	rootCmd.PersistentFlags().BoolVar(&searchFlag, "search", false, "Start with focus in the search input")
+	rootCmd.PersistentFlags().BoolVar(&stickyFlag, "sticky", false, "Sticky sidebar mode: forces compact + card view, disables quit (used by `demux sidebar`)")
 }
 
 func loadConfig() config.Config {

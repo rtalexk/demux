@@ -293,6 +293,11 @@ type Config struct {
 	Git               GitConfig         `toml:"git"`
 	Theme             ThemeConfig       `toml:"theme"`
 	PathAliases       []PathAlias       `toml:"path_aliases"`
+
+	// StickyMode is in-memory only (TOML tag "-"). Set by the --sticky flag on
+	// the root command; the TUI uses it to strip the quit binding and force
+	// compact + card session view.
+	StickyMode bool `toml:"-"`
 }
 
 func Default() Config {
