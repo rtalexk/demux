@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -682,5 +683,188 @@ color_proc_label_bg = "#222222"
 	}
 	if cfg.Theme.ColorProcLabelBG != "#222222" {
 		t.Fatalf("bg mismatch: %q", cfg.Theme.ColorProcLabelBG)
+	}
+}
+
+func TestDefaults_SidebarSessionView(t *testing.T) {
+	c := config.Default()
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected SessionView=\"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_Card(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"card\"\n")
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "card" {
+		t.Errorf("expected \"card\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_InvalidFallsBackToRow(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"banana\"\n")
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected fallback \"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_MissingDefaultsRow(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nwidth = 40\n")
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionView != "row" {
+		t.Errorf("expected default \"row\", got %q", c.Sidebar.SessionView)
+	}
+}
+
+func TestLoadFromFile_SessionView_InvalidWarnsOnStderr(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stderr = w
+	if _, err := config.Load(path); err != nil {
+		os.Stderr = origStderr
+		t.Fatal(err)
+	}
+	w.Close()
+	os.Stderr = origStderr
+	buf, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(buf), `ignoring sidebar.session_view "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
+	}
+}
+
+func TestDefaults_CardSeparator(t *testing.T) {
+	c := config.Default()
+	if c.Sidebar.CardSeparator != config.CardSeparatorBlank {
+		t.Errorf("expected CardSeparator default %q, got %q", config.CardSeparatorBlank, c.Sidebar.CardSeparator)
+	}
+}
+
+func TestLoadFromFile_CardSeparator_Values(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"none", config.CardSeparatorNone},
+		{"blank", config.CardSeparatorBlank},
+		{"rule", config.CardSeparatorRule},
+	}
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			path := writeTempConfig(t, "[sidebar]\ncard_separator = \""+tc.input+"\"\n")
+			c, err := config.Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if c.Sidebar.CardSeparator != tc.expected {
+				t.Errorf("got %q, want %q", c.Sidebar.CardSeparator, tc.expected)
+			}
+		})
+	}
+}
+
+func TestLoadFromFile_CardSeparator_InvalidWarnsAndDefaults(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\ncard_separator = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	c, err := config.Load(path)
+	w.Close()
+	os.Stderr = origStderr
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf, _ := io.ReadAll(r)
+	if !strings.Contains(string(buf), `ignoring sidebar.card_separator "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
+	}
+	if c.Sidebar.CardSeparator != config.CardSeparatorBlank {
+		t.Errorf("invalid value should fall back to %q, got %q", config.CardSeparatorBlank, c.Sidebar.CardSeparator)
+	}
+}
+
+func TestLoadFromFile_SessionViewModeOverrides(t *testing.T) {
+	path := writeTempConfig(t, `[sidebar]
+session_view = "row"
+session_view_mode_compact = "card"
+session_view_mode_full = "row"
+`)
+	c, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Sidebar.SessionViewModeCompact != "card" {
+		t.Errorf("compact override: got %q, want \"card\"", c.Sidebar.SessionViewModeCompact)
+	}
+	if c.Sidebar.SessionViewModeFull != "row" {
+		t.Errorf("full override: got %q, want \"row\"", c.Sidebar.SessionViewModeFull)
+	}
+}
+
+func TestLoadFromFile_SessionViewModeInvalidWarnsAndClears(t *testing.T) {
+	path := writeTempConfig(t, "[sidebar]\nsession_view_mode_compact = \"banana\"\n")
+	origStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	c, err := config.Load(path)
+	w.Close()
+	os.Stderr = origStderr
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf, _ := io.ReadAll(r)
+	if !strings.Contains(string(buf), `ignoring sidebar.session_view_mode_compact "banana"`) {
+		t.Errorf("expected stderr warning, got %q", string(buf))
+	}
+	if c.Sidebar.SessionViewModeCompact != "" {
+		t.Errorf("invalid override should clear to \"\", got %q", c.Sidebar.SessionViewModeCompact)
+	}
+}
+
+func TestResolvedSessionView(t *testing.T) {
+	cases := []struct {
+		name     string
+		base     string
+		compact  string
+		full     string
+		mode     string
+		expected string
+	}{
+		{"default empty all", "", "", "", "full", "row"},
+		{"base only", "card", "", "", "full", "card"},
+		{"compact override beats base", "row", "card", "", "compact", "card"},
+		{"full override beats base", "card", "", "row", "full", "row"},
+		{"compact override ignored in full mode", "row", "card", "", "full", "row"},
+		{"full override ignored in compact mode", "card", "", "row", "compact", "card"},
+		{"unknown mode falls through to base", "card", "", "", "weird", "card"},
+		{"unknown mode falls through to default", "", "", "", "weird", "row"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sc := config.SidebarConfig{
+				SessionView:            tc.base,
+				SessionViewModeCompact: tc.compact,
+				SessionViewModeFull:    tc.full,
+			}
+			if got := sc.ResolvedSessionView(tc.mode); got != tc.expected {
+				t.Errorf("ResolvedSessionView(mode=%q): got %q, want %q", tc.mode, got, tc.expected)
+			}
+		})
 	}
 }

@@ -189,17 +189,71 @@ func (s SidebarConfig) ProcessPatterns() []procmatch.Pattern {
 	return out
 }
 
+// ResolvedSessionView returns the effective session view for the given top-level
+// mode. Mode-specific overrides win, then SessionView, then the row default.
+// Caller is expected to pass Config.Mode (e.g. "full" or "compact").
+func (s SidebarConfig) ResolvedSessionView(mode string) string {
+	switch mode {
+	case "compact":
+		if s.SessionViewModeCompact != "" {
+			return s.SessionViewModeCompact
+		}
+	case "full":
+		if s.SessionViewModeFull != "" {
+			return s.SessionViewModeFull
+		}
+	}
+	if s.SessionView != "" {
+		return s.SessionView
+	}
+	return SidebarViewRow
+}
+
+// normalizeCardSeparator validates sidebar.card_separator. Empty defaults to
+// "blank" (preserving the previous behavior). An invalid value warns and
+// also defaults to "blank".
+func normalizeCardSeparator(value string) string {
+	switch value {
+	case "":
+		return CardSeparatorBlank
+	case CardSeparatorNone, CardSeparatorBlank, CardSeparatorRule:
+		return value
+	default:
+		fmt.Fprintf(os.Stderr, "demux: ignoring sidebar.card_separator %q: must be \"none\", \"blank\", or \"rule\"\n", value)
+		return CardSeparatorBlank
+	}
+}
+
+// normalizeSessionView validates a session_view-style value. Empty input
+// returns emptyDefault unchanged; an invalid non-empty value warns to stderr
+// and returns emptyDefault.
+func normalizeSessionView(value, key, emptyDefault string) string {
+	switch value {
+	case "":
+		return emptyDefault
+	case SidebarViewRow, SidebarViewCard:
+		return value
+	default:
+		fmt.Fprintf(os.Stderr, "demux: ignoring %s %q: must be \"row\" or \"card\"\n", key, value)
+		return emptyDefault
+	}
+}
+
 type SidebarConfig struct {
-	DefaultFilter     string         `toml:"default_filter"`
-	FocusOnOpen       string         `toml:"focus_on_open"`
-	FocusSearchOnOpen bool           `toml:"focus_search_on_open"`
-	SearchSort        string         `toml:"search_sort"`
-	ShowLastSeen      bool           `toml:"show_last_seen"`
-	ActiveSessionIcon string         `toml:"active_session_icon"`
-	Sort              []string       `toml:"sort"`
-	SwitchFocus       string         `toml:"switch_focus"`
-	Width             int            `toml:"width"`
-	Processes         []ProcessLabel `toml:"processes"`
+	DefaultFilter          string         `toml:"default_filter"`
+	FocusOnOpen            string         `toml:"focus_on_open"`
+	FocusSearchOnOpen      bool           `toml:"focus_search_on_open"`
+	SearchSort             string         `toml:"search_sort"`
+	ShowLastSeen           bool           `toml:"show_last_seen"`
+	ActiveSessionIcon      string         `toml:"active_session_icon"`
+	Sort                   []string       `toml:"sort"`
+	SwitchFocus            string         `toml:"switch_focus"`
+	Width                  int            `toml:"width"`
+	SessionView            string         `toml:"session_view"`
+	SessionViewModeCompact string         `toml:"session_view_mode_compact"`
+	SessionViewModeFull    string         `toml:"session_view_mode_full"`
+	CardSeparator          string         `toml:"card_separator"`
+	Processes              []ProcessLabel `toml:"processes"`
 }
 
 type ProcessListConfig struct {
@@ -252,6 +306,8 @@ func Default() Config {
 			Width:             DefaultSidebarWidth,
 			ShowLastSeen:      true,
 			ActiveSessionIcon: DefaultActiveSessionIcon,
+			SessionView:       SidebarViewRow,
+			CardSeparator:     CardSeparatorBlank,
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},
@@ -374,6 +430,11 @@ func Load(path string) (Config, error) {
 		return len(cfg.PathAliases[i].Prefix) > len(cfg.PathAliases[j].Prefix)
 	})
 	cfg.Sidebar.Sort = normalizeSortKeys(cfg.Sidebar.Sort)
+
+	cfg.Sidebar.SessionView = normalizeSessionView(cfg.Sidebar.SessionView, "sidebar.session_view", SidebarViewRow)
+	cfg.Sidebar.SessionViewModeCompact = normalizeSessionView(cfg.Sidebar.SessionViewModeCompact, "sidebar.session_view_mode_compact", "")
+	cfg.Sidebar.SessionViewModeFull = normalizeSessionView(cfg.Sidebar.SessionViewModeFull, "sidebar.session_view_mode_full", "")
+	cfg.Sidebar.CardSeparator = normalizeCardSeparator(cfg.Sidebar.CardSeparator)
 
 	filteredProcs := cfg.Sidebar.Processes[:0]
 	for _, p := range cfg.Sidebar.Processes {

@@ -443,6 +443,10 @@ focus_search_on_open = false        # start with cursor in the search input
 default_filter = "t"                # t | a | c | w | !
 sort = ["priority", "last_seen", "alphabetical"]
 switch_focus = "default"            # default | newest | oldest
+session_view = "row"                # row | card  (default for both modes; card = two-row layout)
+session_view_mode_compact = ""      # row | card  (override session_view in compact mode; "" = inherit)
+session_view_mode_full = ""         # row | card  (override session_view in full mode; "" = inherit)
+card_separator = "blank"            # none | blank | rule  (separator row between cards in card view)
 
 [process_list]
 path_right_align = false            # right-align pane CWD paths

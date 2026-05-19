@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	runewidth "github.com/mattn/go-runewidth"
+	"github.com/muesli/termenv"
 	"github.com/rtalexk/demux/internal/config"
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
@@ -1147,11 +1149,16 @@ func TestSidebarViewport(t *testing.T) {
 		{"all fit", 0, 0, 10, 5, 0, 10, false, false},
 		{"scroll below", 0, 0, 5, 10, 0, 4, false, true},
 		{"cursor before offset", 2, 5, 10, 10, 2, 9, true, false},
-		{"cursor past viewport", 8, 0, 5, 10, 4, 3, true, true},
+		// New variable-height algorithm advances offset until the cursor truly
+		// fits in the post-hint contentRows. Old algorithm snapped to 4 which
+		// put the cursor outside the visible range; new algorithm picks 6 so
+		// the four remaining nodes (6,7,8,9) fill the post-hint viewport.
+		{"cursor past viewport", 8, 0, 5, 10, 6, 4, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotOffset, gotContent, gotAbove, gotBelow := sidebarViewport(tt.cursor, tt.offset, tt.visRows, tt.nodeCount)
+			rowHeight := func(i int, isLast bool) int { return 1 }
+			gotOffset, gotContent, gotAbove, gotBelow := sidebarViewport(tt.cursor, tt.offset, tt.visRows, tt.nodeCount, rowHeight)
 			if gotOffset != tt.wantOffset {
 				t.Errorf("offset: got %d, want %d", gotOffset, tt.wantOffset)
 			}
@@ -1165,6 +1172,159 @@ func TestSidebarViewport(t *testing.T) {
 				t.Errorf("hasBelow: got %v, want %v", gotBelow, tt.wantBelow)
 			}
 		})
+	}
+}
+
+func TestSidebarViewport_CardMode_KeepsCursorVisible(t *testing.T) {
+	heightFn := func(i int, isLast bool) int {
+		if isLast {
+			return 2
+		}
+		return 3
+	}
+	// Setup: 5 nodes with heights [3, 3, 3, 3, 2], cursor=3, visibleRows=8.
+	// The viewport must advance offset until the cursor fits inside the
+	// budget (which shrinks by 1 for ▲ and another 1 for ▼). With offset=2
+	// and contentRows=6 (8 - 1 ▲ - 1 ▼), heights [3, 3] from offset 2 sum to
+	// 6 and include cursor 3 — first offset where this works.
+	const cursor = 3
+	const nodeCount = 5
+	offset, contentRows, hasAbove, hasBelow := sidebarViewport(cursor, 0, 8, nodeCount, heightFn)
+	if offset != 2 {
+		t.Errorf("offset: got %d, want 2", offset)
+	}
+	if contentRows != 6 {
+		t.Errorf("contentRows: got %d, want 6", contentRows)
+	}
+	if !hasAbove {
+		t.Errorf("hasAbove: got false, want true (offset > 0)")
+	}
+	if !hasBelow {
+		t.Errorf("hasBelow: got false, want true (nodes beyond visible)")
+	}
+	// Sanity check: cursor must fall within the range of fitting nodes.
+	consumed, cursorFits := countFit(offset, nodeCount, cursor, contentRows, heightFn)
+	if !cursorFits {
+		t.Errorf("cursor %d should fit in [%d, %d)", cursor, offset, consumed)
+	}
+	if cursor < offset || cursor >= consumed {
+		t.Errorf("cursor %d outside fitting range [%d, %d)", cursor, offset, consumed)
+	}
+}
+
+func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorBlank, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// Visible rows: 3 + 3 + 2 = 8 (alpha card, beta card, gamma card with no trailing separator).
+	lines := s.buildSidebarLines(0, 8, false, false, false, 40, centered)
+	if len(lines) != 8 {
+		t.Fatalf("expected 8 lines, got %d: %v", len(lines), lines)
+	}
+	for _, idx := range []int{0, 3, 6} {
+		want := []string{"alpha", "beta", "gamma"}[idx/3]
+		if !strings.Contains(stripANSI(lines[idx]), want) {
+			t.Errorf("line %d should contain %q (card row 1), got %q", idx, want, lines[idx])
+		}
+	}
+	if strings.TrimSpace(stripANSI(lines[2])) != "" {
+		t.Errorf("line 2 should be blank separator, got %q", lines[2])
+	}
+	if strings.TrimSpace(stripANSI(lines[5])) != "" {
+		t.Errorf("line 5 should be blank separator, got %q", lines[5])
+	}
+}
+
+func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorBlank, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"}, {Session: "delta"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+			{DisplayName: "delta", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return "▼" }
+	// Render only first 2 cards with hasBelow=true. contentRows budget = 6 (2 cards × 3 rows each).
+	// Expected lines (with hasBelow appending the ▼ hint): alpha-r1, alpha-r2, blank, beta-r1, beta-r2, then ▼.
+	// No blank between beta-r2 and ▼.
+	lines := s.buildSidebarLines(0, 6, false, true, false, 40, centered)
+	if len(lines) != 6 {
+		t.Fatalf("expected 6 lines, got %d: %v", len(lines), lines)
+	}
+	if strings.TrimSpace(stripANSI(lines[2])) != "" {
+		t.Errorf("line 2 should be separator between cards, got %q", lines[2])
+	}
+	if !strings.Contains(stripANSI(lines[3]), "beta") {
+		t.Errorf("line 3 (beta r1) should contain \"beta\", got %q", lines[3])
+	}
+	if !strings.Contains(lines[5], "▼") {
+		t.Errorf("line 5 should be ▼ hint, got %q", lines[5])
+	}
+}
+
+func TestBuildSidebarLines_CardMode_NoSeparatorWhenDisabled(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorNone, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"}, {Session: "gamma"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+			{DisplayName: "gamma", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// With separators off, each card consumes exactly 2 rows: 3 cards × 2 = 6.
+	lines := s.buildSidebarLines(0, 6, false, false, false, 40, centered)
+	if len(lines) != 6 {
+		t.Fatalf("expected 6 lines, got %d: %v", len(lines), lines)
+	}
+	for i, name := range []string{"alpha", "beta", "gamma"} {
+		if !strings.Contains(stripANSI(lines[i*2]), name) {
+			t.Errorf("line %d should contain %q (card row 1), got %q", i*2, name, lines[i*2])
+		}
+	}
+}
+
+func TestBuildSidebarLines_CardMode_RuleSeparator(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", ColorBorder: lipgloss.Color("#313244")}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, CardSeparator: config.CardSeparatorRule, Width: 40}},
+		nodes: []SidebarNode{
+			{Session: "alpha"}, {Session: "beta"},
+		},
+		sessions: []session.Session{
+			{DisplayName: "alpha", IsLive: true},
+			{DisplayName: "beta", IsLive: true},
+		},
+	}
+	centered := func(t string) string { return t }
+	// 2 cards: 3 + 2 = 5 rows.
+	lines := s.buildSidebarLines(0, 5, false, false, false, 40, centered)
+	if len(lines) != 5 {
+		t.Fatalf("expected 5 lines, got %d", len(lines))
+	}
+	// Separator is line index 2 (after alpha r1, r2). Must contain the rule glyph.
+	if !strings.Contains(stripANSI(lines[2]), "─") {
+		t.Errorf("line 2 should contain rule glyph, got %q", stripANSI(lines[2]))
 	}
 }
 
@@ -1382,5 +1542,197 @@ func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
 	fg, bg := resolveProcLabelColors(lbl, false, false)
 	if fg != lipgloss.Color("#aaa") || bg != lipgloss.Color("#222") {
 		t.Fatalf("expected theme fallback, got fg=%v bg=%v", fg, bg)
+	}
+}
+
+func TestNodeHeight(t *testing.T) {
+	cases := []struct {
+		name      string
+		view      string
+		separator string
+		isLast    bool
+		expected  int
+	}{
+		{"row mode any", config.SidebarViewRow, config.CardSeparatorBlank, false, 1},
+		{"row mode last", config.SidebarViewRow, config.CardSeparatorBlank, true, 1},
+		{"card mode non-last with blank separator", config.SidebarViewCard, config.CardSeparatorBlank, false, 3},
+		{"card mode non-last with rule separator", config.SidebarViewCard, config.CardSeparatorRule, false, 3},
+		{"card mode last with separator", config.SidebarViewCard, config.CardSeparatorBlank, true, 2},
+		{"card mode non-last no separator", config.SidebarViewCard, config.CardSeparatorNone, false, 2},
+		{"card mode last no separator", config.SidebarViewCard, config.CardSeparatorNone, true, 2},
+		{"empty defaults row", "", config.CardSeparatorBlank, false, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := SidebarModel{cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: tc.view, CardSeparator: tc.separator}}}
+			got := s.nodeHeight(tc.isLast)
+			if got != tc.expected {
+				t.Errorf("nodeHeight(view=%q, sep=%v, isLast=%v): got %d, want %d", tc.view, tc.separator, tc.isLast, got, tc.expected)
+			}
+		})
+	}
+}
+
+// --- renderSessionCard ---
+
+func TestRenderSessionCard_Unfocused_Basic(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	lines := strings.Split(out, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
+	}
+	if !strings.Contains(stripANSI(lines[0]), "alpha") {
+		t.Errorf("row 1 missing session name: %q", lines[0])
+	}
+}
+
+func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	initStyles(Theme{
+		IconTmuxSession: "⊞", IconCfgSession: "⚙︎",
+		ColorSelected: lipgloss.Color("#2a2a4a"), ColorFgPrimary: lipgloss.Color("#ffffff"),
+	}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, true, 40)
+	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	fLines := strings.Split(focused, "\n")
+	uLines := strings.Split(unfocused, "\n")
+	if len(fLines) != 2 || len(uLines) != 2 {
+		t.Fatalf("expected 2 lines each, got focused=%d unfocused=%d", len(fLines), len(uLines))
+	}
+	// Both focused rows must contain a SGR background code (\x1b[48...) for the
+	// selected background. Both unfocused rows must NOT.
+	const bgPrefix = "\x1b[48"
+	for i, l := range fLines {
+		if !strings.Contains(l, bgPrefix) {
+			t.Errorf("focused row %d missing background ANSI %q: %q", i+1, bgPrefix, l)
+		}
+	}
+	for i, l := range uLines {
+		if strings.Contains(l, bgPrefix) {
+			t.Errorf("unfocused row %d unexpectedly contains background ANSI %q: %q", i+1, bgPrefix, l)
+		}
+	}
+}
+
+func TestRenderSessionCard_IdleStateBlanksLeftGroup(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateIdle: "○"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateIdle}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	row2 := strings.Split(out, "\n")[1]
+	if strings.Contains(stripANSI(row2), "idle") {
+		t.Errorf("row 2 should not show \"idle\" label: %q", row2)
+	}
+	if strings.Contains(stripANSI(row2), activeTheme.IconStateIdle) {
+		t.Errorf("row 2 should not show idle icon: %q", row2)
+	}
+}
+
+func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateWorking: "⟳"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	row2 := strings.Split(out, "\n")[1]
+	if !strings.Contains(stripANSI(row2), "working") {
+		t.Errorf("row 2 expected \"working\" label: %q", row2)
+	}
+}
+
+func TestRenderSessionCard_UnselectedHasNoFocusGlyph(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	for i, l := range strings.Split(out, "\n") {
+		if strings.Contains(stripANSI(l), focusGlyph) {
+			t.Errorf("unselected card row %d should not contain focus glyph %q: %q", i+1, focusGlyph, l)
+		}
+	}
+}
+
+func TestRenderSessionCard_SelectedUnfocusedShowsGlyphWithoutBg(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	initStyles(Theme{
+		IconTmuxSession: "⊞", IconCfgSession: "⚙︎",
+		ColorSelected: lipgloss.Color("#2a2a4a"), ColorSession: lipgloss.Color("#89dceb"),
+	}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, false, 40)
+	for i, l := range strings.Split(out, "\n") {
+		if !strings.Contains(stripANSI(l), focusGlyph) {
+			t.Errorf("selected card row %d should contain focus glyph %q: %q", i+1, focusGlyph, stripANSI(l))
+		}
+		if strings.Contains(l, "\x1b[48") {
+			t.Errorf("selected-but-pane-unfocused row %d should not have background: %q", i+1, l)
+		}
+	}
+}
+
+func TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns(t *testing.T) {
+	initStyles(Theme{
+		IconTmuxSession:  "⊞",
+		IconCfgSession:   "⚙︎",
+		IconStateWorking: "⟳",
+		ColorSelected:    "#2a2a4a",
+		ColorFgPrimary:   "#ffffff",
+	}, config.ProcessesConfig{}, nil)
+	mk := func(focused bool) string {
+		s := SidebarModel{
+			cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
+			sessions: []session.Session{{DisplayName: "alpha", IsLive: true, Activity: time.Now().Add(-5 * time.Minute)}},
+			states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
+		}
+		return s.renderSessionCard(SidebarNode{Session: "alpha"}, focused, focused, 40)
+	}
+	row2Focused := strings.Split(mk(true), "\n")[1]
+	row2Unfocused := strings.Split(mk(false), "\n")[1]
+	// The display width (after stripping ANSI) of row 2 should be equal in both
+	// states, since both render to the same column budget.
+	wFocused := runewidth.StringWidth(stripANSI(row2Focused))
+	wUnfocused := runewidth.StringWidth(stripANSI(row2Unfocused))
+	if wFocused != wUnfocused {
+		t.Errorf("row 2 display widths differ: focused=%d unfocused=%d (focused=%q unfocused=%q)",
+			wFocused, wUnfocused, row2Focused, row2Unfocused)
+	}
+}
+
+func TestRenderSession_DispatchesByView(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	mkModel := func(view string) SidebarModel {
+		return SidebarModel{
+			cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: view, Width: 40}},
+			sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		}
+	}
+	rowOut := mkModel(config.SidebarViewRow).renderSession(SidebarNode{Session: "alpha"}, false, false, 40)
+	cardOut := mkModel(config.SidebarViewCard).renderSession(SidebarNode{Session: "alpha"}, false, false, 40)
+	if strings.Contains(rowOut, "\n") {
+		t.Errorf("row view should be single line: %q", rowOut)
+	}
+	if !strings.Contains(cardOut, "\n") {
+		t.Errorf("card view should be multi-line: %q", cardOut)
 	}
 }
