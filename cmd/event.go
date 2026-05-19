@@ -162,18 +162,27 @@ var eventPaneClosedCmd = &cobra.Command{
 
 func applyPaneClosed(d *db.DB, paneID, windowID string) error {
 	demuxlog.Debug("pane_closed", "pane_id", paneID, "window_id", windowID)
-	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
-	if err := d.StateClear(t); err != nil {
-		return err
+	if paneID != "" {
+		t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
+		if err := d.StateClear(t); err != nil {
+			return err
+		}
 	}
 	tmuxClient := stickyTmuxForEvents()
-	if err := sticky.ClearStickyEnvForPane(tmuxClient, paneID); err != nil {
-		demuxlog.Warn("pane_closed: sticky env cleanup failed", "pane_id", paneID, "err", err)
-	}
-	if windowID != "" {
-		if err := (&sticky.Sticky{T: tmuxClient}).HandleWindowAfterKill(windowID); err != nil {
-			demuxlog.Warn("pane_closed: orphan slot cleanup failed", "window_id", windowID, "err", err)
+	if paneID != "" {
+		if err := sticky.ClearStickyEnvForPane(tmuxClient, paneID); err != nil {
+			demuxlog.Warn("pane_closed: sticky env cleanup failed", "pane_id", paneID, "err", err)
 		}
+	}
+	// tmux >= 3.5 leaves #{hook_pane} / #{hook_window} empty for
+	// after-kill-pane, so we cannot rely on the targeted paths above. Always
+	// run a server-wide sweep: stale env vars first, then orphan windows.
+	s := &sticky.Sticky{T: tmuxClient}
+	if err := s.SweepStaleStickyEnv(); err != nil {
+		demuxlog.Warn("pane_closed: stale env sweep failed", "err", err)
+	}
+	if err := s.SweepOrphanWindows(); err != nil {
+		demuxlog.Warn("pane_closed: orphan window sweep failed", "err", err)
 	}
 	return nil
 }
