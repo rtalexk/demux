@@ -457,6 +457,9 @@ func (m Model) plainBreadcrumb() string {
 
 // Run launches the Bubbletea program.
 func Run(cfg config.Config, database *db.DB) error {
+	if cfg.StickyMode {
+		ApplyStickyMode()
+	}
 	m := New(cfg, database)
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	_, err := p.Run()
