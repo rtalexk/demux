@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rtalexk/demux/internal/config"
+	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
 // HandleWindowAfterKill is invoked from the after-kill-pane hook with the
@@ -52,6 +53,7 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 		return nil
 	}
 	isSlot := slot == "1"
+	demuxlog.Info("orphan: candidate", "window_id", windowID, "pane_id", orphan, "is_slot", isSlot)
 
 	isSidebar := false
 	if envOut, err := s.T.Output("show-environment", "-g"); err == nil {
@@ -73,7 +75,10 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 
 	if !isSidebar {
 		if isSlot {
+			demuxlog.Info("orphan: kill placeholder", "window_id", windowID, "pane_id", orphan)
 			_ = s.T.Run("kill-pane", "-t", orphan)
+		} else {
+			demuxlog.Info("orphan: skip (not slot, not sidebar)", "window_id", windowID, "pane_id", orphan)
 		}
 		return nil
 	}
@@ -117,8 +122,10 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 		target = fallback
 	}
 	if target == "" {
+		demuxlog.Info("orphan: no sibling window in session, skip", "window_id", windowID, "session_id", sessID)
 		return nil
 	}
+	demuxlog.Info("orphan: moving sidebar", "window_id", windowID, "pane_id", orphan, "target", target)
 
 	if targetSlot, _ := s.FindSlotInWindow(target); targetSlot != "" && targetSlot != orphan {
 		_ = s.T.Run("kill-pane", "-t", targetSlot)
