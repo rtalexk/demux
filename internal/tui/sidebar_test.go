@@ -1231,14 +1231,17 @@ func TestBuildSidebarLines_CardMode_EmitsSeparatorsBetween(t *testing.T) {
 	if len(lines) != 8 {
 		t.Fatalf("expected 8 lines, got %d: %v", len(lines), lines)
 	}
+	for _, idx := range []int{0, 3, 6} {
+		want := []string{"alpha", "beta", "gamma"}[idx/3]
+		if !strings.Contains(stripANSI(lines[idx]), want) {
+			t.Errorf("line %d should contain %q (card row 1), got %q", idx, want, lines[idx])
+		}
+	}
 	if strings.TrimSpace(stripANSI(lines[2])) != "" {
 		t.Errorf("line 2 should be blank separator, got %q", lines[2])
 	}
 	if strings.TrimSpace(stripANSI(lines[5])) != "" {
 		t.Errorf("line 5 should be blank separator, got %q", lines[5])
-	}
-	if strings.TrimSpace(stripANSI(lines[7])) == "" {
-		t.Errorf("line 7 (last card row 2) should not be blank: %q", lines[7])
 	}
 }
 
@@ -1267,8 +1270,8 @@ func TestBuildSidebarLines_CardMode_NoSeparatorBeforeScrollHint(t *testing.T) {
 	if strings.TrimSpace(stripANSI(lines[2])) != "" {
 		t.Errorf("line 2 should be separator between cards, got %q", lines[2])
 	}
-	if strings.TrimSpace(stripANSI(lines[4])) == "" {
-		t.Errorf("line 4 (beta r2) should not be blank: %q", lines[4])
+	if !strings.Contains(stripANSI(lines[3]), "beta") {
+		t.Errorf("line 3 (beta r1) should contain \"beta\", got %q", lines[3])
 	}
 	if !strings.Contains(lines[5], "▼") {
 		t.Errorf("line 5 should be ▼ hint, got %q", lines[5])
@@ -1294,9 +1297,9 @@ func TestBuildSidebarLines_CardMode_NoSeparatorWhenDisabled(t *testing.T) {
 	if len(lines) != 6 {
 		t.Fatalf("expected 6 lines, got %d: %v", len(lines), lines)
 	}
-	for i, l := range lines {
-		if strings.TrimSpace(stripANSI(l)) == "" {
-			t.Errorf("line %d unexpectedly blank: %q", i, l)
+	for i, name := range []string{"alpha", "beta", "gamma"} {
+		if !strings.Contains(stripANSI(lines[i*2]), name) {
+			t.Errorf("line %d should contain %q (card row 1), got %q", i*2, name, lines[i*2])
 		}
 	}
 }
@@ -1578,7 +1581,7 @@ func TestRenderSessionCard_Unfocused_Basic(t *testing.T) {
 		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
 		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
 	}
-	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
 	lines := strings.Split(out, "\n")
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
@@ -1599,8 +1602,8 @@ func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
 		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40, ShowLastSeen: true}},
 		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
 	}
-	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, 40)
-	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	focused := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, true, 40)
+	unfocused := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
 	fLines := strings.Split(focused, "\n")
 	uLines := strings.Split(unfocused, "\n")
 	if len(fLines) != 2 || len(uLines) != 2 {
@@ -1628,7 +1631,7 @@ func TestRenderSessionCard_IdleStateBlanksLeftGroup(t *testing.T) {
 		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
 		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateIdle}},
 	}
-	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
 	row2 := strings.Split(out, "\n")[1]
 	if strings.Contains(stripANSI(row2), "idle") {
 		t.Errorf("row 2 should not show \"idle\" label: %q", row2)
@@ -1645,10 +1648,46 @@ func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
 		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
 		states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
 	}
-	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, 40)
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
 	row2 := strings.Split(out, "\n")[1]
 	if !strings.Contains(stripANSI(row2), "working") {
 		t.Errorf("row 2 expected \"working\" label: %q", row2)
+	}
+}
+
+func TestRenderSessionCard_UnselectedHasNoFocusGlyph(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	for i, l := range strings.Split(out, "\n") {
+		if strings.Contains(stripANSI(l), focusGlyph) {
+			t.Errorf("unselected card row %d should not contain focus glyph %q: %q", i+1, focusGlyph, l)
+		}
+	}
+}
+
+func TestRenderSessionCard_SelectedUnfocusedShowsGlyphWithoutBg(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	initStyles(Theme{
+		IconTmuxSession: "⊞", IconCfgSession: "⚙︎",
+		ColorSelected: lipgloss.Color("#2a2a4a"), ColorSession: lipgloss.Color("#89dceb"),
+	}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, true, false, 40)
+	for i, l := range strings.Split(out, "\n") {
+		if !strings.Contains(stripANSI(l), focusGlyph) {
+			t.Errorf("selected card row %d should contain focus glyph %q: %q", i+1, focusGlyph, stripANSI(l))
+		}
+		if strings.Contains(l, "\x1b[48") {
+			t.Errorf("selected-but-pane-unfocused row %d should not have background: %q", i+1, l)
+		}
 	}
 }
 
@@ -1666,7 +1705,7 @@ func TestRenderSessionCard_FocusedAndUnfocusedRow2_RightGroupAligns(t *testing.T
 			sessions: []session.Session{{DisplayName: "alpha", IsLive: true, Activity: time.Now().Add(-5 * time.Minute)}},
 			states:   []db.ToolState{{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Value: db.StateWorking}},
 		}
-		return s.renderSessionCard(SidebarNode{Session: "alpha"}, focused, 40)
+		return s.renderSessionCard(SidebarNode{Session: "alpha"}, focused, focused, 40)
 	}
 	row2Focused := strings.Split(mk(true), "\n")[1]
 	row2Unfocused := strings.Split(mk(false), "\n")[1]

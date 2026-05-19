@@ -931,7 +931,7 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
 	if s.cardView() {
-		return s.renderSessionCard(node, selected && focused, width)
+		return s.renderSessionCard(node, selected, selected && focused, width)
 	}
 	indicators := s.sessionIndicators(node, selected, focused)
 
@@ -1000,19 +1000,33 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 // focused == true means: the cursor is on this session AND the sidebar pane
 // has focus. The highlight background is applied to both content rows when
 // focused.
-func (s SidebarModel) renderSessionCard(node SidebarNode, focused bool, width int) string {
+func (s SidebarModel) renderSessionCard(node SidebarNode, selected, focused bool, width int) string {
 	innerW := width - borderOverhead
 	if innerW < minRowWidth+4 {
 		innerW = minRowWidth + 4
 	}
-	row1 := s.renderCardRow1(node, focused, innerW)
-	row2 := s.renderCardRow2(node, focused, innerW)
+	row1 := s.renderCardRow1(node, selected, focused, innerW)
+	row2 := s.renderCardRow2(node, selected, focused, innerW)
 	return row1 + "\n" + row2
+}
+
+// cardLeadingGlyph returns the column-0 glyph for a card row. Selected cards
+// (regardless of pane focus) get the blue focus glyph; everything else gets a
+// plain space so unselected cards never look highlighted.
+func cardLeadingGlyph(selected, focused bool) string {
+	switch {
+	case focused:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
+	case selected:
+		return lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
+	default:
+		return " "
+	}
 }
 
 // renderCardRow1 builds row 1: focus + active + session icon + name + watch,
 // with the highlight background extended to the full innerW when focused.
-func (s SidebarModel) renderCardRow1(node SidebarNode, focused bool, innerW int) string {
+func (s SidebarModel) renderCardRow1(node SidebarNode, selected, focused bool, innerW int) string {
 	// Active indicator slot (always 1 col so column alignment is stable).
 	activeIcon := s.cfg.Sidebar.ActiveSessionIcon
 	if activeIcon == "" {
@@ -1061,8 +1075,8 @@ func (s SidebarModel) renderCardRow1(node SidebarNode, focused bool, innerW int)
 		pad = 0
 	}
 
+	focusGl := cardLeadingGlyph(selected, focused)
 	if focused {
-		focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
 		iconStyled := selectedBG.Render(iconPrefix)
 		nameStyled := selectedBG.Bold(true).Render(nameStr)
 		sep := selectedBG.Render(" ")
@@ -1070,7 +1084,6 @@ func (s SidebarModel) renderCardRow1(node SidebarNode, focused bool, innerW int)
 		return focusGl + active + sep + iconStyled + nameStyled + sep + watch + trail
 	}
 
-	focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
 	nameStyled := sessionStyle.Render(nameStr)
 	return focusGl + active + " " + iconPrefix + nameStyled + " " + watch
 }
@@ -1078,7 +1091,7 @@ func (s SidebarModel) renderCardRow1(node SidebarNode, focused bool, innerW int)
 // renderCardRow2 builds row 2: focus + state-icon + state-label (left) and
 // proc/git/todo/last-seen (right), with justify-between spacing. When the
 // session is idle or has no state, the left state group is blank.
-func (s SidebarModel) renderCardRow2(node SidebarNode, focused bool, innerW int) string {
+func (s SidebarModel) renderCardRow2(node SidebarNode, selected, focused bool, innerW int) string {
 	// Left group: state icon + label.
 	var leftIcon, leftLabel string
 	st := s.stateForSession(node.Session)
@@ -1137,8 +1150,8 @@ func (s SidebarModel) renderCardRow2(node SidebarNode, focused bool, innerW int)
 		gap = 1
 	}
 
+	focusGl := cardLeadingGlyph(selected, focused)
 	if focused {
-		focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Background(activeTheme.ColorSelected).Render(focusGlyph)
 		sep := selectedBG.Render(" ")
 		var leftIconStyled string
 		if leftLabel == "" {
@@ -1151,7 +1164,6 @@ func (s SidebarModel) renderCardRow2(node SidebarNode, focused bool, innerW int)
 		return focusGl + sep + leftIconStyled + sep + leftLabel + gapStr + right + trail
 	}
 
-	focusGl := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
 	return focusGl + " " + leftIcon + " " + leftLabel + strings.Repeat(" ", gap) + right + " "
 }
 
