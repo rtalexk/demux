@@ -691,36 +691,67 @@ which shows up as a one-frame flicker.
 Set `[sidebar.sticky] slots = true` and the sidebar switches to a different
 strategy:
 
-- A **slot pane** is created in every window (one extra pane each, running
-  `demux sidebar slot` as a quiet placeholder).
+- Up to **8 slot panes** are maintained server-wide, in the most recently used
+  windows (plus the current window's own sidebar pane). Each slot runs
+  `demux sidebar slot` as a quiet placeholder.
 - Each slot is tagged with the tmux user option `@demux_slot=1` and titled
   `demux-slot` so you can recognize it (visible if you have
   `set -g pane-border-status top` in your tmux config).
-- On window/session switch, the active sidebar pane is **swapped** with the
-  destination window's slot via `swap-pane -d`. No layout rebuild, no
-  flicker. Width is preserved via a follow-up `resize-pane`.
+- On window/session switch to a window that already has a slot, the active
+  sidebar pane is **swapped** with that slot via `swap-pane -d`. No layout
+  rebuild, no flicker. Width is preserved via a follow-up `resize-pane`.
+- Switching to a window that fell out of the MRU triggers a one-time
+  `split-window` to recreate its slot, then the swap; that window enters the
+  MRU and is flicker-free on subsequent visits.
+
+#### Reserved-set priority
+
+After each switch, demux recomputes which windows keep a placeholder slot.
+Priority (highest first), capped at 8 total:
+
+1. The current session's `window_last_flag=1` window (tmux's "last window").
+2. The client's last-attached session's active window.
+3. Other windows in the current session, ordered by MRU then tmux index.
+4. Cross-session windows from the MRU.
+
+The current window itself is excluded (it holds the sidebar, not a
+placeholder). Slots in windows that fall out of the reserved set are killed
+to free their PTY.
+
+#### Pre-join on demux navigation
+
+When you connect to a session or pane through the demux TUI (`o`, `Enter`),
+demux installs the destination's slot **before** issuing the tmux switch, so
+the after-select-window follow swaps in without any flicker even for windows
+not currently in the MRU.
 
 Lifecycle for slots mode:
 
 ```bash
-demux sidebar show              # installs slots + activates current window's slot
+demux sidebar show              # installs slots in MRU + activates current window's slot
 demux sidebar hide              # removes every slot pane (full teardown)
-demux sidebar slots install     # idempotent: ensure every window has a slot
+demux sidebar slots install     # idempotent: ensure every reserved window has a slot
 demux sidebar slots uninstall   # remove every slot pane
 ```
 
 The tmux snippet from `demux hooks init --tool tmux` already includes an
-`after-new-window` hook that auto-creates a slot in any newly created window
-(no-op when `slots = false`).
+`after-new-window` hook that reconciles the slot set when a new window
+appears (no-op when `slots = false`).
 
 Trade-offs:
 
-- Cost: one extra pane per window. Each runs a tiny demux process that
-  ignores `SIGINT`/`SIGTERM` so casual Ctrl+C doesn't kill the slot. Use
-  `prefix x` (tmux kill-pane) or `demux sidebar slots uninstall` to remove.
+- Cost: at most 8 placeholder panes + 1 active sidebar pane server-wide,
+  regardless of how many windows you have open. Each placeholder runs a tiny
+  demux process that ignores `SIGINT`/`SIGTERM` so casual Ctrl+C doesn't kill
+  the slot. Use `prefix x` (tmux kill-pane) or `demux sidebar slots
+  uninstall` to remove.
 - Slots in windows whose pane layout doesn't naturally accommodate a left
   column will resize the existing panes to make room. Run `slots uninstall`
   to revert.
+- Why 8? macOS caps total PTYs at `kern.tty.ptmx_max=511` by default; a
+  server-wide one-slot-per-window scheme exhausts that cap fast on heavy
+  multi-session setups. 8 covers typical navigation patterns while leaving
+  comfortable headroom.
 
 ### Notes and limitations
 
