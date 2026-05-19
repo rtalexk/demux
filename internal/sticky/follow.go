@@ -8,12 +8,14 @@ import (
 	"github.com/rtalexk/demux/internal/config"
 )
 
-// Follow moves the sticky sidebar pane into the current client's session,
-// preserving the pane's current width. It is a no-op when:
+// Follow moves the sticky sidebar pane into the current client's window
+// (which implies the current session too), preserving the pane's current
+// width. It is a no-op when:
 //   - no sidebar is tracked for this client,
 //   - the tracked pane is gone (user runs `show` to recreate),
-//   - the pane is already in the current session.
+//   - the pane is already in the current window.
 //
+// join-pane uses -d so user focus stays in the non-sidebar pane after the move.
 // join-pane failures are swallowed so the tmux hook that drives Follow never
 // crashes user navigation.
 func (s *Sticky) Follow() error {
@@ -41,16 +43,16 @@ func (s *Sticky) Follow() error {
 		return fmt.Errorf("tmux display-message current target: %w", err)
 	}
 	curr = strings.TrimSpace(curr)
-	paneSession, err := s.T.Output("display-message", "-p", "-t", val, "#{session_id}")
+	paneWindow, err := s.T.Output("display-message", "-p", "-t", val, "#{window_id}")
 	if err != nil {
-		return fmt.Errorf("tmux display-message pane session: %w", err)
+		return fmt.Errorf("tmux display-message pane window: %w", err)
 	}
-	paneSession = strings.TrimSpace(paneSession)
+	paneWindow = strings.TrimSpace(paneWindow)
 	currParts := strings.SplitN(curr, ":", 2)
 	if len(currParts) < 2 {
 		return fmt.Errorf("unexpected current target %q", curr)
 	}
-	if paneSession == currParts[0] {
+	if paneWindow == currParts[1] {
 		return nil
 	}
 	widthStr, _ := s.T.Output("display-message", "-p", "-t", val, "#{pane_width}")
@@ -58,6 +60,6 @@ func (s *Sticky) Follow() error {
 	if width <= 0 {
 		width = config.DefaultStickySidebarWidth
 	}
-	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
+	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
 	return nil
 }
