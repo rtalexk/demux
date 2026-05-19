@@ -199,6 +199,39 @@ func TestFollow_PokesRefreshAfterMove(t *testing.T) {
 	}
 }
 
+func TestFollow_DeadTrackedPane_CleansSlotsAndEnv(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	// Tracked pane %42 is no longer in list-panes.
+	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%1\n%2\n"}
+	// UninstallSlots will scan tags; placeholder slots remain in other windows.
+	f.outputs["list-panes -aF #{pane_id} #{@demux_slot}"] = fakeReply{out: "%50 1\n%60 1\n"}
+	s := &Sticky{T: f, Slots: true}
+	if err := s.Follow(); err != nil {
+		t.Fatalf("Follow: %v", err)
+	}
+	var unset, kill50, kill60 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "set-environment -gu DEMUX_STICKY_PANE__dev_ttys001" {
+			unset = true
+		}
+		if j == "kill-pane -t %50" {
+			kill50 = true
+		}
+		if j == "kill-pane -t %60" {
+			kill60 = true
+		}
+	}
+	if !unset {
+		t.Errorf("expected env var unset on dead pane, got: %v", f.runs)
+	}
+	if !kill50 || !kill60 {
+		t.Errorf("expected leftover slots %%50 and %%60 killed, got: %v", f.runs)
+	}
+}
+
 func TestFollow_EjectsFocusWhenSidebarIsActive(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}

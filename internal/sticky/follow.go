@@ -36,6 +36,14 @@ func (s *Sticky) Follow() error {
 		return err
 	}
 	if !alive {
+		// The tracked sticky pane was killed externally (e.g. prefix x).
+		// Clean up the env var, and in slots mode tear down the leftover
+		// placeholder panes so they don't linger in every other window.
+		// Best-effort: ignore errors so the hook never crashes navigation.
+		_ = s.UnsetEnv(key)
+		if s.Slots {
+			_ = s.UninstallSlots()
+		}
 		return nil
 	}
 	curr, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
