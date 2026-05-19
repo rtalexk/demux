@@ -84,6 +84,43 @@ func TestShow_OldTmux_Errors(t *testing.T) {
 	}
 }
 
+func TestShow_SlotsMode_InstallsAndRespawnsCurrentSlot(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["list-windows -aF #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n$1:@8\n"}
+	f.outputs["list-panes -t $1:@7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%10\n"}
+	f.outputs["list-panes -t $1:@8 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%2 \n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@8 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%11\n"}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
+	// After install, current-window slot lookup re-runs list-panes.
+	// First call already returned "%1 ", but now @demux_slot tag is set on %10.
+	// Override to reflect updated state.
+	f.outputs["list-panes -t $1:@7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%10 1\n"}
+	s := &Sticky{T: f, Slots: true}
+	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	var sawRespawn, sawRecord bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "respawn-pane -k -t %10 demux --sticky" {
+			sawRespawn = true
+		}
+		if j == "set-environment -g DEMUX_STICKY_PANE__dev_ttys001 %10" {
+			sawRecord = true
+		}
+	}
+	if !sawRespawn {
+		t.Errorf("expected respawn-pane on current window's slot, got: %v", f.runs)
+	}
+	if !sawRecord {
+		t.Errorf("expected env var to record active slot pane id, got: %v", f.runs)
+	}
+}
+
 func TestShow_SplitFailure_Surfaces(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}

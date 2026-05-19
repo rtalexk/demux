@@ -60,6 +60,34 @@ func (s *Sticky) Follow() error {
 	if width <= 0 {
 		width = config.DefaultStickySidebarWidth
 	}
+	if s.Slots {
+		return s.followSlotsMode(val, curr, width)
+	}
 	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d", "-l", strconv.Itoa(width), "-s", val, "-t", curr)
+	return nil
+}
+
+// followSlotsMode swaps the active sidebar pane with the destination window's
+// slot pane (zero-flicker compared to join-pane), then resizes the swapped
+// pane to preserve the user's chosen width.
+func (s *Sticky) followSlotsMode(activePane, currTarget string, width int) error {
+	slot, err := s.FindSlotInWindow(currTarget)
+	if err != nil {
+		return err
+	}
+	if slot == "" {
+		if err := s.EnsureSlotInWindow(currTarget, width); err != nil {
+			return nil
+		}
+		slot, err = s.FindSlotInWindow(currTarget)
+		if err != nil || slot == "" {
+			return nil
+		}
+	}
+	if slot == activePane {
+		return nil
+	}
+	_ = s.T.Run("swap-pane", "-d", "-s", activePane, "-t", slot)
+	_ = s.T.Run("resize-pane", "-t", activePane, "-x", strconv.Itoa(width))
 	return nil
 }

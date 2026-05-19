@@ -1,8 +1,12 @@
 package sticky
 
-// Hide removes the sticky sidebar pane for the current client. It is a no-op
-// when no pane is tracked. Errors from kill-pane (typically "pane not found"
-// after a manual kill) are tolerated so the env var is still cleared.
+// Hide deactivates the sticky sidebar pane for the current client.
+//
+// In split mode the pane is killed. In slots mode the pane is respawned with
+// the slot placeholder so the slot stays in place (matching the rest of the
+// windows). The env var is always cleared so the next Show treats the
+// sidebar as inactive. Errors from kill-pane/respawn-pane (typically "pane
+// not found" after a manual kill) are tolerated.
 func (s *Sticky) Hide() error {
 	tty, err := s.CurrentClientTTY()
 	if err != nil {
@@ -17,7 +21,11 @@ func (s *Sticky) Hide() error {
 		return nil
 	}
 	if val != "" {
-		_ = s.T.Run("kill-pane", "-t", val)
+		if s.Slots {
+			_ = s.T.Run("respawn-pane", "-k", "-t", val, SlotPlaceholderCmd)
+		} else {
+			_ = s.T.Run("kill-pane", "-t", val)
+		}
 	}
 	return s.UnsetEnv(key)
 }

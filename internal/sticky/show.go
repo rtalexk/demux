@@ -19,6 +19,10 @@ type ShowOpts struct {
 // already tracked and the pane is alive, Show is a no-op. Otherwise it splits
 // the current window with a full-height left column of opts.Width columns and
 // records the new pane id.
+//
+// In slots mode (s.Slots==true), Show first installs a slot pane in every
+// window, then respawns the current window's slot with opts.Cmd to make it
+// the active sidebar pane.
 func (s *Sticky) Show(opts ShowOpts) error {
 	if err := s.VersionOK(); err != nil {
 		return err
@@ -41,6 +45,13 @@ func (s *Sticky) Show(opts ShowOpts) error {
 			return nil
 		}
 	}
+	if s.Slots {
+		return s.showSlotsMode(key, opts)
+	}
+	return s.showSplitMode(key, opts)
+}
+
+func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
 	if err != nil {
 		return fmt.Errorf("tmux display-message current target: %w", err)
@@ -61,4 +72,26 @@ func (s *Sticky) Show(opts ShowOpts) error {
 		return fmt.Errorf("tmux split-window returned empty pane id")
 	}
 	return s.WriteEnv(key, newPane)
+}
+
+func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
+	if err := s.InstallSlotsInAllWindows(opts.Width); err != nil {
+		return err
+	}
+	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	if err != nil {
+		return fmt.Errorf("tmux display-message current target: %w", err)
+	}
+	target = strings.TrimSpace(target)
+	slot, err := s.FindSlotInWindow(target)
+	if err != nil {
+		return err
+	}
+	if slot == "" {
+		return fmt.Errorf("no slot in current window after install")
+	}
+	if err := s.T.Run("respawn-pane", "-k", "-t", slot, opts.Cmd); err != nil {
+		return fmt.Errorf("tmux respawn-pane: %w", err)
+	}
+	return s.WriteEnv(key, slot)
 }

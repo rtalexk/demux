@@ -50,6 +50,38 @@ func TestHide_EnvSet_KillsPaneAndUnsets(t *testing.T) {
 	}
 }
 
+func TestHide_SlotsMode_RespawnsPlaceholder(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	s := &Sticky{T: f, Slots: true}
+	if err := s.Hide(); err != nil {
+		t.Fatalf("Hide: %v", err)
+	}
+	var sawRespawn, sawKill, sawUnset bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "respawn-pane -k -t %42 demux sidebar slot" {
+			sawRespawn = true
+		}
+		if strings.HasPrefix(j, "kill-pane") {
+			sawKill = true
+		}
+		if j == "set-environment -gu DEMUX_STICKY_PANE__dev_ttys001" {
+			sawUnset = true
+		}
+	}
+	if !sawRespawn {
+		t.Errorf("expected respawn-pane to placeholder, got: %v", f.runs)
+	}
+	if sawKill {
+		t.Errorf("expected no kill-pane in slots mode, got: %v", f.runs)
+	}
+	if !sawUnset {
+		t.Errorf("expected env unset, got: %v", f.runs)
+	}
+}
+
 func TestHide_KillPaneFailure_StillUnsets(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}

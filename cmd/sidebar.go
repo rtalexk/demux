@@ -11,7 +11,12 @@ import (
 )
 
 // stickyClient is overridable in tests so we can inject a fake Tmux.
-var stickyClient = func() *sticky.Sticky { return sticky.New() }
+var stickyClient = func() *sticky.Sticky {
+	cfg := loadConfig()
+	s := sticky.New()
+	s.Slots = cfg.Sidebar.Sticky.Slots
+	return s
+}
 
 var sidebarCmd = &cobra.Command{
 	Use:   "sidebar",

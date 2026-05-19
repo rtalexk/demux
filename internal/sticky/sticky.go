@@ -34,6 +34,11 @@ func (realTmux) Output(args ...string) (string, error) {
 // inject a fake Tmux for tests.
 type Sticky struct {
 	T Tmux
+	// Slots toggles per-window slot mode: when true, Show installs a slot
+	// pane in every window and switches between them via swap-pane (instead
+	// of join-pane). The active sidebar pane lives in whichever window's
+	// slot is currently selected; the others run SlotPlaceholderCmd.
+	Slots bool
 }
 
 // New returns a Sticky wired to the real tmux binary.
