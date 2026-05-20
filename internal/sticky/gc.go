@@ -2,7 +2,6 @@ package sticky
 
 import (
 	"fmt"
-	"strings"
 )
 
 // ClearStickyEnvForPane scans every tmux server-global env var and unsets any
@@ -16,23 +15,14 @@ import (
 // In split mode there are no slot-tagged panes, so the uninstall pass is a
 // no-op.
 func ClearStickyEnvForPane(t Tmux, paneID string) error {
-	out, err := t.Output("show-environment", "-g")
+	envs, err := listStickyPaneEnv(t)
 	if err != nil {
 		return fmt.Errorf("tmux show-environment -g: %w", err)
 	}
 	matched := false
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, envKeyPrefix) {
-			continue
-		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
-			continue
-		}
-		k, v := line[:eq], line[eq+1:]
-		if v == paneID {
-			_ = t.Run("set-environment", "-gu", k)
+	for _, e := range envs {
+		if e.pane == paneID {
+			_ = t.Run("set-environment", "-gu", e.key)
 			matched = true
 		}
 	}

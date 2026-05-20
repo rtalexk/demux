@@ -64,17 +64,9 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 	demuxlog.Info("orphan: candidate", "window_id", windowID, "pane_id", orphan, "is_slot", isSlot)
 
 	isSidebar := false
-	if envOut, err := s.T.Output("show-environment", "-g"); err == nil {
-		for _, line := range strings.Split(envOut, "\n") {
-			line = strings.TrimSpace(line)
-			if !strings.HasPrefix(line, envKeyPrefix) {
-				continue
-			}
-			eq := strings.IndexByte(line, '=')
-			if eq < 0 {
-				continue
-			}
-			if line[eq+1:] == orphan {
+	if envs, err := listStickyPaneEnv(s.T); err == nil {
+		for _, e := range envs {
+			if e.pane == orphan {
 				isSidebar = true
 				break
 			}

@@ -129,6 +129,36 @@ func (s *Sticky) UnsetEnv(key string) error {
 	return nil
 }
 
+// stickyPaneEnv is one DEMUX_STICKY_PANE_* binding parsed from
+// `tmux show-environment -g`: the env var name and the pane id it points at.
+type stickyPaneEnv struct {
+	key  string
+	pane string
+}
+
+// listStickyPaneEnv runs `tmux show-environment -g` and returns every
+// DEMUX_STICKY_PANE_* binding found. Lines that lack a '=' (e.g. tmux's "-KEY"
+// unset marker) are skipped.
+func listStickyPaneEnv(t Tmux) ([]stickyPaneEnv, error) {
+	out, err := t.Output("show-environment", "-g")
+	if err != nil {
+		return nil, err
+	}
+	var envs []stickyPaneEnv
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, envKeyPrefix) {
+			continue
+		}
+		eq := strings.IndexByte(line, '=')
+		if eq < 0 {
+			continue
+		}
+		envs = append(envs, stickyPaneEnv{key: line[:eq], pane: line[eq+1:]})
+	}
+	return envs, nil
+}
+
 // VersionOK returns nil when the available tmux binary is >= 2.6, which is
 // required for the -f flag on split-window and join-pane.
 func (s *Sticky) VersionOK() error {

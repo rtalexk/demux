@@ -17,6 +17,29 @@ const SlotPaneTitle = "demux-slot"
 // SlotPlaceholderCmd is the command run inside an inactive slot pane.
 const SlotPlaceholderCmd = "demux sidebar slot"
 
+// slotLines parses `tmux list-panes -F` output whose format string ends with
+// "#{@demux_slot}". fieldCount is the total number of space-separated fields
+// per line, including that trailing slot tag. For each line tagged "1" it
+// returns the leading fields (everything before the tag); other lines and
+// lines with too few fields are skipped.
+func slotLines(out string, fieldCount int) [][]string {
+	var rows [][]string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, " ", fieldCount)
+		if len(parts) < fieldCount {
+			continue
+		}
+		if strings.TrimSpace(parts[fieldCount-1]) == "1" {
+			rows = append(rows, parts[:fieldCount-1])
+		}
+	}
+	return rows
+}
+
 // FindSlotInWindow returns the pane id of the slot in target window, or ""
 // if the window has no slot pane.
 func (s *Sticky) FindSlotInWindow(target string) (string, error) {
@@ -24,18 +47,8 @@ func (s *Sticky) FindSlotInWindow(target string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("tmux list-panes: %w", err)
 	}
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		if strings.TrimSpace(parts[1]) == "1" {
-			return parts[0], nil
-		}
+	for _, row := range slotLines(out, 2) {
+		return row[0], nil
 	}
 	return "", nil
 }
@@ -49,20 +62,7 @@ func (s *Sticky) AnySlotExists() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("tmux list-panes: %w", err)
 	}
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		if strings.TrimSpace(parts[1]) == "1" {
-			return true, nil
-		}
-	}
-	return false, nil
+	return len(slotLines(out, 2)) > 0, nil
 }
 
 // EnsureSlotInWindow creates a sidebar slot pane in the target window if none
@@ -124,22 +124,8 @@ func (s *Sticky) UninstallSlots() error {
 	if err != nil {
 		return fmt.Errorf("tmux list-panes: %w", err)
 	}
-	var kills []string
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) < 2 {
-			continue
-		}
-		if strings.TrimSpace(parts[1]) == "1" {
-			kills = append(kills, parts[0])
-		}
-	}
-	for _, p := range kills {
-		_ = s.T.Run("kill-pane", "-t", p)
+	for _, row := range slotLines(out, 2) {
+		_ = s.T.Run("kill-pane", "-t", row[0])
 	}
 	return nil
 }

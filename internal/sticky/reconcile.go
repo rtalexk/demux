@@ -1,9 +1,5 @@
 package sticky
 
-import (
-	"strings"
-)
-
 // ReconcileSlots brings the server's set of slot panes into agreement with
 // reserved + currentWindow. For each window in reserved that lacks a slot, a
 // placeholder is installed via EnsureSlotInWindow. For each window that has
@@ -25,19 +21,8 @@ func (s *Sticky) ReconcileSlots(reserved []string, currentWindow string, width i
 		return err
 	}
 	existing := make(map[string]string)
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 3)
-		if len(parts) < 3 {
-			continue
-		}
-		wid, pid, slot := parts[0], parts[1], strings.TrimSpace(parts[2])
-		if slot != "1" {
-			continue
-		}
+	for _, row := range slotLines(out, 3) {
+		wid, pid := row[0], row[1]
 		if _, has := existing[wid]; !has {
 			existing[wid] = pid
 		}

@@ -11,32 +11,23 @@ import (
 // `#{hook_pane}` is not populated for `after-kill-pane`, leaving targeted
 // cleanup blind to which pane was actually killed.
 func (s *Sticky) SweepStaleStickyEnv() error {
-	out, err := s.T.Output("show-environment", "-g")
+	envs, err := listStickyPaneEnv(s.T)
 	if err != nil {
 		return nil
 	}
 	var stale []string
 	anyLive := false
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, envKeyPrefix) {
+	for _, e := range envs {
+		if e.pane == "" {
+			stale = append(stale, e.key)
 			continue
 		}
-		eq := strings.IndexByte(line, '=')
-		if eq < 0 {
-			continue
-		}
-		k, v := line[:eq], line[eq+1:]
-		if v == "" {
-			stale = append(stale, k)
-			continue
-		}
-		alive, _ := s.PaneAlive(v)
+		alive, _ := s.PaneAlive(e.pane)
 		if alive {
 			anyLive = true
 			continue
 		}
-		stale = append(stale, k)
+		stale = append(stale, e.key)
 	}
 	if len(stale) == 0 {
 		return nil
