@@ -91,9 +91,17 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 // while waiting for after-kill-pane to fire (which may be unreliable for
 // natural process exits in some tmux versions).
 //
+// When the remaining pane is a placeholder slot rather than the active
+// sidebar (e.g. an ephemeral lazygit window that got a slot from the
+// after-new-window hook), the placeholder is killed so the window closes
+// cleanly instead of lingering as a useless slot-only window. This mirrors
+// HandleWindowAfterKill's placeholder branch - but after-kill-pane does not
+// fire for natural process exits, so this proactive path is the only cleanup
+// that runs for them.
+//
 // No-op when the window has more than two panes, when the remaining pane after
-// excluding exitingPaneID is not the tracked sidebar, or when there is no
-// sibling window to receive the sidebar.
+// excluding exitingPaneID is a regular (non-sticky) pane, or when there is no
+// sibling window to receive a relocated sidebar.
 func (s *Sticky) EjectSidebarIfAloneAfterExit(exitingPaneID, windowID string, width int) error {
 	if exitingPaneID == "" || windowID == "" {
 		return nil
@@ -102,7 +110,7 @@ func (s *Sticky) EjectSidebarIfAloneAfterExit(exitingPaneID, windowID string, wi
 	if err != nil {
 		return nil
 	}
-	var orphan string
+	var orphan, orphanSlot string
 	remaining := 0
 	for _, line := range nonEmptyLines(panesOut) {
 		parts := strings.SplitN(line, " ", 2)
@@ -112,6 +120,10 @@ func (s *Sticky) EjectSidebarIfAloneAfterExit(exitingPaneID, windowID string, wi
 		}
 		remaining++
 		orphan = paneID
+		orphanSlot = ""
+		if len(parts) >= 2 {
+			orphanSlot = strings.TrimSpace(parts[1])
+		}
 	}
 	if remaining != 1 {
 		return nil
@@ -126,6 +138,13 @@ func (s *Sticky) EjectSidebarIfAloneAfterExit(exitingPaneID, windowID string, wi
 		}
 	}
 	if !isSidebar {
+		// The window would be left with a single pane that is not the active
+		// sidebar. If it is a placeholder slot, kill it now so the window
+		// closes once the exiting pane dies; a regular pane is left alone.
+		if orphanSlot == "1" {
+			demuxlog.Info("pre-exit: lone placeholder slot, killing", "window_id", windowID, "pane_id", orphan)
+			_ = s.T.Run("kill-pane", "-t", orphan)
+		}
 		return nil
 	}
 	demuxlog.Info("pre-exit: sidebar will be alone, relocating", "window_id", windowID, "pane_id", orphan)
