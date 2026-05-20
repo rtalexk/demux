@@ -9,24 +9,32 @@ import (
 )
 
 // HandleWindowAfterKill is invoked from the after-kill-pane hook with the
-// window id where the kill happened. When that window is left with only one
-// pane that is either an active sidebar pane (split mode) or a sidebar slot
-// pane (slots mode), we close the window cleanly so a useless slot-only or
-// sidebar-only window does not linger:
+// window id where the kill happened and the configured sidebar width. When
+// that window is left with only one pane that is either an active sidebar pane
+// (split mode) or a sidebar slot pane (slots mode), we close the window
+// cleanly so a useless slot-only or sidebar-only window does not linger:
 //
 //   - If the lone pane is the active sidebar for some client (its pane id
 //     appears as a DEMUX_STICKY_PANE_* env value), the sidebar pane is moved
-//     into the last-active sibling window via join-pane. The source window
-//     auto-closes because it ends up with zero panes.
+//     into the last-active sibling window, sized to width. When that window
+//     has a placeholder slot the move is a swap-pane (no pane killed, so the
+//     after-kill-pane hook is not re-entered); otherwise it is a join-pane.
+//     The source window auto-closes because it ends up with zero panes.
 //   - Otherwise, if the lone pane is a slot (placeholder, slots mode), it is
 //     killed outright and the source window closes naturally.
 //   - Otherwise (a regular pane unrelated to sticky), it is left alone.
 //
+// width is the caller's configured sidebar width. The orphan pane's own
+// #{pane_width} cannot be used: by the time this hook runs the pane has
+// already reflowed to fill its now-single-pane source window.
+//
 // No-op when windowID is empty, when list-panes errors (window already gone),
-// when the window has more than one pane, or when the session has no sibling
+// when the window has more than one pane, when the session has no sibling
 // window to receive the sidebar (closing the last window would terminate the
-// session).
-func (s *Sticky) HandleWindowAfterKill(windowID string) error {
+// session), or when the sidebar has already been moved out of windowID by a
+// concurrent handler (the function is idempotent under the hook re-firing it
+// triggers itself).
+func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 	if windowID == "" {
 		return nil
 	}
@@ -125,22 +133,43 @@ func (s *Sticky) HandleWindowAfterKill(windowID string) error {
 		demuxlog.Info("orphan: no sibling window in session, skip", "window_id", windowID, "session_id", sessID)
 		return nil
 	}
-	demuxlog.Info("orphan: moving sidebar", "window_id", windowID, "pane_id", orphan, "target", target)
-
-	if targetSlot, _ := s.FindSlotInWindow(target); targetSlot != "" && targetSlot != orphan {
-		_ = s.T.Run("kill-pane", "-t", targetSlot)
-	}
-
-	width := config.DefaultStickySidebarWidth
-	if wOut, _ := s.T.Output("display-message", "-p", "-t", orphan, "#{pane_width}"); strings.TrimSpace(wOut) != "" {
-		if w, perr := strconv.Atoi(strings.TrimSpace(wOut)); perr == nil && w > 0 {
-			width = w
+	// Defense in depth: if a concurrent pane_closed handler has already moved
+	// the sidebar out of windowID, do not move it a second time.
+	if curWin, curErr := s.T.Output("display-message", "-p", "-t", orphan, "#{window_id}"); curErr == nil {
+		if w := strings.TrimSpace(curWin); w != "" && w != windowID {
+			demuxlog.Info("orphan: sidebar already moved, skip", "pane_id", orphan, "now_window", w)
+			return nil
 		}
 	}
 
-	_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d",
-		"-l", strconv.Itoa(width),
-		"-s", orphan, "-t", target)
+	demuxlog.Info("orphan: moving sidebar", "window_id", windowID, "pane_id", orphan, "target", target)
+
+	if width <= 0 {
+		width = config.DefaultStickySidebarWidth
+	}
+
+	targetSlot, _ := s.FindSlotInWindow(target)
+
+	if targetSlot != "" && targetSlot != orphan {
+		// swap-pane moves the sidebar into the target window's slot position
+		// without killing any pane, so it does NOT re-fire after-kill-pane:
+		// no re-entrant handler, no double move, no width corruption. The
+		// placeholder slot ends up parked alone in the (now content-less)
+		// source window.
+		_ = s.T.Run("swap-pane", "-d", "-s", orphan, "-t", targetSlot)
+		_ = s.T.Run("resize-pane", "-t", orphan, "-x", strconv.Itoa(width))
+		// Remove the parked placeholder so the empty source window closes.
+		// This kill re-fires after-kill-pane, but the move is already done so
+		// the nested sweep is a no-op - and the kill happens in the source
+		// window, so it cannot disturb the sidebar geometry in the target.
+		_ = s.T.Run("kill-pane", "-t", targetSlot)
+	} else {
+		// No placeholder slot in the target (split mode, or slots partially
+		// uninstalled): join the sidebar in directly.
+		_ = s.T.Run("join-pane", "-f", "-h", "-b", "-d",
+			"-l", strconv.Itoa(width),
+			"-s", orphan, "-t", target)
+	}
 	_ = s.T.Run("select-window", "-t", target)
 	return nil
 }

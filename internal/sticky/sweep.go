@@ -55,7 +55,10 @@ func (s *Sticky) SweepStaleStickyEnv() error {
 // either folded into a sibling window (if it holds the active sidebar) or
 // closed outright (if its slot is just a placeholder). Safe to call when no
 // orphan exists - HandleWindowAfterKill is a no-op for healthy windows.
-func (s *Sticky) SweepOrphanWindows() error {
+//
+// width is the configured sidebar width, forwarded to HandleWindowAfterKill
+// so a folded-in sidebar is sized correctly.
+func (s *Sticky) SweepOrphanWindows(width int) error {
 	out, err := s.T.Output("list-windows", "-aF", "#{window_id}")
 	if err != nil {
 		return nil
@@ -65,7 +68,7 @@ func (s *Sticky) SweepOrphanWindows() error {
 		if wid == "" {
 			continue
 		}
-		_ = s.HandleWindowAfterKill(wid)
+		_ = s.HandleWindowAfterKill(wid, width)
 	}
 	return nil
 }

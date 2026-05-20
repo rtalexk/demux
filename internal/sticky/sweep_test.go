@@ -128,7 +128,7 @@ func TestSweepOrphanWindows_VisitsEveryWindow(t *testing.T) {
 	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%20 \n%21 \n"}
 	f.outputs["list-panes -t @3 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%30 \n%31 \n"}
 	s := &Sticky{T: f}
-	if err := s.SweepOrphanWindows(); err != nil {
+	if err := s.SweepOrphanWindows(35); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var saw1, saw2, saw3 bool
@@ -160,7 +160,7 @@ func TestSweepOrphanWindows_KillsOrphanPlaceholder(t *testing.T) {
 	f.outputs["list-panes -t @7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%77 1\n"}
 	f.outputs["show-environment -g"] = fakeReply{out: ""}
 	s := &Sticky{T: f}
-	if err := s.SweepOrphanWindows(); err != nil {
+	if err := s.SweepOrphanWindows(35); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	saw := false
@@ -171,5 +171,33 @@ func TestSweepOrphanWindows_KillsOrphanPlaceholder(t *testing.T) {
 	}
 	if !saw {
 		t.Errorf("expected kill-pane for orphan placeholder %%77, got: %v", f.runs)
+	}
+}
+
+// SweepOrphanWindows must forward its width argument to HandleWindowAfterKill
+// so a folded-in sidebar is joined at the configured width.
+func TestSweepOrphanWindows_FoldsSidebarWithConfiguredWidth(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-windows -aF #{window_id}"] = fakeReply{out: "@7\n"}
+	// @7 holds the active sidebar as its lone pane.
+	f.outputs["list-panes -t @7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%77 1\n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%77\n"}
+	f.outputs["display-message -t @7 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@7 0\n@3 1\n"}
+	f.outputs["list-panes -t @3 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%30 \n%31 \n"}
+	f.outputs["display-message -p -t %77 #{window_id}"] = fakeReply{out: "@7\n"}
+
+	s := &Sticky{T: f}
+	if err := s.SweepOrphanWindows(48); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	saw := false
+	for _, r := range f.runs {
+		if strings.Join(r, " ") == "join-pane -f -h -b -d -l 48 -s %77 -t @3" {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Errorf("expected join-pane sized to forwarded width 48, got: %v", f.runs)
 	}
 }

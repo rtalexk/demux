@@ -177,11 +177,19 @@ func applyPaneClosed(d *db.DB, paneID, windowID string) error {
 	// tmux >= 3.5 leaves #{hook_pane} / #{hook_window} empty for
 	// after-kill-pane, so we cannot rely on the targeted paths above. Always
 	// run a server-wide sweep: stale env vars first, then orphan windows.
+	//
+	// This handler can re-enter itself: the sweep's kill-pane calls re-fire
+	// after-kill-pane, and the hook's run-shell is synchronous, so the nested
+	// handler runs to completion before kill-pane returns. The sweep is built
+	// to be idempotent under that re-entry (see HandleWindowAfterKill), so no
+	// lock is needed - and a lock would in fact deadlock against the nested,
+	// synchronous handler.
 	s := &sticky.Sticky{T: tmuxClient}
 	if err := s.SweepStaleStickyEnv(); err != nil {
 		demuxlog.Warn("pane_closed: stale env sweep failed", "err", err)
 	}
-	if err := s.SweepOrphanWindows(); err != nil {
+	width := loadConfig().Sidebar.Sticky.Width
+	if err := s.SweepOrphanWindows(width); err != nil {
 		demuxlog.Warn("pane_closed: orphan window sweep failed", "err", err)
 	}
 	return nil
