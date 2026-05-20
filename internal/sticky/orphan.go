@@ -84,38 +84,9 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 		return nil
 	}
 	sessID := strings.TrimSpace(sessOut)
-	winsOut, err := s.T.Output("list-windows", "-t", sessID, "-F", "#{window_id} #{window_last_flag}")
+	target, err := s.siblingWindow(sessID, windowID)
 	if err != nil {
 		return nil
-	}
-	var target, fallback string
-	for _, line := range strings.Split(winsOut, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, " ", 2)
-		if len(parts) < 1 {
-			continue
-		}
-		wid := parts[0]
-		if wid == windowID {
-			continue
-		}
-		flag := ""
-		if len(parts) >= 2 {
-			flag = strings.TrimSpace(parts[1])
-		}
-		if flag == "1" {
-			target = wid
-			break
-		}
-		if fallback == "" {
-			fallback = wid
-		}
-	}
-	if target == "" {
-		target = fallback
 	}
 	if target == "" {
 		demuxlog.Info("orphan: no sibling window in session, skip", "window_id", windowID, "session_id", sessID)
@@ -160,4 +131,30 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 	}
 	_ = s.T.Run("select-window", "-t", target)
 	return nil
+}
+
+// siblingWindow returns a window in sessID other than excludeWindow that can
+// receive a folded-in sidebar. It prefers the session's last-active window
+// (window_last_flag=1); otherwise it falls back to the first other window in
+// tmux index order. Returns "" when sessID has no other window.
+func (s *Sticky) siblingWindow(sessID, excludeWindow string) (string, error) {
+	out, err := s.T.Output("list-windows", "-t", sessID, "-F", "#{window_id} #{window_last_flag}")
+	if err != nil {
+		return "", err
+	}
+	var fallback string
+	for _, line := range nonEmptyLines(out) {
+		parts := strings.SplitN(line, " ", 2)
+		wid := parts[0]
+		if wid == excludeWindow {
+			continue
+		}
+		if len(parts) >= 2 && strings.TrimSpace(parts[1]) == "1" {
+			return wid, nil
+		}
+		if fallback == "" {
+			fallback = wid
+		}
+	}
+	return fallback, nil
 }
