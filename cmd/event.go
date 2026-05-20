@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
+	"github.com/rtalexk/demux/internal/sticky"
 	"github.com/spf13/cobra"
 )
 
@@ -143,7 +144,22 @@ func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
 	return nil
 }
 
+var eventPaneExitingPaneID string
+var eventPaneExitingWindowID string
+
+var eventPaneExitingCmd = &cobra.Command{
+	Use:   "pane_exiting",
+	Short: "Eject sidebar if it would be stranded by an exiting pane (called by pane-exited hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := loadConfig()
+		t := stickyTmuxForEvents()
+		s := &sticky.Sticky{T: t}
+		return s.EjectSidebarIfAloneAfterExit(eventPaneExitingPaneID, eventPaneExitingWindowID, cfg.Sidebar.Sticky.Width)
+	},
+}
+
 var eventPaneClosedPaneID string
+var eventPaneClosedWindowID string
 
 var eventPaneClosedCmd = &cobra.Command{
 	Use:   "pane_closed",
@@ -154,14 +170,49 @@ var eventPaneClosedCmd = &cobra.Command{
 			return err
 		}
 		defer d.Close()
-		return applyPaneClosed(d, eventPaneClosedPaneID)
+		return applyPaneClosed(d, eventPaneClosedPaneID, eventPaneClosedWindowID)
 	},
 }
 
-func applyPaneClosed(d *db.DB, paneID string) error {
-	demuxlog.Debug("pane_closed", "pane_id", paneID)
-	t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
-	return d.StateClear(t)
+func applyPaneClosed(d *db.DB, paneID, windowID string) error {
+	demuxlog.Debug("pane_closed", "pane_id", paneID, "window_id", windowID)
+	if paneID != "" {
+		t := db.Target{Type: db.TargetTypePane, ID: paneID, PaneID: paneID}
+		if err := d.StateClear(t); err != nil {
+			return err
+		}
+	}
+	tmuxClient := stickyTmuxForEvents()
+	if paneID != "" {
+		if err := sticky.ClearStickyEnvForPane(tmuxClient, paneID); err != nil {
+			demuxlog.Warn("pane_closed: sticky env cleanup failed", "pane_id", paneID, "err", err)
+		}
+	}
+	// tmux >= 3.5 leaves #{hook_pane} / #{hook_window} empty for
+	// after-kill-pane, so we cannot rely on the targeted paths above. Always
+	// run a server-wide sweep: stale env vars first, then orphan windows.
+	//
+	// This handler can re-enter itself: the sweep's kill-pane calls re-fire
+	// after-kill-pane, and the hook's run-shell is synchronous, so the nested
+	// handler runs to completion before kill-pane returns. The sweep is built
+	// to be idempotent under that re-entry (see HandleWindowAfterKill), so no
+	// lock is needed - and a lock would in fact deadlock against the nested,
+	// synchronous handler.
+	s := &sticky.Sticky{T: tmuxClient}
+	if err := s.SweepStaleStickyEnv(); err != nil {
+		demuxlog.Warn("pane_closed: stale env sweep failed", "err", err)
+	}
+	width := loadConfig().Sidebar.Sticky.Width
+	if err := s.SweepOrphanWindows(width); err != nil {
+		demuxlog.Warn("pane_closed: orphan window sweep failed", "err", err)
+	}
+	return nil
+}
+
+// stickyTmuxForEvents is a swappable real-tmux instance so tests can inject a
+// fake without going through global state.
+var stickyTmuxForEvents = func() sticky.Tmux {
+	return sticky.New().T
 }
 
 func init() {
@@ -179,9 +230,15 @@ func init() {
 	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target-id)")
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
+	eventPaneExitingCmd.Flags().StringVar(&eventPaneExitingPaneID, "pane", "", "Stable pane ID (%N format) of the exiting pane (required)")
+	eventPaneExitingCmd.Flags().StringVar(&eventPaneExitingWindowID, "window", "", "Stable window ID (@N format) of the exiting pane's window (required)")
+	eventPaneExitingCmd.MarkFlagRequired("pane")
+	eventPaneExitingCmd.MarkFlagRequired("window")
+
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")
+	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneClosedCmd)
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

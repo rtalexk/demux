@@ -94,6 +94,22 @@ session_view_mode_full = ""
 #   rule   — horizontal rule ('─') in the border color
 card_separator = "blank"
 
+# Sticky sidebar - a per-client tmux pane that runs 'demux --sticky' and
+# follows the attached client across session switches.
+# Controlled via:
+#   demux sidebar toggle   (or show/hide)
+# See README "Sticky sidebar" section for the tmux hook snippet that auto-shows
+# the sidebar on attach.
+[sidebar.sticky]
+# Initial width (columns) the first time the pane is created. After that, the
+# user resizes the pane normally; the width is preserved on every session move.
+width = 35
+# Opt in to slots mode: pre-create a reserved sidebar pane in every window
+# (tagged with the @demux_slot tmux option and titled "demux-slot"). The
+# sticky sidebar swaps between slots on window/session switch, avoiding the
+# brief layout flicker of join-pane. Cost: one extra pane per window.
+# slots = false
+
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
 # full cmdline (case-insensitive). Only the pane root and its direct children

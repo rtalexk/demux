@@ -624,6 +624,151 @@ shells = ["zsh", "bash", "sh", "fish", "dash", "nu", "pwsh"]
 
 </details>
 
+## Sticky sidebar
+
+The sticky sidebar is a per-client tmux pane that runs `demux --sticky`
+(compact mode + card session view, with the quit binding disabled) and
+physically follows you between tmux sessions. It is created and dismissed
+through the `demux sidebar` subcommand and is **off by default**.
+
+### Lifecycle
+
+```bash
+demux sidebar toggle   # show if hidden, hide if shown
+demux sidebar show     # idempotent: create if missing
+demux sidebar hide     # idempotent: kill if present
+```
+
+All three require the invoking shell to be inside tmux (`$TMUX` set). Running
+them outside tmux exits with status 1.
+
+Internally, `demux sidebar follow` is invoked by a tmux hook on
+`client-session-changed`; it physically moves the existing pane (preserving
+its current width) into the newly attached session.
+
+### Enable the auto-show + follow hooks
+
+Run `demux hooks init --tool tmux` and paste the snippet into your
+`~/.tmux.conf`, then reload tmux:
+
+```bash
+demux hooks init --tool tmux >> ~/.tmux.conf
+tmux source ~/.tmux.conf
+```
+
+The snippet now includes four extra lines:
+
+- `set-hook -ga client-session-changed "run-shell 'demux sidebar follow ...'"`
+  moves the sidebar pane to whichever session you switch into.
+- `set-hook -ga after-select-window "run-shell 'demux sidebar follow ...'"`
+  moves the sidebar pane to whichever window you switch into (same session).
+- `set-hook -ga after-new-window "run-shell 'demux sidebar follow ...'"`
+  moves the sidebar pane into a window you just created. tmux does not fire
+  `after-select-window` for `new-window`, so this hook is needed separately.
+- `set-hook -ga client-attached "run-shell 'demux sidebar show ...'"`
+  creates the sidebar pane automatically when you attach a tmux client.
+
+If you prefer to manage the sidebar manually with `demux sidebar toggle`,
+remove the `client-attached` line. The three `follow` lines are required for
+the "follow" behavior; without them the sidebar stays in whichever session
+and window it was created in.
+
+### Configuration
+
+```toml
+[sidebar.sticky]
+# Initial width (columns) the first time the pane is created. After that,
+# resize it normally with tmux (e.g. `prefix + <` or mouse drag); the width
+# is preserved on every session move.
+width = 35
+# Opt in to slots mode (see below).
+slots = false
+```
+
+### Slots mode (opt-in, no follow flicker)
+
+By default, `follow` uses `join-pane` to physically move the sidebar pane
+across sessions and windows. Tmux briefly redraws the destination layout,
+which shows up as a one-frame flicker.
+
+Set `[sidebar.sticky] slots = true` and the sidebar switches to a different
+strategy:
+
+- Up to **8 slot panes** are maintained server-wide, in the most recently used
+  windows (plus the current window's own sidebar pane). Each slot runs
+  `demux sidebar slot` as a quiet placeholder.
+- Each slot is tagged with the tmux user option `@demux_slot=1` and titled
+  `demux-slot` so you can recognize it (visible if you have
+  `set -g pane-border-status top` in your tmux config).
+- On window/session switch to a window that already has a slot, the active
+  sidebar pane is **swapped** with that slot via `swap-pane -d`. No layout
+  rebuild, no flicker. Width is preserved via a follow-up `resize-pane`.
+- Switching to a window that fell out of the MRU triggers a one-time
+  `split-window` to recreate its slot, then the swap; that window enters the
+  MRU and is flicker-free on subsequent visits.
+
+#### Reserved-set priority
+
+After each switch, demux recomputes which windows keep a placeholder slot.
+Priority (highest first), capped at 8 total:
+
+1. The current session's `window_last_flag=1` window (tmux's "last window").
+2. The client's last-attached session's active window.
+3. Other windows in the current session, ordered by MRU then tmux index.
+4. Cross-session windows from the MRU.
+
+The current window itself is excluded (it holds the sidebar, not a
+placeholder). Slots in windows that fall out of the reserved set are killed
+to free their PTY.
+
+#### Pre-join on demux navigation
+
+When you connect to a session or pane through the demux TUI (`o`, `Enter`),
+demux installs the destination's slot **before** issuing the tmux switch, so
+the after-select-window follow swaps in without any flicker even for windows
+not currently in the MRU.
+
+Lifecycle for slots mode:
+
+```bash
+demux sidebar show              # installs slots in MRU + activates current window's slot
+demux sidebar hide              # removes every slot pane (full teardown)
+demux sidebar slots install     # idempotent: ensure every reserved window has a slot
+demux sidebar slots uninstall   # remove every slot pane
+```
+
+The tmux snippet from `demux hooks init --tool tmux` already includes an
+`after-new-window` hook that reconciles the slot set when a new window
+appears (no-op when `slots = false`).
+
+Trade-offs:
+
+- Cost: at most 8 placeholder panes + 1 active sidebar pane server-wide,
+  regardless of how many windows you have open. Each placeholder runs a tiny
+  demux process that ignores `SIGINT`/`SIGTERM` so casual Ctrl+C doesn't kill
+  the slot. Use `prefix x` (tmux kill-pane) or `demux sidebar slots
+  uninstall` to remove.
+- Slots in windows whose pane layout doesn't naturally accommodate a left
+  column will resize the existing panes to make room. Run `slots uninstall`
+  to revert.
+- Why 8? macOS caps total PTYs at `kern.tty.ptmx_max=511` by default; a
+  server-wide one-slot-per-window scheme exhausts that cap fast on heavy
+  multi-session setups. 8 covers typical navigation patterns while leaving
+  comfortable headroom.
+
+### Notes and limitations
+
+- The sticky sidebar is **per-client**: each attached client owns its own
+  pane. Two clients attached to the same session may end up with two sidebar
+  panes side by side; close either with `prefix x`.
+- The sidebar follows both session and window switches; focus is preserved
+  on the user's previously active pane via the `-d` flag on `join-pane` /
+  `swap-pane`.
+- Tmux 2.6 or newer is required (uses the `-f` flag on `split-window` /
+  `join-pane`).
+- `demux --sticky` is not intended for interactive standalone use; the quit
+  binding is disabled. Use `demux sidebar hide` to dismiss it.
+
 ## Sessions
 
 Define sessions in `~/.config/demux/sessions.toml`. Sensitive or machine-specific entries (e.g. paths that differ per machine) can go in `~/.config/demux/private.toml` instead, which you can safely exclude from version control.

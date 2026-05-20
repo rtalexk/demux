@@ -51,6 +51,22 @@ func TestValidate_bad_log_level(t *testing.T) {
 	}
 }
 
+func TestValidate_StickySidebarWidthBelowMin(t *testing.T) {
+	cfg := config.Default()
+	cfg.Sidebar.Sticky.Width = 5
+	issues := cfg.Validate()
+	found := false
+	for _, i := range issues {
+		if i.Field == "sidebar.sticky.width" && i.Level == "error" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected error for sidebar.sticky.width below %d; got: %+v", config.MinStickySidebarWidth, issues)
+	}
+}
+
 // helpers
 func filterLevel(issues []config.ValidationIssue, level string) []config.ValidationIssue {
 	var out []config.ValidationIssue

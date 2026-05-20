@@ -13,8 +13,26 @@ import (
 	"github.com/rtalexk/demux/internal/proc"
 	"github.com/rtalexk/demux/internal/query"
 	"github.com/rtalexk/demux/internal/session"
+	"github.com/rtalexk/demux/internal/sticky"
 	"github.com/rtalexk/demux/internal/tmux"
 )
+
+// stickyPrepareTarget pre-installs a slot pane in the window tmux would focus
+// when given target, so the after-select-window hook's follow can swap-pane
+// instead of split-window (avoiding a one-time flicker). No-op outside
+// sticky/slots mode or when the resolution fails. Best-effort.
+func (m Model) stickyPrepareTarget(target string) {
+	if target == "" || !m.cfg.StickyMode || !m.cfg.Sidebar.Sticky.Slots {
+		return
+	}
+	winID, err := tmux.ResolveWindowID(target)
+	if err != nil || winID == "" {
+		return
+	}
+	s := sticky.New()
+	s.Slots = true
+	_ = s.PrepareWindow(winID, m.cfg.Sidebar.Sticky.Width)
+}
 
 const (
 	dirDown = 1
@@ -121,6 +139,15 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Refresh.Binding):
 		m.procGen++
 		return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
+	case msg.Type == tea.KeyF12:
+		// Sticky-mode follow poke: force-refresh and refocus the sidebar
+		// on the now-active session on the resulting panesMsg.
+		if m.cfg.StickyMode {
+			m.pendingStickyRefocus = true
+			m.procGen++
+			return m, tea.Batch(m.fetchPanes(), m.fetchStates(), m.fetchWatches(), m.fetchItemSessions(), m.scheduleProcFetch())
+		}
+		return m, nil
 	case msg.String() == "C":
 		// C toggles items mode globally regardless of focus.
 		// Not available in compact mode (no proclist panel to render into).
@@ -269,9 +296,16 @@ func (m Model) switchLiveSession(sessionName string) (Model, tea.Cmd) {
 	if target == "" {
 		target = sessionName
 	}
+	m.stickyPrepareTarget(target)
 	err := tmux.SwitchClient(target)
 	if err == nil && m.popupMode {
 		return m, tea.Quit
+	}
+	if err == nil && m.cfg.StickyMode {
+		// In sticky mode the user wants 'o'/Enter to drop them out of the
+		// sidebar pane into the session content (otherwise focus stays in
+		// the sidebar). Equivalent to tmux's default `prefix + o`.
+		_ = tmux.SelectNextPane()
 	}
 	return m, nil
 }
@@ -456,6 +490,7 @@ func (m Model) handleProcListOpen() (Model, tea.Cmd) {
 		target = node.Session
 	}
 	if target != "" {
+		m.stickyPrepareTarget(target)
 		tmux.SwitchClient(target)
 		if m.popupMode {
 			return m, tea.Quit

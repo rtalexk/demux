@@ -240,10 +240,10 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	m.sidebar.SetActiveSession(msg.currentSession)
 	m.updateDetailFromSelection()
 	var cmds []tea.Cmd
+	visibleRows := max(1, m.height-1-2-searchBoxH)
 	if !m.ready {
 		// First load: sidebar is visible — kick off tick and states; procs are fetched on-demand
 		m.currentSession = msg.currentSession
-		visibleRows := max(1, m.height-1-2-searchBoxH)
 		switch m.cfg.Sidebar.FocusOnOpen {
 		case "current_session", "first_session":
 			m.applyNonAlertFocusMode(m.cfg.Sidebar.FocusOnOpen, visibleRows)
@@ -265,6 +265,14 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 			m.procGen++
 			cmds = append(cmds, m.scheduleProcFetch())
 		}
+	} else if m.cfg.StickyMode && msg.currentSession != "" &&
+		(m.pendingStickyRefocus || msg.currentSession != m.currentSession) {
+		// In sticky mode, refocus the sidebar on the active session whenever
+		// the user jumps to a different session OR a follow poke (F12) asks
+		// us to re-snap (covers same-session window switches).
+		m.currentSession = msg.currentSession
+		m.sidebar.FocusNode(m.currentSession, visibleRows)
+		m.pendingStickyRefocus = false
 	}
 	if m.cfg.Git.Enabled {
 		for sessionName, windows := range grouped {

@@ -108,9 +108,9 @@ var keys = keyMap{
 }
 
 // allKeyDefs returns the ordered list of keyDefs for help menu rendering.
-// Bindings with empty section are omitted.
+// Bindings with empty section are omitted (used to hide entries in sticky mode).
 func allKeyDefs() []keyDef {
-	return []keyDef{
+	all := []keyDef{
 		// Global
 		keys.FocusSidebarList, keys.Yank, keys.FilterSearch, keys.ClearFilter,
 		keys.Refresh, keys.Help, keys.Quit,
@@ -124,4 +124,28 @@ func allKeyDefs() []keyDef {
 		keys.JumpUpDown, keys.ExpandCollapse, keys.ExpandCollapseAll,
 		keys.ProcEnter, keys.ProcOpen, keys.ActionMenu, keys.KillProc,
 	}
+	out := make([]keyDef, 0, len(all))
+	for _, d := range all {
+		if d.section == "" {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
+// ApplyStickyMode mutates the package-global `keys` so the quit binding is
+// disabled and the quit row is omitted from the help overlay. Idempotent.
+// Call once from tui.Run when cfg.StickyMode is true. Pair with ResetStickyMode
+// in tests that toggle sticky mode mid-process.
+func ApplyStickyMode() {
+	keys.Quit.Binding.SetEnabled(false)
+	keys.Quit.section = ""
+}
+
+// ResetStickyMode restores the quit binding to its default enabled state and
+// puts the Quit row back into the Global section. Test-only helper.
+func ResetStickyMode() {
+	keys.Quit.Binding.SetEnabled(true)
+	keys.Quit.section = "Global"
 }

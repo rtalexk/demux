@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/sticky"
 )
 
 func paneTarget(paneID, windowID, sessionID string) db.Target {
@@ -133,7 +135,7 @@ func TestApplyPaneClosed_DeletesPaneState(t *testing.T) {
 
 	pt := db.Target{Type: db.TargetTypePane, ID: "%7", PaneID: "%7", WindowID: "@0", SessionID: "$0"}
 	d.StateSet(pt, "claude", db.StateWorking, "", db.SourceTool, false, nil)
-	if err := applyPaneClosed(d, "%7"); err != nil {
+	if err := applyPaneClosed(d, "%7", ""); err != nil {
 		t.Fatal(err)
 	}
 	st, _ := d.StateByID(pt)
@@ -146,7 +148,7 @@ func TestApplyPaneClosed_NoopUnknownPane(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	if err := applyPaneClosed(d, "%99"); err != nil {
+	if err := applyPaneClosed(d, "%99", ""); err != nil {
 		t.Errorf("unknown pane_id should be a no-op, got: %v", err)
 	}
 }
@@ -178,5 +180,56 @@ func TestApplyHookError_InvalidTargetIDIsNoop(t *testing.T) {
 	states, _ := d.StateList(0, "")
 	if len(states) != 0 {
 		t.Errorf("expected no states for invalid target, got %d", len(states))
+	}
+}
+
+// fakeStickyTmux is a minimal recorder for sticky.Tmux used in event tests.
+type fakeStickyTmux struct {
+	outputs map[string]string
+	errs    map[string]error
+	runs    [][]string
+}
+
+func (f *fakeStickyTmux) Run(args ...string) error {
+	f.runs = append(f.runs, append([]string(nil), args...))
+	return nil
+}
+
+func (f *fakeStickyTmux) Output(args ...string) (string, error) {
+	key := strings.Join(args, " ")
+	if err, ok := f.errs[key]; ok {
+		return "", err
+	}
+	return f.outputs[key], nil
+}
+
+var _ sticky.Tmux = (*fakeStickyTmux)(nil)
+
+func TestApplyPaneClosed_ClearsStickyEnvVar(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+	pt := db.Target{Type: db.TargetTypePane, ID: "%42", PaneID: "%42"}
+	d.StateSet(pt, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+
+	fake := &fakeStickyTmux{
+		outputs: map[string]string{
+			"show-environment -g": "DEMUX_STICKY_PANE__dev_ttys001=%42\nOTHER=keep\n",
+		},
+	}
+	orig := stickyTmuxForEvents
+	stickyTmuxForEvents = func() sticky.Tmux { return fake }
+	defer func() { stickyTmuxForEvents = orig }()
+
+	if err := applyPaneClosed(d, "%42", ""); err != nil {
+		t.Fatal(err)
+	}
+	sawUnset := false
+	for _, r := range fake.runs {
+		if strings.Join(r, " ") == "set-environment -gu DEMUX_STICKY_PANE__dev_ttys001" {
+			sawUnset = true
+		}
+	}
+	if !sawUnset {
+		t.Errorf("expected sticky env unset for %%42, got runs: %v", fake.runs)
 	}
 }

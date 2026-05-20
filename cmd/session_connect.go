@@ -92,7 +92,7 @@ func resolveConnectTarget(sessions []session.Session, name string) (*session.Ses
 }
 
 func loadMergedSessions() ([]session.Session, session.SessionsConfig, error) {
-	panes, _ := tmux.ListPanes()  // Soft fallback: zero live sessions on error
+	panes, _ := tmux.ListPanes() // Soft fallback: zero live sessions on error
 	cfgPath, err := config.DefaultPath()
 	if err != nil {
 		return nil, session.SessionsConfig{}, fmt.Errorf("config dir: %w", err)
