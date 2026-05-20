@@ -79,25 +79,84 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 		return nil
 	}
 
-	sessOut, err := s.T.Output("display-message", "-t", windowID, "-p", "#{session_id}")
+	s.moveOrphanSidebar(orphan, windowID, width)
+	return nil
+}
+
+// EjectSidebarIfAloneAfterExit is the proactive companion to
+// HandleWindowAfterKill. It is called from the pane-exited hook BEFORE
+// exitingPaneID is actually destroyed. By excluding exitingPaneID from the
+// pane count it detects that the sidebar will be left alone and relocates it
+// immediately, so the user is not briefly stranded in a sidebar-only window
+// while waiting for after-kill-pane to fire (which may be unreliable for
+// natural process exits in some tmux versions).
+//
+// No-op when the window has more than two panes, when the remaining pane after
+// excluding exitingPaneID is not the tracked sidebar, or when there is no
+// sibling window to receive the sidebar.
+func (s *Sticky) EjectSidebarIfAloneAfterExit(exitingPaneID, windowID string, width int) error {
+	if exitingPaneID == "" || windowID == "" {
+		return nil
+	}
+	panesOut, err := s.T.Output("list-panes", "-t", windowID, "-F", "#{pane_id} #{@demux_slot}")
 	if err != nil {
 		return nil
+	}
+	var orphan string
+	remaining := 0
+	for _, line := range nonEmptyLines(panesOut) {
+		parts := strings.SplitN(line, " ", 2)
+		paneID := parts[0]
+		if paneID == exitingPaneID {
+			continue
+		}
+		remaining++
+		orphan = paneID
+	}
+	if remaining != 1 {
+		return nil
+	}
+	isSidebar := false
+	if envs, err := listStickyPaneEnv(s.T); err == nil {
+		for _, e := range envs {
+			if e.pane == orphan {
+				isSidebar = true
+				break
+			}
+		}
+	}
+	if !isSidebar {
+		return nil
+	}
+	demuxlog.Info("pre-exit: sidebar will be alone, relocating", "window_id", windowID, "pane_id", orphan)
+	s.moveOrphanSidebar(orphan, windowID, width)
+	return nil
+}
+
+// moveOrphanSidebar relocates the sidebar pane (orphan) from windowID to the
+// last-active sibling window. It is shared by HandleWindowAfterKill (called
+// after the last non-sidebar pane is gone) and EjectSidebarIfAloneAfterExit
+// (called while the exiting pane is still present).
+func (s *Sticky) moveOrphanSidebar(orphan, windowID string, width int) {
+	sessOut, err := s.T.Output("display-message", "-t", windowID, "-p", "#{session_id}")
+	if err != nil {
+		return
 	}
 	sessID := strings.TrimSpace(sessOut)
 	target, err := s.siblingWindow(sessID, windowID)
 	if err != nil {
-		return nil
+		return
 	}
 	if target == "" {
 		demuxlog.Info("orphan: no sibling window in session, skip", "window_id", windowID, "session_id", sessID)
-		return nil
+		return
 	}
 	// Defense in depth: if a concurrent pane_closed handler has already moved
 	// the sidebar out of windowID, do not move it a second time.
 	if curWin, curErr := s.T.Output("display-message", "-p", "-t", orphan, "#{window_id}"); curErr == nil {
 		if w := strings.TrimSpace(curWin); w != "" && w != windowID {
 			demuxlog.Info("orphan: sidebar already moved, skip", "pane_id", orphan, "now_window", w)
-			return nil
+			return
 		}
 	}
 
@@ -130,7 +189,6 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 			"-s", orphan, "-t", target)
 	}
 	_ = s.T.Run("select-window", "-t", target)
-	return nil
 }
 
 // siblingWindow returns a window in sessID other than excludeWindow that can

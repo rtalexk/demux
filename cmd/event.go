@@ -144,6 +144,20 @@ func applyHookErrorDB(d *db.DB, targetID, tool, hook, message string) error {
 	return nil
 }
 
+var eventPaneExitingPaneID string
+var eventPaneExitingWindowID string
+
+var eventPaneExitingCmd = &cobra.Command{
+	Use:   "pane_exiting",
+	Short: "Eject sidebar if it would be stranded by an exiting pane (called by pane-exited hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := loadConfig()
+		t := stickyTmuxForEvents()
+		s := &sticky.Sticky{T: t}
+		return s.EjectSidebarIfAloneAfterExit(eventPaneExitingPaneID, eventPaneExitingWindowID, cfg.Sidebar.Sticky.Width)
+	},
+}
+
 var eventPaneClosedPaneID string
 var eventPaneClosedWindowID string
 
@@ -216,10 +230,15 @@ func init() {
 	eventHookErrorCmd.Flags().BoolVar(&hookErrorSetStateError, "set-state-error", false, "Set the target state to error (requires --target-id)")
 	eventHookErrorCmd.MarkFlagRequired("hook")
 
+	eventPaneExitingCmd.Flags().StringVar(&eventPaneExitingPaneID, "pane", "", "Stable pane ID (%N format) of the exiting pane (required)")
+	eventPaneExitingCmd.Flags().StringVar(&eventPaneExitingWindowID, "window", "", "Stable window ID (@N format) of the exiting pane's window (required)")
+	eventPaneExitingCmd.MarkFlagRequired("pane")
+	eventPaneExitingCmd.MarkFlagRequired("window")
+
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedPaneID, "pane", "", "Stable pane ID (%N format) of the closed pane (required)")
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneClosedCmd)
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

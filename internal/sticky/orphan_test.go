@@ -295,3 +295,162 @@ func TestHandleWindowAfterKill_OrphanSidebar_AlreadyMoved_NoDoubleJoin(t *testin
 		}
 	}
 }
+
+// ── EjectSidebarIfAloneAfterExit tests ──────────────────────────────────────
+
+func TestEjectSidebarIfAloneAfterExit_EmptyArgs_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("", "", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.runs) != 0 {
+		t.Errorf("expected no tmux runs, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_WindowGone_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{err: stderrExitError("can't find window\n")}
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.runs) != 0 {
+		t.Errorf("expected no tmux runs, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_MoreThanTwoPanes_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	// Window has 3 panes: exiting + sidebar + another.
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 \n%99 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.runs) != 0 {
+		t.Errorf("expected no tmux runs for 3-pane window, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_OnlyExitingPane_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	// Window has only the exiting pane (no sidebar). Remaining count = 0.
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.runs) != 0 {
+		t.Errorf("expected no runs when remaining count = 0, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_RemainingIsNotSidebar_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	// Window has exiting pane + a regular (non-sidebar) pane.
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%20 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(f.runs) != 0 {
+		t.Errorf("expected no runs when remaining pane is not sidebar, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_SidebarAlone_MovesToLastActive(t *testing.T) {
+	f := newFakeTmux()
+	// Ephemeral window @2: lazygit pane %10 is exiting, sidebar %42 would be left alone.
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	f.outputs["display-message -t @2 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@2 0\n@1 1\n"}
+	f.outputs["display-message -p -t %42 #{window_id}"] = fakeReply{out: "@2\n"}
+	// Target @1 has no slot pane (split mode).
+	f.outputs["list-panes -t @1 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%30 \n%31 \n"}
+
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ranCmd(f, "join-pane -f -h -b -d -l 35 -s %42 -t @1") {
+		t.Errorf("expected join-pane moving sidebar %%42 into @1, got: %v", f.runs)
+	}
+	if !ranCmd(f, "select-window -t @1") {
+		t.Errorf("expected select-window -t @1, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_SlotsMode_SwapsIntoTargetSlot(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 1\n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	f.outputs["display-message -t @2 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@2 0\n@1 1\n"}
+	f.outputs["display-message -p -t %42 #{window_id}"] = fakeReply{out: "@2\n"}
+	// Target @1 has a placeholder slot %30.
+	f.outputs["list-panes -t @1 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%30 1\n%31 \n"}
+
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ranCmd(f, "swap-pane -d -s %42 -t %30") {
+		t.Errorf("expected swap-pane into target slot %%30, got: %v", f.runs)
+	}
+	if !ranCmd(f, "resize-pane -t %42 -x 35") {
+		t.Errorf("expected resize-pane, got: %v", f.runs)
+	}
+	if !ranCmd(f, "kill-pane -t %30") {
+		t.Errorf("expected kill-pane for parked placeholder, got: %v", f.runs)
+	}
+	if !ranCmd(f, "select-window -t @1") {
+		t.Errorf("expected select-window -t @1, got: %v", f.runs)
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_NoSiblingWindow_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	f.outputs["display-message -t @2 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	// Only window in session.
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@2 0\n"}
+
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if strings.HasPrefix(j, "join-pane") || strings.HasPrefix(j, "select-window") {
+			t.Errorf("expected no move when no sibling window, got: %v", f.runs)
+		}
+	}
+}
+
+func TestEjectSidebarIfAloneAfterExit_AlreadyMoved_NoOp(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 \n"}
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
+	f.outputs["display-message -t @2 -p #{session_id}"] = fakeReply{out: "$1\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@2 0\n@1 1\n"}
+	// Sidebar already in target window (concurrent handler moved it first).
+	f.outputs["display-message -p -t %42 #{window_id}"] = fakeReply{out: "@1\n"}
+
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if strings.HasPrefix(j, "join-pane") || strings.HasPrefix(j, "select-window") {
+			t.Errorf("sidebar already moved: expected no mutation, got: %v", f.runs)
+		}
+	}
+}

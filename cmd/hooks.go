@@ -153,6 +153,14 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_
 # (e.g. the user closed the last non-slot pane) and clean it up.
 set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
+# Sticky sidebar - proactively ejects the sidebar when the process running in a
+# pane exits and the sidebar would be the only pane left in that window. Fires
+# BEFORE after-kill-pane (while the exiting pane is still present), which makes
+# the sidebar return to the previous window without any stranded-sidebar flicker.
+# Complements after-kill-pane for cases where that hook is unreliable (e.g.
+# natural process exits in some tmux versions).
+set-hook -ga pane-exited "run-shell 'demux event pane_exiting --pane=#{pane_id} --window=#{window_id} 2>/dev/null; true'"
+
 # Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"
 
