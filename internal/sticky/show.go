@@ -52,11 +52,10 @@ func (s *Sticky) Show(opts ShowOpts) error {
 }
 
 func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
-	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	target, _, _, err := s.currentTarget()
 	if err != nil {
-		return fmt.Errorf("tmux display-message current target: %w", err)
+		return err
 	}
-	target = strings.TrimSpace(target)
 	out, err := s.T.Output(
 		"split-window", "-f", "-h", "-b",
 		"-l", strconv.Itoa(opts.Width),
@@ -78,11 +77,10 @@ func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
 	// Activate the current window's slot first so the user sees demux
 	// appear immediately, then create placeholder slots in the remaining
 	// windows in the background.
-	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	target, currSession, currWindow, err := s.currentTarget()
 	if err != nil {
-		return fmt.Errorf("tmux display-message current target: %w", err)
+		return err
 	}
-	target = strings.TrimSpace(target)
 	if err := s.EnsureSlotInWindow(target, opts.Width); err != nil {
 		return err
 	}
@@ -102,13 +100,6 @@ func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
 	// Install slots only in the MRU-reserved set (capped at MRUMaxLen).
 	// Current window already has its own slot (the sidebar), so we pass it
 	// in explicitly so reconcile won't touch it.
-	parts := strings.SplitN(target, ":", 2)
-	currWindow := target
-	currSession := ""
-	if len(parts) == 2 {
-		currSession = parts[0]
-		currWindow = parts[1]
-	}
 	reserved, err := s.ComputeReservedWindows(currWindow, currSession)
 	if err == nil {
 		_ = s.ReconcileSlots(reserved, currWindow, opts.Width)

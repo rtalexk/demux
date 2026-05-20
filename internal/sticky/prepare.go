@@ -1,9 +1,5 @@
 package sticky
 
-import (
-	"strings"
-)
-
 // PrepareWindow is called by the TUI right before it issues a tmux switch to
 // targetWindowID. In slots mode it pre-installs a slot pane in the target
 // window so the after-select-window hook's follow can swap the sidebar in
@@ -28,18 +24,14 @@ func (s *Sticky) PrepareWindow(targetWindowID string, width int) error {
 	if err := s.PushMRU(targetWindowID); err != nil {
 		return err
 	}
-	curr, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	_, session, window, err := s.currentTarget()
 	if err != nil {
-		return nil
-	}
-	parts := strings.SplitN(strings.TrimSpace(curr), ":", 2)
-	if len(parts) < 2 {
 		return nil
 	}
 	_ = s.PruneMRU()
-	reserved, err := s.ComputeReservedWindows(parts[1], parts[0])
+	reserved, err := s.ComputeReservedWindows(window, session)
 	if err != nil {
 		return err
 	}
-	return s.ReconcileSlots(reserved, parts[1], width)
+	return s.ReconcileSlots(reserved, window, width)
 }

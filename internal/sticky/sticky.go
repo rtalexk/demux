@@ -224,6 +224,34 @@ func (s *Sticky) CurrentClientTTY() (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
+// currentTarget returns the window the invoking tmux client is focused on.
+// target is the raw "session_id:window_id" string (usable directly as a tmux
+// -t argument); session and window are its two halves.
+func (s *Sticky) currentTarget() (target, session, window string, err error) {
+	out, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	if err != nil {
+		return "", "", "", fmt.Errorf("tmux display-message current target: %w", err)
+	}
+	target = strings.TrimSpace(out)
+	parts := strings.SplitN(target, ":", 2)
+	if len(parts) < 2 {
+		return "", "", "", fmt.Errorf("unexpected current target %q", target)
+	}
+	return target, parts[0], parts[1], nil
+}
+
+// nonEmptyLines splits raw tmux output on newlines and returns each line
+// trimmed of surrounding whitespace, dropping any that are empty.
+func nonEmptyLines(out string) []string {
+	var lines []string
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
 // isUnknownVariableErr inspects an error from exec.Command.Output() to detect
 // tmux's "unknown variable: X" stderr line.
 func isUnknownVariableErr(err error) bool {

@@ -46,21 +46,15 @@ func (s *Sticky) Follow() error {
 		}
 		return nil
 	}
-	curr, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	curr, currSession, currWindow, err := s.currentTarget()
 	if err != nil {
-		return fmt.Errorf("tmux display-message current target: %w", err)
+		return err
 	}
-	curr = strings.TrimSpace(curr)
 	paneWindow, err := s.T.Output("display-message", "-p", "-t", val, "#{window_id}")
 	if err != nil {
 		return fmt.Errorf("tmux display-message pane window: %w", err)
 	}
 	paneWindow = strings.TrimSpace(paneWindow)
-	currParts := strings.SplitN(curr, ":", 2)
-	if len(currParts) < 2 {
-		return fmt.Errorf("unexpected current target %q", curr)
-	}
-	currSession, currWindow := currParts[0], currParts[1]
 	widthStr, _ := s.T.Output("display-message", "-p", "-t", val, "#{pane_width}")
 	width, _ := strconv.Atoi(strings.TrimSpace(widthStr))
 	if width <= 0 {
