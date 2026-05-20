@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -129,15 +131,35 @@ var sidebarSlotCmd = &cobra.Command{
 	Short:  "Internal: placeholder process for an inactive sticky sidebar slot",
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		signal.Ignore(syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
-		fmt.Print("\x1b[2J\x1b[H\n\n")
-		fmt.Println("  demux sidebar slot")
-		fmt.Println()
-		fmt.Println("  Reserved by [sidebar.sticky] slots.")
-		fmt.Println("  Activate this window's slot with")
-		fmt.Println("  `demux sidebar show`.")
-		select {}
+		runSidebarSlotPlaceholder(cmd.OutOrStdout())
+		return nil
 	},
+}
+
+// runSidebarSlotPlaceholder is the body of `demux sidebar slot`: it paints a
+// static placeholder screen in the slot's tmux pane and blocks until the pane
+// is torn down.
+//
+// SIGINT is ignored so an accidental Ctrl-C while the slot pane is focused
+// cannot destroy the reserved slot. SIGHUP and SIGTERM are deliberately NOT
+// ignored: tmux delivers SIGHUP (by closing the pane's pty) when it kills the
+// pane, and the placeholder MUST exit then so its pty device is released back
+// to the system. Previously all three signals were ignored, which orphaned
+// these processes onto launchd and leaked one pty each until the host hit
+// kern.tty.ptmx_max and could no longer fork new terminals.
+func runSidebarSlotPlaceholder(w io.Writer) {
+	signal.Ignore(syscall.SIGINT)
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, syscall.SIGHUP, syscall.SIGTERM)
+
+	fmt.Fprint(w, "\x1b[2J\x1b[H\n\n")
+	fmt.Fprintln(w, "  demux sidebar slot")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "  Reserved by [sidebar.sticky] slots.")
+	fmt.Fprintln(w, "  Activate this window's slot with")
+	fmt.Fprintln(w, "  `demux sidebar show`.")
+
+	<-done
 }
 
 func init() {
