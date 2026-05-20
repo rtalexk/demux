@@ -1625,6 +1625,22 @@ func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
 	}
 }
 
+// extColorArgs returns how many extra SGR parameters an extended-colour
+// introducer (38/48) consumes: 2 for "5;<n>" (256-colour), 4 for
+// "2;<r>;<g>;<b>" (truecolour), 0 otherwise.
+func extColorArgs(rest []string) int {
+	if len(rest) == 0 {
+		return 0
+	}
+	switch rest[0] {
+	case "5":
+		return 2
+	case "2":
+		return 4
+	}
+	return 0
+}
+
 // sgrBackgroundActive interprets one SGR parameter list and returns whether a
 // background colour is active afterwards, given the prior state. It consumes
 // 38/48 extended-colour arguments so a foreground colour is never mistaken for
@@ -1636,29 +1652,13 @@ func sgrBackgroundActive(params string, bg bool) bool {
 	parts := strings.Split(params, ";")
 	for k := 0; k < len(parts); k++ {
 		switch parts[k] {
-		case "0":
-			bg = false
-		case "49":
+		case "0", "49":
 			bg = false
 		case "48":
 			bg = true
-			if k+1 < len(parts) {
-				switch parts[k+1] {
-				case "5":
-					k += 2
-				case "2":
-					k += 4
-				}
-			}
+			k += extColorArgs(parts[k+1:])
 		case "38":
-			if k+1 < len(parts) {
-				switch parts[k+1] {
-				case "5":
-					k += 2
-				case "2":
-					k += 4
-				}
-			}
+			k += extColorArgs(parts[k+1:])
 		}
 	}
 	return bg
