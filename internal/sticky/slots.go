@@ -24,11 +24,7 @@ const SlotPlaceholderCmd = "demux sidebar slot"
 // lines with too few fields are skipped.
 func slotLines(out string, fieldCount int) [][]string {
 	var rows [][]string
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
+	for _, line := range nonEmptyLines(out) {
 		parts := strings.SplitN(line, " ", fieldCount)
 		if len(parts) < fieldCount {
 			continue
@@ -106,11 +102,7 @@ func (s *Sticky) InstallSlotsInAllWindows(width int) error {
 		return fmt.Errorf("tmux list-windows: %w", err)
 	}
 	var firstErr error
-	for _, line := range strings.Split(out, "\n") {
-		target := strings.TrimSpace(line)
-		if target == "" {
-			continue
-		}
+	for _, target := range nonEmptyLines(out) {
 		if err := s.EnsureSlotInWindow(target, width); err != nil && firstErr == nil {
 			firstErr = err
 		}

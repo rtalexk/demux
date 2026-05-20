@@ -117,11 +117,7 @@ func (s *Sticky) listCurrentSessionWindows(currentSession string) ([]string, str
 	}
 	var windows []string
 	var lastFlag string
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
+	for _, line := range nonEmptyLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 1 {
 			continue

@@ -102,11 +102,8 @@ func (s *Sticky) liveWindowSet() (map[string]struct{}, error) {
 		return nil, err
 	}
 	live := make(map[string]struct{})
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			live[line] = struct{}{}
-		}
+	for _, line := range nonEmptyLines(out) {
+		live[line] = struct{}{}
 	}
 	return live, nil
 }

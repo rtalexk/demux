@@ -145,8 +145,7 @@ func listStickyPaneEnv(t Tmux) ([]stickyPaneEnv, error) {
 		return nil, err
 	}
 	var envs []stickyPaneEnv
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimSpace(line)
+	for _, line := range nonEmptyLines(out) {
 		if !strings.HasPrefix(line, envKeyPrefix) {
 			continue
 		}
@@ -208,8 +207,8 @@ func (s *Sticky) PaneAlive(paneID string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("tmux list-panes: %w", err)
 	}
-	for _, line := range strings.Split(out, "\n") {
-		if strings.TrimSpace(line) == paneID {
+	for _, line := range nonEmptyLines(out) {
+		if line == paneID {
 			return true, nil
 		}
 	}

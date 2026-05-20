@@ -44,11 +44,7 @@ func (s *Sticky) HandleWindowAfterKill(windowID string, width int) error {
 	}
 	var orphan, slot string
 	count := 0
-	for _, line := range strings.Split(panesOut, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
+	for _, line := range nonEmptyLines(panesOut) {
 		count++
 		parts := strings.SplitN(line, " ", 2)
 		orphan = parts[0]

@@ -1,9 +1,5 @@
 package sticky
 
-import (
-	"strings"
-)
-
 // SweepStaleStickyEnv scans every DEMUX_STICKY_PANE_* env var on the server
 // and unsets any whose pane id no longer exists (or is empty). If after this
 // pass no live sidebar remains tracked, slot placeholder panes across all
@@ -54,11 +50,7 @@ func (s *Sticky) SweepOrphanWindows(width int) error {
 	if err != nil {
 		return nil
 	}
-	for _, line := range strings.Split(out, "\n") {
-		wid := strings.TrimSpace(line)
-		if wid == "" {
-			continue
-		}
+	for _, wid := range nonEmptyLines(out) {
 		_ = s.HandleWindowAfterKill(wid, width)
 	}
 	return nil
