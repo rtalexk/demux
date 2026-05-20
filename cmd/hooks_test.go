@@ -47,6 +47,24 @@ func TestTmuxHooksSnippet_ContainsAfterKillPane(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_ContainsPaneExitedHook(t *testing.T) {
+	if !strings.Contains(tmuxHooksSnippet, "pane-exited") {
+		t.Error("snippet should include pane-exited hook for proactive sidebar eject")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "pane_exiting") {
+		t.Error("pane-exited hook should call demux event pane_exiting")
+	}
+	// Must use #{hook_pane}/#{hook_window}, not #{pane_id}/#{window_id}: in global
+	// hooks #{pane_id} resolves to the surviving pane (focus already shifted), not
+	// the one that triggered pane-exited.
+	if !strings.Contains(tmuxHooksSnippet, "--pane=#{hook_pane}") {
+		t.Error("pane_exiting hook must pass --pane=#{hook_pane}, not --pane=#{pane_id}")
+	}
+	if !strings.Contains(tmuxHooksSnippet, "--window=#{hook_window}") {
+		t.Error("pane_exiting hook must pass --window=#{hook_window}, not --window=#{window_id}")
+	}
+}
+
 func TestTmuxHooksSnippet_PaneFocusIncludesPaneID(t *testing.T) {
 	if !strings.Contains(tmuxHooksSnippet, "--pane-id=#{pane_id}") {
 		t.Error("pane_focus hooks should pass --pane-id=#{pane_id}")

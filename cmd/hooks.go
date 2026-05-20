@@ -159,7 +159,7 @@ set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pa
 # the sidebar return to the previous window without any stranded-sidebar flicker.
 # Complements after-kill-pane for cases where that hook is unreliable (e.g.
 # natural process exits in some tmux versions).
-set-hook -ga pane-exited "run-shell 'demux event pane_exiting --pane=#{pane_id} --window=#{window_id} 2>/dev/null; true'"
+set-hook -ga pane-exited "run-shell 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
 # Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"
