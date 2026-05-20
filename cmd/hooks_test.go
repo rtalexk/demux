@@ -80,6 +80,23 @@ func TestTmuxHooksSnippet_ContainsStickySlotsEnsureHook(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_ContainsStickyNewWindowFollowHook(t *testing.T) {
+	// after-select-window does NOT fire when a window is created via new-window
+	// (tmux fires after-new-window instead), so a separate after-new-window
+	// follow hook is required for the sidebar to follow into a fresh window.
+	found := false
+	for _, line := range strings.Split(tmuxHooksSnippet, "\n") {
+		if strings.Contains(line, "set-hook -ga after-new-window") &&
+			strings.Contains(line, "demux sidebar follow") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("snippet should bind 'demux sidebar follow' to after-new-window so the sidebar follows into newly created windows")
+	}
+}
+
 func TestTmuxHooksSnippet_ContainsStickyAutoShowHook(t *testing.T) {
 	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-attached") {
 		t.Error("snippet should include client-attached hook for sticky auto-show")
