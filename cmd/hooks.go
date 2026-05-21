@@ -151,7 +151,10 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_
 # the kill - using #{pane_id} here would clear the wrong pane's state.
 # #{hook_window} lets demux detect a window left with only a sidebar slot pane
 # (e.g. the user closed the last non-slot pane) and clean it up.
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
+# run-shell -b backgrounds the handler so closing many panes at once (e.g.
+# 'demux sidebar hide' tearing down every sticky slot pane) never blocks tmux
+# input; concurrent handlers serialize on a file lock instead.
+set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
 # Sticky sidebar - proactively ejects the sidebar when the process running in a
 # pane exits and the sidebar would be the only pane left in that window. Fires
@@ -159,7 +162,9 @@ set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pa
 # the sidebar return to the previous window without any stranded-sidebar flicker.
 # Complements after-kill-pane for cases where that hook is unreliable (e.g.
 # natural process exits in some tmux versions).
-set-hook -ga pane-exited "run-shell 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
+# run-shell -b backgrounds the handler (see after-kill-pane above) so it never
+# blocks tmux input; it shares the pane_closed handler's file lock.
+set-hook -ga pane-exited "run-shell -b 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
 # Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"

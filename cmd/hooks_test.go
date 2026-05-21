@@ -47,6 +47,22 @@ func TestTmuxHooksSnippet_ContainsAfterKillPane(t *testing.T) {
 	}
 }
 
+func TestTmuxHooksSnippet_KillHooksBackgrounded(t *testing.T) {
+	// after-kill-pane and pane-exited can fire in a burst when many panes close
+	// at once (e.g. `demux sidebar hide` tearing down every sticky slot pane).
+	// They must run with `run-shell -b` so the cleanup never blocks tmux input.
+	for _, line := range strings.Split(tmuxHooksSnippet, "\n") {
+		if !strings.HasPrefix(line, "set-hook") {
+			continue
+		}
+		if strings.Contains(line, "after-kill-pane") || strings.Contains(line, "pane-exited") {
+			if !strings.Contains(line, "run-shell -b") {
+				t.Errorf("kill-related hook must use 'run-shell -b':\n  %s", line)
+			}
+		}
+	}
+}
+
 func TestTmuxHooksSnippet_ContainsPaneExitedHook(t *testing.T) {
 	if !strings.Contains(tmuxHooksSnippet, "pane-exited") {
 		t.Error("snippet should include pane-exited hook for proactive sidebar eject")
