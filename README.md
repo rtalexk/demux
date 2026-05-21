@@ -656,22 +656,28 @@ demux hooks init --tool tmux >> ~/.tmux.conf
 tmux source ~/.tmux.conf
 ```
 
-The snippet now includes four extra lines:
+The snippet adds these sticky-sidebar hooks:
 
 - `set-hook -ga client-session-changed "run-shell 'demux sidebar follow ...'"`
   moves the sidebar pane to whichever session you switch into.
 - `set-hook -ga after-select-window "run-shell 'demux sidebar follow ...'"`
   moves the sidebar pane to whichever window you switch into (same session).
-- `set-hook -ga after-new-window "run-shell 'demux sidebar follow ...'"`
-  moves the sidebar pane into a window you just created. tmux does not fire
-  `after-select-window` for `new-window`, so this hook is needed separately.
-- `set-hook -ga client-attached "run-shell 'demux sidebar show ...'"`
+- `set-hook -g after-new-window "run-shell -b 'demux sidebar follow ...; demux sidebar slots ensure ...'"`
+  moves the sidebar into a window you just created and reconciles slot panes.
+  tmux does not fire `after-select-window` for `new-window`, so this hook is
+  needed separately.
+- `set-hook -g client-attached "run-shell -b 'demux sidebar show ...'"`
   creates the sidebar pane automatically when you attach a tmux client.
 
+The `after-new-window` and `client-attached` hooks use `-g` (replace), not
+`-ga` (append), so re-sourcing `~/.tmux.conf` replaces them in place instead
+of stacking duplicate copies; `run-shell -b` keeps window creation and client
+attach from blocking while the handler runs.
+
 If you prefer to manage the sidebar manually with `demux sidebar toggle`,
-remove the `client-attached` line. The three `follow` lines are required for
-the "follow" behavior; without them the sidebar stays in whichever session
-and window it was created in.
+remove the `client-attached` line. The two `follow` lines plus
+`after-new-window` are required for the "follow" behavior; without them the
+sidebar stays in whichever session and window it was created in.
 
 ### Configuration
 

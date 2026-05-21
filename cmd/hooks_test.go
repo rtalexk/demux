@@ -106,8 +106,8 @@ func TestTmuxHooksSnippet_ContainsStickyWindowFollowHook(t *testing.T) {
 }
 
 func TestTmuxHooksSnippet_ContainsStickySlotsEnsureHook(t *testing.T) {
-	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga after-new-window") {
-		t.Error("snippet should include after-new-window -ga hook for slots ensure")
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -g after-new-window") {
+		t.Error("snippet should include after-new-window hook for slots ensure")
 	}
 	if !strings.Contains(tmuxHooksSnippet, "demux sidebar slots ensure") {
 		t.Error("after-new-window hook should call 'demux sidebar slots ensure'")
@@ -116,27 +116,47 @@ func TestTmuxHooksSnippet_ContainsStickySlotsEnsureHook(t *testing.T) {
 
 func TestTmuxHooksSnippet_ContainsStickyNewWindowFollowHook(t *testing.T) {
 	// after-select-window does NOT fire when a window is created via new-window
-	// (tmux fires after-new-window instead), so a separate after-new-window
-	// follow hook is required for the sidebar to follow into a fresh window.
+	// (tmux fires after-new-window instead), so the after-new-window hook must
+	// move the sidebar into the fresh window. It uses -g (replace), not -ga, so
+	// re-sourcing ~/.tmux.conf cannot stack duplicate copies, and run-shell -b
+	// so window creation never blocks on the handler.
 	found := false
 	for _, line := range strings.Split(tmuxHooksSnippet, "\n") {
-		if strings.Contains(line, "set-hook -ga after-new-window") &&
-			strings.Contains(line, "demux sidebar follow") {
+		if strings.HasPrefix(line, "set-hook -g after-new-window") &&
+			strings.Contains(line, "demux sidebar follow") &&
+			strings.Contains(line, "run-shell -b") {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("snippet should bind 'demux sidebar follow' to after-new-window so the sidebar follows into newly created windows")
+		t.Error("snippet should bind 'demux sidebar follow' to after-new-window via 'set-hook -g' with 'run-shell -b'")
 	}
 }
 
 func TestTmuxHooksSnippet_ContainsStickyAutoShowHook(t *testing.T) {
-	if !strings.Contains(tmuxHooksSnippet, "set-hook -ga client-attached") {
+	if !strings.Contains(tmuxHooksSnippet, "set-hook -g client-attached") {
 		t.Error("snippet should include client-attached hook for sticky auto-show")
 	}
 	if !strings.Contains(tmuxHooksSnippet, "demux sidebar show") {
 		t.Error("snippet should call 'demux sidebar show' on client-attached")
+	}
+}
+
+func TestTmuxHooksSnippet_NonSharedHooksAreIdempotent(t *testing.T) {
+	// after-new-window, client-attached and pane-exited have no -g reset line
+	// for their event elsewhere in the snippet, so they must use -g (replace),
+	// not -ga (append). With -ga, re-sourcing ~/.tmux.conf stacks a duplicate
+	// copy every time, eventually spawning dozens of demux processes per event.
+	for _, line := range strings.Split(tmuxHooksSnippet, "\n") {
+		if !strings.HasPrefix(line, "set-hook") {
+			continue
+		}
+		for _, ev := range []string{"after-new-window", "client-attached", "pane-exited"} {
+			if strings.Contains(line, ev) && strings.Contains(line, "-ga") {
+				t.Errorf("%s hook must use -g (not -ga) to stay idempotent on re-source:\n  %s", ev, line)
+			}
+		}
 	}
 }
 
