@@ -28,10 +28,11 @@ garbage line with no bracket
 
 func TestIsDemuxEntry(t *testing.T) {
 	cases := map[string]bool{
-		`run-shell 'demux event pane_focus'`:  true,
-		`run-shell -b 'demux sidebar follow'`: true,
-		`run-shell 'tmux_claude_layout open'`: false,
-		`run-shell 'echo demuxing'`:           false,
+		`run-shell 'demux event pane_focus'`:     true,
+		`run-shell -b 'demux sidebar follow'`:    true,
+		`run-shell 'tmux_claude_layout open'`:    false,
+		`run-shell 'echo demuxing'`:              false,
+		`run-shell 'echo "demux sidebar rocks"'`: true, // known limitation: substring match
 	}
 	for in, want := range cases {
 		if got := isDemuxEntry(in); got != want {

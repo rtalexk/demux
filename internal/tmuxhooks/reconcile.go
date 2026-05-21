@@ -63,13 +63,11 @@ func Reconcile(t Tmux) error {
 				keep = append(keep, cmd) // preserve the user's own hooks
 			}
 		}
-		newEntries := append(keep, desired[event]...)
-
 		if err := t.Run("set-hook", "-gu", event); err != nil {
 			demuxlog.Warn("tmuxhooks: clear hook failed", "event", event, "err", err)
 			continue
 		}
-		for _, cmd := range newEntries {
+		for _, cmd := range append(keep, desired[event]...) {
 			if err := t.Run("set-hook", "-ga", event, cmd); err != nil {
 				demuxlog.Warn("tmuxhooks: set hook failed", "event", event, "err", err)
 			}
