@@ -66,7 +66,7 @@ active_session_icon = "►"
 focus_on_open = "current_session"
 
 # Start with cursor in the search input (also available as --search flag)
-# focus_search_on_open = false
+focus_search_on_open = false
 
 # Initial sidebar filter on startup: t (tmux) | a (all) | g (config) | w (worktree) | ! (priority)
 default_filter = "t"
@@ -101,19 +101,23 @@ card_separator = "blank"
 # See README "Sticky sidebar" section for the tmux hook snippet that auto-shows
 # the sidebar on attach.
 [sidebar.sticky]
+
 # Initial width (columns) the first time the pane is created. After that, the
 # user resizes the pane normally; the width is preserved on every session move.
 width = 35
+
 # Opt in to slots mode: pre-create a reserved sidebar pane in every window
 # (tagged with the @demux_slot tmux option and titled "demux-slot"). The
 # sticky sidebar swaps between slots on window/session switch, avoiding the
 # brief layout flicker of join-pane. Cost: one extra pane per window.
-# slots = false
+ slots = false
+
 # Focus the sidebar pane when it opens (split and slots mode alike).
 focus_on_open = true
+
 # When 'demux sidebar toggle' runs while the sidebar is open but not focused,
 # move focus into it instead of closing it; toggle again from inside to close.
-# focus_before_toggle_close = false
+focus_before_toggle_close = false
 
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
