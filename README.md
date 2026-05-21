@@ -746,9 +746,8 @@ demux sidebar slots install     # idempotent: ensure every reserved window has a
 demux sidebar slots uninstall   # remove every slot pane
 ```
 
-The tmux snippet from `demux hooks init --tool tmux` already includes an
-`after-new-window` hook that reconciles the slot set when a new window
-appears (no-op when `slots = false`).
+demux's tmux hooks already include an `after-new-window` hook that
+reconciles the slot set when a new window appears (no-op when `slots = false`).
 
 Trade-offs:
 
@@ -918,56 +917,11 @@ If the named session is configured in `sessions.toml` or `private.toml` but not 
 
 ### Tmux
 
-demux can automatically clear `done` states when you navigate between panes, windows, or sessions, so you always know if a tool finished while you were away. Generate the hook configuration with:
-
-```bash
-demux hooks init --tool tmux
-```
-
-Paste the output into `~/.tmux.conf` and reload:
-
-```bash
-tmux source ~/.tmux.conf
-```
-
-> [!CAUTION]
-> Use `--flag=value` syntax (not `--flag value`) in tmux hooks. tmux expands
-> `#{session_id}` to a raw ID like `$8`; the shell then treats `$8` as a
-> positional parameter, which is empty. With `--flag value` the empty expansion
-> leaves the flag without an argument and the command silently fails. With
-> `--flag=value` the empty expansion produces `--flag=` (empty string), which
-> is valid and handled correctly.
-
-<details>
-
-<summary>Tmux hook snippet</summary>
-
-```tmux
-# Note: flags use --flag=value (not --flag value). tmux expands #{session_id} to a
-# raw ID like $8; the shell then treats $8 as a positional parameter (empty). With
-# --flag value an empty expansion leaves the flag with no argument. With --flag=value
-# an empty expansion produces --flag= (empty string), which is valid.
-
-# Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Removes Demux state when a pane is closed (prevents stale state accumulation).
-# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
-# the kill — using #{pane_id} here would clear the wrong pane's state.
-# run-shell -b backgrounds the handler so closing many panes at once never blocks tmux input.
-set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
-```
-
-</details>
+demux uses tmux hooks to clear `done` states when you navigate between panes,
+windows, or sessions, so you always know if a tool finished while you were
+away, plus the hooks that drive the sticky sidebar. These hooks are registered
+and kept up to date automatically by `demux hooks install` — see
+[Enable the tmux hooks](#enable-the-tmux-hooks) for the one-time setup.
 
 ### Tmux Status Bar
 
@@ -1171,7 +1125,7 @@ demux event pane_focus [--pane-id <%N>] [--window-id <@N>] [--session-id <$N>]
 
 # Config
 demux config init                  # print default config to stdout
-demux hooks init --tool tmux       # print tmux hook snippet to paste into .tmux.conf
+demux hooks install --tool tmux    # install demux's tmux hooks (writes a managed block to .tmux.conf)
 ```
 
 </details>
