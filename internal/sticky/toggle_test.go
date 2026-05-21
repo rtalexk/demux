@@ -31,7 +31,7 @@ func TestToggle_EnvUnset_CallsShow(t *testing.T) {
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
 	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
 	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
-	f.outputs["split-window -f -h -b -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
 	s := &Sticky{T: f}
 	if err := s.Toggle(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
 		t.Fatalf("Toggle: %v", err)
@@ -54,7 +54,7 @@ func TestToggle_EnvSetButPaneDead_CallsShow(t *testing.T) {
 	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%1\n%3\n"}
 	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
 	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
-	f.outputs["split-window -f -h -b -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
 	s := &Sticky{T: f}
 	if err := s.Toggle(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
 		t.Fatalf("Toggle: %v", err)

@@ -57,7 +57,7 @@ func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 		return err
 	}
 	out, err := s.T.Output(
-		"split-window", "-f", "-h", "-b",
+		"split-window", "-f", "-h", "-b", "-d",
 		"-l", strconv.Itoa(opts.Width),
 		"-t", target,
 		"-P", "-F", "#{pane_id}",
@@ -70,7 +70,13 @@ func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 	if newPane == "" {
 		return fmt.Errorf("tmux split-window returned empty pane id")
 	}
-	return s.WriteEnv(key, newPane)
+	if err := s.WriteEnv(key, newPane); err != nil {
+		return err
+	}
+	if s.FocusOnOpen {
+		s.focusPane(newPane)
+	}
+	return nil
 }
 
 func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
@@ -96,6 +102,9 @@ func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
 	}
 	if err := s.WriteEnv(key, slot); err != nil {
 		return err
+	}
+	if s.FocusOnOpen {
+		s.focusPane(slot)
 	}
 	// Install slots only in the MRU-reserved set (capped at MRUMaxLen).
 	// Current window already has its own slot (the sidebar), so we pass it

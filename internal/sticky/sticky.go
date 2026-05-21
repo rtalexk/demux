@@ -58,6 +58,13 @@ type Sticky struct {
 	// of join-pane). The active sidebar pane lives in whichever window's
 	// slot is currently selected; the others run SlotPlaceholderCmd.
 	Slots bool
+	// FocusOnOpen, when true, moves focus into the sidebar pane right after
+	// Show creates (split mode) or activates (slots mode) it.
+	FocusOnOpen bool
+	// FocusBeforeToggleClose, when true, makes Toggle focus an already-open
+	// but unfocused sidebar instead of hiding it; a second Toggle from
+	// inside the sidebar then hides it.
+	FocusBeforeToggleClose bool
 }
 
 // New returns a Sticky wired to the real tmux binary.
