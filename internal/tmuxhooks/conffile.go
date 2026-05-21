@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -109,4 +110,56 @@ func SaveConf(realPath, content string) error {
 		return fmt.Errorf("rename temp: %w", err)
 	}
 	return nil
+}
+
+// legacyHookRE matches a tmux set-hook line that registers a demux command,
+// i.e. a line from the old pasted snippet. Comment lines (leading #) and lines
+// that do not start with set-hook are excluded.
+var legacyHookRE = regexp.MustCompile(`^\s*set-hook\b.*\bdemux (event|sidebar)\b`)
+
+// LegacyLine is a recognized old-snippet hook line found outside the managed
+// block.
+type LegacyLine struct {
+	Number int // 1-based line number
+	Text   string
+}
+
+// DetectLegacyHooks finds old-style demux hook lines outside the managed
+// block. Lines inside the managed block (including the bootstrap line) are
+// never reported.
+func DetectLegacyHooks(content string) []LegacyLine {
+	var out []LegacyLine
+	inBlock := false
+	for i, line := range strings.Split(content, "\n") {
+		switch {
+		case strings.Contains(line, markerBegin):
+			inBlock = true
+			continue
+		case strings.Contains(line, markerEnd):
+			inBlock = false
+			continue
+		}
+		if inBlock {
+			continue
+		}
+		if legacyHookRE.MatchString(line) {
+			out = append(out, LegacyLine{Number: i + 1, Text: line})
+		}
+	}
+	return out
+}
+
+// RemoveLines returns content with the given 1-based line numbers removed.
+func RemoveLines(content string, numbers []int) string {
+	drop := make(map[int]bool, len(numbers))
+	for _, n := range numbers {
+		drop[n] = true
+	}
+	var kept []string
+	for i, line := range strings.Split(content, "\n") {
+		if !drop[i+1] {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }

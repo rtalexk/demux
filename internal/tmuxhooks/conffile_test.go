@@ -73,3 +73,35 @@ func TestLoadConfResolvesSymlink(t *testing.T) {
 		t.Errorf("realPath = %q, want %q", realPath, real)
 	}
 }
+
+func TestDetectLegacyHooks(t *testing.T) {
+	content := strings.Join([]string{
+		"set -g mouse on", // 1: not a hook
+		`set-hook -g after-select-pane "run-shell 'demux event pane_focus'"`, // 2: legacy
+		"# set-hook -g foo 'demux event bar'",                                // 3: comment, ignored
+		`set-hook -ga after-new-window "run-shell 'demux sidebar follow'"`,   // 4: legacy
+		`set-hook -g client-resized 'run-shell "other tool"'`,                // 5: not demux
+	}, "\n")
+	got := DetectLegacyHooks(content)
+	if len(got) != 2 {
+		t.Fatalf("want 2 legacy lines, got %d: %+v", len(got), got)
+	}
+	if got[0].Number != 2 || got[1].Number != 4 {
+		t.Errorf("wrong line numbers: %+v", got)
+	}
+}
+
+func TestDetectLegacyHooksIgnoresManagedBlock(t *testing.T) {
+	content := WithManagedBlock("set -g mouse on\n")
+	if got := DetectLegacyHooks(content); len(got) != 0 {
+		t.Errorf("bootstrap line inside managed block must not be flagged: %+v", got)
+	}
+}
+
+func TestRemoveLines(t *testing.T) {
+	content := "a\nb\nc\nd\n"
+	got := RemoveLines(content, []int{2, 4})
+	if got != "a\nc\n" {
+		t.Errorf("RemoveLines = %q, want %q", got, "a\nc\n")
+	}
+}
