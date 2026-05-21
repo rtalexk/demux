@@ -1426,3 +1426,80 @@ func TestRenderPaneHeader_SlotPane_Selected_ShowsSidebarTag(t *testing.T) {
 		t.Errorf("expected sidebar slot tag in selected slot pane header, got: %q", plain)
 	}
 }
+
+func TestRenderPaneHeader_SlotPane_HidesPathAndGit(t *testing.T) {
+	p := ProcListModel{
+		cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
+	}
+	node := ProcListNode{
+		IsPaneHeader: true,
+		Pane:         tmux.Pane{PaneIndex: 0, IsSlot: true, CWD: "/divergent-marker"},
+		GitDeviant:   true,
+	}
+	plain := stripANSI(p.renderPaneHeader(node, false, 60, false))
+	if strings.Contains(plain, "divergent-marker") {
+		t.Errorf("expected slot pane to hide its path, got: %q", plain)
+	}
+	if strings.Contains(plain, pathRedirectGlyph) {
+		t.Errorf("expected slot pane to hide the git divergence glyph, got: %q", plain)
+	}
+}
+
+func TestSetSessionData_SlotPaneHasNoIdleNode(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	for i, n := range m.nodes {
+		if n.IsPaneHeader && n.Pane.IsSlot {
+			if i+1 < len(m.nodes) && m.nodes[i+1].IsIdle {
+				t.Error("slot pane header should not be followed by an idle node")
+			}
+		}
+	}
+}
+
+func TestSetSessionData_RealEmptyPaneKeepsIdleNode(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	found := false
+	for i, n := range m.nodes {
+		if n.IsPaneHeader && !n.Pane.IsSlot && n.Pane.PaneIndex == 1 {
+			if i+1 < len(m.nodes) && m.nodes[i+1].IsIdle {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("expected real empty pane to keep its idle node")
+	}
+}
+
+func TestRender_SlotPaneRow_NoPathNoIdle(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/real", PanePID: 10},
+		{Session: "s", WindowIndex: 0, PaneIndex: 1, CWD: "/sidebar-divergent", IsSlot: true, PanePID: 9},
+	}
+	var m ProcListModel
+	m.SetSessionData(panes, "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	out := stripANSI(m.Render(120, 20, false, "procs"))
+	slotLine := ""
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, slotPaneTag) {
+			slotLine = ln
+		}
+	}
+	if slotLine == "" {
+		t.Fatal("slot pane row not found in render output")
+	}
+	if strings.Contains(slotLine, "sidebar-divergent") {
+		t.Errorf("slot row should not show a path, got: %q", slotLine)
+	}
+	if strings.Contains(slotLine, idleLabel) {
+		t.Errorf("slot row should not show the idle label, got: %q", slotLine)
+	}
+}

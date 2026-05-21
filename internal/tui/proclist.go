@@ -182,7 +182,8 @@ func (p *ProcListModel) appendPaneNodes(pane tmux.Pane, displayPane tmux.Pane, w
 	procNodes := buildProcNodesForPane(pane, procs, cwdMap, tree, p.collapsedPIDs, winCWD)
 	p.nodes = append(p.nodes, procNodes...)
 
-	if len(p.nodes) == headerIdx+1 {
+	// A sticky sidebar slot pane never shows an idle marker.
+	if len(p.nodes) == headerIdx+1 && !pane.IsSlot {
 		p.nodes = append(p.nodes, ProcListNode{IsIdle: true, Depth: 1})
 	}
 }

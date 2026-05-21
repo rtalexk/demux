@@ -277,11 +277,30 @@ func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW i
 	return dimStyle.Render(stripANSI(rendered))
 }
 
-func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
-	label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
-	if node.Pane.IsSlot {
-		label += colSep + slotPaneTag
+// renderSlotPaneHeader renders the header row for a sticky sidebar slot pane.
+// A slot pane shows only "pane N" plus the [sidebar] tag (styled like the idle
+// indicator); it never displays a path, git divergence, or an idle marker.
+func renderSlotPaneHeader(paneIndex int, selected bool, innerW int) string {
+	label := fmt.Sprintf("pane %d", paneIndex)
+	if !selected {
+		return paneHeaderStyle.Render(label) + colSep + paneIdleStyle.Render(slotPaneTag)
 	}
+	tagVisualW := len(colSep) + len([]rune(slotPaneTag))
+	padCount := innerW - len([]rune(label)) - tagVisualW
+	if padCount < 0 {
+		padCount = 0
+	}
+	return selectedBG.Render(label) +
+		selectedBG.Render(colSep) +
+		paneIdleStyle.Background(activeTheme.ColorSelected).Render(slotPaneTag) +
+		selectedBG.Render(strings.Repeat(" ", padCount))
+}
+
+func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
+	if node.Pane.IsSlot {
+		return renderSlotPaneHeader(node.Pane.PaneIndex, selected, innerW)
+	}
+	label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
 
 	pathStr := ""
 	if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {
