@@ -719,17 +719,44 @@ func (s *SidebarModel) SetLaunchErr(msg string) { s.launchErr = msg }
 // ClearLaunchErr clears any stored launch error.
 func (s *SidebarModel) ClearLaunchErr() { s.launchErr = "" }
 
-// sessionIcon returns the rendered icon for a sidebar session row.
+// sessionIcon returns the raw (unstyled) icon glyph for a sidebar session
+// row. Styling is applied by the caller via styledIconPrefix so the glyph can
+// be composed into a highlighted row without an embedded SGR reset breaking
+// the selection background.
 func sessionIcon(sess session.Session) string {
-	var icon string
 	if sess.IsConfig && sess.Config != nil && sess.Config.Icon != "" {
-		icon = sess.Config.Icon
-	} else if sess.IsLive {
-		icon = activeTheme.IconTmuxSession
-	} else {
-		icon = activeTheme.IconCfgSession
+		return sess.Config.Icon
 	}
-	return sessionIconStyle.Render(icon)
+	if sess.IsLive {
+		return activeTheme.IconTmuxSession
+	}
+	return activeTheme.IconCfgSession
+}
+
+// sessionIconPrefix returns the raw "<icon> " prefix for a sidebar session
+// row, or "" when the session cannot be resolved. The trailing space separates
+// the icon from the name; styledIconPrefix applies the colour.
+func (s SidebarModel) sessionIconPrefix(node SidebarNode) string {
+	sess := s.FindSession(node.Session)
+	if sess == nil {
+		return ""
+	}
+	return sessionIcon(*sess) + " "
+}
+
+// styledIconPrefix styles a raw "<icon> " prefix for a sidebar session row.
+// When highlighted, the muted icon colour and the selection background are
+// applied as a single lipgloss style: rendering a pre-styled string (which
+// ends in an SGR reset) inside a background style would reset that background
+// mid-row and leave the space after the icon un-highlighted.
+func styledIconPrefix(iconPrefix string, highlighted bool) string {
+	if iconPrefix == "" {
+		return ""
+	}
+	if highlighted {
+		return selectedBG.Foreground(activeTheme.ColorFgMuted).Render(iconPrefix)
+	}
+	return sessionIconStyle.Render(iconPrefix)
 }
 
 // resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
@@ -919,12 +946,12 @@ func renderSelectedRow(iconPrefix, nameStr, indicators, gap string, availW, indW
 		trail := lipgloss.NewStyle().Background(activeTheme.ColorSelected).Render(selectedTrail)
 		name := selectedBG.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
 		spacer := selectedBG.Render(" ")
-		styledIcon := selectedBG.Render(iconPrefix)
+		styledIcon := styledIconPrefix(iconPrefix, true)
 		return indicatorGlyph + gap + spacer + styledIcon + name + indicators + trail
 	}
 	indicatorGlyph := lipgloss.NewStyle().Foreground(activeTheme.ColorSession).Render(focusGlyph)
 	name := selectedInactive.Bold(true).Render(nameStr + strings.Repeat(" ", pad))
-	return indicatorGlyph + gap + " " + iconPrefix + name + indicators
+	return indicatorGlyph + gap + " " + styledIconPrefix(iconPrefix, false) + name + indicators
 }
 
 func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, width int) string {
@@ -933,11 +960,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 	indicators := s.sessionIndicators(node, selected, focused)
 
-	// Icon prefix: look up the session and render its icon.
-	iconPrefix := ""
-	if sess := s.FindSession(node.Session); sess != nil {
-		iconPrefix = sessionIcon(*sess) + " "
-	}
+	iconPrefix := s.sessionIconPrefix(node)
 	iconW := visualWidth(iconPrefix)
 
 	// Row format: [focus(1)] [gap(1)] [active-slot(1)] [icon(iconW)] [name+indicators(availW)]
@@ -967,7 +990,7 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
 	}
 	text := alignedRow(nameStr, indicators, availW)
-	return " " + gap + " " + iconPrefix + sessionStyle.Render(text)
+	return " " + gap + " " + styledIconPrefix(iconPrefix, false) + sessionStyle.Render(text)
 }
 
 // renderSessionCard renders a session as a two-row card.
@@ -1040,11 +1063,7 @@ func (s SidebarModel) activeIndicator(node SidebarNode, highlighted bool) string
 func (s SidebarModel) renderCardHeader(node SidebarNode, selected, focused bool, innerW int) string {
 	active := s.activeIndicator(node, focused)
 
-	// Session icon.
-	iconPrefix := ""
-	if sess := s.FindSession(node.Session); sess != nil {
-		iconPrefix = sessionIcon(*sess) + " "
-	}
+	iconPrefix := s.sessionIconPrefix(node)
 	iconW := visualWidth(iconPrefix)
 
 	// Watch slot (fixed width even when unwatched).
@@ -1074,7 +1093,7 @@ func (s SidebarModel) renderCardHeader(node SidebarNode, selected, focused bool,
 
 	focusGl := cardLeadingGlyph(selected, focused)
 	if focused {
-		iconStyled := selectedBG.Render(iconPrefix)
+		iconStyled := styledIconPrefix(iconPrefix, true)
 		nameStyled := selectedBG.Bold(true).Render(nameStr)
 		sep := selectedBG.Render(" ")
 		trail := selectedBG.Render(strings.Repeat(" ", pad+1)) // +1 for the trailing slot in overhead
@@ -1082,7 +1101,7 @@ func (s SidebarModel) renderCardHeader(node SidebarNode, selected, focused bool,
 	}
 
 	nameStyled := sessionStyle.Render(nameStr)
-	return focusGl + active + " " + iconPrefix + nameStyled + " " + watch
+	return focusGl + active + " " + styledIconPrefix(iconPrefix, false) + nameStyled + " " + watch
 }
 
 // renderCardStatus builds the bottom row of a session card: focus +

@@ -3,6 +3,7 @@ package tui
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"time"
 
@@ -1620,6 +1621,96 @@ func TestRenderSessionCard_Focused_HighlightsBothRows(t *testing.T) {
 	for i, l := range uLines {
 		if strings.Contains(l, bgPrefix) {
 			t.Errorf("unfocused row %d unexpectedly contains background ANSI %q: %q", i+1, bgPrefix, l)
+		}
+	}
+}
+
+// extColorArgs returns how many extra SGR parameters an extended-colour
+// introducer (38/48) consumes: 2 for "5;<n>" (256-colour), 4 for
+// "2;<r>;<g>;<b>" (truecolour), 0 otherwise.
+func extColorArgs(rest []string) int {
+	if len(rest) == 0 {
+		return 0
+	}
+	switch rest[0] {
+	case "5":
+		return 2
+	case "2":
+		return 4
+	}
+	return 0
+}
+
+// sgrBackgroundActive interprets one SGR parameter list and returns whether a
+// background colour is active afterwards, given the prior state. It consumes
+// 38/48 extended-colour arguments so a foreground colour is never mistaken for
+// a background reset.
+func sgrBackgroundActive(params string, bg bool) bool {
+	if params == "" {
+		return false // ESC[m is a full reset
+	}
+	parts := strings.Split(params, ";")
+	for k := 0; k < len(parts); k++ {
+		switch parts[k] {
+		case "0", "49":
+			bg = false
+		case "48":
+			bg = true
+			k += extColorArgs(parts[k+1:])
+		case "38":
+			k += extColorArgs(parts[k+1:])
+		}
+	}
+	return bg
+}
+
+// bgColumns returns one bool per display column of an ANSI-styled line,
+// reporting whether a background colour is active at that column.
+func bgColumns(line string) []bool {
+	var cols []bool
+	bg := false
+	for i := 0; i < len(line); {
+		if line[i] == '\x1b' && i+1 < len(line) && line[i+1] == '[' {
+			j := i + 2
+			for j < len(line) && line[j] != 'm' {
+				j++
+			}
+			bg = sgrBackgroundActive(line[i+2:j], bg)
+			i = j + 1
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(line[i:])
+		for w := runewidth.RuneWidth(r); w > 0; w-- {
+			cols = append(cols, bg)
+		}
+		i += size
+	}
+	return cols
+}
+
+// Regression: sessionIcon returns a pre-styled glyph that ends in an SGR reset.
+// When the focused card header re-wraps "icon + space" in the selection
+// background, that embedded reset punches a hole in the highlight, leaving the
+// space after the icon un-highlighted. Every column of a focused header must
+// carry the background.
+func TestRenderSessionCard_Focused_IconHighlightIsContiguous(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(termenv.Ascii) })
+	initStyles(Theme{
+		IconTmuxSession: "⊞", IconCfgSession: "⚙︎",
+		ColorSelected:  lipgloss.Color("#2a2a4a"),
+		ColorFgPrimary: lipgloss.Color("#ffffff"),
+		ColorFgMuted:   lipgloss.Color("#888888"), // makes sessionIcon emit ANSI
+	}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg:      config.Config{Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40}},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+	}
+	header := strings.Split(s.renderSessionCard(SidebarNode{Session: "alpha"}, true, true, 40), "\n")[0]
+	cols := bgColumns(header)
+	for i, hasBg := range cols {
+		if !hasBg {
+			t.Errorf("focused card header column %d lacks the highlight background; gap in selection bar\n  line: %q\n  bg:   %v", i, header, cols)
 		}
 	}
 }

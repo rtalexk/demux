@@ -363,6 +363,33 @@ func TestEjectSidebarIfAloneAfterExit_RemainingIsNotSidebar_NoOp(t *testing.T) {
 	}
 }
 
+// Regression: an ephemeral window (e.g. a lazygit `new-window`) holds a
+// content pane plus a placeholder slot pane. When the content pane's process
+// exits naturally, pane-exited fires but after-kill-pane does not, so this is
+// the only cleanup that runs. The lone placeholder must be killed so the
+// window closes instead of lingering as a useless slot-only window.
+func TestEjectSidebarIfAloneAfterExit_RemainingIsPlaceholderSlot_KillsIt(t *testing.T) {
+	f := newFakeTmux()
+	// Window @2: content pane %10 is exiting; the only other pane %42 is a
+	// placeholder slot (tagged) that is NOT the tracked sidebar.
+	f.outputs["list-panes -t @2 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 \n%42 1\n"}
+	// Active sidebar is alive elsewhere (%99); env does not point at %42.
+	f.outputs["show-environment -g"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%99\n"}
+	s := &Sticky{T: f}
+	if err := s.EjectSidebarIfAloneAfterExit("%10", "@2", 35); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !ranCmd(f, "kill-pane -t %42") {
+		t.Errorf("expected kill-pane for lone placeholder slot, got: %v", f.runs)
+	}
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if strings.HasPrefix(j, "join-pane") || strings.HasPrefix(j, "swap-pane") {
+			t.Errorf("did not expect a sidebar move for a placeholder, got: %v", f.runs)
+		}
+	}
+}
+
 func TestEjectSidebarIfAloneAfterExit_SidebarAlone_MovesToLastActive(t *testing.T) {
 	f := newFakeTmux()
 	// Ephemeral window @2: lazygit pane %10 is exiting, sidebar %42 would be left alone.
