@@ -240,8 +240,10 @@ func normalizeSessionView(value, key, emptyDefault string) string {
 }
 
 type SidebarStickyConfig struct {
-	Width int  `toml:"width"`
-	Slots bool `toml:"slots"`
+	Width                  int  `toml:"width"`
+	Slots                  bool `toml:"slots"`
+	FocusOnOpen            bool `toml:"focus_on_open"`
+	FocusBeforeToggleClose bool `toml:"focus_before_toggle_close"`
 }
 
 type SidebarConfig struct {
@@ -319,7 +321,7 @@ func Default() Config {
 			ActiveSessionIcon: DefaultActiveSessionIcon,
 			SessionView:       SidebarViewRow,
 			CardSeparator:     CardSeparatorBlank,
-			Sticky:            SidebarStickyConfig{Width: DefaultStickySidebarWidth},
+			Sticky:            SidebarStickyConfig{Width: DefaultStickySidebarWidth, FocusOnOpen: true},
 		},
 		StatusBar: StatusBarConfig{Show: true},
 		Log:       LogConfig{Level: "warn"},

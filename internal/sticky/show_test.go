@@ -12,7 +12,7 @@ func TestShow_EnvUnset_CreatesPane(t *testing.T) {
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable: DEMUX_STICKY_PANE__dev_ttys001\n")}
 	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
-	f.outputs["split-window -f -h -b -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
 	s := &Sticky{T: f}
 	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
 		t.Fatalf("Show: %v", err)
@@ -55,7 +55,7 @@ func TestShow_EnvSetButPaneDead_Recreates(t *testing.T) {
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{out: "DEMUX_STICKY_PANE__dev_ttys001=%42\n"}
 	f.outputs["list-panes -aF #{pane_id}"] = fakeReply{out: "%1\n%2\n"}
 	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$2:@9\n"}
-	f.outputs["split-window -f -h -b -l 35 -t $2:@9 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%99\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $2:@9 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%99\n"}
 	s := &Sticky{T: f}
 	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
 		t.Fatalf("Show: %v", err)
@@ -134,13 +134,83 @@ func TestShow_SlotsMode_ActivatesCurrentSlotBeforeOtherWindows(t *testing.T) {
 	}
 }
 
+func TestShow_FocusOnOpen_SplitMode_SelectsPane(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
+	s := &Sticky{T: f, FocusOnOpen: true}
+	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	sawFocus := false
+	for _, r := range f.runs {
+		if strings.Join(r, " ") == "select-pane -t %88" {
+			sawFocus = true
+		}
+	}
+	if !sawFocus {
+		t.Errorf("expected select-pane -t %%88 (focus new pane), got runs: %v", f.runs)
+	}
+}
+
+func TestShow_NoFocusOnOpen_SplitMode_NoSelectPane(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{out: "%88\n"}
+	s := &Sticky{T: f, FocusOnOpen: false}
+	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	for _, r := range f.runs {
+		if strings.HasPrefix(strings.Join(r, " "), "select-pane") {
+			t.Errorf("expected no select-pane when FocusOnOpen=false, got: %v", r)
+		}
+	}
+}
+
+func TestShow_FocusOnOpen_SlotsMode_SelectsSlot(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
+	f.outputs["list-panes -t $1:@7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%1 \n%10 1\n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%10\n"}
+	f.outputs["list-windows -aF #{window_id}"] = fakeReply{out: "@7\n@8\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@7 0\n@8 1\n"}
+	f.outputs["display-message -p #{client_last_session}"] = fakeReply{out: "\n"}
+	f.outputs["show-environment -g "+MRUEnvKey] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@7 %10 1\n"}
+	f.outputs["list-panes -t @8 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%2 \n"}
+	f.outputs["split-window -f -h -b -d -l 35 -t @8 -P -F #{pane_id} demux sidebar slot"] = fakeReply{out: "%11\n"}
+	s := &Sticky{T: f, Slots: true, FocusOnOpen: true}
+	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	sawFocus := false
+	for _, r := range f.runs {
+		if strings.Join(r, " ") == "select-pane -t %10" {
+			sawFocus = true
+		}
+	}
+	if !sawFocus {
+		t.Errorf("expected select-pane -t %%10 (focus the slot), got runs: %v", f.runs)
+	}
+}
+
 func TestShow_SplitFailure_Surfaces(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
 	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
 	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
 	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
-	f.outputs["split-window -f -h -b -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{err: errors.New("can't split")}
+	f.outputs["split-window -f -h -b -d -l 35 -t $1:@7 -P -F #{pane_id} demux --sticky"] = fakeReply{err: errors.New("can't split")}
 	s := &Sticky{T: f}
 	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err == nil {
 		t.Error("expected split-window failure to surface")

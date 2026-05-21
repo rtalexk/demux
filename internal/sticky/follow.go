@@ -104,11 +104,11 @@ func (s *Sticky) ejectFocusIfOnSidebar(sidebarPane string) {
 	if sidebarPane == "" {
 		return
 	}
-	out, err := s.T.Output("display-message", "-p", "#{pane_id}")
+	active, err := s.activePane()
 	if err != nil {
 		return
 	}
-	if strings.TrimSpace(out) == sidebarPane {
+	if active == sidebarPane {
 		_ = s.T.Run("select-pane", "-t", ":.+")
 	}
 }

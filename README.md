@@ -683,6 +683,12 @@ and window it was created in.
 width = 35
 # Opt in to slots mode (see below).
 slots = false
+# Focus the sidebar pane when it opens (split and slots mode alike).
+focus_on_open = true
+# When `demux sidebar toggle` runs while the sidebar is open but not focused,
+# move focus into it instead of closing it. Toggle again from inside the
+# sidebar to close it.
+focus_before_toggle_close = false
 ```
 
 ### Slots mode (opt-in, no follow flicker)
