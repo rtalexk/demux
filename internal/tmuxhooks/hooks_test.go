@@ -10,6 +10,9 @@ func TestDesiredHooksExcludesClientAttached(t *testing.T) {
 	if len(hooks) == 0 {
 		t.Fatal("DesiredHooks returned empty set")
 	}
+	if len(hooks) != 9 {
+		t.Errorf("DesiredHooks: want 9 entries, got %d", len(hooks))
+	}
 	for _, h := range hooks {
 		if h.Event == "client-attached" {
 			t.Errorf("client-attached must not be in DesiredHooks (it is the bootstrap)")
