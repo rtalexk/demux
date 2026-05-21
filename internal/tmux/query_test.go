@@ -105,6 +105,41 @@ func TestParsePanes_WithoutSessionActivity_BackwardCompat(t *testing.T) {
 	}
 }
 
+func TestParsePanes_WithSlotMarker(t *testing.T) {
+	// 11-field format: ...session_activity, demux_slot. Slot panes carry "1",
+	// every other pane carries an empty trailing field.
+	raw := "s\t$1\t0\t@5\t0\t/home/dev\t%1\tdemux-slot\t1234\t1711652000\t1\n" +
+		"s\t$1\t0\t@5\t1\t/home/dev/app\t%2\teditor\t1235\t1711652000\t\n"
+	panes, err := tmux.ParsePanes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(panes) != 2 {
+		t.Fatalf("expected 2 panes, got %d", len(panes))
+	}
+	if !panes[0].IsSlot {
+		t.Error("expected pane 0 (demux_slot=1) to have IsSlot=true")
+	}
+	if panes[1].IsSlot {
+		t.Error("expected pane 1 (demux_slot empty) to have IsSlot=false")
+	}
+}
+
+func TestParsePanes_WithoutSlotMarker_BackwardCompat(t *testing.T) {
+	// 10-field format (no demux_slot) should still parse with IsSlot=false
+	raw := "mysession\t$1\t0\t@5\t0\t/home/dev\t%1\teditor\t1234\t1711652000\n"
+	panes, err := tmux.ParsePanes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(panes) != 1 {
+		t.Fatalf("expected 1 pane, got %d", len(panes))
+	}
+	if panes[0].IsSlot {
+		t.Error("expected IsSlot=false for old format")
+	}
+}
+
 func TestSessionActivityMap_MaxPerSession(t *testing.T) {
 	panes := []tmux.Pane{
 		{Session: "s1", SessionActivity: 1000},

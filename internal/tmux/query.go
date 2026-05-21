@@ -19,6 +19,7 @@ type Pane struct {
 	WindowName      string
 	PanePID         int32 // PID of the shell process running in this pane
 	SessionActivity int64 // Unix timestamp from #{session_activity}
+	IsSlot          bool  // true when the pane is a sticky sidebar slot (@demux_slot=1)
 }
 
 // DisplayLabel returns the "session:windowIndex.paneIndex" string used as a human-readable display label.
@@ -28,8 +29,10 @@ func (p Pane) DisplayLabel() string {
 
 // ListPanes runs tmux list-panes and returns all panes across all sessions.
 func ListPanes() ([]Pane, error) {
+	// The trailing #{@demux_slot} is the sticky sidebar slot marker
+	// (sticky.SlotMarker); it is empty on every non-slot pane.
 	out, err := exec.Command("tmux", "list-panes", "-a",
-		"-F", "#{session_name}\t#{session_id}\t#{window_index}\t#{window_id}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}\t#{pane_pid}\t#{session_activity}",
+		"-F", "#{session_name}\t#{session_id}\t#{window_index}\t#{window_id}\t#{pane_index}\t#{pane_current_path}\t#{pane_id}\t#{window_name}\t#{pane_pid}\t#{session_activity}\t#{@demux_slot}",
 	).Output()
 	if err != nil {
 		return nil, fmt.Errorf("tmux list-panes: %w", err)
@@ -73,6 +76,9 @@ func ParsePanes(raw string) ([]Pane, error) {
 			if ts, err := strconv.ParseInt(strings.TrimSpace(parts[9]), 10, 64); err == nil {
 				p.SessionActivity = ts
 			}
+		}
+		if len(parts) >= 11 {
+			p.IsSlot = strings.TrimSpace(parts[10]) == "1"
 		}
 		panes = append(panes, p)
 	}
