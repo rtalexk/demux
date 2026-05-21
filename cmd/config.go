@@ -119,6 +119,10 @@ focus_on_open = true
 # move focus into it instead of closing it; toggle again from inside to close.
 focus_before_toggle_close = false
 
+# Automatically show the sticky sidebar when a tmux client attaches.
+# Requires the demux managed block in ~/.tmux.conf (see "demux hooks install").
+auto_show = false
+
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
 # full cmdline (case-insensitive). Only the pane root and its direct children

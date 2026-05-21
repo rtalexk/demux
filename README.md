@@ -695,6 +695,8 @@ focus_on_open = true
 # move focus into it instead of closing it. Toggle again from inside the
 # sidebar to close it.
 focus_before_toggle_close = false
+# Automatically show the sticky sidebar when a tmux client attaches.
+auto_show = false
 ```
 
 ### Slots mode (opt-in, no follow flicker)
