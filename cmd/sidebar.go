@@ -17,6 +17,8 @@ var stickyClient = func() *sticky.Sticky {
 	cfg := loadConfig()
 	s := sticky.New()
 	s.Slots = cfg.Sidebar.Sticky.Slots
+	s.FocusOnOpen = cfg.Sidebar.Sticky.FocusOnOpen
+	s.FocusBeforeToggleClose = cfg.Sidebar.Sticky.FocusBeforeToggleClose
 	return s
 }
 
