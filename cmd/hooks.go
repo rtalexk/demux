@@ -125,7 +125,7 @@ var hooksInitCmd = &cobra.Command{
 // tmuxCurrentIDs returns the stable pane, window, and session IDs for the
 // tmux pane that launched this process.
 func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
-	paneID = os.Getenv("TMUX_PANE")
+	paneID = os.Getenv("TMUX_PANE") // $TMUX_PANE is set by tmux as %N
 	if paneID == "" {
 		return "", "", "", fmt.Errorf("TMUX_PANE not set")
 	}
@@ -136,6 +136,7 @@ func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
 func init() {
 	hooksInstallCmd.Flags().StringVar(&hooksInstallTool, "tool", "tmux", "Tool to configure (supported: tmux)")
 	hooksInstallCmd.Flags().BoolVar(&hooksInstallPrintOnly, "print-only", false, "Print the bootstrap line without changing any files")
+	hooksInitCmd.Flags().String("tool", "tmux", "Deprecated and ignored; kept for backward compatibility")
 	hooksCmd.AddCommand(hooksInstallCmd, hooksInitCmd)
 	rootCmd.AddCommand(hooksCmd)
 }
