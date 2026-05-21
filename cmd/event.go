@@ -6,6 +6,7 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/sticky"
+	"github.com/rtalexk/demux/internal/tmuxhooks"
 	"github.com/spf13/cobra"
 )
 
@@ -180,6 +181,40 @@ var eventPaneClosedCmd = &cobra.Command{
 	},
 }
 
+// eventClientAttachedCmd is fired by the demux managed-block bootstrap hook on
+// client-attached. It reconciles demux's tmux hook set (version-gated fast
+// path), auto-shows the sticky sidebar when configured, and warns when legacy
+// pasted hook lines still linger in tmux.conf.
+var eventClientAttachedCmd = &cobra.Command{
+	Use:   "client_attached",
+	Short: "Reconcile demux tmux hooks and auto-show the sidebar (called by the client-attached hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = withEventLock(func() error {
+			if err := tmuxhooks.Sync(tmuxhooks.Real()); err != nil {
+				demuxlog.Warn("client_attached: hook sync failed", "err", err)
+			}
+			return nil
+		})
+
+		cfg := loadConfig()
+		if cfg.Sidebar.Sticky.AutoShow {
+			if err := stickyClient().Show(sidebarShowOpts()); err != nil {
+				demuxlog.Warn("client_attached: sidebar show failed", "err", err)
+			}
+		}
+
+		if path, err := tmuxhooks.ConfPath(); err == nil {
+			if content, _, _, err := tmuxhooks.LoadConf(path); err == nil {
+				if legacy := tmuxhooks.DetectLegacyHooks(content); len(legacy) > 0 {
+					demuxlog.Warn("client_attached: legacy demux hook lines in tmux.conf; run `demux hooks install` to remove them",
+						"count", len(legacy), "path", path)
+				}
+			}
+		}
+		return nil
+	},
+}
+
 // eventLockPath returns the path of the cross-process lock file that
 // serializes sticky-mutating tmux event handlers. It lives next to the state
 // database so it shares the demux data directory.
@@ -276,6 +311,6 @@ func init() {
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd)
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/sticky"
+	"github.com/spf13/cobra"
 )
 
 func paneTarget(paneID, windowID, sessionID string) db.Target {
@@ -231,5 +232,20 @@ func TestApplyPaneClosed_ClearsStickyEnvVar(t *testing.T) {
 	}
 	if !sawUnset {
 		t.Errorf("expected sticky env unset for %%42, got runs: %v", fake.runs)
+	}
+}
+
+func TestEventClientAttachedCommandRegistered(t *testing.T) {
+	var found *cobra.Command
+	for _, c := range eventCmd.Commands() {
+		if c.Use == "client_attached" {
+			found = c
+		}
+	}
+	if found == nil {
+		t.Fatal("event client_attached subcommand not registered")
+	}
+	if found.RunE == nil {
+		t.Error("client_attached command has no RunE")
 	}
 }
