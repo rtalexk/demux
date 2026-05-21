@@ -939,3 +939,32 @@ func TestResolvedSessionView(t *testing.T) {
 		})
 	}
 }
+
+func TestSidebarSticky_DefaultFocusFlags(t *testing.T) {
+	cfg := config.Default()
+	if !cfg.Sidebar.Sticky.FocusOnOpen {
+		t.Errorf("default sticky focus_on_open: want true, got false")
+	}
+	if cfg.Sidebar.Sticky.FocusBeforeToggleClose {
+		t.Errorf("default sticky focus_before_toggle_close: want false, got true")
+	}
+}
+
+func TestSidebarSticky_LoadOverridesFocusFlags(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	body := "[sidebar.sticky]\nfocus_on_open = false\nfocus_before_toggle_close = true\n"
+	if err := os.WriteFile(path, []byte(body), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Sidebar.Sticky.FocusOnOpen {
+		t.Errorf("focus_on_open override: want false, got true")
+	}
+	if !cfg.Sidebar.Sticky.FocusBeforeToggleClose {
+		t.Errorf("focus_before_toggle_close override: want true, got false")
+	}
+}
