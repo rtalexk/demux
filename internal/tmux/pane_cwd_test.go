@@ -27,3 +27,32 @@ func TestPrimaryPaneCWD(t *testing.T) {
 		}
 	}
 }
+
+func TestPrimaryPane(t *testing.T) {
+	cases := []struct {
+		name  string
+		panes []tmux.Pane
+		want  string // CWD of the expected pane, or "<nil>" when none
+	}{
+		{"empty", nil, "<nil>"},
+		{"pane 0", []tmux.Pane{{PaneIndex: 0, CWD: "/a"}, {PaneIndex: 1, CWD: "/b"}}, "/a"},
+		{"slot at index 0 skipped", []tmux.Pane{{PaneIndex: 0, CWD: "/sidebar", IsSlot: true}, {PaneIndex: 1, CWD: "/real"}}, "/real"},
+		{"only slot pane", []tmux.Pane{{PaneIndex: 0, CWD: "/sidebar", IsSlot: true}}, "<nil>"},
+	}
+	for _, c := range cases {
+		got := tmux.PrimaryPane(c.panes)
+		if c.want == "<nil>" {
+			if got != nil {
+				t.Errorf("%s: expected nil, got %+v", c.name, *got)
+			}
+			continue
+		}
+		if got == nil {
+			t.Errorf("%s: expected pane with CWD %q, got nil", c.name, c.want)
+			continue
+		}
+		if got.CWD != c.want {
+			t.Errorf("%s: PrimaryPane CWD = %q, want %q", c.name, got.CWD, c.want)
+		}
+	}
+}

@@ -33,6 +33,10 @@ const (
 
 	// idleLabel is the text shown next to a pane with no active process.
 	idleLabel = "idle"
+
+	// slotPaneTag marks a pane that is the sticky sidebar slot, so it is
+	// recognizable in the process list and not mistaken for real work.
+	slotPaneTag = "[sidebar]"
 )
 
 // renderedLine pairs a node index with its rendered text, used to build the
@@ -275,6 +279,9 @@ func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW i
 
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
 	label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
+	if node.Pane.IsSlot {
+		label += colSep + slotPaneTag
+	}
 
 	pathStr := ""
 	if node.Pane.CWD != "" && node.Pane.CWD != p.primaryCWD {

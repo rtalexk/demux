@@ -219,12 +219,13 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
 	}
 	sort.Ints(winIdxs)
 
-	// Compute session-level primary CWD from the first window's first pane.
+	// Compute the session-level primary CWD from the first window's primary
+	// pane. Sticky sidebar slot panes are skipped so an open sidebar does not
+	// hijack the session's primary path.
 	p.primaryCWD = ""
 	for _, wi := range winIdxs {
-		ps := sortPanes(windows[wi])
-		if len(ps) > 0 {
-			p.primaryCWD = ps[0].CWD
+		if cwd := tmux.PrimaryPaneCWD(windows[wi]); cwd != "" {
+			p.primaryCWD = cwd
 			break
 		}
 	}
@@ -237,17 +238,23 @@ func (p *ProcListModel) SetSessionData(panes []tmux.Pane, session string, procs 
 }
 
 // appendWindowNodes appends a window header and all of its panes' nodes to p.nodes.
-// It is a no-op when the window has no panes.
+// It is a no-op when the window has no panes. The window's primary pane (and
+// thus its CWD) skips any sticky sidebar slot so the window path reflects real
+// work rather than the sidebar's stale path.
 func (p *ProcListModel) appendWindowNodes(wPanes []tmux.Pane, session string, wi int, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, gitInfo map[string]git.Info) {
 	wPanes = sortPanes(wPanes)
 	if len(wPanes) == 0 {
 		return
 	}
-	winCWD := wPanes[0].CWD
+	headerPane := wPanes[0]
+	if pp := tmux.PrimaryPane(wPanes); pp != nil {
+		headerPane = *pp
+	}
+	winCWD := headerPane.CWD
 
 	p.nodes = append(p.nodes, ProcListNode{
 		IsWindowHeader: true,
-		Pane:           wPanes[0],
+		Pane:           headerPane,
 	})
 
 	for _, pane := range wPanes {
