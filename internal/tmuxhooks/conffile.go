@@ -102,7 +102,7 @@ func SaveConf(realPath, content string) error {
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
-		return err
+		return fmt.Errorf("close temp: %w", err)
 	}
 	if err := os.Rename(tmpName, realPath); err != nil {
 		os.Remove(tmpName)
