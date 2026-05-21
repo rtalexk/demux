@@ -73,9 +73,7 @@ func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 	if err := s.WriteEnv(key, newPane); err != nil {
 		return err
 	}
-	if s.FocusOnOpen {
-		s.focusPane(newPane)
-	}
+	s.maybeFocusOnOpen(newPane)
 	return nil
 }
 
@@ -103,9 +101,7 @@ func (s *Sticky) showSlotsMode(key string, opts ShowOpts) error {
 	if err := s.WriteEnv(key, slot); err != nil {
 		return err
 	}
-	if s.FocusOnOpen {
-		s.focusPane(slot)
-	}
+	s.maybeFocusOnOpen(slot)
 	// Install slots only in the MRU-reserved set (capped at MRUMaxLen).
 	// Current window already has its own slot (the sidebar), so we pass it
 	// in explicitly so reconcile won't touch it.

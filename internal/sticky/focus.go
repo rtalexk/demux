@@ -21,3 +21,11 @@ func (s *Sticky) focusPane(paneID string) {
 	}
 	_ = s.T.Run("select-pane", "-t", paneID)
 }
+
+// maybeFocusOnOpen focuses the just-created sidebar pane when the FocusOnOpen
+// config flag is set. Shared tail of both Show modes.
+func (s *Sticky) maybeFocusOnOpen(paneID string) {
+	if s.FocusOnOpen {
+		s.focusPane(paneID)
+	}
+}
