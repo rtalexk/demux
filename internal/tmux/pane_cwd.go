@@ -5,6 +5,7 @@ package tmux
 // open sidebar does not hijack the primary path. Returns nil if panes is empty
 // or contains only slot panes.
 func PrimaryPane(panes []Pane) *Pane {
+	var fallback *Pane
 	for i := range panes {
 		if panes[i].IsSlot {
 			continue
@@ -12,13 +13,11 @@ func PrimaryPane(panes []Pane) *Pane {
 		if panes[i].PaneIndex == 0 {
 			return &panes[i]
 		}
-	}
-	for i := range panes {
-		if !panes[i].IsSlot {
-			return &panes[i]
+		if fallback == nil {
+			fallback = &panes[i]
 		}
 	}
-	return nil
+	return fallback
 }
 
 // PrimaryPaneCWD returns the CWD of the primary pane (see PrimaryPane).
