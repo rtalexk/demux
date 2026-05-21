@@ -33,6 +33,10 @@ const (
 
 	// idleLabel is the text shown next to a pane with no active process.
 	idleLabel = "idle"
+
+	// slotPaneTag marks a pane that is the sticky sidebar slot, so it is
+	// recognizable in the process list and not mistaken for real work.
+	slotPaneTag = "[sidebar]"
 )
 
 // renderedLine pairs a node index with its rendered text, used to build the
@@ -273,7 +277,31 @@ func (p ProcListModel) renderProcLine(node ProcListNode, selected bool, innerW i
 	return dimStyle.Render(stripANSI(rendered))
 }
 
+// renderPaneHeaderTag renders a pane-header row made up of a label and a short
+// trailing tag styled like the idle indicator — used both for the "idle" marker
+// and the "[sidebar]" slot tag. When selected, the whole row carries the
+// selected background and is padded to innerW.
+func renderPaneHeaderTag(label, tag string, selected bool, innerW int) string {
+	if !selected {
+		return paneHeaderStyle.Render(label) + colSep + paneIdleStyle.Render(tag)
+	}
+	padCount := innerW - len([]rune(label)) - len(colSep) - len([]rune(tag))
+	if padCount < 0 {
+		padCount = 0
+	}
+	return selectedBG.Render(label) +
+		selectedBG.Render(colSep) +
+		paneIdleStyle.Background(activeTheme.ColorSelected).Render(tag) +
+		selectedBG.Render(strings.Repeat(" ", padCount))
+}
+
 func (p ProcListModel) renderPaneHeader(node ProcListNode, selected bool, innerW int, hasIdle bool) string {
+	if node.Pane.IsSlot {
+		// A sticky sidebar slot pane shows only its label plus the [sidebar]
+		// tag — never a path, git divergence, or idle marker.
+		label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
+		return renderPaneHeaderTag(label, slotPaneTag, selected, innerW)
+	}
 	label := fmt.Sprintf("pane %d", node.Pane.PaneIndex)
 
 	pathStr := ""
@@ -354,18 +382,7 @@ func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string
 		return selectedBG.Render(content + strings.Repeat(" ", padCount))
 	}
 	if hasIdle {
-		// Render "label  idle" inline, then fill the remaining width with
-		// the selected background so the row doesn't wrap.
-		const idleVisualW = len(colSep) + len(idleLabel)
-		padCount := innerW - len([]rune(left)) - idleVisualW
-		if padCount < 0 {
-			padCount = 0
-		}
-		idleRendered := paneIdleStyle.Background(activeTheme.ColorSelected).Render("idle")
-		return selectedBG.Render(left) +
-			selectedBG.Render(colSep) +
-			idleRendered +
-			selectedBG.Render(strings.Repeat(" ", padCount))
+		return renderPaneHeaderTag(left, idleLabel, true, innerW)
 	}
 	padCount := innerW - len([]rune(left))
 	if padCount < 0 {

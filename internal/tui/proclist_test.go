@@ -1333,3 +1333,173 @@ func TestRender_SessionMode_PaneHeaderIndented(t *testing.T) {
 		t.Errorf("expected '    pane 0' (4-space indent) in output, got:\n%s", plain)
 	}
 }
+
+// ---------- sidebar slot handling ----------
+
+// slotSessionPanes returns a window whose pane index 0 is a sticky sidebar
+// slot pointing at a stale directory, with the real work in pane index 1.
+func slotSessionPanes() []tmux.Pane {
+	return []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/sidebar", IsSlot: true, PanePID: 9},
+		{Session: "s", WindowIndex: 0, PaneIndex: 1, CWD: "/real", PanePID: 10},
+	}
+}
+
+func TestSetSessionData_PrimaryCWDIgnoresSlotPane(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	if m.primaryCWD != "/real" {
+		t.Errorf("expected primaryCWD '/real' (sidebar slot ignored), got %q", m.primaryCWD)
+	}
+}
+
+func TestSetSessionData_WindowHeaderIgnoresSlotPane(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	found := false
+	for _, n := range m.nodes {
+		if n.IsWindowHeader {
+			found = true
+			if n.Pane.IsSlot {
+				t.Error("window header pane should not be the sidebar slot pane")
+			}
+			if n.Pane.CWD != "/real" {
+				t.Errorf("expected window header CWD '/real' (slot ignored), got %q", n.Pane.CWD)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("no window header node emitted")
+	}
+}
+
+func TestSetSessionData_WindowCWDFromSlotPaneSkipped(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	for _, n := range m.nodes {
+		if !n.IsPaneHeader {
+			continue
+		}
+		if n.Pane.IsSlot {
+			// Slot pane diverges from the real window CWD — keeps its own path.
+			if n.Pane.CWD != "/sidebar" {
+				t.Errorf("expected slot pane to keep CWD '/sidebar', got %q", n.Pane.CWD)
+			}
+		} else {
+			// Real pane matches the window CWD — path suppressed.
+			if n.Pane.CWD != "" {
+				t.Errorf("expected real pane CWD suppressed (matches window CWD), got %q", n.Pane.CWD)
+			}
+		}
+	}
+}
+
+func TestRenderPaneHeader_SlotPane_ShowsSidebarTag(t *testing.T) {
+	var p ProcListModel
+	node := ProcListNode{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0, IsSlot: true}}
+	plain := stripANSI(p.renderPaneHeader(node, false, 40, false))
+	if !strings.Contains(plain, slotPaneTag) {
+		t.Errorf("expected sidebar slot tag %q in pane header, got: %q", slotPaneTag, plain)
+	}
+}
+
+func TestRenderPaneHeader_NonSlotPane_NoSidebarTag(t *testing.T) {
+	var p ProcListModel
+	node := ProcListNode{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0}}
+	plain := stripANSI(p.renderPaneHeader(node, false, 40, false))
+	if strings.Contains(plain, slotPaneTag) {
+		t.Errorf("expected no slot tag for a non-slot pane, got: %q", plain)
+	}
+}
+
+func TestRenderPaneHeader_SlotPane_Selected_ShowsSidebarTag(t *testing.T) {
+	var p ProcListModel
+	node := ProcListNode{IsPaneHeader: true, Pane: tmux.Pane{PaneIndex: 0, IsSlot: true}}
+	plain := stripANSI(p.renderPaneHeader(node, true, 40, false))
+	if !strings.Contains(plain, slotPaneTag) {
+		t.Errorf("expected sidebar slot tag in selected slot pane header, got: %q", plain)
+	}
+}
+
+func TestRenderPaneHeader_SlotPane_HidesPathAndGit(t *testing.T) {
+	p := ProcListModel{
+		cfg: config.Config{ProcessList: config.ProcessListConfig{PathRightAlign: true}},
+	}
+	node := ProcListNode{
+		IsPaneHeader: true,
+		Pane:         tmux.Pane{PaneIndex: 0, IsSlot: true, CWD: "/divergent-marker"},
+		GitDeviant:   true,
+	}
+	plain := stripANSI(p.renderPaneHeader(node, false, 60, false))
+	if strings.Contains(plain, "divergent-marker") {
+		t.Errorf("expected slot pane to hide its path, got: %q", plain)
+	}
+	if strings.Contains(plain, pathRedirectGlyph) {
+		t.Errorf("expected slot pane to hide the git divergence glyph, got: %q", plain)
+	}
+}
+
+func TestSetSessionData_SlotPaneHasNoIdleNode(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	for i, n := range m.nodes {
+		if n.IsPaneHeader && n.Pane.IsSlot {
+			if i+1 < len(m.nodes) && m.nodes[i+1].IsIdle {
+				t.Error("slot pane header should not be followed by an idle node")
+			}
+		}
+	}
+}
+
+func TestSetSessionData_RealEmptyPaneKeepsIdleNode(t *testing.T) {
+	var m ProcListModel
+	m.SetSessionData(slotSessionPanes(), "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	found := false
+	for i, n := range m.nodes {
+		if n.IsPaneHeader && !n.Pane.IsSlot && n.Pane.PaneIndex == 1 {
+			if i+1 < len(m.nodes) && m.nodes[i+1].IsIdle {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Error("expected real empty pane to keep its idle node")
+	}
+}
+
+func TestRender_SlotPaneRow_NoPathNoIdle(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/real", PanePID: 10},
+		{Session: "s", WindowIndex: 0, PaneIndex: 1, CWD: "/sidebar-divergent", IsSlot: true, PanePID: 9},
+	}
+	var m ProcListModel
+	m.SetSessionData(panes, "s",
+		nil, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	out := stripANSI(m.Render(120, 20, false, "procs"))
+	slotLine := ""
+	for _, ln := range strings.Split(out, "\n") {
+		if strings.Contains(ln, slotPaneTag) {
+			slotLine = ln
+		}
+	}
+	if slotLine == "" {
+		t.Fatal("slot pane row not found in render output")
+	}
+	if strings.Contains(slotLine, "sidebar-divergent") {
+		t.Errorf("slot row should not show a path, got: %q", slotLine)
+	}
+	if strings.Contains(slotLine, idleLabel) {
+		t.Errorf("slot row should not show the idle label, got: %q", slotLine)
+	}
+}
