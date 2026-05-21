@@ -98,6 +98,23 @@ func TestDetectLegacyHooksIgnoresManagedBlock(t *testing.T) {
 	}
 }
 
+func TestDetectLegacyHooksBeforeAndAfterBlock(t *testing.T) {
+	content := strings.Join([]string{
+		`set-hook -g after-select-pane "run-shell 'demux event pane_focus'"`, // 1: legacy, before block
+		markerBegin,
+		`set-hook -g client-attached "run-shell 'demux event client_attached'"`, // 3: inside block, skipped
+		markerEnd,
+		`set-hook -ga after-new-window "run-shell 'demux sidebar follow'"`, // 5: legacy, after block
+	}, "\n")
+	got := DetectLegacyHooks(content)
+	if len(got) != 2 {
+		t.Fatalf("want 2 legacy lines, got %d: %+v", len(got), got)
+	}
+	if got[0].Number != 1 || got[1].Number != 5 {
+		t.Errorf("wrong line numbers: %+v", got)
+	}
+}
+
 func TestRemoveLines(t *testing.T) {
 	content := "a\nb\nc\nd\n"
 	got := RemoveLines(content, []int{2, 4})
