@@ -109,6 +109,11 @@ width = 35
 # sticky sidebar swaps between slots on window/session switch, avoiding the
 # brief layout flicker of join-pane. Cost: one extra pane per window.
 # slots = false
+# Focus the sidebar pane when it opens (split and slots mode alike).
+focus_on_open = true
+# When 'demux sidebar toggle' runs while the sidebar is open but not focused,
+# move focus into it instead of closing it; toggle again from inside to close.
+# focus_before_toggle_close = false
 
 # Sidebar process labels — render a single highest-count label per session.
 # Globs match either the process name or any whitespace-separated token of the
