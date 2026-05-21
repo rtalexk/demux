@@ -646,38 +646,33 @@ Internally, `demux sidebar follow` is invoked by a tmux hook on
 `client-session-changed`; it physically moves the existing pane (preserving
 its current width) into the newly attached session.
 
-### Enable the auto-show + follow hooks
+### Enable the tmux hooks
 
-Run `demux hooks init --tool tmux` and paste the snippet into your
-`~/.tmux.conf`, then reload tmux:
+Run `demux hooks install` once:
 
 ```bash
-demux hooks init --tool tmux >> ~/.tmux.conf
-tmux source ~/.tmux.conf
+demux hooks install --tool tmux
 ```
 
-The snippet adds these sticky-sidebar hooks:
+This writes a one-line managed block to `~/.tmux.conf`:
 
-- `set-hook -ga client-session-changed "run-shell 'demux sidebar follow ...'"`
-  moves the sidebar pane to whichever session you switch into.
-- `set-hook -ga after-select-window "run-shell 'demux sidebar follow ...'"`
-  moves the sidebar pane to whichever window you switch into (same session).
-- `set-hook -g after-new-window "run-shell -b 'demux sidebar follow ...; demux sidebar slots ensure ...'"`
-  moves the sidebar into a window you just created and reconciles slot panes.
-  tmux does not fire `after-select-window` for `new-window`, so this hook is
-  needed separately.
-- `set-hook -g client-attached "run-shell -b 'demux sidebar show ...'"`
-  creates the sidebar pane automatically when you attach a tmux client.
+```
+# >>> demux managed block >>>
+set-hook -g client-attached "run-shell -b 'demux event client_attached 2>/dev/null; true'"
+# <<< demux managed block <<<
+```
 
-The `after-new-window` and `client-attached` hooks use `-g` (replace), not
-`-ga` (append), so re-sourcing `~/.tmux.conf` replaces them in place instead
-of stacking duplicate copies; `run-shell -b` keeps window creation and client
-attach from blocking while the handler runs.
+On every tmux client attach, demux reconciles its full hook set into the
+running server — de-duplicating and self-healing automatically, with no
+snippet to re-paste when demux updates. Re-running `demux hooks install` is
+safe and idempotent. If an older multi-line demux snippet is found, you are
+prompted to remove it.
 
-If you prefer to manage the sidebar manually with `demux sidebar toggle`,
-remove the `client-attached` line. The two `follow` lines plus
-`after-new-window` are required for the "follow" behavior; without them the
-sidebar stays in whichever session and window it was created in.
+`demux hooks install --print-only` prints the bootstrap line without touching
+any files.
+
+Set `[sidebar.sticky] auto_show = true` to have the sticky sidebar appear
+automatically on attach.
 
 ### Configuration
 

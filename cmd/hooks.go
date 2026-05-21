@@ -1,70 +1,143 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 
 	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/tmuxhooks"
 	"github.com/spf13/cobra"
 )
 
-var hooksInitTool string
+var (
+	hooksInstallTool      string
+	hooksInstallPrintOnly bool
+)
 
 var hooksCmd = &cobra.Command{
 	Use:   "hooks",
-	Short: "AI agent hook utilities",
+	Short: "Manage demux's tmux hooks",
 }
 
-var hooksInitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Print hook configuration for an AI agent",
-	Long: `Prints a configuration snippet for the specified tool.
+// promptYesNo reads a line from r and returns true only for an affirmative
+// answer (y/yes, case-insensitive). Anything else, including EOF, is false.
+func promptYesNo(r io.Reader, w io.Writer, question string) bool {
+	fmt.Fprintf(w, "%s [y/N] ", question)
+	line, _ := bufio.NewReader(r).ReadString('\n')
+	switch strings.ToLower(strings.TrimSpace(line)) {
+	case "y", "yes":
+		return true
+	default:
+		return false
+	}
+}
 
-Supported tools: tmux
+var hooksInstallCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install demux's tmux hooks into ~/.tmux.conf and the live server",
+	Long: `Installs demux's tmux integration.
 
-For --tool tmux, prints hook lines to add to ~/.tmux.conf.`,
+Writes a one-line managed block to ~/.tmux.conf that bootstraps demux's
+self-registering hooks, and registers them in the running tmux server
+immediately. Re-running it is safe and idempotent.
+
+With --print-only, prints the bootstrap line and makes no changes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		def, err := resolveAgent(hooksInitTool)
+		if hooksInstallTool != "tmux" {
+			return fmt.Errorf("unknown tool %q: supported tools: tmux", hooksInstallTool)
+		}
+		out := cmd.OutOrStdout()
+
+		if hooksInstallPrintOnly {
+			fmt.Fprintln(out, tmuxhooks.BootstrapHook)
+			return nil
+		}
+
+		path, err := tmuxhooks.ConfPath()
 		if err != nil {
 			return err
 		}
-		fmt.Print(def.snippet)
+		content, realPath, existed, err := tmuxhooks.LoadConf(path)
+		if err != nil {
+			return err
+		}
+
+		legacy := tmuxhooks.DetectLegacyHooks(content)
+		if len(legacy) > 0 {
+			fmt.Fprintf(out, "Found %d legacy demux hook line(s) in %s:\n", len(legacy), realPath)
+			for _, l := range legacy {
+				fmt.Fprintf(out, "  L%d: %s\n", l.Number, strings.TrimSpace(l.Text))
+			}
+			if promptYesNo(cmd.InOrStdin(), out, "Remove them and replace with the managed block?") {
+				nums := make([]int, len(legacy))
+				for i, l := range legacy {
+					nums[i] = l.Number
+				}
+				content = tmuxhooks.RemoveLines(content, nums)
+				fmt.Fprintf(out, "Removed %d legacy line(s).\n", len(legacy))
+			} else {
+				fmt.Fprintln(out, "Kept legacy lines; they will be de-duplicated at runtime but should be removed.")
+			}
+		}
+
+		content = tmuxhooks.WithManagedBlock(content)
+		if err := tmuxhooks.SaveConf(realPath, content); err != nil {
+			return err
+		}
+		if existed {
+			fmt.Fprintf(out, "Updated %s (backup: %s.demux-bak)\n", realPath, realPath)
+		} else {
+			fmt.Fprintf(out, "Created %s\n", realPath)
+		}
+
+		t := tmuxhooks.Real()
+		if err := t.Run("set-hook", "-g", tmuxhooks.BootstrapEvent, tmuxhooks.BootstrapCommand()); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: live bootstrap registration failed (not in tmux?): %v\n", err)
+			return nil
+		}
+		if err := tmuxhooks.Reconcile(t); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: live hook reconcile failed: %v\n", err)
+			return nil
+		}
+		if err := tmuxhooks.MarkVersion(t); err != nil {
+			fmt.Fprintf(cmd.ErrOrStderr(), "warning: recording hook version failed: %v\n", err)
+		}
+		fmt.Fprintln(out, "Registered demux hooks in the live tmux server.")
 		return nil
 	},
 }
 
-type agentDef struct {
-	snippet string
-}
-
-var agentDefs = map[string]agentDef{
-	"tmux": {snippet: tmuxHooksSnippet},
-}
-
-func resolveAgent(name string) (agentDef, error) {
-	if def, ok := agentDefs[name]; ok {
-		return def, nil
-	}
-	supported := make([]string, 0, len(agentDefs))
-	for k := range agentDefs {
-		supported = append(supported, k)
-	}
-	sort.Strings(supported)
-	return agentDef{}, fmt.Errorf("unknown tool %q: supported tools: %s", name, strings.Join(supported, ", "))
+// hooksInitCmd is a hidden deprecated alias for `hooks install --print-only`.
+var hooksInitCmd = &cobra.Command{
+	Use:    "init",
+	Short:  "Deprecated: use `demux hooks install --print-only`",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Fprintln(cmd.OutOrStdout(), tmuxhooks.BootstrapHook)
+		return nil
+	},
 }
 
 // tmuxCurrentIDs returns the stable pane, window, and session IDs for the
 // tmux pane that launched this process.
 func tmuxCurrentIDs() (paneID, windowID, sessionID string, err error) {
-	paneID = os.Getenv("TMUX_PANE") // $TMUX_PANE is set by tmux as %N
+	paneID = os.Getenv("TMUX_PANE")
 	if paneID == "" {
 		return "", "", "", fmt.Errorf("TMUX_PANE not set")
 	}
 	windowID, sessionID, err = tmuxParentIDs(paneID)
 	return paneID, windowID, sessionID, err
+}
+
+func init() {
+	hooksInstallCmd.Flags().StringVar(&hooksInstallTool, "tool", "tmux", "Tool to configure (supported: tmux)")
+	hooksInstallCmd.Flags().BoolVar(&hooksInstallPrintOnly, "print-only", false, "Print the bootstrap line without changing any files")
+	hooksCmd.AddCommand(hooksInstallCmd, hooksInitCmd)
+	rootCmd.AddCommand(hooksCmd)
 }
 
 // resolveParentIDs fills in parent window/session IDs on t by querying tmux.
@@ -112,92 +185,4 @@ func tmuxResolveTarget(target string) (paneID, windowID, sessionID string, err e
 		return "", "", "", fmt.Errorf("unexpected tmux output for %q", target)
 	}
 	return parts[0], parts[1], parts[2], nil
-}
-
-const tmuxHooksSnippet = `# demux tmux hooks
-# ──────────────────────────────────────────────────────────────────────────────
-# Paste the lines below into ~/.tmux.conf, then reload with:
-#   tmux source ~/.tmux.conf
-#
-# How it works:
-#   after-select-pane   — fires when you move focus between panes within a window.
-#   after-select-window — fires when you switch to a different window.
-#   client-session-changed — fires when you switch to a different session.
-#   All three are needed: each navigation action fires a different hook.
-#   Together they cover every way a pane can receive focus.
-#   after-kill-pane     — fires when a pane is closed; removes its state record.
-#
-# Flag syntax note: flags use --flag=value (not --flag value). tmux expands
-# #{session_id} to the raw tmux ID (e.g. $8). The shell then expands $8 as a
-# positional parameter, which is empty. With --flag value, an empty expansion
-# leaves the flag with no argument and the command fails. With --flag=value, an
-# empty expansion produces --flag= (empty string), which is valid.
-#
-# Idempotency note: the hooks below use -g (replace), not -ga (append), so
-# re-sourcing this file (e.g. via a stray after-new-session re-source hook)
-# replaces each hook in place instead of stacking duplicate copies. The two
-# follow hooks on shared events (client-session-changed, after-select-window)
-# keep -ga only because a -g line for the same event resets the array just
-# above them.
-# ──────────────────────────────────────────────────────────────────────────────
-
-# Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Removes Demux state when a pane is closed (prevents stale state accumulation).
-# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
-# the kill - using #{pane_id} here would clear the wrong pane's state.
-# #{hook_window} lets demux detect a window left with only a sidebar slot pane
-# (e.g. the user closed the last non-slot pane) and clean it up.
-# run-shell -b backgrounds the handler so closing many panes at once (e.g.
-# 'demux sidebar hide' tearing down every sticky slot pane) never blocks tmux
-# input; concurrent handlers serialize on a file lock instead.
-set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
-
-# Sticky sidebar - proactively ejects the sidebar when the process running in a
-# pane exits and the sidebar would be the only pane left in that window. Fires
-# BEFORE after-kill-pane (while the exiting pane is still present), which makes
-# the sidebar return to the previous window without any stranded-sidebar flicker.
-# Complements after-kill-pane for cases where that hook is unreliable (e.g.
-# natural process exits in some tmux versions).
-# run-shell -b backgrounds the handler (see after-kill-pane above) so it never
-# blocks tmux input; it shares the pane_closed handler's file lock.
-set-hook -g pane-exited "run-shell -b 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
-
-# Sticky sidebar - moves the demux sidebar pane to the newly active session.
-set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"
-
-# Sticky sidebar - moves the demux sidebar pane to the newly active window
-# (within the same session). join-pane uses -d so user focus is preserved.
-set-hook -ga after-select-window "run-shell 'demux sidebar follow 2>/dev/null; true'"
-
-# Sticky sidebar - moves the demux sidebar pane into a newly created window and
-# ensures that window gets a slot pane (slots mode; no-op when slots = false or
-# no slots are installed). tmux does NOT fire after-select-window for
-# new-window, so this separate hook is required.
-# run-shell -b backgrounds the handler so creating a window never blocks input
-# while the sidebar relocates. follow + slots ensure run sequentially in one
-# job so they never race each other.
-set-hook -g after-new-window "run-shell -b 'demux sidebar follow 2>/dev/null; demux sidebar slots ensure 2>/dev/null; true'"
-
-# Sticky sidebar auto-show on client attach. Remove this line if you prefer
-# to toggle the sticky sidebar manually with 'demux sidebar toggle'.
-set-hook -g client-attached "run-shell -b 'demux sidebar show 2>/dev/null; true'"
-# ──────────────────────────────────────────────────────────────────────────────
-`
-
-func init() {
-	hooksInitCmd.Flags().StringVar(&hooksInitTool, "tool", "", "Tool to configure (required): tmux")
-	hooksInitCmd.MarkFlagRequired("tool")
-	hooksCmd.AddCommand(hooksInitCmd)
-	rootCmd.AddCommand(hooksCmd)
 }
