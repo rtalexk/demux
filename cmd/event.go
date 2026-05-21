@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/sticky"
@@ -151,10 +153,12 @@ var eventPaneExitingCmd = &cobra.Command{
 	Use:   "pane_exiting",
 	Short: "Eject sidebar if it would be stranded by an exiting pane (called by pane-exited hook)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg := loadConfig()
-		t := stickyTmuxForEvents()
-		s := &sticky.Sticky{T: t}
-		return s.EjectSidebarIfAloneAfterExit(eventPaneExitingPaneID, eventPaneExitingWindowID, cfg.Sidebar.Sticky.Width)
+		return withEventLock(func() error {
+			cfg := loadConfig()
+			t := stickyTmuxForEvents()
+			s := &sticky.Sticky{T: t}
+			return s.EjectSidebarIfAloneAfterExit(eventPaneExitingPaneID, eventPaneExitingWindowID, cfg.Sidebar.Sticky.Width)
+		})
 	},
 }
 
@@ -165,13 +169,47 @@ var eventPaneClosedCmd = &cobra.Command{
 	Use:   "pane_closed",
 	Short: "Clear state for a closed tmux pane (called by after-kill-pane hook)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		d, err := openDB()
-		if err != nil {
-			return err
-		}
-		defer d.Close()
-		return applyPaneClosed(d, eventPaneClosedPaneID, eventPaneClosedWindowID)
+		return withEventLock(func() error {
+			d, err := openDB()
+			if err != nil {
+				return err
+			}
+			defer d.Close()
+			return applyPaneClosed(d, eventPaneClosedPaneID, eventPaneClosedWindowID)
+		})
 	},
+}
+
+// eventLockPath returns the path of the cross-process lock file that
+// serializes sticky-mutating tmux event handlers. It lives next to the state
+// database so it shares the demux data directory.
+func eventLockPath() (string, error) {
+	dbPath, err := db.DefaultPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(filepath.Dir(dbPath), "event.lock"), nil
+}
+
+// withEventLock runs fn while holding an exclusive cross-process lock shared by
+// the pane_closed and pane_exiting handlers.
+//
+// Their tmux hooks (after-kill-pane, pane-exited) run `run-shell -b`, so a
+// burst of pane kills - e.g. `demux sidebar hide` tearing down every sticky
+// sidebar slot pane - spawns many handler processes at once. Each runs a
+// server-wide sticky sweep, and those sweeps are only safe run sequentially -
+// the ordering tmux's synchronous command queue used to guarantee before the
+// hooks were backgrounded. This lock restores that guarantee. Because the
+// hooks run in the background, blocking on the lock never stalls tmux input.
+//
+// Best-effort: if the lock path cannot be resolved, fn runs unguarded rather
+// than dropping the cleanup entirely.
+func withEventLock(fn func() error) error {
+	path, err := eventLockPath()
+	if err != nil {
+		return fn()
+	}
+	return withFileLock(path, fn)
 }
 
 func applyPaneClosed(d *db.DB, paneID, windowID string) error {
@@ -192,12 +230,11 @@ func applyPaneClosed(d *db.DB, paneID, windowID string) error {
 	// after-kill-pane, so we cannot rely on the targeted paths above. Always
 	// run a server-wide sweep: stale env vars first, then orphan windows.
 	//
-	// This handler can re-enter itself: the sweep's kill-pane calls re-fire
-	// after-kill-pane, and the hook's run-shell is synchronous, so the nested
-	// handler runs to completion before kill-pane returns. The sweep is built
-	// to be idempotent under that re-entry (see HandleWindowAfterKill), so no
-	// lock is needed - and a lock would in fact deadlock against the nested,
-	// synchronous handler.
+	// The after-kill-pane hook runs `run-shell -b`, so a burst of kill-pane
+	// calls spawns these handlers concurrently, and the sweep's own kill-pane
+	// calls spawn still more. withEventLock (held by the pane_closed command)
+	// serializes every handler process, so each sweep still runs sequentially -
+	// the model HandleWindowAfterKill is built to be idempotent under.
 	s := &sticky.Sticky{T: tmuxClient}
 	if err := s.SweepStaleStickyEnv(); err != nil {
 		demuxlog.Warn("pane_closed: stale env sweep failed", "err", err)

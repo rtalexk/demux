@@ -960,7 +960,8 @@ set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_
 # Removes Demux state when a pane is closed (prevents stale state accumulation).
 # #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
 # the kill — using #{pane_id} here would clear the wrong pane's state.
-set-hook -g after-kill-pane "run-shell 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
+# run-shell -b backgrounds the handler so closing many panes at once never blocks tmux input.
+set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
 ```
 
 </details>
