@@ -110,7 +110,7 @@ width = 35
 # (tagged with the @demux_slot tmux option and titled "demux-slot"). The
 # sticky sidebar swaps between slots on window/session switch, avoiding the
 # brief layout flicker of join-pane. Cost: one extra pane per window.
- slots = false
+slots = false
 
 # Focus the sidebar pane when it opens (split and slots mode alike).
 focus_on_open = true
