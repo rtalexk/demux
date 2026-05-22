@@ -1185,17 +1185,22 @@ tail -f ~/.local/share/demux/demux.log
 First, confirm the hooks are registered in the running tmux session (not just in `.tmux.conf`):
 
 ```bash
-# List all global hooks — demux registers four of them
+# List all global hooks
 tmux show-hooks -g
 
 # Filter to just the demux lines
 tmux show-hooks -g | grep demux
 ```
 
-Expected output includes entries for `after-select-pane`, `after-select-window`, `client-session-changed`, and `client-focus-in`. If any are missing, reload the config:
+Expected output includes entries for `after-select-pane`, `after-select-window`,
+`client-session-changed`, `client-focus-in`, `after-kill-pane`, and
+`after-new-window`. demux registers these automatically each time a tmux client
+attaches, via the `client-attached` bootstrap hook installed by `demux hooks
+install`. If they are missing, the managed block may not be installed — run
+`demux hooks install` and re-attach, or trigger a reconcile directly:
 
 ```bash
-tmux source ~/.tmux.conf
+demux event client_attached
 tmux show-hooks -g | grep demux   # verify again
 ```
 
