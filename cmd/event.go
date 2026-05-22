@@ -181,6 +181,67 @@ var eventPaneClosedCmd = &cobra.Command{
 	},
 }
 
+// runWindowFocus is the shared handler for the window_focus and session_changed
+// events. It clears resting done-states for the focused pane (like pane_focus)
+// and moves the sticky sidebar to the focused window/session.
+func runWindowFocus(cmd *cobra.Command, args []string) error {
+	paneID, _ := cmd.Flags().GetString("pane-id")
+	windowID, _ := cmd.Flags().GetString("window-id")
+	sessionID, _ := cmd.Flags().GetString("session-id")
+	if paneID == "" {
+		var err error
+		paneID, windowID, sessionID, err = tmuxCurrentIDs()
+		if err != nil {
+			return err
+		}
+	}
+
+	d, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	if err := applyPaneFocus(d, paneID, windowID, sessionID); err != nil {
+		return err
+	}
+	if err := stickyClient().Follow(); err != nil {
+		demuxlog.Warn("window_focus: sidebar follow failed", "err", err)
+	}
+	return nil
+}
+
+// eventWindowFocusCmd is fired by the after-select-window hook.
+var eventWindowFocusCmd = &cobra.Command{
+	Use:   "window_focus",
+	Short: "Clear done states and move the sticky sidebar to the focused window",
+	RunE:  runWindowFocus,
+}
+
+// eventSessionChangedCmd is fired by the client-session-changed hook.
+var eventSessionChangedCmd = &cobra.Command{
+	Use:   "session_changed",
+	Short: "Clear done states and move the sticky sidebar to the focused session",
+	RunE:  runWindowFocus,
+}
+
+// eventNewWindowCmd is fired by the after-new-window hook. It moves the sticky
+// sidebar into the new window and reconciles slot panes. Both steps are
+// best-effort: failures are logged, not returned.
+var eventNewWindowCmd = &cobra.Command{
+	Use:   "new_window",
+	Short: "Move the sticky sidebar into a new window and reconcile slot panes",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := stickyClient().Follow(); err != nil {
+			demuxlog.Warn("new_window: sidebar follow failed", "err", err)
+		}
+		if err := ensureSlots(); err != nil {
+			demuxlog.Warn("new_window: slots ensure failed", "err", err)
+		}
+		return nil
+	},
+}
+
 // eventClientAttachedCmd is fired by the demux managed-block bootstrap hook on
 // client-attached. It reconciles demux's tmux hook set (version-gated fast
 // path), auto-shows the sticky sidebar when configured, and warns when legacy
@@ -311,6 +372,12 @@ func init() {
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd)
+	for _, c := range []*cobra.Command{eventWindowFocusCmd, eventSessionChangedCmd} {
+		c.Flags().String("pane-id", "", "Stable pane ID (%N format)")
+		c.Flags().String("window-id", "", "Stable window ID (@N format)")
+		c.Flags().String("session-id", "", "Stable session ID ($N format)")
+	}
+
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd)
 	rootCmd.AddCommand(eventCmd)
 }

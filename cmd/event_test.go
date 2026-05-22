@@ -249,3 +249,20 @@ func TestEventClientAttachedCommandRegistered(t *testing.T) {
 		t.Error("client_attached command has no RunE")
 	}
 }
+
+func TestEventWindowEventsRegistered(t *testing.T) {
+	want := map[string]bool{"window_focus": false, "session_changed": false, "new_window": false}
+	for _, c := range eventCmd.Commands() {
+		if _, ok := want[c.Use]; ok {
+			want[c.Use] = true
+			if c.RunE == nil {
+				t.Errorf("%s command has no RunE", c.Use)
+			}
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("event %s subcommand not registered", name)
+		}
+	}
+}
