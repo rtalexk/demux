@@ -97,34 +97,41 @@ var sidebarSlotsUninstallCmd = &cobra.Command{
 	},
 }
 
+// ensureSlots reconciles sidebar slot panes against the MRU budget. It is a
+// no-op when slots mode is disabled or no slot panes have been installed.
+// Called by the after-new-window hook via `demux event new_window`.
+func ensureSlots() error {
+	cfg := loadConfig()
+	if !cfg.Sidebar.Sticky.Slots {
+		return nil
+	}
+	s := stickyClient()
+	any, err := s.AnySlotExists()
+	if err != nil || !any {
+		return err
+	}
+	target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
+	if err != nil {
+		return err
+	}
+	parts := strings.SplitN(strings.TrimSpace(target), ":", 2)
+	if len(parts) < 2 {
+		return nil
+	}
+	_ = s.PruneMRU()
+	reserved, err := s.ComputeReservedWindows(parts[1], parts[0])
+	if err != nil {
+		return err
+	}
+	return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
+}
+
 var sidebarSlotsEnsureCmd = &cobra.Command{
 	Use:    "ensure",
 	Short:  "Internal: reconcile slot panes against the MRU budget (called by tmux hook)",
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		cfg := loadConfig()
-		if !cfg.Sidebar.Sticky.Slots {
-			return nil
-		}
-		s := stickyClient()
-		any, err := s.AnySlotExists()
-		if err != nil || !any {
-			return err
-		}
-		target, err := s.T.Output("display-message", "-p", "#{session_id}:#{window_id}")
-		if err != nil {
-			return err
-		}
-		parts := strings.SplitN(strings.TrimSpace(target), ":", 2)
-		if len(parts) < 2 {
-			return nil
-		}
-		_ = s.PruneMRU()
-		reserved, err := s.ComputeReservedWindows(parts[1], parts[0])
-		if err != nil {
-			return err
-		}
-		return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
+		return ensureSlots()
 	},
 }
 
