@@ -6,6 +6,7 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 	demuxlog "github.com/rtalexk/demux/internal/log"
 	"github.com/rtalexk/demux/internal/sticky"
+	"github.com/rtalexk/demux/internal/tmuxhooks"
 	"github.com/spf13/cobra"
 )
 
@@ -180,6 +181,114 @@ var eventPaneClosedCmd = &cobra.Command{
 	},
 }
 
+// runWindowFocus is the shared handler for the window_focus and session_changed
+// events. It clears resting done-states for the focused pane (like pane_focus)
+// and moves the sticky sidebar to the focused window/session.
+func runWindowFocus(cmd *cobra.Command, args []string) error {
+	paneID, _ := cmd.Flags().GetString("pane-id")
+	windowID, _ := cmd.Flags().GetString("window-id")
+	sessionID, _ := cmd.Flags().GetString("session-id")
+	if paneID == "" {
+		var err error
+		paneID, windowID, sessionID, err = tmuxCurrentIDs()
+		if err != nil {
+			return err
+		}
+	}
+
+	d, err := openDB()
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+
+	if err := applyPaneFocus(d, paneID, windowID, sessionID); err != nil {
+		return err
+	}
+	if err := stickyClient().Follow(); err != nil {
+		demuxlog.Warn(cmd.Use+": sidebar follow failed", "err", err)
+	}
+	return nil
+}
+
+// eventWindowFocusCmd is fired by the after-select-window hook.
+var eventWindowFocusCmd = &cobra.Command{
+	Use:   "window_focus",
+	Short: "Clear done states and move the sticky sidebar to the focused window",
+	RunE:  runWindowFocus,
+}
+
+// eventSessionChangedCmd is fired by the client-session-changed hook.
+var eventSessionChangedCmd = &cobra.Command{
+	Use:   "session_changed",
+	Short: "Clear done states and move the sticky sidebar to the focused session",
+	RunE:  runWindowFocus,
+}
+
+// eventNewWindowCmd is fired by the after-new-window hook. It moves the sticky
+// sidebar into the new window and reconciles slot panes. Both steps are
+// best-effort: failures are logged, not returned.
+var eventNewWindowCmd = &cobra.Command{
+	Use:   "new_window",
+	Short: "Move the sticky sidebar into a new window and reconcile slot panes",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := stickyClient().Follow(); err != nil {
+			demuxlog.Warn("new_window: sidebar follow failed", "err", err)
+		}
+		if err := ensureSlots(); err != nil {
+			demuxlog.Warn("new_window: slots ensure failed", "err", err)
+		}
+		return nil
+	},
+}
+
+// warnLegacyTmuxHooks logs a warning when old-style pasted demux hook lines
+// still linger outside the managed block in ~/.tmux.conf. Best-effort: any
+// failure to locate or read the config is silently skipped.
+func warnLegacyTmuxHooks() {
+	path, err := tmuxhooks.ConfPath()
+	if err != nil {
+		return
+	}
+	content, _, _, err := tmuxhooks.LoadConf(path)
+	if err != nil {
+		return
+	}
+	legacy := tmuxhooks.DetectLegacyHooks(content)
+	if len(legacy) == 0 {
+		return
+	}
+	demuxlog.Warn("client_attached: legacy demux hook lines in tmux.conf; run `demux hooks install` to remove them",
+		"count", len(legacy), "path", path)
+}
+
+// eventClientAttachedCmd is fired by the demux managed-block bootstrap hook on
+// client-attached. It reconciles demux's tmux hook set (version-gated fast
+// path), auto-shows the sticky sidebar when configured, and warns when legacy
+// pasted hook lines still linger in tmux.conf.
+var eventClientAttachedCmd = &cobra.Command{
+	Use:   "client_attached",
+	Short: "Reconcile demux tmux hooks and auto-show the sidebar (called by the client-attached hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		_ = withEventLock(func() error {
+			if err := tmuxhooks.Sync(tmuxhooks.Real()); err != nil {
+				demuxlog.Warn("client_attached: hook sync failed", "err", err)
+			}
+			return nil
+		})
+
+		cfg := loadConfig()
+		if cfg.Sidebar.Sticky.AutoShow {
+			if err := stickyClient().Show(sidebarShowOpts()); err != nil {
+				demuxlog.Warn("client_attached: sidebar show failed", "err", err)
+			}
+		}
+
+		warnLegacyTmuxHooks()
+		return nil
+	},
+}
+
 // eventLockPath returns the path of the cross-process lock file that
 // serializes sticky-mutating tmux event handlers. It lives next to the state
 // database so it shares the demux data directory.
@@ -276,6 +385,13 @@ func init() {
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd)
+	for _, c := range []*cobra.Command{eventWindowFocusCmd, eventSessionChangedCmd} {
+		c.Flags().String("pane-id", "", "Stable pane ID (%N format); auto-detected if omitted")
+		c.Flags().String("window-id", "", "Stable window ID (@N format); auto-detected if omitted")
+		c.Flags().String("session-id", "", "Stable session ID ($N format); auto-detected if omitted")
+	}
+
+	rejectUnknownSubcommand(eventCmd)
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd)
 	rootCmd.AddCommand(eventCmd)
 }

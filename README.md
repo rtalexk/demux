@@ -642,42 +642,48 @@ demux sidebar hide     # idempotent: kill if present
 All three require the invoking shell to be inside tmux (`$TMUX` set). Running
 them outside tmux exits with status 1.
 
-Internally, `demux sidebar follow` is invoked by a tmux hook on
-`client-session-changed`; it physically moves the existing pane (preserving
-its current width) into the newly attached session.
+Internally, the tmux hooks call `demux event window_focus` and
+`demux event session_changed` when you switch windows or sessions; each
+physically moves the existing sidebar pane (preserving its current width) into
+the newly focused window or session.
 
-### Enable the auto-show + follow hooks
+### Enable the tmux hooks
 
-Run `demux hooks init --tool tmux` and paste the snippet into your
-`~/.tmux.conf`, then reload tmux:
+Run `demux hooks install` once:
 
 ```bash
-demux hooks init --tool tmux >> ~/.tmux.conf
-tmux source ~/.tmux.conf
+demux hooks install --tool tmux
 ```
 
-The snippet adds these sticky-sidebar hooks:
+This writes a one-line managed block to `~/.tmux.conf`:
 
-- `set-hook -ga client-session-changed "run-shell 'demux sidebar follow ...'"`
-  moves the sidebar pane to whichever session you switch into.
-- `set-hook -ga after-select-window "run-shell 'demux sidebar follow ...'"`
-  moves the sidebar pane to whichever window you switch into (same session).
-- `set-hook -g after-new-window "run-shell -b 'demux sidebar follow ...; demux sidebar slots ensure ...'"`
-  moves the sidebar into a window you just created and reconciles slot panes.
-  tmux does not fire `after-select-window` for `new-window`, so this hook is
-  needed separately.
-- `set-hook -g client-attached "run-shell -b 'demux sidebar show ...'"`
-  creates the sidebar pane automatically when you attach a tmux client.
+```
+# >>> demux managed block >>>
+set-hook -g client-attached "run-shell -b 'demux event client_attached 2>/dev/null; true'"
+# <<< demux managed block <<<
+```
 
-The `after-new-window` and `client-attached` hooks use `-g` (replace), not
-`-ga` (append), so re-sourcing `~/.tmux.conf` replaces them in place instead
-of stacking duplicate copies; `run-shell -b` keeps window creation and client
-attach from blocking while the handler runs.
+On every tmux client attach, demux reconciles its full hook set into the
+running server — de-duplicating and self-healing automatically, with no
+snippet to re-paste when demux updates. Re-running `demux hooks install` is
+safe and idempotent. If an older multi-line demux snippet is found, you are
+prompted to remove it.
 
-If you prefer to manage the sidebar manually with `demux sidebar toggle`,
-remove the `client-attached` line. The two `follow` lines plus
-`after-new-window` are required for the "follow" behavior; without them the
-sidebar stays in whichever session and window it was created in.
+> [!WARNING]
+> **Upgrading from an older demux?** Earlier versions had you paste a multi-line
+> hook snippet from `demux hooks init` into `~/.tmux.conf` and re-source it on
+> every update. That snippet is obsolete. Run `demux hooks install` once: it
+> detects the old pasted lines and prompts you to remove them in favor of the
+> managed block. Until they are removed the old lines still fire (demux
+> de-duplicates them into its canonical set at each client attach), but they no
+> longer track demux's hook set, so clear them when prompted. `demux hooks init`
+> is kept only as a deprecated alias and now prints just the one-line bootstrap.
+
+`demux hooks install --print-only` prints the bootstrap line without touching
+any files.
+
+Set `[sidebar.sticky] auto_show = true` to have the sticky sidebar appear
+automatically on attach.
 
 ### Configuration
 
@@ -695,6 +701,8 @@ focus_on_open = true
 # move focus into it instead of closing it. Toggle again from inside the
 # sidebar to close it.
 focus_before_toggle_close = false
+# Automatically show the sticky sidebar when a tmux client attaches.
+auto_show = false
 ```
 
 ### Slots mode (opt-in, no follow flicker)
@@ -749,9 +757,8 @@ demux sidebar slots install     # idempotent: ensure every reserved window has a
 demux sidebar slots uninstall   # remove every slot pane
 ```
 
-The tmux snippet from `demux hooks init --tool tmux` already includes an
-`after-new-window` hook that reconciles the slot set when a new window
-appears (no-op when `slots = false`).
+demux's tmux hooks already include an `after-new-window` hook that
+reconciles the slot set when a new window appears (no-op when `slots = false`).
 
 Trade-offs:
 
@@ -921,56 +928,11 @@ If the named session is configured in `sessions.toml` or `private.toml` but not 
 
 ### Tmux
 
-demux can automatically clear `done` states when you navigate between panes, windows, or sessions, so you always know if a tool finished while you were away. Generate the hook configuration with:
-
-```bash
-demux hooks init --tool tmux
-```
-
-Paste the output into `~/.tmux.conf` and reload:
-
-```bash
-tmux source ~/.tmux.conf
-```
-
-> [!CAUTION]
-> Use `--flag=value` syntax (not `--flag value`) in tmux hooks. tmux expands
-> `#{session_id}` to a raw ID like `$8`; the shell then treats `$8` as a
-> positional parameter, which is empty. With `--flag value` the empty expansion
-> leaves the flag without an argument and the command silently fails. With
-> `--flag=value` the empty expansion produces `--flag=` (empty string), which
-> is valid and handled correctly.
-
-<details>
-
-<summary>Tmux hook snippet</summary>
-
-```tmux
-# Note: flags use --flag=value (not --flag value). tmux expands #{session_id} to a
-# raw ID like $8; the shell then treats $8 as a positional parameter (empty). With
-# --flag value an empty expansion leaves the flag with no argument. With --flag=value
-# an empty expansion produces --flag= (empty string), which is valid.
-
-# Clears Demux done states when switching between panes within the same window.
-set-hook -g after-select-pane   "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching windows (after-select-pane does not fire for window switches).
-set-hook -g after-select-window "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching sessions (after-select-window does not fire for session switches).
-set-hook -g client-session-changed "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Clears Demux done states when switching back from another application.
-set-hook -g client-focus-in "run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'"
-
-# Removes Demux state when a pane is closed (prevents stale state accumulation).
-# #{hook_pane} is the killed pane's ID; #{pane_id} is the new active pane after
-# the kill — using #{pane_id} here would clear the wrong pane's state.
-# run-shell -b backgrounds the handler so closing many panes at once never blocks tmux input.
-set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook_pane} 2>/dev/null; true'"
-```
-
-</details>
+demux uses tmux hooks to clear `done` states when you navigate between panes,
+windows, or sessions, so you always know if a tool finished while you were
+away, plus the hooks that drive the sticky sidebar. These hooks are registered
+and kept up to date automatically by `demux hooks install` — see
+[Enable the tmux hooks](#enable-the-tmux-hooks) for the one-time setup.
 
 ### Tmux Status Bar
 
@@ -1174,7 +1136,7 @@ demux event pane_focus [--pane-id <%N>] [--window-id <@N>] [--session-id <$N>]
 
 # Config
 demux config init                  # print default config to stdout
-demux hooks init --tool tmux       # print tmux hook snippet to paste into .tmux.conf
+demux hooks install --tool tmux    # install demux's tmux hooks (writes a managed block to .tmux.conf)
 ```
 
 </details>
@@ -1234,17 +1196,22 @@ tail -f ~/.local/share/demux/demux.log
 First, confirm the hooks are registered in the running tmux session (not just in `.tmux.conf`):
 
 ```bash
-# List all global hooks — demux registers four of them
+# List all global hooks
 tmux show-hooks -g
 
 # Filter to just the demux lines
 tmux show-hooks -g | grep demux
 ```
 
-Expected output includes entries for `after-select-pane`, `after-select-window`, `client-session-changed`, and `client-focus-in`. If any are missing, reload the config:
+Expected output includes entries for `after-select-pane`, `after-select-window`,
+`client-session-changed`, `client-focus-in`, `after-kill-pane`, and
+`after-new-window`. demux registers these automatically each time a tmux client
+attaches, via the `client-attached` bootstrap hook installed by `demux hooks
+install`. If they are missing, the managed block may not be installed — run
+`demux hooks install` and re-attach, or trigger a reconcile directly:
 
 ```bash
-tmux source ~/.tmux.conf
+demux event client_attached
 tmux show-hooks -g | grep demux   # verify again
 ```
 

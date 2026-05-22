@@ -92,6 +92,22 @@ func Execute() {
 	}
 }
 
+// rejectUnknownSubcommand makes a parent (group) command fail loudly — an error
+// on stderr with a non-zero exit — when invoked with an unknown subcommand,
+// instead of cobra's default for a non-runnable parent: printing the command's
+// help to stdout with a zero exit. demux's tmux hooks call subcommands as
+// `demux … 2>/dev/null`; if a hook references a since-removed subcommand, this
+// keeps the failure silent (swallowed by 2>/dev/null) rather than dumping help
+// text into the pane. Invoked bare (no subcommand) it still prints help.
+func rejectUnknownSubcommand(c *cobra.Command) {
+	c.RunE = func(cmd *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			return fmt.Errorf("unknown command %q for %q", args[0], cmd.CommandPath())
+		}
+		return cmd.Help()
+	}
+}
+
 func init() {
 	rootCmd.Version = Version
 	rootCmd.PersistentFlags().StringVar(&formatFlag, "format", "", "Output format: text|table|json")

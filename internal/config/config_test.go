@@ -968,3 +968,24 @@ func TestSidebarSticky_LoadOverridesFocusFlags(t *testing.T) {
 		t.Errorf("focus_before_toggle_close override: want true, got false")
 	}
 }
+
+func TestAutoShowDefaultsFalse(t *testing.T) {
+	if config.Default().Sidebar.Sticky.AutoShow {
+		t.Error("Sidebar.Sticky.AutoShow should default to false")
+	}
+}
+
+func TestAutoShowParsesFromTOML(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/demux.toml"
+	if err := os.WriteFile(path, []byte("[sidebar.sticky]\nauto_show = true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !cfg.Sidebar.Sticky.AutoShow {
+		t.Error("auto_show = true did not parse into Sidebar.Sticky.AutoShow")
+	}
+}

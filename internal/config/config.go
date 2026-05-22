@@ -244,6 +244,7 @@ type SidebarStickyConfig struct {
 	Slots                  bool `toml:"slots"`
 	FocusOnOpen            bool `toml:"focus_on_open"`
 	FocusBeforeToggleClose bool `toml:"focus_before_toggle_close"`
+	AutoShow               bool `toml:"auto_show"`
 }
 
 type SidebarConfig struct {
