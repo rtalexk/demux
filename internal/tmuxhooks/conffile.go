@@ -11,21 +11,18 @@ import (
 const (
 	markerBegin = "# >>> demux managed block >>>"
 	markerEnd   = "# <<< demux managed block <<<"
-
-	// bootstrapCommand is the run-shell payload of the bootstrap hook.
-	bootstrapCommand = `run-shell -b 'demux event client_attached 2>/dev/null; true'`
 )
 
 // BootstrapEvent is the tmux hook event demux's bootstrap line registers.
 const BootstrapEvent = "client-attached"
 
+// BootstrapCommand is the run-shell payload of the bootstrap hook, used for
+// live registration via `tmux set-hook -g client-attached <payload>`.
+const BootstrapCommand = `run-shell -b 'demux event client_attached 2>/dev/null; true'`
+
 // BootstrapHook is the single set-hook line demux's managed block installs in
 // ~/.tmux.conf. It fires demux's reconciler on every client attach.
-var BootstrapHook = fmt.Sprintf("set-hook -g %s %q", BootstrapEvent, bootstrapCommand)
-
-// BootstrapCommand returns the run-shell payload for live registration via
-// `tmux set-hook -g client-attached <payload>`.
-func BootstrapCommand() string { return bootstrapCommand }
+var BootstrapHook = fmt.Sprintf("set-hook -g %s %q", BootstrapEvent, BootstrapCommand)
 
 // managedBlock returns the full marker-delimited block text (no trailing
 // newline).
