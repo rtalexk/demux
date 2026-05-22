@@ -1732,6 +1732,34 @@ func TestRenderSessionCard_IdleStateBlanksLeftGroup(t *testing.T) {
 	}
 }
 
+// Regression: a "done" state that has aged past done_idle_after_secs collapses
+// to StateIdle via ageDrivenValue. The card must still show the idle icon (as
+// the full dashboard does), not blank the left group — only a genuine StateIdle
+// row blanks it.
+func TestRenderSessionCard_AgedDoneShowsIdleIcon(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateIdle: "○"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Config{
+			Sidebar: config.SidebarConfig{SessionView: config.SidebarViewCard, Width: 40},
+			Tui:     config.TuiConfig{DoneIdleAfterSecs: 60},
+		},
+		sessions: []session.Session{{DisplayName: "alpha", IsLive: true}},
+		states: []db.ToolState{{
+			Target:    db.Target{Type: db.TargetTypeSession, ID: "alpha"},
+			Value:     db.StateDone,
+			UpdatedAt: time.Now().Add(-2 * time.Minute),
+		}},
+	}
+	out := s.renderSessionCard(SidebarNode{Session: "alpha"}, false, false, 40)
+	row2 := strings.Split(out, "\n")[1]
+	if !strings.Contains(stripANSI(row2), activeTheme.IconStateIdle) {
+		t.Errorf("aged done should show idle icon: %q", row2)
+	}
+	if !strings.Contains(stripANSI(row2), "idle") {
+		t.Errorf("aged done should show \"idle\" label: %q", row2)
+	}
+}
+
 func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎", IconStateWorking: "⟳"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{
