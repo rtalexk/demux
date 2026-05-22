@@ -642,6 +642,27 @@ demux sidebar hide     # idempotent: kill if present
 All three require the invoking shell to be inside tmux (`$TMUX` set). Running
 them outside tmux exits with status 1.
 
+### Bind a key to toggle
+
+`demux sidebar toggle` is an ordinary shell command, so you can bind it to any
+tmux key:
+
+```tmux
+bind-key -n M-E run-shell "demux sidebar toggle"
+```
+
+The `-n` flag drops the prefix requirement. Terminals do not forward
+`cmd`-based shortcuts to tmux, so to drive the toggle from a `cmd` chord you map
+the chord in your terminal emulator to the escape sequence the tmux binding
+listens for. In Ghostty:
+
+```
+keybind = cmd+shift+e=text:\x1bE
+```
+
+`\x1bE` is `Alt-E` (`M-E`), which the `bind-key -n M-E` binding above catches.
+The result: `CMD + Shift + E` toggles the sticky sidebar from anywhere.
+
 Internally, the tmux hooks call `demux event window_focus` and
 `demux event session_changed` when you switch windows or sessions; each
 physically moves the existing sidebar pane (preserving its current width) into
