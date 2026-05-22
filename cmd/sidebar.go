@@ -63,18 +63,6 @@ var sidebarToggleCmd = &cobra.Command{
 	},
 }
 
-var sidebarFollowCmd = &cobra.Command{
-	Use:    "follow",
-	Short:  "Internal: move the sticky sidebar pane to the current session",
-	Hidden: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := stickyClient().Follow(); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "demux sidebar follow: %v\n", err)
-		}
-		return nil
-	},
-}
-
 var sidebarSlotsCmd = &cobra.Command{
 	Use:   "slots",
 	Short: "Manage per-window sidebar slots (sidebar.sticky.slots mode)",
@@ -126,15 +114,6 @@ func ensureSlots() error {
 	return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
 }
 
-var sidebarSlotsEnsureCmd = &cobra.Command{
-	Use:    "ensure",
-	Short:  "Internal: reconcile slot panes against the MRU budget (called by tmux hook)",
-	Hidden: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return ensureSlots()
-	},
-}
-
 var sidebarSlotCmd = &cobra.Command{
 	Use:    "slot",
 	Short:  "Internal: placeholder process for an inactive sticky sidebar slot",
@@ -172,7 +151,7 @@ func runSidebarSlotPlaceholder(w io.Writer) {
 }
 
 func init() {
-	sidebarSlotsCmd.AddCommand(sidebarSlotsInstallCmd, sidebarSlotsUninstallCmd, sidebarSlotsEnsureCmd)
-	sidebarCmd.AddCommand(sidebarShowCmd, sidebarHideCmd, sidebarToggleCmd, sidebarFollowCmd, sidebarSlotCmd, sidebarSlotsCmd)
+	sidebarSlotsCmd.AddCommand(sidebarSlotsInstallCmd, sidebarSlotsUninstallCmd)
+	sidebarCmd.AddCommand(sidebarShowCmd, sidebarHideCmd, sidebarToggleCmd, sidebarSlotCmd, sidebarSlotsCmd)
 	rootCmd.AddCommand(sidebarCmd)
 }

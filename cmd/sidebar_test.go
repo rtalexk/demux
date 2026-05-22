@@ -17,7 +17,7 @@ func TestSidebarCmd_Registered(t *testing.T) {
 }
 
 func TestSidebarCmd_Subcommands(t *testing.T) {
-	for _, sub := range []string{"toggle", "show", "hide", "follow"} {
+	for _, sub := range []string{"toggle", "show", "hide"} {
 		cmd, _, _ := rootCmd.Find([]string{"sidebar", sub})
 		if cmd == nil || cmd.Name() != sub {
 			t.Errorf("expected `demux sidebar %s`, got %v", sub, cmd)
@@ -25,32 +25,12 @@ func TestSidebarCmd_Subcommands(t *testing.T) {
 	}
 }
 
-func TestSidebarCmd_FollowIsHidden(t *testing.T) {
-	cmd, _, _ := rootCmd.Find([]string{"sidebar", "follow"})
-	if cmd == nil {
-		t.Fatal("follow subcommand missing")
-	}
-	if !cmd.Hidden {
-		t.Errorf("follow should be hidden from --help")
-	}
-}
-
 func TestSidebarCmd_SlotsSubcommands(t *testing.T) {
-	for _, sub := range []string{"install", "uninstall", "ensure"} {
+	for _, sub := range []string{"install", "uninstall"} {
 		cmd, _, _ := rootCmd.Find([]string{"sidebar", "slots", sub})
 		if cmd == nil || cmd.Name() != sub {
 			t.Errorf("expected `demux sidebar slots %s`, got %v", sub, cmd)
 		}
-	}
-}
-
-func TestSidebarCmd_SlotsEnsureHidden(t *testing.T) {
-	cmd, _, _ := rootCmd.Find([]string{"sidebar", "slots", "ensure"})
-	if cmd == nil {
-		t.Fatal("ensure subcommand missing")
-	}
-	if !cmd.Hidden {
-		t.Errorf("slots ensure should be hidden from --help")
 	}
 }
 
