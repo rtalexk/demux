@@ -669,6 +669,16 @@ snippet to re-paste when demux updates. Re-running `demux hooks install` is
 safe and idempotent. If an older multi-line demux snippet is found, you are
 prompted to remove it.
 
+> [!WARNING]
+> **Upgrading from an older demux?** Earlier versions had you paste a multi-line
+> hook snippet from `demux hooks init` into `~/.tmux.conf` and re-source it on
+> every update. That snippet is obsolete. Run `demux hooks install` once: it
+> detects the old pasted lines and prompts you to remove them in favor of the
+> managed block. Until they are removed the old lines still fire (demux
+> de-duplicates them into its canonical set at each client attach), but they no
+> longer track demux's hook set, so clear them when prompted. `demux hooks init`
+> is kept only as a deprecated alias and now prints just the one-line bootstrap.
+
 `demux hooks install --print-only` prints the bootstrap line without touching
 any files.
 
