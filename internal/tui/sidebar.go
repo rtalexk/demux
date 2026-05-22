@@ -1112,20 +1112,21 @@ func (s SidebarModel) renderCardStatus(node SidebarNode, selected, focused bool,
 	// Left group: state icon + label.
 	var leftIcon, leftLabel string
 	st := s.stateForSession(node.Session)
-	if st != nil {
+	// Gate on the raw state, not the age-driven value: a "done" state that has
+	// aged into StateIdle (via ageDrivenValue) must still render its idle icon,
+	// matching the full dashboard. Only a genuine StateIdle row blanks the group.
+	if st != nil && st.Value.IsDisplayable() {
 		value := ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
-		if value.IsDisplayable() {
-			if focused {
-				leftIcon = stateIconOnBG(value, activeTheme.ColorSelected)
-			} else {
-				leftIcon = stateIcon(value)
-			}
-			labelStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
-			if focused {
-				labelStyle = labelStyle.Background(activeTheme.ColorSelected)
-			}
-			leftLabel = labelStyle.Render(value.String())
+		if focused {
+			leftIcon = stateIconOnBG(value, activeTheme.ColorSelected)
+		} else {
+			leftIcon = stateIcon(value)
 		}
+		labelStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
+		if focused {
+			labelStyle = labelStyle.Background(activeTheme.ColorSelected)
+		}
+		leftLabel = labelStyle.Render(value.String())
 	}
 
 	// Right group: proc, git, todo, last-seen. Joined by a single space, styled
