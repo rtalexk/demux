@@ -642,9 +642,10 @@ demux sidebar hide     # idempotent: kill if present
 All three require the invoking shell to be inside tmux (`$TMUX` set). Running
 them outside tmux exits with status 1.
 
-Internally, `demux sidebar follow` is invoked by a tmux hook on
-`client-session-changed`; it physically moves the existing pane (preserving
-its current width) into the newly attached session.
+Internally, the tmux hooks call `demux event window_focus` and
+`demux event session_changed` when you switch windows or sessions; each
+physically moves the existing sidebar pane (preserving its current width) into
+the newly focused window or session.
 
 ### Enable the tmux hooks
 
