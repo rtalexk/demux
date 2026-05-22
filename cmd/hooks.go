@@ -36,6 +36,52 @@ func promptYesNo(r io.Reader, w io.Writer, question string) bool {
 	}
 }
 
+// reviewLegacyHooks reports any legacy (pre-managed-block) demux hook lines in
+// content, prompts the user to remove them, and returns content with the
+// confirmed removals applied. realPath is used only in the report. content is
+// returned unchanged when there are no legacy lines or the user declines.
+func reviewLegacyHooks(in io.Reader, out io.Writer, content, realPath string) string {
+	legacy := tmuxhooks.DetectLegacyHooks(content)
+	if len(legacy) == 0 {
+		return content
+	}
+	fmt.Fprintf(out, "Found %d legacy demux hook line(s) in %s:\n", len(legacy), realPath)
+	for _, l := range legacy {
+		fmt.Fprintf(out, "  L%d: %s\n", l.Number, strings.TrimSpace(l.Text))
+	}
+	if !promptYesNo(in, out, "Remove them and replace with the managed block?") {
+		fmt.Fprintln(out, "Kept legacy lines; they will be de-duplicated at runtime but should be removed.")
+		return content
+	}
+	nums := make([]int, len(legacy))
+	for i, l := range legacy {
+		nums[i] = l.Number
+	}
+	fmt.Fprintf(out, "Removed %d legacy line(s).\n", len(legacy))
+	return tmuxhooks.RemoveLines(content, nums)
+}
+
+// registerLiveHooks registers the bootstrap hook and demux's full hook set into
+// the running tmux server, then records the hook-set version. Failures are
+// reported as warnings on stderr, not returned: the managed block is already
+// written, so the next client attach reconciles even if no server is reachable.
+func registerLiveHooks(cmd *cobra.Command) {
+	out, errOut := cmd.OutOrStdout(), cmd.ErrOrStderr()
+	t := tmuxhooks.Real()
+	if err := t.Run("set-hook", "-g", tmuxhooks.BootstrapEvent, tmuxhooks.BootstrapCommand); err != nil {
+		fmt.Fprintf(errOut, "warning: live bootstrap registration failed (not in tmux?): %v\n", err)
+		return
+	}
+	if err := tmuxhooks.Reconcile(t); err != nil {
+		fmt.Fprintf(errOut, "warning: live hook reconcile failed: %v\n", err)
+		return
+	}
+	if err := tmuxhooks.MarkVersion(t); err != nil {
+		fmt.Fprintf(errOut, "warning: recording hook version failed: %v\n", err)
+	}
+	fmt.Fprintln(out, "Registered demux hooks in the live tmux server.")
+}
+
 var hooksInstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install demux's tmux hooks into ~/.tmux.conf and the live server",
@@ -66,24 +112,7 @@ With --print-only, prints the bootstrap line and makes no changes.`,
 			return err
 		}
 
-		legacy := tmuxhooks.DetectLegacyHooks(content)
-		if len(legacy) > 0 {
-			fmt.Fprintf(out, "Found %d legacy demux hook line(s) in %s:\n", len(legacy), realPath)
-			for _, l := range legacy {
-				fmt.Fprintf(out, "  L%d: %s\n", l.Number, strings.TrimSpace(l.Text))
-			}
-			if promptYesNo(cmd.InOrStdin(), out, "Remove them and replace with the managed block?") {
-				nums := make([]int, len(legacy))
-				for i, l := range legacy {
-					nums[i] = l.Number
-				}
-				content = tmuxhooks.RemoveLines(content, nums)
-				fmt.Fprintf(out, "Removed %d legacy line(s).\n", len(legacy))
-			} else {
-				fmt.Fprintln(out, "Kept legacy lines; they will be de-duplicated at runtime but should be removed.")
-			}
-		}
-
+		content = reviewLegacyHooks(cmd.InOrStdin(), out, content, realPath)
 		content = tmuxhooks.WithManagedBlock(content)
 		if err := tmuxhooks.SaveConf(realPath, content); err != nil {
 			return err
@@ -94,19 +123,7 @@ With --print-only, prints the bootstrap line and makes no changes.`,
 			fmt.Fprintf(out, "Created %s\n", realPath)
 		}
 
-		t := tmuxhooks.Real()
-		if err := t.Run("set-hook", "-g", tmuxhooks.BootstrapEvent, tmuxhooks.BootstrapCommand()); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: live bootstrap registration failed (not in tmux?): %v\n", err)
-			return nil
-		}
-		if err := tmuxhooks.Reconcile(t); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: live hook reconcile failed: %v\n", err)
-			return nil
-		}
-		if err := tmuxhooks.MarkVersion(t); err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), "warning: recording hook version failed: %v\n", err)
-		}
-		fmt.Fprintln(out, "Registered demux hooks in the live tmux server.")
+		registerLiveHooks(cmd)
 		return nil
 	},
 }
