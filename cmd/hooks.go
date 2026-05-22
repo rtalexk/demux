@@ -132,6 +132,13 @@ const tmuxHooksSnippet = `# demux tmux hooks
 # positional parameter, which is empty. With --flag value, an empty expansion
 # leaves the flag with no argument and the command fails. With --flag=value, an
 # empty expansion produces --flag= (empty string), which is valid.
+#
+# Idempotency note: the hooks below use -g (replace), not -ga (append), so
+# re-sourcing this file (e.g. via a stray after-new-session re-source hook)
+# replaces each hook in place instead of stacking duplicate copies. The two
+# follow hooks on shared events (client-session-changed, after-select-window)
+# keep -ga only because a -g line for the same event resets the array just
+# above them.
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Clears Demux done states when switching between panes within the same window.
@@ -164,7 +171,7 @@ set-hook -g after-kill-pane "run-shell -b 'demux event pane_closed --pane=#{hook
 # natural process exits in some tmux versions).
 # run-shell -b backgrounds the handler (see after-kill-pane above) so it never
 # blocks tmux input; it shares the pane_closed handler's file lock.
-set-hook -ga pane-exited "run-shell -b 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
+set-hook -g pane-exited "run-shell -b 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'"
 
 # Sticky sidebar - moves the demux sidebar pane to the newly active session.
 set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null; true'"
@@ -173,19 +180,18 @@ set-hook -ga client-session-changed "run-shell 'demux sidebar follow 2>/dev/null
 # (within the same session). join-pane uses -d so user focus is preserved.
 set-hook -ga after-select-window "run-shell 'demux sidebar follow 2>/dev/null; true'"
 
-# Sticky sidebar - moves the demux sidebar pane into a newly created window.
-# tmux does NOT fire after-select-window for new-window, so this separate hook
-# is required for the sidebar to follow when you create a window.
-set-hook -ga after-new-window "run-shell 'demux sidebar follow 2>/dev/null; true'"
-
-# Sticky sidebar (slots mode) - ensures every newly created window gets a
-# sidebar slot pane. No-op when [sidebar.sticky] slots = false or when no
-# slots have been installed yet.
-set-hook -ga after-new-window "run-shell 'demux sidebar slots ensure 2>/dev/null; true'"
+# Sticky sidebar - moves the demux sidebar pane into a newly created window and
+# ensures that window gets a slot pane (slots mode; no-op when slots = false or
+# no slots are installed). tmux does NOT fire after-select-window for
+# new-window, so this separate hook is required.
+# run-shell -b backgrounds the handler so creating a window never blocks input
+# while the sidebar relocates. follow + slots ensure run sequentially in one
+# job so they never race each other.
+set-hook -g after-new-window "run-shell -b 'demux sidebar follow 2>/dev/null; demux sidebar slots ensure 2>/dev/null; true'"
 
 # Sticky sidebar auto-show on client attach. Remove this line if you prefer
 # to toggle the sticky sidebar manually with 'demux sidebar toggle'.
-set-hook -ga client-attached "run-shell 'demux sidebar show 2>/dev/null; true'"
+set-hook -g client-attached "run-shell -b 'demux sidebar show 2>/dev/null; true'"
 # ──────────────────────────────────────────────────────────────────────────────
 `
 
