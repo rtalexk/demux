@@ -1,6 +1,7 @@
 package tmuxhooks
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -112,5 +113,34 @@ func TestSyncReconcilesWhenHashStale(t *testing.T) {
 	}
 	if !wrote {
 		t.Errorf("Sync must record the new hash; runs=%v", f.runStrings())
+	}
+}
+
+func TestReconcileSkipsEventWhenClearFails(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["show-hooks -g"] = ""
+	// Simulate a tmux build that rejects clearing the after-select-pane hook.
+	f.errs["set-hook -gu after-select-pane"] = errors.New("unknown hook")
+
+	if err := Reconcile(f); err != nil {
+		t.Fatalf("Reconcile must not return an error on a per-event failure: %v", err)
+	}
+
+	runs := f.runStrings()
+	// after-select-pane was never cleared successfully, so it must not be re-added.
+	for _, r := range runs {
+		if strings.HasPrefix(r, "set-hook -ga after-select-pane ") {
+			t.Errorf("after-select-pane must be skipped after clear failure, got run %q", r)
+		}
+	}
+	// A later event must still reconcile despite the earlier failure.
+	reconciled := false
+	for _, r := range runs {
+		if strings.HasPrefix(r, "set-hook -ga after-new-window ") {
+			reconciled = true
+		}
+	}
+	if !reconciled {
+		t.Errorf("after-new-window must still reconcile despite the earlier event failure; runs=%v", runs)
 	}
 }
