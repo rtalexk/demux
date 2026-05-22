@@ -242,6 +242,26 @@ var eventNewWindowCmd = &cobra.Command{
 	},
 }
 
+// warnLegacyTmuxHooks logs a warning when old-style pasted demux hook lines
+// still linger outside the managed block in ~/.tmux.conf. Best-effort: any
+// failure to locate or read the config is silently skipped.
+func warnLegacyTmuxHooks() {
+	path, err := tmuxhooks.ConfPath()
+	if err != nil {
+		return
+	}
+	content, _, _, err := tmuxhooks.LoadConf(path)
+	if err != nil {
+		return
+	}
+	legacy := tmuxhooks.DetectLegacyHooks(content)
+	if len(legacy) == 0 {
+		return
+	}
+	demuxlog.Warn("client_attached: legacy demux hook lines in tmux.conf; run `demux hooks install` to remove them",
+		"count", len(legacy), "path", path)
+}
+
 // eventClientAttachedCmd is fired by the demux managed-block bootstrap hook on
 // client-attached. It reconciles demux's tmux hook set (version-gated fast
 // path), auto-shows the sticky sidebar when configured, and warns when legacy
@@ -264,14 +284,7 @@ var eventClientAttachedCmd = &cobra.Command{
 			}
 		}
 
-		if path, err := tmuxhooks.ConfPath(); err == nil {
-			if content, _, _, err := tmuxhooks.LoadConf(path); err == nil {
-				if legacy := tmuxhooks.DetectLegacyHooks(content); len(legacy) > 0 {
-					demuxlog.Warn("client_attached: legacy demux hook lines in tmux.conf; run `demux hooks install` to remove them",
-						"count", len(legacy), "path", path)
-				}
-			}
-		}
+		warnLegacyTmuxHooks()
 		return nil
 	},
 }
