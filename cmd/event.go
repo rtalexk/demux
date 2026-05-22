@@ -378,6 +378,7 @@ func init() {
 		c.Flags().String("session-id", "", "Stable session ID ($N format); auto-detected if omitted")
 	}
 
+	rejectUnknownSubcommand(eventCmd)
 	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd)
 	rootCmd.AddCommand(eventCmd)
 }

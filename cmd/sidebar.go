@@ -151,6 +151,8 @@ func runSidebarSlotPlaceholder(w io.Writer) {
 }
 
 func init() {
+	rejectUnknownSubcommand(sidebarCmd)
+	rejectUnknownSubcommand(sidebarSlotsCmd)
 	sidebarSlotsCmd.AddCommand(sidebarSlotsInstallCmd, sidebarSlotsUninstallCmd)
 	sidebarCmd.AddCommand(sidebarShowCmd, sidebarHideCmd, sidebarToggleCmd, sidebarSlotCmd, sidebarSlotsCmd)
 	rootCmd.AddCommand(sidebarCmd)
