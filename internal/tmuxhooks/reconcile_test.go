@@ -73,7 +73,7 @@ func TestReconcileDedupesAndPreservesUserHooks(t *testing.T) {
 		if strings.Contains(r, `set-hook -ga after-new-window run-shell "my own hook"`) {
 			userIdx = i
 		}
-		if strings.Contains(r, "set-hook -ga after-new-window run-shell -b 'demux sidebar follow 2>/dev/null; demux sidebar slots ensure") {
+		if strings.Contains(r, "set-hook -ga after-new-window run-shell -b 'demux event new_window") {
 			demuxIdx = i
 		}
 	}
