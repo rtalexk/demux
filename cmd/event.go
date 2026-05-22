@@ -206,7 +206,7 @@ func runWindowFocus(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if err := stickyClient().Follow(); err != nil {
-		demuxlog.Warn("window_focus: sidebar follow failed", "err", err)
+		demuxlog.Warn(cmd.Use+": sidebar follow failed", "err", err)
 	}
 	return nil
 }
@@ -373,9 +373,9 @@ func init() {
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
 	for _, c := range []*cobra.Command{eventWindowFocusCmd, eventSessionChangedCmd} {
-		c.Flags().String("pane-id", "", "Stable pane ID (%N format)")
-		c.Flags().String("window-id", "", "Stable window ID (@N format)")
-		c.Flags().String("session-id", "", "Stable session ID ($N format)")
+		c.Flags().String("pane-id", "", "Stable pane ID (%N format); auto-detected if omitted")
+		c.Flags().String("window-id", "", "Stable window ID (@N format); auto-detected if omitted")
+		c.Flags().String("session-id", "", "Stable session ID ($N format); auto-detected if omitted")
 	}
 
 	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd)
