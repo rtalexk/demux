@@ -12,8 +12,8 @@ import (
 //	after-new-window[0] run-shell -b "demux ..."
 var hookLineRE = regexp.MustCompile(`^([a-zA-Z-]+)\[\d+\]\s+(.*)$`)
 
-// parseShowHooks groups `tmux show-hooks -g` output by event name, preserving
-// per-event order. The value is the list of hook command strings.
+// parseShowHooks groups `tmux show-hooks -g [event]` output by event name,
+// preserving per-event order. The value is the list of hook command strings.
 func parseShowHooks(out string) map[string][]string {
 	result := map[string][]string{}
 	for _, line := range strings.Split(out, "\n") {
@@ -35,18 +35,16 @@ func isDemuxEntry(cmd string) bool {
 const versionOption = "@demux_hooks_version"
 
 // Reconcile registers demux's desired hook set into the running tmux server.
-// For each event it clears the hook array, then re-adds the user's own
-// (non-demux) entries followed by demux's canonical entries — so the result is
-// idempotent and can never stack duplicates. Per-event errors are logged and
-// skipped (e.g. a tmux build without the pane-exited hook) so one unsupported
-// event never aborts the rest.
+// For each event it queries that event's current hooks, clears the array, then
+// re-adds the user's own (non-demux) entries followed by demux's canonical
+// entries — so the result is idempotent and can never stack duplicates.
+//
+// Each event is queried individually with `show-hooks -g <event>`: the bare
+// `show-hooks -g` dump omits some events entirely (e.g. pane-exited on tmux
+// 3.x), and a missing event would hide the user's own hook so the clear below
+// silently destroys it. Per-event errors are logged and skipped (e.g. a tmux
+// build without a given hook) so one unsupported event never aborts the rest.
 func Reconcile(t Tmux) error {
-	out, err := t.Output("show-hooks", "-g")
-	if err != nil {
-		return err
-	}
-	current := parseShowHooks(out)
-
 	desired := map[string][]string{}
 	var events []string
 	for _, h := range DesiredHooks() {
@@ -57,8 +55,13 @@ func Reconcile(t Tmux) error {
 	}
 
 	for _, event := range events {
+		out, err := t.Output("show-hooks", "-g", event)
+		if err != nil {
+			demuxlog.Warn("tmuxhooks: show hook failed", "event", event, "err", err)
+			continue
+		}
 		var keep []string
-		for _, cmd := range current[event] {
+		for _, cmd := range parseShowHooks(out)[event] {
 			if !isDemuxEntry(cmd) {
 				keep = append(keep, cmd) // preserve the user's own hooks
 			}

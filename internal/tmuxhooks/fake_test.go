@@ -38,6 +38,15 @@ func (f *fakeTmux) Output(args ...string) (string, error) {
 	return out, nil
 }
 
+// scriptShowHooks scripts the per-event `show-hooks -g <event>` responses for
+// every demux event. Events absent from byEvent return empty output; pass nil
+// for "every event empty".
+func (f *fakeTmux) scriptShowHooks(byEvent map[string]string) {
+	for _, h := range DesiredHooks() {
+		f.outputs["show-hooks -g "+h.Event] = byEvent[h.Event]
+	}
+}
+
 // runStrings returns every recorded Run call as a space-joined string.
 func (f *fakeTmux) runStrings() []string {
 	var out []string

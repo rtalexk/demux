@@ -45,12 +45,14 @@ func TestIsDemuxEntry(t *testing.T) {
 func TestReconcileDedupesAndPreservesUserHooks(t *testing.T) {
 	f := newFakeTmux()
 	// after-new-window has 3 stale demux copies + 1 user hook.
-	f.outputs["show-hooks -g"] = strings.Join([]string{
-		`after-new-window[0] run-shell -b "demux sidebar follow"`,
-		`after-new-window[1] run-shell -b "demux sidebar follow"`,
-		`after-new-window[2] run-shell "my own hook"`,
-		`after-new-window[3] run-shell -b "demux sidebar slots ensure"`,
-	}, "\n")
+	f.scriptShowHooks(map[string]string{
+		"after-new-window": strings.Join([]string{
+			`after-new-window[0] run-shell -b "demux sidebar follow"`,
+			`after-new-window[1] run-shell -b "demux sidebar follow"`,
+			`after-new-window[2] run-shell "my own hook"`,
+			`after-new-window[3] run-shell -b "demux sidebar slots ensure"`,
+		}, "\n"),
+	})
 
 	if err := Reconcile(f); err != nil {
 		t.Fatalf("Reconcile: %v", err)
@@ -85,6 +87,41 @@ func TestReconcileDedupesAndPreservesUserHooks(t *testing.T) {
 	}
 }
 
+func TestReconcilePreservesUserHookForPerEventQuery(t *testing.T) {
+	f := newFakeTmux()
+	// Scripts only the per-event queries — mirroring real tmux, whose bare
+	// `show-hooks -g` dump omits some events entirely (e.g. pane-exited on
+	// tmux 3.x). Reconcile must query each event individually so a user's own
+	// hook on such an event is preserved rather than destroyed by the clear.
+	f.scriptShowHooks(map[string]string{
+		"pane-exited": `pane-exited[0] run-shell "my own pane-exited hook"`,
+	})
+
+	if err := Reconcile(f); err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+
+	runs := f.runStrings()
+	userIdx, demuxIdx := -1, -1
+	for i, r := range runs {
+		if r == `set-hook -ga pane-exited run-shell "my own pane-exited hook"` {
+			userIdx = i
+		}
+		if strings.HasPrefix(r, "set-hook -ga pane-exited run-shell -b 'demux event pane_exiting") {
+			demuxIdx = i
+		}
+	}
+	if userIdx < 0 {
+		t.Fatalf("user pane-exited hook was not preserved; runs=%v", runs)
+	}
+	if demuxIdx < 0 {
+		t.Fatalf("demux pane-exited hook was not registered; runs=%v", runs)
+	}
+	if userIdx > demuxIdx {
+		t.Errorf("user hook re-added after demux hook: user=%d demux=%d", userIdx, demuxIdx)
+	}
+}
+
 func TestSyncFastPathSkipsWhenHashMatches(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["show -gv @demux_hooks_version"] = HooksHash()
@@ -101,7 +138,7 @@ func TestSyncFastPathSkipsWhenHashMatches(t *testing.T) {
 func TestSyncReconcilesWhenHashStale(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["show -gv @demux_hooks_version"] = "stale000000"
-	f.outputs["show-hooks -g"] = ""
+	f.scriptShowHooks(nil)
 	if err := Sync(f); err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
@@ -118,7 +155,7 @@ func TestSyncReconcilesWhenHashStale(t *testing.T) {
 
 func TestReconcileSkipsEventWhenClearFails(t *testing.T) {
 	f := newFakeTmux()
-	f.outputs["show-hooks -g"] = ""
+	f.scriptShowHooks(nil)
 	// Simulate a tmux build that rejects clearing the after-select-pane hook.
 	f.errs["set-hook -gu after-select-pane"] = errors.New("unknown hook")
 
