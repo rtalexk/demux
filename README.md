@@ -631,6 +631,8 @@ The sticky sidebar is a per-client tmux pane that runs `demux --sticky`
 physically follows you between tmux sessions. It is created and dismissed
 through the `demux sidebar` subcommand and is **off by default**.
 
+![demux sticky sidebar](docs/assets/sidebar_view.png)
+
 ### Lifecycle
 
 ```bash
