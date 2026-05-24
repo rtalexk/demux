@@ -770,7 +770,7 @@ func isIconLabel(text string) bool {
 		return false
 	}
 	for _, r := range trimmed {
-		if r < 128 {
+		if !isIconRune(r) {
 			return false
 		}
 	}
