@@ -205,8 +205,12 @@ func runWindowFocus(cmd *cobra.Command, args []string) error {
 	if err := applyPaneFocus(d, paneID, windowID, sessionID); err != nil {
 		return err
 	}
-	if err := stickyClient().Follow(); err != nil {
+	s := stickyClient()
+	if err := s.Follow(); err != nil {
 		demuxlog.Warn(cmd.Use+": sidebar follow failed", "err", err)
+	}
+	if err := s.MaybePromoteSlot(sidebarShowOpts()); err != nil {
+		demuxlog.Warn(cmd.Use+": sidebar promote failed", "err", err)
 	}
 	return nil
 }

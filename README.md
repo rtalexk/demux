@@ -749,6 +749,12 @@ strategy:
 - Switching to a window that fell out of the MRU triggers a one-time
   `split-window` to recreate its slot, then the swap; that window enters the
   MRU and is flicker-free on subsequent visits.
+- Switching sessions with no active sidebar tracked (e.g. you ran
+  `demux sidebar hide`, then later jumped sessions with a tmux binding) will
+  re-promote the destination window's slot to active sidebar so navigating
+  between configured sessions never leaves a bare placeholder behind. Triggered
+  only when slots have been installed at least once; respects `auto_show=false`
+  on initial client attach.
 
 #### Reserved-set priority
 
