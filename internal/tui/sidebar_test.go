@@ -1528,8 +1528,8 @@ func TestSidebar_ResolveProcLabelColors_FocusedOverridesPerEntry(t *testing.T) {
 		t.Fatalf("selected-only should keep entry colors, got fg=%v bg=%v", fg, bg)
 	}
 	fg, bg = resolveProcLabelColors(lbl, true, true)
-	if fg != lipgloss.Color("#cdd6f4") || bg != lipgloss.Color("#2a2a4a") {
-		t.Fatalf("selected+focused should override to theme colors, got fg=%v bg=%v", fg, bg)
+	if fg != lipgloss.Color("#2a2a4a") || bg != lipgloss.Color("#cdd6f4") {
+		t.Fatalf("selected+focused should invert to selection fg=ColorSelected bg=ColorFgPrimary, got fg=%v bg=%v", fg, bg)
 	}
 }
 
@@ -1543,6 +1543,48 @@ func TestSidebar_ResolveProcLabelColors_FallsBackToThemeDefaults(t *testing.T) {
 	fg, bg := resolveProcLabelColors(lbl, false, false)
 	if fg != lipgloss.Color("#aaa") || bg != lipgloss.Color("#222") {
 		t.Fatalf("expected theme fallback, got fg=%v bg=%v", fg, bg)
+	}
+}
+
+func TestSidebar_ResolveProcLabelColors_IconLabelNeverGetsBackground(t *testing.T) {
+	initStyles(Theme{
+		ColorFgPrimary:   lipgloss.Color("#cdd6f4"),
+		ColorSelected:    lipgloss.Color("#2a2a4a"),
+		ColorProcLabelFG: lipgloss.Color("#aaa"),
+		ColorProcLabelBG: lipgloss.Color("#222"),
+	}, config.ProcessesConfig{}, nil)
+	lbl := procmatch.Label{Text: "🤖"}
+
+	if _, bg := resolveProcLabelColors(lbl, false, false); bg != "" {
+		t.Fatalf("icon unfocused: expected no bg, got %v", bg)
+	}
+	fg, bg := resolveProcLabelColors(lbl, true, true)
+	if bg != lipgloss.Color("#2a2a4a") {
+		t.Fatalf("icon selected+focused: expected bg=ColorSelected to blend into row, got %v", bg)
+	}
+	if fg != lipgloss.Color("#aaa") {
+		t.Fatalf("icon selected+focused: fg should not be overridden, got %v", fg)
+	}
+}
+
+func TestSidebar_IsIconLabel(t *testing.T) {
+	cases := []struct {
+		text string
+		want bool
+	}{
+		{"py", false},
+		{"node", false},
+		{"", false},
+		{"🤖", true},
+		{"", true}, // Nerd Font PUA glyph
+		{" 🤖 ", true}, // padded with whitespace
+		{"Go!", false},
+		{"   ", false},
+	}
+	for _, c := range cases {
+		if got := isIconLabel(c.text); got != c.want {
+			t.Errorf("isIconLabel(%q) = %v, want %v", c.text, got, c.want)
+		}
 	}
 }
 
