@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	runewidth "github.com/mattn/go-runewidth"
@@ -759,22 +760,17 @@ func styledIconPrefix(iconPrefix string, highlighted bool) string {
 	return sessionIconStyle.Render(iconPrefix)
 }
 
-// isIconLabel reports whether a proc-label text is an icon glyph (emoji,
-// Nerd Font, symbol) rather than ASCII text like "py" or "node". Icons
-// carry their own visual weight and read better without a chip background.
-// Surrounding whitespace is ignored so labels like "󰵰 " (glyph + padding
-// space) still register as icons.
+// isIconLabel reports whether a proc-label text is a single icon glyph
+// (emoji, Nerd Font, symbol) rather than text like "py" or "node". A label
+// is either pure text or a single icon, so we check the first non-space
+// rune. Icons read better without a chip background.
 func isIconLabel(text string) bool {
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
 		return false
 	}
-	for _, r := range trimmed {
-		if !isIconRune(r) {
-			return false
-		}
-	}
-	return true
+	r, _ := utf8.DecodeRuneInString(trimmed)
+	return isIconRune(r)
 }
 
 // resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
