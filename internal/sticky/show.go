@@ -2,8 +2,6 @@ package sticky
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 )
 
 // ShowOpts controls a Show invocation.
@@ -56,19 +54,9 @@ func (s *Sticky) showSplitMode(key string, opts ShowOpts) error {
 	if err != nil {
 		return err
 	}
-	out, err := s.T.Output(
-		"split-window", "-f", "-h", "-b", "-d",
-		"-l", strconv.Itoa(opts.Width),
-		"-t", target,
-		"-P", "-F", "#{pane_id}",
-		opts.Cmd,
-	)
+	newPane, err := s.splitSidebarPane(target, opts.Width, opts.Cmd)
 	if err != nil {
-		return fmt.Errorf("tmux split-window: %w", err)
-	}
-	newPane := strings.TrimSpace(out)
-	if newPane == "" {
-		return fmt.Errorf("tmux split-window returned empty pane id")
+		return err
 	}
 	if err := s.WriteEnv(key, newPane); err != nil {
 		return err

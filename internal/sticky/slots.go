@@ -2,7 +2,6 @@ package sticky
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -72,19 +71,9 @@ func (s *Sticky) EnsureSlotInWindow(target string, width int) error {
 	if existing != "" {
 		return nil
 	}
-	out, err := s.T.Output(
-		"split-window", "-f", "-h", "-b", "-d",
-		"-l", strconv.Itoa(width),
-		"-t", target,
-		"-P", "-F", "#{pane_id}",
-		SlotPlaceholderCmd,
-	)
+	pane, err := s.splitSidebarPane(target, width, SlotPlaceholderCmd)
 	if err != nil {
-		return fmt.Errorf("tmux split-window slot: %w", err)
-	}
-	pane := strings.TrimSpace(out)
-	if pane == "" {
-		return fmt.Errorf("tmux split-window slot returned empty pane id")
+		return err
 	}
 	if err := s.T.Run("set-option", "-p", "-t", pane, SlotMarker, "1"); err != nil {
 		return fmt.Errorf("tmux set-option %s: %w", SlotMarker, err)
