@@ -784,6 +784,7 @@ demux sidebar show              # installs slots in MRU + activates current wind
 demux sidebar hide              # removes every slot pane (full teardown)
 demux sidebar slots install     # idempotent: ensure every reserved window has a slot
 demux sidebar slots uninstall   # remove every slot pane
+demux sidebar slots prune       # reconcile now: kill duplicate / stale slots without waiting for a tmux event
 ```
 
 demux's tmux hooks already include an `after-new-window` hook that

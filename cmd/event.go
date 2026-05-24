@@ -283,9 +283,12 @@ var eventClientAttachedCmd = &cobra.Command{
 
 		cfg := loadConfig()
 		if cfg.Sidebar.Sticky.AutoShow {
-			if err := stickyClient().Show(sidebarShowOpts()); err != nil {
-				demuxlog.Warn("client_attached: sidebar show failed", "err", err)
-			}
+			_ = withEventLock(func() error {
+				if err := stickyClient().Show(sidebarShowOpts()); err != nil {
+					demuxlog.Warn("client_attached: sidebar show failed", "err", err)
+				}
+				return nil
+			})
 		}
 
 		warnLegacyTmuxHooks()
