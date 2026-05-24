@@ -91,3 +91,79 @@ func TestReconcileSlots_IgnoresNonSlotPanes(t *testing.T) {
 		}
 	}
 }
+
+// Reproduces the corrupt-state bug observed in the wild: a window that ended up
+// with two slot-tagged panes (race in EnsureSlotInWindow + swap-pane edge case).
+// Reconcile must keep one and kill the rest so the duplicate placeholder pane
+// stops haunting the user.
+func TestReconcileSlots_DedupesDuplicatesWithinReservedWindow(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@1 %10 1\n@1 %11 1\n"}
+	s := &Sticky{T: f}
+	if err := s.ReconcileSlots([]string{"@1"}, "@9", 35); err != nil {
+		t.Fatalf("ReconcileSlots: %v", err)
+	}
+	var killed10, killed11 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "kill-pane -t %10" {
+			killed10 = true
+		}
+		if j == "kill-pane -t %11" {
+			killed11 = true
+		}
+	}
+	if killed10 == killed11 {
+		t.Errorf("expected exactly one of %%10/%%11 to be killed (kept the other), got killed10=%v killed11=%v runs=%v",
+			killed10, killed11, f.runs)
+	}
+}
+
+// Same dedupe, but for the current window: the kept slot must not be killed
+// (that would yank the sidebar), and the extra must still go.
+func TestReconcileSlots_DedupesDuplicatesInCurrentWindow(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@9 %90 1\n@9 %91 1\n"}
+	s := &Sticky{T: f}
+	if err := s.ReconcileSlots(nil, "@9", 35); err != nil {
+		t.Fatalf("ReconcileSlots: %v", err)
+	}
+	var killed90, killed91 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "kill-pane -t %90" {
+			killed90 = true
+		}
+		if j == "kill-pane -t %91" {
+			killed91 = true
+		}
+	}
+	if killed90 == killed91 {
+		t.Errorf("expected exactly one of %%90/%%91 to be killed (kept the other), got killed90=%v killed91=%v runs=%v",
+			killed90, killed91, f.runs)
+	}
+}
+
+// Non-reserved, non-current window with duplicate slots: kill them all.
+func TestReconcileSlots_KillsAllDuplicatesInNonReservedWindow(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@7 %70 1\n@7 %71 1\n"}
+	s := &Sticky{T: f}
+	if err := s.ReconcileSlots(nil, "@9", 35); err != nil {
+		t.Fatalf("ReconcileSlots: %v", err)
+	}
+	var killed70, killed71 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "kill-pane -t %70" {
+			killed70 = true
+		}
+		if j == "kill-pane -t %71" {
+			killed71 = true
+		}
+	}
+	if !killed70 || !killed71 {
+		t.Errorf("expected both %%70 and %%71 killed (non-reserved window), got killed70=%v killed71=%v runs=%v",
+			killed70, killed71, f.runs)
+	}
+}

@@ -5,8 +5,14 @@ package sticky
 // placeholder is installed via EnsureSlotInWindow. For each window that has
 // a slot but is neither reserved nor currentWindow, the slot is killed.
 //
-// currentWindow's slot (the active sidebar) is never touched here - that is
-// the caller's responsibility via Show / Follow / swap-pane.
+// Within any single window, only one slot is kept (the first listed); extras
+// are killed. This recovers from corrupt state where a race in
+// EnsureSlotInWindow or a swap-pane edge case left two slot-tagged panes in
+// the same window.
+//
+// currentWindow's first slot (the active sidebar) is never touched here - that
+// is the caller's responsibility via Show / Follow / swap-pane. Duplicates in
+// currentWindow ARE killed.
 //
 // width is the column count passed to EnsureSlotInWindow when creating new
 // slots.
@@ -23,9 +29,14 @@ func (s *Sticky) ReconcileSlots(reserved []string, currentWindow string, width i
 	existing := make(map[string]string)
 	for _, row := range slotLines(out, 3) {
 		wid, pid := row[0], row[1]
-		if _, has := existing[wid]; !has {
-			existing[wid] = pid
+		if _, has := existing[wid]; has {
+			// Duplicate slot in same window: kill the extra regardless of
+			// reserved/current status. Keeps invariant: at most one slot per
+			// window.
+			_ = s.T.Run("kill-pane", "-t", pid)
+			continue
 		}
+		existing[wid] = pid
 	}
 
 	for wid, pid := range existing {
