@@ -759,21 +759,48 @@ func styledIconPrefix(iconPrefix string, highlighted bool) string {
 	return sessionIconStyle.Render(iconPrefix)
 }
 
+// isIconLabel reports whether a proc-label text is an icon glyph (emoji,
+// Nerd Font, symbol) rather than ASCII text like "py" or "node". Icons
+// carry their own visual weight and read better without a chip background.
+// Surrounding whitespace is ignored so labels like "󰵰 " (glyph + padding
+// space) still register as icons.
+func isIconLabel(text string) bool {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return false
+	}
+	for _, r := range trimmed {
+		if r < 128 {
+			return false
+		}
+	}
+	return true
+}
+
 // resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
-// When selected and focused, both fg and bg are overridden to match the
-// selection row so the label stays readable against the selection bg.
+// Text labels get a chip background (theme default or, when selected+focused,
+// the inverted session-name color so the chip pops against the selection
+// row). Icon labels never get a chip background applied by us — but when
+// the row is selected+focused, they must adopt the selection bg so the
+// icon blends into the row rather than punching a hole to terminal default.
 func resolveProcLabelColors(lbl procmatch.Label, selected, focused bool) (fg, bg lipgloss.Color) {
 	fg = lipgloss.Color(lbl.FG)
 	if fg == "" {
 		fg = activeTheme.ColorProcLabelFG
 	}
 	bg = lipgloss.Color(lbl.BG)
-	if bg == "" {
-		bg = activeTheme.ColorProcLabelBG
-	}
-	if selected && focused {
-		fg = activeTheme.ColorFgPrimary
+
+	icon := isIconLabel(lbl.Text)
+	highlighted := selected && focused
+
+	switch {
+	case highlighted && icon:
 		bg = activeTheme.ColorSelected
+	case highlighted:
+		fg = activeTheme.ColorSelected
+		bg = activeTheme.ColorFgPrimary
+	case !icon && bg == "":
+		bg = activeTheme.ColorProcLabelBG
 	}
 	return fg, bg
 }
