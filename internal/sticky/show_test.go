@@ -204,6 +204,36 @@ func TestShow_FocusOnOpen_SlotsMode_SelectsSlot(t *testing.T) {
 	}
 }
 
+// Regression: Show must NOT issue kill-pane. Each kill fires after-kill-pane
+// -> backgrounded pane_closed -> SweepOrphanWindows, which can itself kill
+// more panes. A user with corrupt state (duplicate slots) running `demux
+// sidebar show` triggered a cascade that saturated tmux's command queue and
+// froze input. All slot eviction now belongs to `demux sidebar slots prune`.
+func TestShow_SlotsMode_NeverKillsPanes(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}
+	f.outputs["display-message -p #{client_tty}"] = fakeReply{out: "/dev/ttys001\n"}
+	f.outputs["show-environment -g DEMUX_STICKY_PANE__dev_ttys001"] = fakeReply{err: stderrExitError("unknown variable\n")}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@7\n"}
+	// Two duplicate slots in current window plus a stale slot in @8 that's not
+	// in the reserved set. Naive ReconcileSlots would kill all three extras.
+	f.outputs["list-panes -t $1:@7 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%10 1\n%11 1\n"}
+	f.outputs["list-windows -aF #{window_id}"] = fakeReply{out: "@7\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@7 0\n"}
+	f.outputs["display-message -p #{client_last_session}"] = fakeReply{out: "\n"}
+	f.outputs["show-environment -g "+MRUEnvKey] = fakeReply{err: stderrExitError("unknown variable\n")}
+
+	s := &Sticky{T: f, Slots: true}
+	if err := s.Show(ShowOpts{Width: 35, Cmd: "demux --sticky"}); err != nil {
+		t.Fatalf("Show: %v", err)
+	}
+	for _, r := range f.runs {
+		if strings.HasPrefix(strings.Join(r, " "), "kill-pane") {
+			t.Errorf("Show must not kill panes, got: %v", r)
+		}
+	}
+}
+
 func TestShow_SplitFailure_Surfaces(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["-V"] = fakeReply{out: "tmux 3.3\n"}

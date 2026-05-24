@@ -94,6 +94,20 @@ func (s *Sticky) EnsureSlotInWindow(target string, width int) error {
 	return nil
 }
 
+// AddMissingSlots ensures each window in reserved has at least one slot pane,
+// creating placeholders only where missing. Unlike ReconcileSlots it never
+// kills existing panes - safe to call from hot paths (Show, Follow) where a
+// kill-pane storm would cascade into pane_closed sweeps and saturate tmux.
+// Idempotent.
+func (s *Sticky) AddMissingSlots(reserved []string, width int) error {
+	for _, wid := range reserved {
+		if err := s.EnsureSlotInWindow(wid, width); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // InstallSlotsInAllWindows ensures every window on the server has a sidebar
 // slot pane at the given width. Idempotent.
 func (s *Sticky) InstallSlotsInAllWindows(width int) error {
