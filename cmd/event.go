@@ -229,16 +229,25 @@ var eventSessionChangedCmd = &cobra.Command{
 	RunE:  runWindowFocus,
 }
 
-// eventNewWindowCmd is fired by the after-new-window hook. It moves the sticky
-// sidebar into the new window and reconciles slot panes. Both steps are
-// best-effort: failures are logged, not returned.
+// eventNewWindowCmd is fired by the after-new-window hook. It adds missing
+// sidebar slot panes to MRU-reserved windows. Best-effort: failures are
+// logged, not returned.
+//
+// Follow is intentionally NOT called here. A new window does not imply the
+// client switched - tmux fires after-select-window separately for that, and
+// that handler (runWindowFocus) is the right place for Follow. Calling Follow
+// here races against the after-select-window Follow and, when a multi-window
+// session is being launched (e.g. `demux session connect <config-session>`),
+// against itself across the burst of after-new-window hooks - thrashing the
+// swap-pane state and stranding the sidebar in the wrong window.
+//
+// Not wrapped in withEventLock because ensureSlots is now additive only
+// (AddMissingSlots, never kill-pane), so the lock contention with backgrounded
+// pane_closed sweeps that used to freeze tmux input no longer applies.
 var eventNewWindowCmd = &cobra.Command{
 	Use:   "new_window",
-	Short: "Move the sticky sidebar into a new window and reconcile slot panes",
+	Short: "Add missing sidebar slot panes for MRU-reserved windows",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := stickyClient().Follow(); err != nil {
-			demuxlog.Warn("new_window: sidebar follow failed", "err", err)
-		}
 		if err := ensureSlots(); err != nil {
 			demuxlog.Warn("new_window: slots ensure failed", "err", err)
 		}

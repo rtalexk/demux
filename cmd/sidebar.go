@@ -187,9 +187,14 @@ func parseSuppressedHookCmds(out, event string) []string {
 	return cmds
 }
 
-// ensureSlots reconciles sidebar slot panes against the MRU budget. It is a
-// no-op when slots mode is disabled or no slot panes have been installed.
-// Called by the after-new-window hook via `demux event new_window`.
+// ensureSlots adds missing sidebar slot panes for the MRU-reserved windows.
+// It is a no-op when slots mode is disabled or no slot panes have been
+// installed. Called by the after-new-window hook via `demux event new_window`.
+//
+// Additive only - never kills panes. ReconcileSlots used to live here, but its
+// kill-pane fan-out cascades through the backgrounded after-kill-pane /
+// pane-exited handlers and saturates tmux's command queue. Dedupe and eviction
+// belong to `demux sidebar slots prune`.
 func ensureSlots() error {
 	cfg := loadConfig()
 	if !cfg.Sidebar.Sticky.Slots {
@@ -213,7 +218,7 @@ func ensureSlots() error {
 	if err != nil {
 		return err
 	}
-	return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
+	return s.AddMissingSlots(reserved, cfg.Sidebar.Sticky.Width)
 }
 
 var sidebarSlotCmd = &cobra.Command{

@@ -787,8 +787,10 @@ demux sidebar slots uninstall   # remove every slot pane
 demux sidebar slots prune       # reconcile now: kill duplicate / stale slots without waiting for a tmux event
 ```
 
-demux's tmux hooks already include an `after-new-window` hook that
-reconciles the slot set when a new window appears (no-op when `slots = false`).
+demux's tmux hooks already include an `after-new-window` hook that adds
+missing slot panes to MRU-reserved windows when a new window appears (no-op
+when `slots = false`). It never kills panes - dedupe and stale-slot eviction
+belong to `demux sidebar slots prune`.
 
 Trade-offs:
 
