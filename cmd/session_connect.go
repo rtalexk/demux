@@ -144,7 +144,30 @@ func dispatchConnect(target *session.Session, scfg session.SessionsConfig) error
 		for _, id := range unknown {
 			fmt.Fprintf(os.Stderr, "demux: unknown window_template id %q (skipped)\n", id)
 		}
-		return session.LaunchAndConnectConfigSession(ce.Name, ce.Path, ce.Windows, scfg.WindowTemplates)
+		return launchConfigSessionAndConnect(ce, scfg)
 	}
 	return fmt.Errorf("session %q is neither live nor in config", target.DisplayName)
+}
+
+// launchConfigSessionAndConnect creates the configured session + windows with
+// the after-new-window hook suppressed, then runs the switch-client step
+// without suppression so the client-session-changed handler fires normally.
+//
+// The suppression closes the race that otherwise strands the sticky sidebar
+// in the source session: each new-window during launch normally fires a
+// backgrounded `demux event new_window` handler, and the burst races with the
+// (also backgrounded) client-session-changed handler that follows
+// switch-client. With multiple concurrent Follow / ensureSlots invocations
+// thrashing swap-pane state, the final sidebar location is non-deterministic.
+//
+// Hooks are restored before tmux.Connect so the session-changed handler still
+// fires - one handler, no race.
+func launchConfigSessionAndConnect(ce *session.ConfigEntry, scfg session.SessionsConfig) error {
+	s := stickyClient()
+	if err := withHooksSuppressed(s.T, []string{"after-new-window"}, func() error {
+		return session.LaunchConfigSession(ce.Name, ce.Path, ce.Windows, scfg.WindowTemplates)
+	}); err != nil {
+		return err
+	}
+	return tmux.Connect(ce.Name)
 }

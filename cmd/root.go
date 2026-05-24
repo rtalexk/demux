@@ -117,7 +117,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&stickyFlag, "sticky", false, "Sticky sidebar mode: forces compact + card view, disables quit (used by `demux sidebar`)")
 }
 
-func loadConfig() config.Config {
+var loadConfig = func() config.Config {
 	path, err := config.DefaultPath()
 	if err != nil {
 		demuxlog.Warn("cannot determine config path", "err", err)
