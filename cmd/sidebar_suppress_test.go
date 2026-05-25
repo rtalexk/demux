@@ -135,11 +135,55 @@ pane-exited[0] run-shell "logger b"
 	if len(got) != len(want) {
 		t.Fatalf("got %d cmds, want %d: %v", len(got), len(want), got)
 	}
+	// Order must match the input: tmux's bracket index ([0], [1], ...) reflects
+	// the registration order, and the restore loop re-appends via `set-hook
+	// -ga` in slice order. A future refactor that uses a map (unordered) would
+	// silently swap the bracket-indices on restore.
 	for i := range got {
 		if got[i] != want[i] {
 			t.Errorf("[%d] got %q want %q", i, got[i], want[i])
 		}
 	}
+}
+
+// Regression for the duplicate-hook bug: if `set-hook -gu` fails, the snapshot
+// for that event must not be saved, otherwise the deferred restore would
+// re-append the original hooks on top of the still-installed originals,
+// doubling every subsequent hook firing.
+func TestWithHooksSuppressed_UnsetFails_NoRestore(t *testing.T) {
+	tmux := &stubTmux{
+		outputs: map[string]string{
+			"show-hooks -g after-kill-pane": `after-kill-pane[0] run-shell -b "demux event pane_closed"` + "\n",
+		},
+	}
+	// Make `set-hook -gu after-kill-pane` fail.
+	// stubTmux.Run unconditionally returns nil today, so simulate failure by
+	// extending it via a wrapping struct.
+	wrapped := &failingUnsetTmux{stubTmux: tmux, failOn: "set-hook -gu after-kill-pane"}
+
+	if err := withHooksSuppressed(wrapped, []string{"after-kill-pane"}, func() error { return nil }); err != nil {
+		t.Fatalf("withHooksSuppressed: %v", err)
+	}
+	// No restore must have been attempted, since the snapshot wasn't taken.
+	for _, r := range tmux.runs {
+		if strings.HasPrefix(strings.Join(r, " "), "set-hook -ga after-kill-pane") {
+			t.Errorf("expected NO restore when unset failed (would double hooks), got: %v", r)
+		}
+	}
+}
+
+type failingUnsetTmux struct {
+	*stubTmux
+	failOn string
+}
+
+func (f *failingUnsetTmux) Run(args ...string) error {
+	key := strings.Join(args, " ")
+	if key == f.failOn {
+		f.stubTmux.runs = append(f.stubTmux.runs, append([]string(nil), args...))
+		return errors.New("tmux: set-hook failed")
+	}
+	return f.stubTmux.Run(args...)
 }
 
 func indexOf(haystack []string, needle string) int {

@@ -148,8 +148,14 @@ func withHooksSuppressed(t sticky.Tmux, events []string, fn func() error) error 
 			continue
 		}
 		cmds := parseSuppressedHookCmds(out, ev)
+		// Snapshot the cmds only after the unset actually succeeds. Otherwise a
+		// failed `set-hook -gu` would leave the original hooks in place AND the
+		// deferred restore would re-append them, doubling every subsequent hook
+		// firing.
+		if err := t.Run("set-hook", "-gu", ev); err != nil {
+			continue
+		}
 		snapshots = append(snapshots, saved{event: ev, cmds: cmds})
-		_ = t.Run("set-hook", "-gu", ev)
 	}
 	defer func() {
 		for _, snap := range snapshots {
