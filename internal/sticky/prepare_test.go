@@ -85,3 +85,32 @@ func TestPrepareWindow_PushesMRUAndReconciles(t *testing.T) {
 		t.Errorf("expected new slot %%50 tagged in @5, got: %v", f.runs)
 	}
 }
+
+// Regression: PrepareWindow runs on every TUI session switch. ReconcileSlots
+// used to live here, which fired kill-pane for stale/duplicate slots and
+// cascaded through the backgrounded after-kill-pane -> pane_closed ->
+// SweepOrphanWindows path. Eviction now belongs to `demux sidebar slots
+// prune` only.
+func TestPrepareWindow_NeverKillsPanes(t *testing.T) {
+	f := newFakeTmux()
+	// Sidebar exists. Stale slot in non-reserved window @99 + duplicate in @1.
+	// Reconcile-based PrepareWindow would kill all three extras.
+	f.outputs["list-panes -aF #{pane_id} #{@demux_slot}"] = fakeReply{out: "%50 1\n%51 1\n%99 1\n"}
+	f.outputs["show-environment -g "+MRUEnvKey] = fakeReply{out: MRUEnvKey + "=@5\n"}
+	f.outputs["display-message -p #{session_id}:#{window_id}"] = fakeReply{out: "$1:@1\n"}
+	f.outputs["list-windows -aF #{window_id}"] = fakeReply{out: "@1\n@5\n"}
+	f.outputs["list-windows -t $1 -F #{window_id} #{window_last_flag}"] = fakeReply{out: "@1 1\n"}
+	f.outputs["display-message -p #{client_last_session}"] = fakeReply{out: "\n"}
+	// AddMissingSlots -> EnsureSlotInWindow -> FindSlotInWindow for @5.
+	f.outputs["list-panes -t @5 -F #{pane_id} #{@demux_slot}"] = fakeReply{out: "%5 1\n"}
+
+	s := &Sticky{T: f, Slots: true}
+	if err := s.PrepareWindow("@5", 35); err != nil {
+		t.Fatalf("PrepareWindow: %v", err)
+	}
+	for _, r := range f.runs {
+		if strings.HasPrefix(strings.Join(r, " "), "kill-pane") {
+			t.Errorf("PrepareWindow must not kill panes (cleanup belongs to `slots prune`), got: %v", r)
+		}
+	}
+}

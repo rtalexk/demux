@@ -26,7 +26,7 @@ func TestSidebarCmd_Subcommands(t *testing.T) {
 }
 
 func TestSidebarCmd_SlotsSubcommands(t *testing.T) {
-	for _, sub := range []string{"install", "uninstall"} {
+	for _, sub := range []string{"install", "uninstall", "prune"} {
 		cmd, _, _ := rootCmd.Find([]string{"sidebar", "slots", sub})
 		if cmd == nil || cmd.Name() != sub {
 			t.Errorf("expected `demux sidebar slots %s`, got %v", sub, cmd)

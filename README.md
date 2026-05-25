@@ -749,6 +749,12 @@ strategy:
 - Switching to a window that fell out of the MRU triggers a one-time
   `split-window` to recreate its slot, then the swap; that window enters the
   MRU and is flicker-free on subsequent visits.
+- Switching sessions with no active sidebar tracked (e.g. you ran
+  `demux sidebar hide`, then later jumped sessions with a tmux binding) will
+  re-promote the destination window's slot to active sidebar so navigating
+  between configured sessions never leaves a bare placeholder behind. Triggered
+  only when slots have been installed at least once; respects `auto_show=false`
+  on initial client attach.
 
 #### Reserved-set priority
 
@@ -778,10 +784,13 @@ demux sidebar show              # installs slots in MRU + activates current wind
 demux sidebar hide              # removes every slot pane (full teardown)
 demux sidebar slots install     # idempotent: ensure every reserved window has a slot
 demux sidebar slots uninstall   # remove every slot pane
+demux sidebar slots prune       # reconcile now: kill duplicate / stale slots without waiting for a tmux event
 ```
 
-demux's tmux hooks already include an `after-new-window` hook that
-reconciles the slot set when a new window appears (no-op when `slots = false`).
+demux's tmux hooks already include an `after-new-window` hook that adds
+missing slot panes to MRU-reserved windows when a new window appears (no-op
+when `slots = false`). It never kills panes - dedupe and stale-slot eviction
+belong to `demux sidebar slots prune`.
 
 Trade-offs:
 

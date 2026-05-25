@@ -83,16 +83,21 @@ func (s *Sticky) Follow() error {
 }
 
 // maintainSlotsBudget prunes stale MRU entries, recomputes the reserved set
-// for currWindow/currSession, and reconciles slot panes so only reserved
-// windows hold placeholder slots. Best-effort: errors are swallowed so the
-// hook driving Follow never crashes navigation.
+// for currWindow/currSession, and ADDS missing slot panes for reserved
+// windows. It does NOT kill stale or duplicate slots: the kill cascade
+// (after-kill-pane -> pane_closed -> SweepOrphanWindows -> more kill-pane)
+// can saturate tmux's command queue and freeze input. Eviction and dedupe
+// live in `demux sidebar slots prune`.
+//
+// Best-effort: errors are swallowed so the hook driving Follow never
+// crashes navigation.
 func (s *Sticky) maintainSlotsBudget(currWindow, currSession string, width int) {
 	_ = s.PruneMRU()
 	reserved, err := s.ComputeReservedWindows(currWindow, currSession)
 	if err != nil {
 		return
 	}
-	_ = s.ReconcileSlots(reserved, currWindow, width)
+	_ = s.AddMissingSlots(reserved, width)
 }
 
 // ejectFocusIfOnSidebar moves the client focus to the next pane in the

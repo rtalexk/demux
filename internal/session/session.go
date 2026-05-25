@@ -99,9 +99,17 @@ func Merge(panes []tmux.Pane, entries []ConfigEntry) []Session {
 	return sessions
 }
 
-// LaunchAndConnectConfigSession launches a new session from config and connects to it.
-// It creates a detached session, sets up windows, and connects the client.
-func LaunchAndConnectConfigSession(name, path string, windowIDs []string, templates map[string]WindowTemplate) error {
+// LaunchConfigSession creates a detached tmux session and sets up its windows
+// from config. It does NOT switch or attach the client - callers that want to
+// connect should follow up with tmux.Connect.
+//
+// Callers in the cmd layer (e.g. `demux session connect`) wrap this in
+// withHooksSuppressed("after-new-window") before invoking tmux.Connect.
+// Without the suppression, each new-window during launch fires a backgrounded
+// `demux event new_window` handler; the burst races with the eventual
+// client-session-changed handler and can leave the sidebar stranded in the
+// source session.
+func LaunchConfigSession(name, path string, windowIDs []string, templates map[string]WindowTemplate) error {
 	if err := tmux.NewSessionDetached(name, path); err != nil {
 		return err
 	}
@@ -111,5 +119,5 @@ func LaunchAndConnectConfigSession(name, path string, windowIDs []string, templa
 			return fmt.Errorf("window setup: %w", err)
 		}
 	}
-	return tmux.Connect(name)
+	return nil
 }
