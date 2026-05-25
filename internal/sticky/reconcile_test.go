@@ -14,7 +14,7 @@ func TestReconcileSlots_InstallsMissing(t *testing.T) {
 	f.outputs["split-window -f -h -b -d -l 35 -t @5 -P -F #{pane_id} "+SlotPlaceholderCmd] = fakeReply{out: "%900\n"}
 
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots([]string{"@5"}, "@1", 35); err != nil {
+	if err := s.ReconcileSlots([]string{"@5"}, "@1", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	saw := false
@@ -34,7 +34,7 @@ func TestReconcileSlots_EvictsNonReserved(t *testing.T) {
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@1 %10 1\n@2 %20 1\n@3 %30 1\n"}
 	// @1 already has slot - no install path needed.
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots([]string{"@1"}, "@3", 35); err != nil {
+	if err := s.ReconcileSlots([]string{"@1"}, "@3", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	var killed10, killed20, killed30 bool
@@ -65,7 +65,7 @@ func TestReconcileSlots_NoOpWhenAlreadyMatching(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@1 %10 1\n@2 %20 1\n"}
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots([]string{"@1", "@2"}, "@3", 35); err != nil {
+	if err := s.ReconcileSlots([]string{"@1", "@2"}, "@3", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	for _, r := range f.runs {
@@ -81,7 +81,7 @@ func TestReconcileSlots_IgnoresNonSlotPanes(t *testing.T) {
 	// Mix of slot and non-slot panes; only slots should be considered.
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@5 %50 1\n@5 %51 \n@6 %60 \n"}
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots([]string{"@5"}, "@1", 35); err != nil {
+	if err := s.ReconcileSlots([]string{"@5"}, "@1", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	for _, r := range f.runs {
@@ -100,7 +100,7 @@ func TestReconcileSlots_DedupesDuplicatesWithinReservedWindow(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@1 %10 1\n@1 %11 1\n"}
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots([]string{"@1"}, "@9", 35); err != nil {
+	if err := s.ReconcileSlots([]string{"@1"}, "@9", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	var killed10, killed11 bool
@@ -125,7 +125,7 @@ func TestReconcileSlots_DedupesDuplicatesInCurrentWindow(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@9 %90 1\n@9 %91 1\n"}
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots(nil, "@9", 35); err != nil {
+	if err := s.ReconcileSlots(nil, "@9", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	var killed90, killed91 bool
@@ -144,12 +144,70 @@ func TestReconcileSlots_DedupesDuplicatesInCurrentWindow(t *testing.T) {
 	}
 }
 
+// When the env-tracked active sidebar pane is among the duplicates in the
+// current window, ReconcileSlots must preserve it as survivor even when it
+// is not the first-listed pane. Otherwise prune would kill the user's
+// sidebar and the next Follow would cascade into UninstallSlots, tearing
+// down every other slot on the server.
+func TestReconcileSlots_DedupesDuplicatesInCurrentWindow_PreservesProtected(t *testing.T) {
+	f := newFakeTmux()
+	// %90 listed first, %91 is the env-tracked active sidebar.
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@9 %90 1\n@9 %91 1\n"}
+	s := &Sticky{T: f}
+	if err := s.ReconcileSlots(nil, "@9", "%91", 35); err != nil {
+		t.Fatalf("ReconcileSlots: %v", err)
+	}
+	var killed90, killed91 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "kill-pane -t %90" {
+			killed90 = true
+		}
+		if j == "kill-pane -t %91" {
+			killed91 = true
+		}
+	}
+	if !killed90 {
+		t.Errorf("expected %%90 (non-protected duplicate) to be killed, got: %v", f.runs)
+	}
+	if killed91 {
+		t.Errorf("must not kill %%91 (env-tracked active sidebar), got: %v", f.runs)
+	}
+}
+
+// Symmetric to the above: protected pane happens to be listed first. The
+// non-protected duplicate must still be the one killed.
+func TestReconcileSlots_DedupesDuplicatesInCurrentWindow_ProtectedListedFirst(t *testing.T) {
+	f := newFakeTmux()
+	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@9 %91 1\n@9 %90 1\n"}
+	s := &Sticky{T: f}
+	if err := s.ReconcileSlots(nil, "@9", "%91", 35); err != nil {
+		t.Fatalf("ReconcileSlots: %v", err)
+	}
+	var killed90, killed91 bool
+	for _, r := range f.runs {
+		j := strings.Join(r, " ")
+		if j == "kill-pane -t %90" {
+			killed90 = true
+		}
+		if j == "kill-pane -t %91" {
+			killed91 = true
+		}
+	}
+	if !killed90 {
+		t.Errorf("expected %%90 (non-protected duplicate) to be killed, got: %v", f.runs)
+	}
+	if killed91 {
+		t.Errorf("must not kill %%91 (env-tracked active sidebar), got: %v", f.runs)
+	}
+}
+
 // Non-reserved, non-current window with duplicate slots: kill them all.
 func TestReconcileSlots_KillsAllDuplicatesInNonReservedWindow(t *testing.T) {
 	f := newFakeTmux()
 	f.outputs["list-panes -aF #{window_id} #{pane_id} #{@demux_slot}"] = fakeReply{out: "@7 %70 1\n@7 %71 1\n"}
 	s := &Sticky{T: f}
-	if err := s.ReconcileSlots(nil, "@9", 35); err != nil {
+	if err := s.ReconcileSlots(nil, "@9", "", 35); err != nil {
 		t.Fatalf("ReconcileSlots: %v", err)
 	}
 	var killed70, killed71 bool

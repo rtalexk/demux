@@ -113,12 +113,22 @@ var sidebarSlotsPruneCmd = &cobra.Command{
 				if len(parts) < 2 {
 					return fmt.Errorf("unexpected current target %q", target)
 				}
+				// Look up the env-tracked active sidebar so ReconcileSlots
+				// preserves it across the current-window dedup. Best-effort:
+				// missing tty / unset env / read failure all degrade to no
+				// protection, which is the same behavior prune had before.
+				var protected string
+				if tty, ttyErr := s.CurrentClientTTY(); ttyErr == nil {
+					if v, set, envErr := s.ReadEnv(sticky.EnvKey(tty)); envErr == nil && set {
+						protected = v
+					}
+				}
 				_ = s.PruneMRU()
 				reserved, err := s.ComputeReservedWindows(parts[1], parts[0])
 				if err != nil {
 					return err
 				}
-				return s.ReconcileSlots(reserved, parts[1], cfg.Sidebar.Sticky.Width)
+				return s.ReconcileSlots(reserved, parts[1], protected, cfg.Sidebar.Sticky.Width)
 			})
 		})
 	},
