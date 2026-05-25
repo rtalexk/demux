@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	demuxlog "github.com/rtalexk/demux/internal/log"
 )
 
 // splitSidebarPane runs the standard sidebar split-window invocation
@@ -31,7 +33,10 @@ func (s *Sticky) splitSidebarPane(windowTarget string, width int, cmd string) (s
 	// Best-effort: if geometry can't be read, skip rebalance but still split.
 	// The rebalance is a cosmetic adjustment; failing to perform it must not
 	// block the user from opening the sidebar.
-	pre, minLeft, _ := s.listPaneGeometry(windowTarget)
+	pre, minLeft, geomErr := s.listPaneGeometry(windowTarget)
+	if geomErr != nil {
+		demuxlog.Debug("splitSidebarPane: geometry read failed, skipping rebalance", "target", windowTarget, "err", geomErr)
+	}
 
 	out, err := s.T.Output(
 		"split-window", "-f", "-h", "-b", "-d",

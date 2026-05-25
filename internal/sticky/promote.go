@@ -51,6 +51,13 @@ func (s *Sticky) MaybePromoteSlot(opts ShowOpts) error {
 	if err != nil || slot == "" {
 		return nil
 	}
+	// Cross-client caveat: if a different client already tracks this slot as
+	// its active sidebar, the respawn-pane below kills that client's TUI
+	// process. This is acceptable for single-user multi-client setups (which
+	// is the demux target audience) - both clients end up with a fresh TUI
+	// in the same slot, and the env rewrite below repoints THIS client's
+	// tracking. Multi-user shared-tmux setups should not rely on the
+	// auto-promote behavior.
 	if err := s.T.Run("respawn-pane", "-k", "-t", slot, opts.Cmd); err != nil {
 		return nil
 	}
