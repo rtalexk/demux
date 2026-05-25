@@ -162,12 +162,17 @@ func dispatchConnect(target *session.Session, scfg session.SessionsConfig) error
 //
 // Hooks are restored before tmux.Connect so the session-changed handler still
 // fires - one handler, no race.
+// launchConfigSession and tmuxConnect are package-level vars so the
+// integration test can inject fakes without spawning real tmux processes.
+var launchConfigSession = session.LaunchConfigSession
+var tmuxConnect = tmux.Connect
+
 func launchConfigSessionAndConnect(ce *session.ConfigEntry, scfg session.SessionsConfig) error {
 	s := stickyClient()
 	if err := withHooksSuppressed(s.T, []string{"after-new-window"}, func() error {
-		return session.LaunchConfigSession(ce.Name, ce.Path, ce.Windows, scfg.WindowTemplates)
+		return launchConfigSession(ce.Name, ce.Path, ce.Windows, scfg.WindowTemplates)
 	}); err != nil {
 		return err
 	}
-	return tmux.Connect(ce.Name)
+	return tmuxConnect(ce.Name)
 }
