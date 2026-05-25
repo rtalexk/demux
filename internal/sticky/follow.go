@@ -87,7 +87,7 @@ func (s *Sticky) Follow() error {
 // windows. It does NOT kill stale or duplicate slots: the kill cascade
 // (after-kill-pane -> pane_closed -> SweepOrphanWindows -> more kill-pane)
 // can saturate tmux's command queue and freeze input. Eviction and dedupe
-// live in `demux sidebar slots prune` and the after-new-window event.
+// live in `demux sidebar slots prune`.
 //
 // Best-effort: errors are swallowed so the hook driving Follow never
 // crashes navigation.
