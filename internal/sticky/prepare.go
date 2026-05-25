@@ -6,9 +6,15 @@ package sticky
 // without a one-time split-window flicker.
 //
 // Steps: push target to the head of the MRU, prune stale entries, recompute
-// the reserved set against the still-current window, and reconcile slot
-// panes. Reconcile will install the slot in target (it sits at MRU head, so
-// it's reserved) and evict any non-reserved slot that fell out of budget.
+// the reserved set against the still-current window, and add missing slots
+// for reserved windows. The target sits at MRU head and so is reserved -
+// AddMissingSlots installs it.
+//
+// Additive only: PrepareWindow never kills panes. Reconciling stale or
+// duplicate slots here would fire after-kill-pane -> backgrounded
+// pane_closed -> SweepOrphanWindows on every TUI session switch, the same
+// cascade that froze tmux input from the now-explicit `slots prune` path.
+// Eviction belongs to `demux sidebar slots prune`.
 //
 // No-op when slots mode is disabled, when no sidebar is active anywhere on
 // the server, or when targetWindowID is empty. Best-effort overall: callers
@@ -33,5 +39,5 @@ func (s *Sticky) PrepareWindow(targetWindowID string, width int) error {
 	if err != nil {
 		return err
 	}
-	return s.ReconcileSlots(reserved, window, width)
+	return s.AddMissingSlots(reserved, width)
 }
