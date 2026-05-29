@@ -220,6 +220,11 @@ var eventSessionClosedCmd = &cobra.Command{
 // Unlike pane_closed, this handler does no sticky-sidebar mutation - it is pure
 // DB work, like applyPaneFocus - so it intentionally does not take
 // withEventLock. The state writes serialize at the SQLite layer.
+//
+// Known limitation: window-unlinked also fires for a window that is still alive
+// in another session (linked windows). This over-deletes that window's state,
+// but it self-heals on the next state-set hook, and demux never creates linked
+// windows, so the case is accepted.
 func applyWindowClosed(d *db.DB, windowID string) error {
 	demuxlog.Debug("window_closed", "window_id", windowID)
 	if windowID != "" {
