@@ -66,7 +66,7 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 	}
 	defer d.Close()
 
-	deleted, skipped, err := sweepOrphanStates(d)
+	deleted, skipped, err := sweepOrphans(d)
 	if err != nil {
 		return err
 	}
