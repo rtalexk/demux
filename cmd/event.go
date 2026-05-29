@@ -182,6 +182,73 @@ var eventPaneClosedCmd = &cobra.Command{
 	},
 }
 
+var eventWindowClosedWindowID string
+
+var eventWindowClosedCmd = &cobra.Command{
+	Use:   "window_closed",
+	Short: "Clear state for a closed tmux window and its panes (called by the window-unlinked hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return applyWindowClosed(d, eventWindowClosedWindowID)
+	},
+}
+
+var eventSessionClosedSessionID string
+
+var eventSessionClosedCmd = &cobra.Command{
+	Use:   "session_closed",
+	Short: "Clear state for a closed tmux session and its windows/panes (called by the session-closed hook)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
+		return applySessionClosed(d, eventSessionClosedSessionID)
+	},
+}
+
+// applyWindowClosed deletes the closed window's state row and its pane rows,
+// then runs the orphan sweep as a catch-all. Both steps are best-effort: a
+// failure is logged and the handler still returns nil so the tmux hook stays
+// quiet. The hook ID may be empty on some tmux versions; the sweep covers that.
+func applyWindowClosed(d *db.DB, windowID string) error {
+	demuxlog.Debug("window_closed", "window_id", windowID)
+	if windowID != "" {
+		if n, err := d.StateDeleteByWindow(windowID); err != nil {
+			demuxlog.Error("window_closed: delete by window failed", "window_id", windowID, "err", err)
+		} else {
+			demuxlog.Debug("window_closed: deleted", "window_id", windowID, "rows", n)
+		}
+	}
+	if _, _, err := sweepOrphans(d); err != nil {
+		demuxlog.Warn("window_closed: orphan sweep failed", "err", err)
+	}
+	return nil
+}
+
+// applySessionClosed deletes all state rows for the closed session (session,
+// window, and pane rows all carry session_id), then runs the orphan sweep as a
+// catch-all. Best-effort, same rationale as applyWindowClosed.
+func applySessionClosed(d *db.DB, sessionID string) error {
+	demuxlog.Debug("session_closed", "session_id", sessionID)
+	if sessionID != "" {
+		if n, err := d.StateDeleteBySession(sessionID); err != nil {
+			demuxlog.Error("session_closed: delete by session failed", "session_id", sessionID, "err", err)
+		} else {
+			demuxlog.Debug("session_closed: deleted", "session_id", sessionID, "rows", n)
+		}
+	}
+	if _, _, err := sweepOrphans(d); err != nil {
+		demuxlog.Warn("session_closed: orphan sweep failed", "err", err)
+	}
+	return nil
+}
+
 // runWindowFocus is the shared handler for the window_focus and session_changed
 // events. It clears resting done-states for the focused pane (like pane_focus)
 // and moves the sticky sidebar to the focused window/session.
@@ -413,6 +480,9 @@ func init() {
 	eventPaneClosedCmd.Flags().StringVar(&eventPaneClosedWindowID, "window", "", "Stable window ID (@N format) of the killed pane's window (optional)")
 	eventPaneClosedCmd.MarkFlagRequired("pane")
 
+	eventWindowClosedCmd.Flags().StringVar(&eventWindowClosedWindowID, "window", "", "Stable window ID (@N format) of the closed window")
+	eventSessionClosedCmd.Flags().StringVar(&eventSessionClosedSessionID, "session", "", "Stable session ID ($N format) of the closed session")
+
 	for _, c := range []*cobra.Command{eventWindowFocusCmd, eventSessionChangedCmd} {
 		c.Flags().String("pane-id", "", "Stable pane ID (%N format); auto-detected if omitted")
 		c.Flags().String("window-id", "", "Stable window ID (@N format); auto-detected if omitted")
@@ -420,6 +490,6 @@ func init() {
 	}
 
 	rejectUnknownSubcommand(eventCmd)
-	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd)
+	eventCmd.AddCommand(eventPaneFocusCmd, eventHookErrorCmd, eventPaneExitingCmd, eventPaneClosedCmd, eventClientAttachedCmd, eventWindowFocusCmd, eventSessionChangedCmd, eventNewWindowCmd, eventWindowClosedCmd, eventSessionClosedCmd)
 	rootCmd.AddCommand(eventCmd)
 }

@@ -266,3 +266,95 @@ func TestEventWindowEventsRegistered(t *testing.T) {
 		}
 	}
 }
+
+func TestApplyWindowClosed_CascadeDeletesWindowAndPanes(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	orig := sweepOrphans
+	sweepOrphans = func(*db.DB) (int64, bool, error) { return 0, false, nil }
+	defer func() { sweepOrphans = orig }()
+
+	wt := windowTarget("@5", "$0")
+	p1 := paneTarget("%10", "@5", "$0")
+	other := paneTarget("%99", "@9", "$0")
+	d.StateSet(wt, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet(p1, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet(other, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+
+	if err := applyWindowClosed(d, "@5"); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := d.StateByID(wt); st != nil {
+		t.Error("window state should be deleted")
+	}
+	if st, _ := d.StateByID(p1); st != nil {
+		t.Error("pane state in closed window should be deleted")
+	}
+	if st, _ := d.StateByID(other); st == nil {
+		t.Error("unrelated pane state should survive")
+	}
+}
+
+func TestApplyWindowClosed_EmptyIDStillSweeps(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	swept := false
+	orig := sweepOrphans
+	sweepOrphans = func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil }
+	defer func() { sweepOrphans = orig }()
+
+	if err := applyWindowClosed(d, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !swept {
+		t.Error("sweep should run even when window ID is empty")
+	}
+}
+
+func TestApplySessionClosed_CascadeDeletesSession(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	orig := sweepOrphans
+	sweepOrphans = func(*db.DB) (int64, bool, error) { return 0, false, nil }
+	defer func() { sweepOrphans = orig }()
+
+	inS0 := paneTarget("%10", "@5", "$0")
+	winS0 := windowTarget("@5", "$0")
+	inS1 := paneTarget("%20", "@8", "$1")
+	d.StateSet(inS0, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet(winS0, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+	d.StateSet(inS1, "claude", db.StateWorking, "", db.SourceTool, false, nil)
+
+	if err := applySessionClosed(d, "$0"); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := d.StateByID(inS0); st != nil {
+		t.Error("pane in closed session should be deleted")
+	}
+	if st, _ := d.StateByID(winS0); st != nil {
+		t.Error("window in closed session should be deleted")
+	}
+	if st, _ := d.StateByID(inS1); st == nil {
+		t.Error("state in other session should survive")
+	}
+}
+
+func TestEventCloseCommandsRegistered(t *testing.T) {
+	want := map[string]bool{"window_closed": false, "session_closed": false}
+	for _, c := range eventCmd.Commands() {
+		if _, ok := want[c.Use]; ok {
+			want[c.Use] = true
+			if c.RunE == nil {
+				t.Errorf("%s command has no RunE", c.Use)
+			}
+		}
+	}
+	for name, found := range want {
+		if !found {
+			t.Errorf("event %s subcommand not registered", name)
+		}
+	}
+}
