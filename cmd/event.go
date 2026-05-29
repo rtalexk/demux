@@ -216,6 +216,10 @@ var eventSessionClosedCmd = &cobra.Command{
 // then runs the orphan sweep as a catch-all. Both steps are best-effort: a
 // failure is logged and the handler still returns nil so the tmux hook stays
 // quiet. The hook ID may be empty on some tmux versions; the sweep covers that.
+//
+// Unlike pane_closed, this handler does no sticky-sidebar mutation - it is pure
+// DB work, like applyPaneFocus - so it intentionally does not take
+// withEventLock. The state writes serialize at the SQLite layer.
 func applyWindowClosed(d *db.DB, windowID string) error {
 	demuxlog.Debug("window_closed", "window_id", windowID)
 	if windowID != "" {

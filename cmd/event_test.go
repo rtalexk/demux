@@ -342,6 +342,23 @@ func TestApplySessionClosed_CascadeDeletesSession(t *testing.T) {
 	}
 }
 
+func TestApplySessionClosed_EmptyIDStillSweeps(t *testing.T) {
+	d, _ := db.Open(":memory:")
+	defer d.Close()
+
+	swept := false
+	orig := sweepOrphans
+	sweepOrphans = func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil }
+	defer func() { sweepOrphans = orig }()
+
+	if err := applySessionClosed(d, ""); err != nil {
+		t.Fatal(err)
+	}
+	if !swept {
+		t.Error("sweep should run even when session ID is empty")
+	}
+}
+
 func TestEventCloseCommandsRegistered(t *testing.T) {
 	want := map[string]bool{"window_closed": false, "session_closed": false}
 	for _, c := range eventCmd.Commands() {
