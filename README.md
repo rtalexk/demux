@@ -962,9 +962,13 @@ If the named session is configured in `sessions.toml` or `private.toml` but not 
 
 demux uses tmux hooks to clear `done` states when you navigate between panes,
 windows, or sessions, so you always know if a tool finished while you were
-away, plus the hooks that drive the sticky sidebar. These hooks are registered
-and kept up to date automatically by `demux hooks install` — see
-[Enable the tmux hooks](#enable-the-tmux-hooks) for the one-time setup.
+away, plus the hooks that drive the sticky sidebar. demux also clears a
+target's state automatically when its pane, window, or session is closed
+(`after-kill-pane`, `window-unlinked`, and `session-closed`), cascading to
+descendant panes, so killing a window or session leaves no stale rows behind.
+These hooks are registered and kept up to date automatically by
+`demux hooks install`, see [Enable the tmux hooks](#enable-the-tmux-hooks)
+for the one-time setup.
 
 ### Tmux Status Bar
 
@@ -1165,6 +1169,8 @@ demux status --format text         # plain text summary
 # Hooks
 demux event pane_focus             # clear done states for the focused pane (used by tmux hooks)
 demux event pane_focus [--pane-id <%N>] [--window-id <@N>] [--session-id <$N>]
+demux event window_closed --window <@N>   # clear state for a closed window + its panes (used by tmux hooks)
+demux event session_closed --session <$N> # clear state for a closed session + its windows/panes (used by tmux hooks)
 
 # Config
 demux config init                  # print default config to stdout
