@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/tmux"
 	"github.com/spf13/cobra"
 )
@@ -18,10 +19,14 @@ var gcStatesCmd = &cobra.Command{
 	RunE:  runGCStates,
 }
 
-func runGCStates(_ *cobra.Command, _ []string) error {
+// sweepOrphanStates deletes state rows whose tmux target is no longer live.
+// It returns the number of rows deleted and skipped=true when no live tmux
+// targets are found (sweep skipped to avoid wiping the table during a tmux
+// outage). Shared by `demux gc states` and the window/session close handlers.
+func sweepOrphanStates(d *db.DB) (deleted int64, skipped bool, err error) {
 	panes, err := tmux.ListPanes()
 	if err != nil {
-		return fmt.Errorf("tmux not available: %w", err)
+		return 0, false, fmt.Errorf("tmux not available: %w", err)
 	}
 
 	livePaneIDs := make(map[string]bool, len(panes))
@@ -40,22 +45,37 @@ func runGCStates(_ *cobra.Command, _ []string) error {
 	}
 
 	if len(livePaneIDs) == 0 && len(liveWindowIDs) == 0 && len(liveSessionIDs) == 0 {
-		fmt.Println("No live tmux targets found; skipping GC to avoid data loss.")
-		return nil
+		return 0, true, nil
 	}
 
+	n, err := d.StateGCOrphaned(livePaneIDs, liveWindowIDs, liveSessionIDs)
+	if err != nil {
+		return 0, false, fmt.Errorf("gc states: %w", err)
+	}
+	return n, false, nil
+}
+
+// sweepOrphans is the orphan-state sweep, indirected so event-handler tests can
+// stub it (the real sweep shells out to tmux, which is unavailable in tests).
+var sweepOrphans = sweepOrphanStates
+
+func runGCStates(_ *cobra.Command, _ []string) error {
 	d, err := openDB()
 	if err != nil {
 		return err
 	}
 	defer d.Close()
 
-	n, err := d.StateGCOrphaned(livePaneIDs, liveWindowIDs, liveSessionIDs)
+	deleted, skipped, err := sweepOrphanStates(d)
 	if err != nil {
-		return fmt.Errorf("gc states: %w", err)
+		return err
 	}
-	if n > 0 {
-		fmt.Printf("Removed %d orphaned state record(s).\n", n)
+	if skipped {
+		fmt.Println("No live tmux targets found; skipping GC to avoid data loss.")
+		return nil
+	}
+	if deleted > 0 {
+		fmt.Printf("Removed %d orphaned state record(s).\n", deleted)
 	} else {
 		fmt.Println("No orphaned state records found.")
 	}
