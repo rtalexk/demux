@@ -154,6 +154,7 @@ var eventPaneExitingCmd = &cobra.Command{
 	Use:   "pane_exiting",
 	Short: "Eject sidebar if it would be stranded by an exiting pane (called by pane-exited hook)",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		demuxlog.Debug("pane_exiting", "pane_id", eventPaneExitingPaneID, "window_id", eventPaneExitingWindowID)
 		return withEventLock(func() error {
 			cfg := loadConfig()
 			t := stickyTmuxForEvents()
@@ -188,31 +189,41 @@ func runWindowFocus(cmd *cobra.Command, args []string) error {
 	paneID, _ := cmd.Flags().GetString("pane-id")
 	windowID, _ := cmd.Flags().GetString("window-id")
 	sessionID, _ := cmd.Flags().GetString("session-id")
+	resolved := false
 	if paneID == "" {
 		var err error
 		paneID, windowID, sessionID, err = tmuxCurrentIDs()
 		if err != nil {
+			demuxlog.Debug(cmd.Use+": resolve current ids failed", "err", err)
 			return err
 		}
+		resolved = true
 	}
+	demuxlog.Debug(cmd.Use, "pane_id", paneID, "window_id", windowID, "session_id", sessionID, "ids_resolved", resolved)
 
-	d, err := openDB()
-	if err != nil {
-		return err
-	}
-	defer d.Close()
+	// The focus hooks are backgrounded (run-shell -b), so two rapid window or
+	// session switches can launch this handler concurrently. Serialize via the
+	// shared event lock so Follow's swap-pane/resize-pane sequence can't race
+	// another invocation and strand the sidebar in the wrong window.
+	return withEventLock(func() error {
+		d, err := openDB()
+		if err != nil {
+			return err
+		}
+		defer d.Close()
 
-	if err := applyPaneFocus(d, paneID, windowID, sessionID); err != nil {
-		return err
-	}
-	s := stickyClient()
-	if err := s.Follow(); err != nil {
-		demuxlog.Warn(cmd.Use+": sidebar follow failed", "err", err)
-	}
-	if err := s.MaybePromoteSlot(sidebarShowOpts()); err != nil {
-		demuxlog.Warn(cmd.Use+": sidebar promote failed", "err", err)
-	}
-	return nil
+		if err := applyPaneFocus(d, paneID, windowID, sessionID); err != nil {
+			return err
+		}
+		s := stickyClient()
+		if err := s.Follow(); err != nil {
+			demuxlog.Warn(cmd.Use+": sidebar follow failed", "err", err)
+		}
+		if err := s.MaybePromoteSlot(sidebarShowOpts()); err != nil {
+			demuxlog.Warn(cmd.Use+": sidebar promote failed", "err", err)
+		}
+		return nil
+	})
 }
 
 // eventWindowFocusCmd is fired by the after-select-window hook.
@@ -248,6 +259,7 @@ var eventNewWindowCmd = &cobra.Command{
 	Use:   "new_window",
 	Short: "Add missing sidebar slot panes for MRU-reserved windows",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		demuxlog.Debug("new_window")
 		if err := ensureSlots(); err != nil {
 			demuxlog.Warn("new_window: slots ensure failed", "err", err)
 		}

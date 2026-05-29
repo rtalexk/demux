@@ -24,9 +24,23 @@ type Hook struct {
 // demux managed block in ~/.tmux.conf and is what triggers reconciliation, so
 // the reconciler must never manage it.
 func DesiredHooks() []Hook {
-	const paneFocus = `run-shell 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
-	const windowFocus = `run-shell 'demux event window_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
-	const sessionChanged = `run-shell 'demux event session_changed --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
+	// pane_focus is backgrounded (-b). It fires on after-select-pane and
+	// client-focus-in, which tmux raises at the very start of a mouse scroll or
+	// drag (the first interaction selects/focuses the pane). A non-backgrounded
+	// run-shell blocks the tmux server's command queue until `demux event`
+	// returns, so the DB work (which can stall on the SQLite lock held by the
+	// frequent state-writer hook) freezes tmux mid-redraw and tears the
+	// copy-mode/selection paint. pane_focus does pure DB work with no tmux
+	// mutation or cross-hook ordering, so backgrounding it is safe.
+	const paneFocus = `run-shell -b 'demux event pane_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
+	// window_focus and session_changed are likewise backgrounded (-b). They fire
+	// on window/session switch and, like pane_focus, a synchronous run-shell here
+	// blocks the tmux server's command queue until `demux event` returns (DB work
+	// that can stall on the SQLite lock), freezing tmux on every switch. The
+	// handler serializes itself with withEventLock so backgrounded invocations
+	// cannot race each other's sidebar moves.
+	const windowFocus = `run-shell -b 'demux event window_focus --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
+	const sessionChanged = `run-shell -b 'demux event session_changed --pane-id=#{pane_id} --window-id=#{window_id} --session-id=#{session_id} 2>/dev/null; true'`
 	return []Hook{
 		{Event: "after-select-pane", Command: paneFocus},
 		{Event: "after-select-window", Command: windowFocus},
