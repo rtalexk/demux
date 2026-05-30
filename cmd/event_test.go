@@ -17,6 +17,13 @@ func windowTarget(windowID, sessionID string) db.Target {
 	return db.Target{Type: db.TargetTypeWindow, ID: windowID, WindowID: windowID, SessionID: sessionID}
 }
 
+func stubSweep(t *testing.T, fn func(*db.DB) (int64, bool, error)) {
+	t.Helper()
+	orig := sweepOrphans
+	sweepOrphans = fn
+	t.Cleanup(func() { sweepOrphans = orig })
+}
+
 func TestPaneFocusClearsDoneStates(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
@@ -271,9 +278,7 @@ func TestApplyWindowClosed_CascadeDeletesWindowAndPanes(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	orig := sweepOrphans
-	sweepOrphans = func(*db.DB) (int64, bool, error) { return 0, false, nil }
-	defer func() { sweepOrphans = orig }()
+	stubSweep(t, func(*db.DB) (int64, bool, error) { return 0, false, nil })
 
 	wt := windowTarget("@5", "$0")
 	p1 := paneTarget("%10", "@5", "$0")
@@ -301,9 +306,7 @@ func TestApplyWindowClosed_EmptyIDStillSweeps(t *testing.T) {
 	defer d.Close()
 
 	swept := false
-	orig := sweepOrphans
-	sweepOrphans = func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil }
-	defer func() { sweepOrphans = orig }()
+	stubSweep(t, func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil })
 
 	if err := applyWindowClosed(d, ""); err != nil {
 		t.Fatal(err)
@@ -317,9 +320,7 @@ func TestApplySessionClosed_CascadeDeletesSession(t *testing.T) {
 	d, _ := db.Open(":memory:")
 	defer d.Close()
 
-	orig := sweepOrphans
-	sweepOrphans = func(*db.DB) (int64, bool, error) { return 0, false, nil }
-	defer func() { sweepOrphans = orig }()
+	stubSweep(t, func(*db.DB) (int64, bool, error) { return 0, false, nil })
 
 	inS0 := paneTarget("%10", "@5", "$0")
 	winS0 := windowTarget("@5", "$0")
@@ -347,9 +348,7 @@ func TestApplySessionClosed_EmptyIDStillSweeps(t *testing.T) {
 	defer d.Close()
 
 	swept := false
-	orig := sweepOrphans
-	sweepOrphans = func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil }
-	defer func() { sweepOrphans = orig }()
+	stubSweep(t, func(*db.DB) (int64, bool, error) { swept = true; return 0, false, nil })
 
 	if err := applySessionClosed(d, ""); err != nil {
 		t.Fatal(err)

@@ -212,50 +212,38 @@ var eventSessionClosedCmd = &cobra.Command{
 	},
 }
 
-// applyWindowClosed deletes the closed window's state row and its pane rows,
-// then runs the orphan sweep as a catch-all. Both steps are best-effort: a
-// failure is logged and the handler still returns nil so the tmux hook stays
+// applyClosedCleanup is shared by window_closed and session_closed. It calls
+// deleteFn(id) when id is non-empty (best-effort, errors logged), then runs
+// the orphan sweep as a catch-all. Always returns nil so the tmux hook stays
 // quiet. The hook ID may be empty on some tmux versions; the sweep covers that.
 //
-// Unlike pane_closed, this handler does no sticky-sidebar mutation - it is pure
-// DB work, like applyPaneFocus - so it intentionally does not take
-// withEventLock. The state writes serialize at the SQLite layer.
+// No sticky-sidebar mutation here (pure DB work), so no withEventLock needed;
+// state writes serialize at the SQLite layer.
 //
-// Known limitation: window-unlinked also fires for a window that is still alive
-// in another session (linked windows). This over-deletes that window's state,
-// but it self-heals on the next state-set hook, and demux never creates linked
-// windows, so the case is accepted.
-func applyWindowClosed(d *db.DB, windowID string) error {
-	demuxlog.Debug("window_closed", "window_id", windowID)
-	if windowID != "" {
-		if n, err := d.StateDeleteByWindow(windowID); err != nil {
-			demuxlog.Error("window_closed: delete by window failed", "window_id", windowID, "err", err)
+// Known limitation: window-unlinked also fires for a window still alive in
+// another session (linked windows). This over-deletes, but self-heals on the
+// next state-set hook. demux never creates linked windows, so this is accepted.
+func applyClosedCleanup(d *db.DB, event, idKey, id string, deleteFn func(string) (int64, error)) error {
+	demuxlog.Debug(event, idKey, id)
+	if id != "" {
+		if n, err := deleteFn(id); err != nil {
+			demuxlog.Error(event+": delete failed", idKey, id, "err", err)
 		} else {
-			demuxlog.Debug("window_closed: deleted", "window_id", windowID, "rows", n)
+			demuxlog.Debug(event+": deleted", idKey, id, "rows", n)
 		}
 	}
 	if _, _, err := sweepOrphans(d); err != nil {
-		demuxlog.Warn("window_closed: orphan sweep failed", "err", err)
+		demuxlog.Warn(event+": orphan sweep failed", "err", err)
 	}
 	return nil
 }
 
-// applySessionClosed deletes all state rows for the closed session (session,
-// window, and pane rows all carry session_id), then runs the orphan sweep as a
-// catch-all. Best-effort, same rationale as applyWindowClosed.
+func applyWindowClosed(d *db.DB, windowID string) error {
+	return applyClosedCleanup(d, "window_closed", "window_id", windowID, d.StateDeleteByWindow)
+}
+
 func applySessionClosed(d *db.DB, sessionID string) error {
-	demuxlog.Debug("session_closed", "session_id", sessionID)
-	if sessionID != "" {
-		if n, err := d.StateDeleteBySession(sessionID); err != nil {
-			demuxlog.Error("session_closed: delete by session failed", "session_id", sessionID, "err", err)
-		} else {
-			demuxlog.Debug("session_closed: deleted", "session_id", sessionID, "rows", n)
-		}
-	}
-	if _, _, err := sweepOrphans(d); err != nil {
-		demuxlog.Warn("session_closed: orphan sweep failed", "err", err)
-	}
-	return nil
+	return applyClosedCleanup(d, "session_closed", "session_id", sessionID, d.StateDeleteBySession)
 }
 
 // runWindowFocus is the shared handler for the window_focus and session_changed
