@@ -397,6 +397,17 @@ func (d *DB) StateDeleteBySession(sessionID string) (int64, error) {
 	return res.RowsAffected()
 }
 
+// StateDeleteByWindow removes the window's own state row and all pane rows
+// belonging to it. Window-target rows and pane rows both carry window_id, so a
+// single delete cascades window + its panes. Returns the rows deleted.
+func (d *DB) StateDeleteByWindow(windowID string) (int64, error) {
+	res, err := d.sql.Exec(`DELETE FROM tool_states WHERE window_id = ?`, windowID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // StateByID returns the ToolState for the given target identity, or nil if no record exists (idle).
 func (d *DB) StateByID(t Target) (*ToolState, error) {
 	row := d.sql.QueryRow(`

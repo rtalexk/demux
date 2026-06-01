@@ -49,6 +49,11 @@ func DesiredHooks() []Hook {
 		{Event: "after-kill-pane", Command: `run-shell -b 'demux event pane_closed --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'`},
 		{Event: "pane-exited", Command: `run-shell -b 'demux event pane_exiting --pane=#{hook_pane} --window=#{hook_window} 2>/dev/null; true'`},
 		{Event: "after-new-window", Command: `run-shell -b 'demux event new_window 2>/dev/null; true'`},
+		// window_closed and session_closed clear state for a closed window or
+		// session (and its descendants). Backgrounded (-b) like the other DB
+		// hooks so the run-shell never blocks the tmux server's command queue.
+		{Event: "window-unlinked", Command: `run-shell -b 'demux event window_closed --window=#{hook_window} 2>/dev/null; true'`},
+		{Event: "session-closed", Command: `run-shell -b 'demux event session_closed --session=#{hook_session} 2>/dev/null; true'`},
 	}
 }
 

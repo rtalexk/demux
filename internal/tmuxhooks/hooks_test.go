@@ -11,8 +11,8 @@ func TestDesiredHooksExcludesClientAttached(t *testing.T) {
 	if len(hooks) == 0 {
 		t.Fatal("DesiredHooks returned empty set")
 	}
-	if len(hooks) != 7 {
-		t.Errorf("DesiredHooks: want 7 entries, got %d", len(hooks))
+	if len(hooks) != 9 {
+		t.Errorf("DesiredHooks: want 9 entries, got %d", len(hooks))
 	}
 	for _, h := range hooks {
 		if h.Event == "client-attached" {
@@ -28,6 +28,7 @@ func TestDesiredHooksCoversExpectedEvents(t *testing.T) {
 	want := []string{
 		"after-select-pane", "after-select-window", "client-session-changed",
 		"client-focus-in", "after-kill-pane", "pane-exited", "after-new-window",
+		"window-unlinked", "session-closed",
 	}
 	got := map[string]bool{}
 	for _, h := range DesiredHooks() {

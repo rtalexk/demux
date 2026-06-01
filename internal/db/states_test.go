@@ -424,6 +424,42 @@ func TestStateDeleteBySession_DeletesAll(t *testing.T) {
 	}
 }
 
+func TestStateDeleteByWindow_CascadesPanesAndWindow(t *testing.T) {
+	d, _ := Open(":memory:")
+	defer d.Close()
+
+	// Window @5 with two panes, plus an unrelated window @6 with one pane.
+	win5 := Target{Type: TargetTypeWindow, ID: "@5", SessionID: "$0", WindowID: "@5"}
+	p1 := Target{Type: TargetTypePane, ID: "%10", SessionID: "$0", WindowID: "@5", PaneID: "%10"}
+	p2 := Target{Type: TargetTypePane, ID: "%11", SessionID: "$0", WindowID: "@5", PaneID: "%11"}
+	win6 := Target{Type: TargetTypeWindow, ID: "@6", SessionID: "$0", WindowID: "@6"}
+	p3 := Target{Type: TargetTypePane, ID: "%12", SessionID: "$0", WindowID: "@6", PaneID: "%12"}
+
+	d.StateSet(win5, "claude", StateWorking, "", SourceTool, false, nil)
+	d.StateSet(p1, "claude", StateWorking, "", SourceTool, false, nil)
+	d.StateSet(p2, "make", StateDone, "", SourceTool, false, nil)
+	d.StateSet(win6, "claude", StateWorking, "", SourceTool, false, nil)
+	d.StateSet(p3, "claude", StateWorking, "", SourceTool, false, nil)
+
+	n, err := d.StateDeleteByWindow("@5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Errorf("expected 3 rows deleted (window + 2 panes), got %d", n)
+	}
+	for _, gone := range []Target{win5, p1, p2} {
+		if st, _ := d.StateByID(gone); st != nil {
+			t.Errorf("expected %s deleted, still present", gone.ID)
+		}
+	}
+	for _, kept := range []Target{win6, p3} {
+		if st, _ := d.StateByID(kept); st == nil {
+			t.Errorf("expected %s to survive, was deleted", kept.ID)
+		}
+	}
+}
+
 func TestStateSet_StoresPaneID(t *testing.T) {
 	d, _ := Open(":memory:")
 	defer d.Close()
