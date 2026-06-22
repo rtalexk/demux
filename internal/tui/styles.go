@@ -77,6 +77,9 @@ var (
 
 	// Todo indicator
 	todoStyle lipgloss.Style
+
+	// Caffeine indicator
+	caffeineStyle lipgloss.Style
 )
 
 // initStyles rebuilds every style using the given theme and merges proc-type
@@ -132,6 +135,7 @@ func initStyles(t Theme, procs config.ProcessesConfig, ignoredProcs []string) {
 
 	watchStyle = lipgloss.NewStyle().Foreground(t.ColorWatch)
 	todoStyle = lipgloss.NewStyle().Foreground(t.ColorTodo)
+	caffeineStyle = lipgloss.NewStyle().Foreground(t.ColorFgMuted)
 }
 
 // ageDrivenValue returns the effective display value for a state.
