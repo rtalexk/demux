@@ -590,7 +590,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 	rowsLeft := contentRows
 	for i := offset; i < end; i++ {
 		isLastInList := (i == len(s.nodes)-1)
-		h := s.nodeHeight(isLastInList)
+		h := s.nodeHeight(i, isLastInList)
 		if h > rowsLeft {
 			break
 		}
@@ -604,7 +604,7 @@ func (s SidebarModel) buildSidebarLines(offset, contentRows int, hasAbove, hasBe
 			// includes the separator for non-last cards, so rowsLeft was already
 			// charged for it; skipping the append here over-subtracts rowsLeft by
 			// 1, but the loop is about to exit so no further damage.
-			nextH := s.nodeHeight((i + 1) == len(s.nodes)-1)
+			nextH := s.nodeHeight(i+1, (i+1) == len(s.nodes)-1)
 			if nextH <= rowsLeft {
 				lines = append(lines, sep)
 			}
@@ -622,7 +622,7 @@ func (s SidebarModel) Render(width, height int, focused bool, title, rightTitle 
 		visibleRows = 1
 	}
 
-	heightFn := func(_ int, isLast bool) int { return s.nodeHeight(isLast) }
+	heightFn := func(i int, isLast bool) int { return s.nodeHeight(i, isLast) }
 	offset, contentRows, hasAbove, hasBelow := sidebarViewport(s.cursor, s.offset, visibleRows, len(s.nodes), heightFn)
 
 	innerW := width - borderOverhead
@@ -684,17 +684,34 @@ func (s SidebarModel) cardSeparatorRow(innerW int) string {
 	}
 }
 
-// nodeHeight returns the viewport rows consumed by a session in the current
-// view. Card mode reserves 2 content rows; a trailing separator row adds 1
-// for every card except the last visible one when card_separator is enabled.
-func (s SidebarModel) nodeHeight(isLast bool) int {
+// statsExpandable reports whether the session has a stat entry and the
+// feature is enabled, i.e. its cursor row should show the resource readout.
+func (s SidebarModel) statsExpandable(session string) bool {
+	if !s.cfg.Sidebar.ShowSessionStats {
+		return false
+	}
+	_, ok := s.stats[session]
+	return ok
+}
+
+// nodeHeight returns the viewport rows consumed by node i in the current view.
+// Card mode reserves 2 content rows; a trailing separator row adds 1 for every
+// card except the last visible one when card_separator is enabled. The cursor
+// row gains 2 extra rows for the resource readout when stats are enabled and
+// available for that session.
+func (s SidebarModel) nodeHeight(i int, isLast bool) int {
+	h := 1
 	if s.cardView() {
 		if isLast || s.cfg.Sidebar.CardSeparator == config.CardSeparatorNone {
-			return 2
+			h = 2
+		} else {
+			h = 3
 		}
-		return 3
 	}
-	return 1
+	if i >= 0 && i < len(s.nodes) && i == s.cursor && s.statsExpandable(s.nodes[i].Session) {
+		h += 2
+	}
+	return h
 }
 
 // alignedRow builds a single sidebar line with the name on the left and
@@ -1033,11 +1050,35 @@ func (s SidebarModel) renderSession(node SidebarNode, selected, focused bool, wi
 	}
 
 	gap := s.activeIndicator(node, selected && focused)
+	var row string
 	if selected {
-		return renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
+		row = renderSelectedRow(iconPrefix, nameStr, indicators, gap, availW, indW, focused)
+	} else {
+		text := alignedRow(nameStr, indicators, availW)
+		row = " " + gap + " " + styledIconPrefix(iconPrefix, false) + sessionStyle.Render(text)
 	}
-	text := alignedRow(nameStr, indicators, availW)
-	return " " + gap + " " + styledIconPrefix(iconPrefix, false) + sessionStyle.Render(text)
+	if selected && s.statsExpandable(node.Session) {
+		if lines := s.renderStatLines(node, width); lines != nil {
+			row += "\n" + strings.Join(lines, "\n")
+		}
+	}
+	return row
+}
+
+// renderStatLines returns the two muted readout lines for a session, or nil
+// when no stat is available. Indented to sit under the session name.
+func (s SidebarModel) renderStatLines(node SidebarNode, width int) []string {
+	st, ok := s.stats[node.Session]
+	if !ok {
+		return nil
+	}
+	cpuLine := fmt.Sprintf("cpu %.0f%% now · %.0f%% peak", st.CPUNow, st.CPUPeak)
+	memLine := fmt.Sprintf("mem %s now · %s peak", humanizeBytes(st.MemNow), humanizeBytes(st.MemPeak))
+	const indent = "     " // align under the session name (focus + gap + icon)
+	return []string{
+		hintStyle.Render(indent + cpuLine),
+		hintStyle.Render(indent + memLine),
+	}
 }
 
 // renderSessionCard renders a session as a two-row card.
@@ -1059,7 +1100,13 @@ func (s SidebarModel) renderSessionCard(node SidebarNode, selected, focused bool
 	}
 	header := s.renderCardHeader(node, selected, focused, innerW)
 	status := s.renderCardStatus(node, selected, focused, innerW)
-	return header + "\n" + status
+	out := header + "\n" + status
+	if selected && s.statsExpandable(node.Session) {
+		if lines := s.renderStatLines(node, width); lines != nil {
+			out += "\n" + strings.Join(lines, "\n")
+		}
+	}
+	return out
 }
 
 // cardLeadingGlyph returns the column-0 glyph for a card row. Selected cards
@@ -1299,7 +1346,7 @@ func (s *SidebarModel) clampViewport(visibleRows int) {
 	if effective < 1 {
 		effective = 1
 	}
-	heightFn := func(_ int, isLast bool) int { return s.nodeHeight(isLast) }
+	heightFn := func(i int, isLast bool) int { return s.nodeHeight(i, isLast) }
 	if s.cursor < s.offset {
 		s.offset = s.cursor
 	}
