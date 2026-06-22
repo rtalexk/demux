@@ -75,3 +75,78 @@ func humanizeBytes(b uint64) string {
 	}
 	return fmt.Sprintf("%.1fGB", float64(b)/float64(gib))
 }
+
+// statsPeakWindow is the number of recent samples retained per session for the
+// rolling peak. At the ~2s proc-poll interval this is ~2 minutes of history.
+const statsPeakWindow = 60
+
+type statSample struct {
+	cpu float64
+	mem uint64
+}
+
+// SessionStatsModel computes per-session resource totals each refresh and
+// tracks a rolling-window peak. The zero value is ready to use; maps are
+// lazily initialized in Update.
+type SessionStatsModel struct {
+	rings map[string][]statSample
+	cur   map[string]SessionStat
+}
+
+// Update recomputes current totals for every live session and rolls the peak
+// window forward. Sessions absent from panes are pruned.
+func (m *SessionStatsModel) Update(panes []tmux.Pane, procs []proc.Process) {
+	if m.rings == nil {
+		m.rings = make(map[string][]statSample)
+	}
+	tree := proc.BuildTree(procs)
+	byPID := indexByPID(procs)
+	grouped := tmux.GroupBySessions(panes)
+
+	newRings := make(map[string][]statSample, len(grouped))
+	newCur := make(map[string]SessionStat, len(grouped))
+
+	for session, windows := range grouped {
+		var sessionPanes []tmux.Pane
+		for _, wPanes := range windows {
+			sessionPanes = append(sessionPanes, wPanes...)
+		}
+		cpu, mem, caf := computeSessionTotals(sessionPanes, byPID, tree)
+
+		ring := append(m.rings[session], statSample{cpu: cpu, mem: mem})
+		if len(ring) > statsPeakWindow {
+			ring = ring[len(ring)-statsPeakWindow:]
+		}
+		newRings[session] = ring
+
+		var cpuPeak float64
+		var memPeak uint64
+		for _, s := range ring {
+			if s.cpu > cpuPeak {
+				cpuPeak = s.cpu
+			}
+			if s.mem > memPeak {
+				memPeak = s.mem
+			}
+		}
+		newCur[session] = SessionStat{
+			CPUNow:      cpu,
+			MemNow:      mem,
+			CPUPeak:     cpuPeak,
+			MemPeak:     memPeak,
+			Caffeinated: caf,
+		}
+	}
+
+	m.rings = newRings // pruning: sessions not in `grouped` are dropped
+	m.cur = newCur
+}
+
+// Snapshot returns the latest per-session stats. The returned map is replaced
+// wholesale on each Update; callers must treat it as read-only.
+func (m SessionStatsModel) Snapshot() map[string]SessionStat {
+	if m.cur == nil {
+		return map[string]SessionStat{}
+	}
+	return m.cur
+}

@@ -82,3 +82,52 @@ func TestHumanizeBytes(t *testing.T) {
 		}
 	}
 }
+
+func TestSessionStatsModel_RollingPeakDecays(t *testing.T) {
+	var m SessionStatsModel
+	mkProcs := func(cpu float64) []proc.Process {
+		return []proc.Process{{PID: 100, PPID: 1, CPU: cpu, MemRSS: 1, Name: "zsh"}}
+	}
+	panes := []tmux.Pane{{Session: "s", PanePID: 100}}
+
+	m.Update(panes, mkProcs(50)) // spike
+	for i := 0; i < statsPeakWindow; i++ {
+		m.Update(panes, mkProcs(10))
+	}
+	st := m.Snapshot()["s"]
+	if st.CPUNow != 10 {
+		t.Errorf("CPUNow = %v, want 10", st.CPUNow)
+	}
+	if st.CPUPeak != 10 {
+		t.Errorf("CPUPeak = %v, want 10 (50 should have decayed out of the %d-sample window)", st.CPUPeak, statsPeakWindow)
+	}
+}
+
+func TestSessionStatsModel_PeakHoldsWithinWindow(t *testing.T) {
+	var m SessionStatsModel
+	panes := []tmux.Pane{{Session: "s", PanePID: 100}}
+	m.Update(panes, []proc.Process{{PID: 100, PPID: 1, CPU: 50, MemRSS: 1, Name: "zsh"}})
+	m.Update(panes, []proc.Process{{PID: 100, PPID: 1, CPU: 10, MemRSS: 1, Name: "zsh"}})
+	st := m.Snapshot()["s"]
+	if st.CPUPeak != 50 {
+		t.Errorf("CPUPeak = %v, want 50 (still within window)", st.CPUPeak)
+	}
+	if st.CPUNow != 10 {
+		t.Errorf("CPUNow = %v, want 10", st.CPUNow)
+	}
+}
+
+func TestSessionStatsModel_PrunesVanishedSessions(t *testing.T) {
+	var m SessionStatsModel
+	m.Update([]tmux.Pane{{Session: "gone", PanePID: 100}},
+		[]proc.Process{{PID: 100, PPID: 1, CPU: 1, MemRSS: 1, Name: "zsh"}})
+	m.Update([]tmux.Pane{{Session: "live", PanePID: 200}},
+		[]proc.Process{{PID: 200, PPID: 1, CPU: 1, MemRSS: 1, Name: "zsh"}})
+	snap := m.Snapshot()
+	if _, ok := snap["gone"]; ok {
+		t.Errorf("session 'gone' should have been pruned")
+	}
+	if _, ok := snap["live"]; !ok {
+		t.Errorf("session 'live' should be present")
+	}
+}
