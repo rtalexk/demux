@@ -74,6 +74,7 @@ type SidebarModel struct {
 	itemSessions      map[string]struct{} // sessions with open (unchecked) TODOs
 	noteSessions      map[string]struct{} // sessions with at least one note
 	procLabels        map[string]procmatch.Label
+	stats             map[string]SessionStat
 	marquee           Marquee
 	lastMarqueeCursor int
 }
@@ -125,6 +126,12 @@ func (s *SidebarModel) SetNoteSessions(sessions []string) {
 // SetProcLabels updates the per-session sidebar process labels. Pass nil to clear.
 func (s *SidebarModel) SetProcLabels(labels map[string]procmatch.Label) {
 	s.procLabels = labels
+}
+
+// SetSessionStats updates the per-session resource stats used for the coffee
+// indicator and the focused-row readout. Pass nil to clear.
+func (s *SidebarModel) SetSessionStats(stats map[string]SessionStat) {
+	s.stats = stats
 }
 
 // SetFilter changes the active sidebar filter. Pressing the current filter's
@@ -915,8 +922,22 @@ func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) st
 	}
 }
 
+// caffeineIndicator returns the coffee glyph when caffeinate runs anywhere in
+// the session's pane trees, or "" otherwise. Styled to blend with the
+// selection background when the row is highlighted.
+func (s SidebarModel) caffeineIndicator(node SidebarNode, selected, focused bool) string {
+	st, ok := s.stats[node.Session]
+	if !ok || !st.Caffeinated || activeTheme.IconCaffeine == "" {
+		return ""
+	}
+	if selected && focused {
+		return caffeineStyle.Background(activeTheme.ColorSelected).Render(activeTheme.IconCaffeine)
+	}
+	return caffeineStyle.Render(activeTheme.IconCaffeine)
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// Order: [proc] [git] [state] [todo] [last-seen] [watch]
+// Order: [proc] [git] [state] [coffee] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
 	if ind := s.procLabelIndicator(node, selected, focused); ind != "" {
@@ -926,6 +947,9 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 		indParts = append(indParts, ind)
 	}
 	if ind := s.stateIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
+	if ind := s.caffeineIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.itemIndicator(node, selected, focused); ind != "" {
@@ -1155,7 +1179,7 @@ func (s SidebarModel) renderCardStatus(node SidebarNode, selected, focused bool,
 	// Right group: proc, git, todo, last-seen. Joined by a single space, styled
 	// when focused so the gap inherits the highlight.
 	indicatorFns := []func(SidebarNode, bool, bool) string{
-		s.procLabelIndicator, s.gitIndicator, s.itemIndicator, s.lastSeenIndicator,
+		s.procLabelIndicator, s.gitIndicator, s.caffeineIndicator, s.itemIndicator, s.lastSeenIndicator,
 	}
 	var rightParts []string
 	for _, fn := range indicatorFns {

@@ -398,7 +398,7 @@ func Default() Config {
 			ColorTodo: "",
 			IconNote:  "✏",
 
-			IconCaffeine: "", // nf-fa-coffee
+			IconCaffeine: "\uf0f4", // nf-fa-coffee
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",
