@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	gops "github.com/shirou/gopsutil/v3/process"
+	gops "github.com/shirou/gopsutil/v4/process"
 )
 
 var versionRe = regexp.MustCompile(`^\d+\.\d+`)
