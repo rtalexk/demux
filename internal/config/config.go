@@ -108,6 +108,8 @@ type ThemeConfig struct {
 	ColorTodo string `toml:"color_todo"`
 	IconNote  string `toml:"icon_note"`
 
+	IconCaffeine string `toml:"icon_caffeine"`
+
 	IconTmuxSession string `toml:"icon_tmux_session"`
 	IconCfgSession  string `toml:"icon_cfg_session"`
 
@@ -253,6 +255,7 @@ type SidebarConfig struct {
 	FocusSearchOnOpen      bool                `toml:"focus_search_on_open"`
 	SearchSort             string              `toml:"search_sort"`
 	ShowLastSeen           bool                `toml:"show_last_seen"`
+	ShowSessionStats       bool                `toml:"show_session_stats"`
 	ActiveSessionIcon      string              `toml:"active_session_icon"`
 	Sort                   []string            `toml:"sort"`
 	SwitchFocus            string              `toml:"switch_focus"`
@@ -319,6 +322,7 @@ func Default() Config {
 			SwitchFocus:       "severity",
 			Width:             DefaultSidebarWidth,
 			ShowLastSeen:      true,
+			ShowSessionStats:  true,
 			ActiveSessionIcon: DefaultActiveSessionIcon,
 			SessionView:       SidebarViewRow,
 			CardSeparator:     CardSeparatorBlank,
@@ -393,6 +397,8 @@ func Default() Config {
 			IconTodo:  "☑︎",
 			ColorTodo: "",
 			IconNote:  "✏",
+
+			IconCaffeine: "\uf0f4", // nf-fa-coffee
 
 			IconTmuxSession: "⊞",
 			IconCfgSession:  "⚙︎",

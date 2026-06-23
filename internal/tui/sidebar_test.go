@@ -1576,7 +1576,7 @@ func TestSidebar_IsIconLabel(t *testing.T) {
 		{"node", false},
 		{"", false},
 		{"🤖", true},
-		{"", true}, // Nerd Font PUA glyph
+		{"", true},   // Nerd Font PUA glyph
 		{" 🤖 ", true}, // padded with whitespace
 		{"Go!", false},
 		{"   ", false},
@@ -1608,7 +1608,7 @@ func TestNodeHeight(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			s := SidebarModel{cfg: config.Config{Sidebar: config.SidebarConfig{SessionView: tc.view, CardSeparator: tc.separator}}}
-			got := s.nodeHeight(tc.isLast)
+			got := s.nodeHeight(0, tc.isLast)
 			if got != tc.expected {
 				t.Errorf("nodeHeight(view=%q, sep=%v, isLast=%v): got %d, want %d", tc.view, tc.separator, tc.isLast, got, tc.expected)
 			}

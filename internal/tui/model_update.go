@@ -298,6 +298,10 @@ func (m Model) handleProcDataMsg(msg procDataMsg) (Model, tea.Cmd) {
 	if patterns := m.cfg.Sidebar.ProcessPatterns(); len(patterns) > 0 {
 		m.sidebar.SetProcLabels(procmatch.Match(m.panes, m.procs, patterns, m.cfg.IgnoredProcesses))
 	}
+	if m.cfg.Sidebar.ShowSessionStats {
+		m.sessionStats.Update(m.panes, m.procs)
+		m.sidebar.SetSessionStats(m.sessionStats.Snapshot())
+	}
 	if node := m.sidebar.Selected(); node != nil {
 		m.procList.SetSessionData(m.panes, node.Session, m.procs, m.cwdMap, m.gitInfo, m.cfg)
 	}

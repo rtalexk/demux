@@ -124,11 +124,12 @@ type Model struct {
 	sessionIDMap map[string]string // $N → "session_name"
 	nameToIDMap  map[string]string // "session_name" → $N
 
-	sidebar  SidebarModel
-	procList ProcListModel
-	detail   DetailModel
-	yank     yankModel
-	help     HelpModel
+	sidebar      SidebarModel
+	procList     ProcListModel
+	detail       DetailModel
+	yank         yankModel
+	help         HelpModel
+	sessionStats SessionStatsModel
 
 	showYank    bool
 	showHelp    bool
