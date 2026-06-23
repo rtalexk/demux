@@ -953,6 +953,25 @@ func (s SidebarModel) caffeineIndicator(node SidebarNode, selected, focused bool
 	return caffeineStyle.Render(activeTheme.IconCaffeine)
 }
 
+// usageIndicator returns the compact current cpu/mem readout (e.g. "5% 1.0G")
+// shown inline on every row, or "" when stats are disabled or unavailable for
+// the session. It occupies the right-side slot where last-seen would otherwise
+// render.
+func (s SidebarModel) usageIndicator(node SidebarNode, selected, focused bool) string {
+	if !s.cfg.Sidebar.ShowSessionStats {
+		return ""
+	}
+	st, ok := s.stats[node.Session]
+	if !ok {
+		return ""
+	}
+	text := fmt.Sprintf("%.0f%% %s", st.CPUNow, humanizeBytesShort(st.MemNow))
+	if selected && focused {
+		return hintStyle.Background(activeTheme.ColorSelected).Render(text)
+	}
+	return hintStyle.Render(text)
+}
+
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
 // Order: [proc] [git] [state] [coffee] [todo] [last-seen] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
@@ -972,7 +991,11 @@ func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool
 	if ind := s.itemIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
-	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
+	// The inline cpu/mem readout takes the right-side slot; fall back to the
+	// last-seen age when no stat is available for this session.
+	if usage := s.usageIndicator(node, selected, focused); usage != "" {
+		indParts = append(indParts, usage)
+	} else if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	var other string
@@ -1223,16 +1246,22 @@ func (s SidebarModel) renderCardStatus(node SidebarNode, selected, focused bool,
 		leftLabel = labelStyle.Render(value.String())
 	}
 
-	// Right group: proc, git, todo, last-seen. Joined by a single space, styled
-	// when focused so the gap inherits the highlight.
+	// Right group: proc, git, caffeine, todo, then the inline cpu/mem readout
+	// (falling back to last-seen when no stat is available). Joined by a single
+	// space, styled when focused so the gap inherits the highlight.
 	indicatorFns := []func(SidebarNode, bool, bool) string{
-		s.procLabelIndicator, s.gitIndicator, s.caffeineIndicator, s.itemIndicator, s.lastSeenIndicator,
+		s.procLabelIndicator, s.gitIndicator, s.caffeineIndicator, s.itemIndicator,
 	}
 	var rightParts []string
 	for _, fn := range indicatorFns {
 		if ind := fn(node, focused, focused); ind != "" {
 			rightParts = append(rightParts, ind)
 		}
+	}
+	if usage := s.usageIndicator(node, focused, focused); usage != "" {
+		rightParts = append(rightParts, usage)
+	} else if ind := s.lastSeenIndicator(node, focused, focused); ind != "" {
+		rightParts = append(rightParts, ind)
 	}
 	sep := " "
 	if focused {

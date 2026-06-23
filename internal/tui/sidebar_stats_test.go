@@ -92,3 +92,48 @@ func TestNodeHeight_DisabledHasNoExtraRows(t *testing.T) {
 		t.Errorf("nodeHeight = %d, want 1 when stats disabled", got)
 	}
 }
+
+func TestHumanizeBytesShort(t *testing.T) {
+	cases := map[uint64]string{
+		320 * 1024 * 1024:  "320M",
+		1024 * 1024 * 1024: "1.0G",
+		1610612736:         "1.5G",
+	}
+	for in, want := range cases {
+		if got := humanizeBytesShort(in); got != want {
+			t.Errorf("humanizeBytesShort(%d) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSidebar_InlineUsageOnEveryRow(t *testing.T) {
+	initStyles(Theme{IconCaffeine: coffeeGlyph, IconTmuxSession: "S"}, config.ProcessesConfig{}, nil)
+	var s SidebarModel
+	s.cfg.Sidebar.ShowSessionStats = true
+	s.cfg.Sidebar.ShowLastSeen = true
+	s.nodes = []SidebarNode{{Session: "work"}}
+	s.SetSessionStats(map[string]SessionStat{
+		"work": {CPUNow: 5, MemNow: 1024 * 1024 * 1024},
+	})
+	// Non-focused row should still show inline current usage.
+	out := s.renderNode(s.nodes[0], false, false, 40)
+	if !strings.Contains(out, "5%") || !strings.Contains(out, "1.0G") {
+		t.Errorf("expected inline cpu/mem on a non-focused row, got %q", out)
+	}
+}
+
+func TestSidebar_UsageReplacesAgeWhenStatPresent(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "S"}, config.ProcessesConfig{}, nil)
+	var s SidebarModel
+	s.cfg.Sidebar.ShowSessionStats = true
+	s.cfg.Sidebar.ShowLastSeen = true
+	s.nodes = []SidebarNode{{Session: "work"}}
+	withStat := s.usageIndicator(s.nodes[0], false, false)
+	if withStat != "" {
+		t.Fatalf("expected empty usage with no stat, got %q", withStat)
+	}
+	s.SetSessionStats(map[string]SessionStat{"work": {CPUNow: 3, MemNow: 200 * 1024 * 1024}})
+	if got := s.usageIndicator(s.nodes[0], false, false); got == "" {
+		t.Errorf("expected non-empty usage indicator once a stat exists")
+	}
+}

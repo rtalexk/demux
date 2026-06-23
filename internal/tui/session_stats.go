@@ -76,6 +76,17 @@ func humanizeBytes(b uint64) string {
 	return fmt.Sprintf("%.1fGB", float64(b)/float64(gib))
 }
 
+// humanizeBytesShort is the compact form for the inline per-row readout:
+// "<n>M" below 1GiB, else "<n.n>G" (no trailing "B" to save sidebar width).
+func humanizeBytesShort(b uint64) string {
+	const mib = 1024 * 1024
+	const gib = 1024 * mib
+	if b < gib {
+		return fmt.Sprintf("%dM", b/mib)
+	}
+	return fmt.Sprintf("%.1fG", float64(b)/float64(gib))
+}
+
 // statsPeakWindow is the number of recent samples retained per session for the
 // rolling peak. At the ~2s proc-poll interval this is ~2 minutes of history.
 const statsPeakWindow = 60
