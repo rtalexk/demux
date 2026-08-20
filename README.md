@@ -270,6 +270,33 @@ demux tracks what tools are doing in each pane. A state has:
 
 States are stored in a local SQLite database and reflected in the sidebar and status bar in near-real time.
 
+### Tool identity
+
+Configure known tool IDs in `demux.toml` to give their states a readable name,
+marker, and color:
+
+```toml
+[tools.claude]
+name = "Claude"
+icon = "C"
+color = "#cba6f7"
+
+[tools.opencode]
+name = "OpenCode"
+icon = "O"
+color = "#89b4fa"
+
+[tools.codex]
+name = "Codex"
+icon = "X"
+color = "#a6e3a1"
+```
+
+Each table key must exactly match the value passed to `--tool`. `name` and
+`color` are optional, but configured entries require an `icon`. Unconfigured
+tool IDs remain visible with a generic fallback, so tools do not need a
+registry entry before they can write states.
+
 <details>
 
 <summary>Setting and clearing states</summary>
@@ -978,7 +1005,7 @@ Add a live state summary to your tmux status bar:
 set -g status-right "#(demux status)"
 ```
 
-This outputs a colored summary of active pane states. When there are no active states it shows a configurable clean icon (default: `🟢`). Counts for `error`, `flagged`, `waiting`, `done`, and `idle` are shown when any are active. Configure the clean icon with `icon_status_clean` in the `[theme]` section.
+This outputs a colored summary of active pane states, grouped by tool and lifecycle state. Each configured tool marker appears before its state icon. When there are no active states it shows a configurable clean icon (default: `🟢`). Configure the clean icon with `icon_status_clean` in the `[theme]` section.
 
 ### Claude Code
 
@@ -996,7 +1023,7 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
         "hooks": [
           {
             "type": "command",
-            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" --force || demux event hook_error --hook PreToolUse --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
+            "command": "demux state set --target-id \"$TMUX_PANE\" --state working --tool claude --message \"on it\" || demux event hook_error --hook PreToolUse --tool claude --target-id \"$TMUX_PANE\" --message \"state set failed\"",
           },
         ],
       },
@@ -1105,6 +1132,20 @@ The following `~/.claude/settings.json` configuration makes Claude update the de
 ```
 
 </details>
+
+### Other tools
+
+Demux does not install vendor hooks. Configure each integration through its own
+lifecycle mechanism, using the matching `--tool` value:
+
+```sh
+demux state set --target-id "$TMUX_PANE" --state working --tool opencode --message "on it"
+demux state set --target-id "$TMUX_PANE" --state waiting --tool codex --message "awaiting input"
+demux state set --target-id "$TMUX_PANE" --state done --tool opencode --message "task complete"
+```
+
+Automated hooks must not add `--force` simply to claim an active state owned by
+another tool.
 
 ## CLI Reference
 

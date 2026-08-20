@@ -283,25 +283,37 @@ type TuiConfig struct {
 	DoneIdleAfterSecs             int    `toml:"done_idle_after_secs"` // 0 = disabled
 }
 
+type ToolConfig struct {
+	Name  string `toml:"name"`
+	Icon  string `toml:"icon"`
+	Color string `toml:"color"`
+}
+
 type Config struct {
-	RefreshIntervalMs int               `toml:"refresh_interval_ms"`
-	IgnoredSessions   []string          `toml:"ignored_sessions"`
-	IgnoredProcesses  []string          `toml:"ignored_processes"`
-	DefaultFormat     string            `toml:"default_format"`
-	Mode              string            `toml:"mode"`
-	Sidebar           SidebarConfig     `toml:"sidebar"`
-	ProcessList       ProcessListConfig `toml:"process_list"`
-	StatusBar         StatusBarConfig   `toml:"status_bar"`
-	Log               LogConfig         `toml:"log"`
-	Tui               TuiConfig         `toml:"tui"`
-	Git               GitConfig         `toml:"git"`
-	Theme             ThemeConfig       `toml:"theme"`
-	PathAliases       []PathAlias       `toml:"path_aliases"`
+	RefreshIntervalMs int                   `toml:"refresh_interval_ms"`
+	IgnoredSessions   []string              `toml:"ignored_sessions"`
+	IgnoredProcesses  []string              `toml:"ignored_processes"`
+	DefaultFormat     string                `toml:"default_format"`
+	Mode              string                `toml:"mode"`
+	Sidebar           SidebarConfig         `toml:"sidebar"`
+	ProcessList       ProcessListConfig     `toml:"process_list"`
+	StatusBar         StatusBarConfig       `toml:"status_bar"`
+	Log               LogConfig             `toml:"log"`
+	Tui               TuiConfig             `toml:"tui"`
+	Git               GitConfig             `toml:"git"`
+	Theme             ThemeConfig           `toml:"theme"`
+	PathAliases       []PathAlias           `toml:"path_aliases"`
+	Tools             map[string]ToolConfig `toml:"tools"`
 
 	// StickyMode is in-memory only (TOML tag "-"). Set by the --sticky flag on
 	// the root command; the TUI uses it to strip the quit binding and force
 	// compact + card session view.
 	StickyMode bool `toml:"-"`
+}
+
+func (c Config) Tool(id string) (ToolConfig, bool) {
+	tool, ok := c.Tools[id]
+	return tool, ok
 }
 
 func Default() Config {
@@ -311,6 +323,11 @@ func Default() Config {
 		IgnoredProcesses:  []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"},
 		DefaultFormat:     "text",
 		Mode:              "full",
+		Tools: map[string]ToolConfig{
+			"claude":   {Name: "Claude", Icon: "C", Color: "#cba6f7"},
+			"opencode": {Name: "OpenCode", Icon: "O", Color: "#89b4fa"},
+			"codex":    {Name: "Codex", Icon: "X", Color: "#a6e3a1"},
+		},
 		Sidebar: SidebarConfig{
 			DefaultFilter:     "t",
 			FocusOnOpen:       "",
@@ -483,6 +500,16 @@ func Load(path string) (Config, error) {
 		filteredProcs = append(filteredProcs, p)
 	}
 	cfg.Sidebar.Processes = filteredProcs
+
+	filteredTools := make(map[string]ToolConfig, len(cfg.Tools))
+	for id, tool := range cfg.Tools {
+		if id == "" || tool.Icon == "" {
+			fmt.Fprintf(os.Stderr, "demux: ignoring tools.%s with empty icon\n", id)
+			continue
+		}
+		filteredTools[id] = tool
+	}
+	cfg.Tools = filteredTools
 
 	return cfg, nil
 }

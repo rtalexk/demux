@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/rtalexk/demux/internal/config"
@@ -23,67 +24,129 @@ func tmuxCounter(color, icon string, count int) string {
 	return fmt.Sprintf("#[fg=%s]%s %d", color, icon, count)
 }
 
-func countStatesByValue(states []db.ToolState) (waiting, errs, flagged, done, idle int) {
-	for _, s := range states {
-		switch s.Value {
-		case db.StateWaiting:
-			waiting++
-		case db.StateError:
-			errs++
-		case db.StateFlagged:
-			flagged++
-		case db.StateDone:
-			done++
-		case db.StateIdle:
-			idle++
-		}
-	}
-	return
+type stateCounter struct {
+	Tool   string
+	Value  db.StateValue
+	Source db.StateSource
+	Count  int
 }
 
-func tmuxStatusParts(waiting, errs, flagged, done, idle int, cfg config.Config) string {
+func statusCounters(states []db.ToolState) []stateCounter {
+	counts := make(map[stateCounter]int)
+	for _, st := range states {
+		switch st.Value {
+		case db.StateError, db.StateFlagged, db.StateWaiting, db.StateDone, db.StateIdle:
+			key := stateCounter{Tool: st.Tool, Value: st.Value}
+			if st.Source == db.SourceUser && st.Value == db.StateFlagged {
+				key.Tool = "user"
+				key.Source = db.SourceUser
+			}
+			counts[key]++
+		}
+	}
+
+	counters := make([]stateCounter, 0, len(counts))
+	for counter, count := range counts {
+		counter.Count = count
+		counters = append(counters, counter)
+	}
+	sort.Slice(counters, func(i, j int) bool {
+		if counters[i].Value != counters[j].Value {
+			return statusStateOrder(counters[i].Value) < statusStateOrder(counters[j].Value)
+		}
+		if counters[i].Tool != counters[j].Tool {
+			return counters[i].Tool < counters[j].Tool
+		}
+		return counters[i].Source < counters[j].Source
+	})
+	return counters
+}
+
+func statusStateOrder(value db.StateValue) int {
+	switch value {
+	case db.StateError:
+		return 0
+	case db.StateFlagged:
+		return 1
+	case db.StateWaiting:
+		return 2
+	case db.StateDone:
+		return 3
+	case db.StateIdle:
+		return 4
+	default:
+		return 5
+	}
+}
+
+func statusToolMarker(st db.ToolState, cfg config.Config) string {
+	if st.Tool == "" || (st.Source == db.SourceUser && st.Value == db.StateFlagged) {
+		return ""
+	}
+
+	if tool, ok := cfg.Tool(st.Tool); ok {
+		color := tool.Color
+		if color == "" {
+			color = cfg.Theme.ColorFgMuted
+		}
+		return fmt.Sprintf("#[fg=%s]%s", color, tool.Icon)
+	}
+
+	runes := []rune(st.Tool)
+	label := st.Tool
+	if len(runes) > 7 {
+		label = string(runes[:6]) + "…"
+	}
+	return fmt.Sprintf("#[fg=%s]? %s", cfg.Theme.ColorFgMuted, label)
+}
+
+func tmuxStateCounter(counter stateCounter, cfg config.Config) string {
 	th := cfg.Theme
-	if waiting == 0 && errs == 0 && flagged == 0 && done == 0 && idle == 0 {
-		return fmt.Sprintf("#[fg=%s]%s#[default]", th.ColorStateDone, th.IconStatusClean)
+	var color, icon string
+	switch counter.Value {
+	case db.StateError:
+		color, icon = th.ColorStateError+",bold", th.IconStateError
+	case db.StateFlagged:
+		color, icon = th.ColorStateFlagged, th.IconStateFlagged
+	case db.StateWaiting:
+		color, icon = th.ColorStateWaiting, th.IconStateWaiting
+	case db.StateDone:
+		color, icon = th.ColorStateDone, th.IconStateDone
+	case db.StateIdle:
+		color, icon = th.ColorStateIdle, th.IconStateIdle
 	}
-	var parts []string
-	if errs > 0 {
-		parts = append(parts, tmuxCounter(th.ColorStateError+",bold", th.IconStateError, errs))
+
+	marker := statusToolMarker(db.ToolState{Tool: counter.Tool, Value: counter.Value, Source: counter.Source}, cfg)
+	if marker == "" {
+		return tmuxCounter(color, icon, counter.Count)
 	}
-	if flagged > 0 {
-		parts = append(parts, tmuxCounter(th.ColorStateFlagged, th.IconStateFlagged, flagged))
+	return marker + " " + tmuxCounter(color, icon, counter.Count)
+}
+
+func tmuxStatusParts(states []db.ToolState, cfg config.Config) string {
+	counters := statusCounters(states)
+	if len(counters) == 0 {
+		return fmt.Sprintf("#[fg=%s]%s#[default]", cfg.Theme.ColorStateDone, cfg.Theme.IconStatusClean)
 	}
-	if waiting > 0 {
-		parts = append(parts, tmuxCounter(th.ColorStateWaiting, th.IconStateWaiting, waiting))
-	}
-	if done > 0 {
-		parts = append(parts, tmuxCounter(th.ColorStateDone, th.IconStateDone, done))
-	}
-	if idle > 0 {
-		parts = append(parts, tmuxCounter(th.ColorStateIdle, th.IconStateIdle, idle))
+	parts := make([]string, 0, len(counters))
+	for _, counter := range counters {
+		parts = append(parts, tmuxStateCounter(counter, cfg))
 	}
 	return strings.Join(parts, " ") + "#[default]"
 }
 
-func textStatusParts(waiting, errs, flagged, done, idle int) string {
-	if waiting == 0 && errs == 0 && flagged == 0 && done == 0 && idle == 0 {
+func textStatusParts(states []db.ToolState, _ config.Config) string {
+	counters := statusCounters(states)
+	if len(counters) == 0 {
 		return "ok"
 	}
-	var parts []string
-	if errs > 0 {
-		parts = append(parts, fmt.Sprintf("errors=%d", errs))
-	}
-	if flagged > 0 {
-		parts = append(parts, fmt.Sprintf("flagged=%d", flagged))
-	}
-	if waiting > 0 {
-		parts = append(parts, fmt.Sprintf("waiting=%d", waiting))
-	}
-	if done > 0 {
-		parts = append(parts, fmt.Sprintf("done=%d", done))
-	}
-	if idle > 0 {
-		parts = append(parts, fmt.Sprintf("idle=%d", idle))
+	parts := make([]string, 0, len(counters))
+	for _, counter := range counters {
+		tool := counter.Tool
+		if counter.Source == db.SourceUser && counter.Value == db.StateFlagged {
+			tool = "user"
+		}
+		parts = append(parts, fmt.Sprintf("%s.%s=%d", tool, counter.Value, counter.Count))
 	}
 	return strings.Join(parts, " ")
 }
@@ -99,8 +162,6 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("list states: %w", err)
 	}
-	waiting, errs, flagged, done, idle := countStatesByValue(states)
-
 	cfg := loadConfig()
 
 	fmtName := resolveFormat(cmd)
@@ -110,9 +171,9 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 
 	switch fmtName {
 	case "tmux":
-		fmt.Print(tmuxStatusParts(waiting, errs, flagged, done, idle, cfg))
+		fmt.Print(tmuxStatusParts(states, cfg))
 	default:
-		fmt.Println(textStatusParts(waiting, errs, flagged, done, idle))
+		fmt.Println(textStatusParts(states, cfg))
 	}
 	return nil
 }

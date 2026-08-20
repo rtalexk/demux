@@ -834,17 +834,18 @@ func (s SidebarModel) gitIndicator(node SidebarNode, selected, focused bool) str
 	return compactGitIndicators(info)
 }
 
-// stateIndicator returns the rendered state icon for a sidebar row, or "".
+// stateIndicator returns the rendered tool and state indicator for a sidebar row, or "".
 func (s SidebarModel) stateIndicator(node SidebarNode, selected, focused bool) string {
 	st := s.stateForSession(node.Session)
 	if st == nil {
 		return ""
 	}
-	value := ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
+	effective := *st
+	effective.Value = ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
 	if selected && focused {
-		return stateIconOnBG(value, activeTheme.ColorSelected)
+		return toolStateIndicator(effective, s.cfg, activeTheme.ColorSelected)
 	}
-	return stateIcon(value)
+	return toolStateIndicator(effective, s.cfg, "")
 }
 
 // lastSeenIndicator returns the rendered last-seen age string for a sidebar row, or "".
@@ -1139,17 +1140,18 @@ func (s SidebarModel) renderCardStatus(node SidebarNode, selected, focused bool,
 	// aged into StateIdle (via ageDrivenValue) must still render its idle icon,
 	// matching the full dashboard. Only a genuine StateIdle row blanks the group.
 	if st != nil && st.Value.IsDisplayable() {
-		value := ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
+		effective := *st
+		effective.Value = ageDrivenValue(*st, s.cfg.Tui.DoneIdleAfterSecs)
 		if focused {
-			leftIcon = stateIconOnBG(value, activeTheme.ColorSelected)
+			leftIcon = toolStateIndicator(effective, s.cfg, activeTheme.ColorSelected)
 		} else {
-			leftIcon = stateIcon(value)
+			leftIcon = toolStateIndicator(effective, s.cfg, "")
 		}
 		labelStyle := lipgloss.NewStyle().Foreground(activeTheme.ColorFgSubtext)
 		if focused {
 			labelStyle = labelStyle.Background(activeTheme.ColorSelected)
 		}
-		leftLabel = labelStyle.Render(value.String())
+		leftLabel = labelStyle.Render(effective.Value.String())
 	}
 
 	// Right group: proc, git, todo, last-seen. Joined by a single space, styled

@@ -42,6 +42,33 @@ func TestValidate_bad_color(t *testing.T) {
 	}
 }
 
+func TestValidate_empty_tool_icon(t *testing.T) {
+	cfg := config.Default()
+	cfg.Tools["custom"] = config.ToolConfig{}
+	issues := cfg.Validate()
+	if !hasIssue(issues, "error", "tools.custom.icon") {
+		t.Error("expected error for empty tools.custom.icon")
+	}
+}
+
+func TestValidate_empty_tool_id(t *testing.T) {
+	cfg := config.Default()
+	cfg.Tools[""] = config.ToolConfig{Icon: "C"}
+	issues := cfg.Validate()
+	if !hasIssue(issues, "error", "tools") {
+		t.Error("expected error for empty tool ID")
+	}
+}
+
+func TestValidate_bad_tool_color(t *testing.T) {
+	cfg := config.Default()
+	cfg.Tools["custom"] = config.ToolConfig{Icon: "C", Color: "notahex"}
+	issues := cfg.Validate()
+	if !hasIssue(issues, "warn", "tools.custom.color") {
+		t.Error("expected warning for invalid tools.custom.color")
+	}
+}
+
 func TestValidate_bad_log_level(t *testing.T) {
 	cfg := config.Default()
 	cfg.Log.Level = "verbose"

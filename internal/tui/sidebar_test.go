@@ -1816,6 +1816,63 @@ func TestRenderSessionCard_WorkingStateShowsLabel(t *testing.T) {
 	}
 }
 
+func TestSidebarRow_ToolIndicatorPrecedesLifecycleIcon(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "T", IconCfgSession: "C", IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	cfg := config.Default()
+	s := SidebarModel{
+		cfg: cfg,
+		states: []db.ToolState{{
+			Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"},
+			Tool:   "opencode",
+			Value:  db.StateWaiting,
+		}},
+	}
+
+	got := stripANSI(s.renderSession(SidebarNode{Session: "alpha"}, false, false, 40))
+	if !strings.Contains(got, "O W") {
+		t.Errorf("sidebar row must show tool marker immediately before lifecycle icon: %q", got)
+	}
+}
+
+func TestSidebarCard_ToolIndicatorPrecedesLifecycleIcon(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "T", IconCfgSession: "C", IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	cfg := config.Default()
+	cfg.Sidebar.SessionView = config.SidebarViewCard
+	s := SidebarModel{
+		cfg: cfg,
+		states: []db.ToolState{{
+			Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"},
+			Tool:   "opencode",
+			Value:  db.StateWaiting,
+		}},
+	}
+
+	got := stripANSI(s.renderSession(SidebarNode{Session: "alpha"}, false, false, 40))
+	if !strings.Contains(got, "O W") {
+		t.Errorf("sidebar card must show tool marker immediately before lifecycle icon: %q", got)
+	}
+}
+
+func TestSidebar_ToolIndicatorUsesHighestPriorityState(t *testing.T) {
+	initStyles(Theme{IconTmuxSession: "T", IconCfgSession: "C", IconStateWorking: "K", IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	cfg := config.Default()
+	s := SidebarModel{
+		cfg: cfg,
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Tool: "opencode", Value: db.StateWorking},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "alpha"}, Tool: "claude", Value: db.StateWaiting},
+		},
+	}
+
+	got := stripANSI(s.renderSession(SidebarNode{Session: "alpha"}, false, false, 40))
+	if !strings.Contains(got, "C W") {
+		t.Errorf("sidebar must use the tool identity of its highest-priority state: %q", got)
+	}
+	if strings.Contains(got, "O K") {
+		t.Errorf("sidebar must not show the lower-priority state identity: %q", got)
+	}
+}
+
 func TestRenderSessionCard_UnselectedHasNoFocusGlyph(t *testing.T) {
 	initStyles(Theme{IconTmuxSession: "⊞", IconCfgSession: "⚙︎"}, config.ProcessesConfig{}, nil)
 	s := SidebarModel{

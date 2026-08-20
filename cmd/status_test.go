@@ -8,85 +8,83 @@ import (
 	"github.com/rtalexk/demux/internal/db"
 )
 
-func TestCountStatesByValue(t *testing.T) {
-	states := []db.ToolState{
-		{Value: db.StateWorking},
-		{Value: db.StateWaiting},
-		{Value: db.StateWaiting},
-		{Value: db.StateError},
-		{Value: db.StateFlagged},
-		{Value: db.StateFlagged},
-		{Value: db.StateDone},
-		{Value: db.StateDone},
-		{Value: db.StateDone},
-		{Value: db.StateIdle},
-	}
-	waiting, errs, flagged, done, idle := countStatesByValue(states)
-	if waiting != 2 {
-		t.Errorf("waiting: want 2, got %d", waiting)
-	}
-	if errs != 1 {
-		t.Errorf("errors: want 1, got %d", errs)
-	}
-	if flagged != 2 {
-		t.Errorf("flagged: want 2, got %d", flagged)
-	}
-	if done != 3 {
-		t.Errorf("done: want 3, got %d", done)
-	}
-	if idle != 1 {
-		t.Errorf("idle: want 1, got %d", idle)
-	}
-}
-
 func TestTmuxStatusParts_NoStates(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 0, 0, 0, 0, cfg)
+	out := tmuxStatusParts(nil, cfg)
 	if !strings.Contains(out, cfg.Theme.IconStatusClean) {
 		t.Errorf("expected clean icon %q, got: %q", cfg.Theme.IconStatusClean, out)
 	}
 }
 
-func TestTmuxStatusParts_OrderErrorFlaggedWaiting(t *testing.T) {
+func TestTmuxStatusParts_GroupsConfiguredToolsByState(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(1, 1, 1, 0, 0, cfg)
-	errIdx := strings.Index(out, cfg.Theme.IconStateError)
-	flagIdx := strings.Index(out, cfg.Theme.IconStateFlagged)
-	waitIdx := strings.Index(out, cfg.Theme.IconStateWaiting)
-	if errIdx == -1 || flagIdx == -1 || waitIdx == -1 {
-		t.Fatalf("missing icon in: %q", out)
+	states := []db.ToolState{
+		{Tool: "opencode", Value: db.StateWaiting},
+		{Tool: "claude", Value: db.StateError},
 	}
-	if !(errIdx < flagIdx && flagIdx < waitIdx) {
-		t.Errorf("expected order error < flagged < waiting, got positions %d %d %d", errIdx, flagIdx, waitIdx)
+
+	out := tmuxStatusParts(states, cfg)
+	errGroup := strings.Index(out, cfg.Tools["claude"].Icon)
+	errState := strings.Index(out, cfg.Theme.IconStateError)
+	waitingGroup := strings.Index(out, cfg.Tools["opencode"].Icon)
+	waitingState := strings.Index(out, cfg.Theme.IconStateWaiting)
+	if errGroup == -1 || errState == -1 || waitingGroup == -1 || waitingState == -1 {
+		t.Fatalf("expected configured tool and state icons in: %q", out)
+	}
+	if !(errGroup < errState && errState < waitingGroup && waitingGroup < waitingState) {
+		t.Errorf("expected error group before waiting group in: %q", out)
 	}
 }
 
-func TestTmuxStatusParts_WaitingOnly(t *testing.T) {
+func TestTmuxStatusParts_UsesFallbackForUnknownTool(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(2, 0, 0, 0, 0, cfg)
+	out := tmuxStatusParts([]db.ToolState{{Tool: "local-runner", Value: db.StateWaiting}}, cfg)
+
+	if !strings.Contains(out, "? local-…") {
+		t.Errorf("expected bounded fallback marker in: %q", out)
+	}
 	if !strings.Contains(out, cfg.Theme.IconStateWaiting) {
-		t.Errorf("expected waiting icon: %q", out)
-	}
-	if strings.Contains(out, cfg.Theme.IconStateError) {
-		t.Errorf("unexpected error icon: %q", out)
+		t.Errorf("expected waiting icon in: %q", out)
 	}
 }
 
-func TestTmuxStatusParts_FlaggedOnly(t *testing.T) {
+func TestTmuxStatusParts_UserFlagHasNoToolMarker(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 0, 1, 0, 0, cfg)
+	out := tmuxStatusParts([]db.ToolState{{
+		Tool:   "opencode",
+		Value:  db.StateFlagged,
+		Source: db.SourceUser,
+	}}, cfg)
+
 	if !strings.Contains(out, cfg.Theme.IconStateFlagged) {
-		t.Errorf("expected flagged icon: %q", out)
+		t.Errorf("expected flagged icon in: %q", out)
 	}
-	if strings.Contains(out, cfg.Theme.IconStateDone) {
-		t.Errorf("unexpected done icon when states present: %q", out)
+	if strings.Contains(out, cfg.Tools["opencode"].Icon) || strings.Contains(out, "?") {
+		t.Errorf("expected no tool marker for user flag in: %q", out)
 	}
 }
 
-func TestTmuxStatusParts_UsesThemeColors(t *testing.T) {
+func TestTextStatusParts_UsesStableToolStateTokens(t *testing.T) {
 	cfg := config.Default()
-	out := tmuxStatusParts(0, 1, 0, 0, 0, cfg)
-	if !strings.Contains(out, cfg.Theme.ColorStateError) {
-		t.Errorf("expected error color %q in output: %q", cfg.Theme.ColorStateError, out)
+	states := []db.ToolState{
+		{Tool: "opencode", Value: db.StateWaiting},
+		{Tool: "claude", Value: db.StateError},
+		{Tool: "opencode", Value: db.StateWaiting},
+	}
+
+	if got, want := textStatusParts(states, cfg), "claude.error=1 opencode.waiting=2"; got != want {
+		t.Errorf("textStatusParts() = %q, want %q", got, want)
+	}
+}
+
+func TestTextStatusParts_AggregatesUserFlagsAcrossToolIDs(t *testing.T) {
+	cfg := config.Default()
+	states := []db.ToolState{
+		{Tool: "claude", Value: db.StateFlagged, Source: db.SourceUser},
+		{Tool: "opencode", Value: db.StateFlagged, Source: db.SourceUser},
+	}
+
+	if got, want := textStatusParts(states, cfg), "user.flagged=2"; got != want {
+		t.Errorf("textStatusParts() = %q, want %q", got, want)
 	}
 }

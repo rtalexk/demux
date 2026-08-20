@@ -111,6 +111,21 @@ func (c Config) Validate() []ValidationIssue {
 	}
 	issues = append(issues, validateColorFields(colorFields)...)
 
+	for id, tool := range c.Tools {
+		if id == "" {
+			add("error", "tools", "must not contain an empty tool ID")
+			continue
+		}
+		if tool.Icon == "" {
+			add("error", "tools."+id+".icon", "must not be empty")
+		}
+		if tool.Color != "" {
+			issues = append(issues, validateColorFields(map[string]string{
+				"tools." + id + ".color": tool.Color,
+			})...)
+		}
+	}
+
 	return issues
 }
 

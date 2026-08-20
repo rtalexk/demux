@@ -341,15 +341,16 @@ func (p ProcListModel) selectedStateIndicator(st *db.ToolState) string {
 	if st == nil {
 		return ""
 	}
-	value := ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
+	effective := *st
+	effective.Value = ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
 	msg := st.Message
 	if msg == "" {
-		msg = value.String()
+		msg = effective.Value.String()
 	}
 	sepOnBG := paneSepStyle.Background(activeTheme.ColorSelected).Render(stateSepGlyph)
-	iconOnBG := stateIconOnBG(value, activeTheme.ColorSelected)
+	iconOnBG := toolStateIndicator(effective, p.cfg, activeTheme.ColorSelected)
 	left := selectedBG.Render(colSep) + sepOnBG + selectedBG.Render(colSep)
-	return left + iconOnBG + selectedBG.Render(" ") + stateBadge(value, msg)
+	return left + iconOnBG + selectedBG.Render(" ") + stateBadge(effective.Value, msg)
 }
 
 // unselectedStateIndicator returns the state indicator for an unselected pane row.
@@ -359,7 +360,7 @@ func (p ProcListModel) unselectedStateIndicator(st *db.ToolState) string {
 	}
 	effective := *st
 	effective.Value = ageDrivenValue(*st, p.cfg.Tui.DoneIdleAfterSecs)
-	return colSep + paneSepStyle.Render(stateSepGlyph) + colSep + paneStateIndicator(&effective)
+	return colSep + paneSepStyle.Render(stateSepGlyph) + colSep + paneStateIndicator(&effective, p.cfg)
 }
 
 func (p ProcListModel) renderPaneHeaderSelected(label, pathStr, gitSuffix string, innerW int, hasIdle bool) string {

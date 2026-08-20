@@ -210,14 +210,14 @@ func stateBadge(value db.StateValue, msg string) string {
 	return lipgloss.NewStyle().Foreground(fg).Background(bg).Render(" " + msg + " ")
 }
 
-// paneStateIndicator returns the inline state text for a pane header row.
-// Returns "" when st is nil. Shows icon + message badge; falls back to the
-// state name when no custom message is set.
-func paneStateIndicator(st *db.ToolState) string {
+// paneStateIndicator returns the inline tool and state text for a pane header row.
+// Returns "" when st is nil. Shows the tool identity, state icon, and message
+// badge; falls back to the state name when no custom message is set.
+func paneStateIndicator(st *db.ToolState, cfg config.Config) string {
 	if st == nil {
 		return ""
 	}
-	icon := stateIcon(st.Value)
+	icon := toolStateIndicator(*st, cfg, "")
 	msg := st.Message
 	if msg == "" {
 		msg = st.Value.String()

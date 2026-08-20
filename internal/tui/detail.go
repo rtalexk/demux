@@ -169,12 +169,12 @@ func (d DetailModel) renderStateSection() []string {
 	for _, st := range active {
 		icon := stateIcon(st.Value)
 		target := st.Target.Format(d.paneIDMap, d.windowIDMap, d.sessionIDMap)
-		tool := st.Tool
+		tool := toolStateLabel(st, d.cfg)
 		if tool == "" {
 			tool = "-"
 		}
 		stateStr := st.Value.String()
-		line := icon + "  " + tool + "  " + target + "  " + stateStr
+		line := tool + "  " + icon + "  " + target + "  " + stateStr
 		lines = append(lines, line)
 		if st.Message != "" {
 			lines = append(lines, "   "+st.Message)

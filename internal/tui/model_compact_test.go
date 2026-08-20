@@ -172,6 +172,20 @@ func TestBuildProcTitle_ShowsSessionTargetState(t *testing.T) {
 	}
 }
 
+func TestModelProcTitle_ToolIndicatorPrecedesLifecycleIcon(t *testing.T) {
+	m := setupModelWithSessionAndStates([]db.ToolState{{
+		Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"},
+		Tool:   "opencode",
+		Value:  db.StateWaiting,
+	}})
+	initStyles(Theme{IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+
+	got := stripANSI(m.buildProcTitle())
+	if !strings.Contains(got, "O W") {
+		t.Errorf("process title must show tool marker immediately before lifecycle icon: %q", got)
+	}
+}
+
 func TestBuildProcTitle_PaneStateTakesPrecedenceButSessionTitleIgnoresIt(t *testing.T) {
 	// Pane has higher-priority state (error) than session (working).
 	// Sidebar would show error; title must only show the session-level working state.

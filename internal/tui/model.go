@@ -329,7 +329,7 @@ func (m Model) buildProcTitle() string {
 	if st := m.sidebar.sessionTargetStateFor(bc); st != nil {
 		effective := *st
 		effective.Value = ageDrivenValue(*st, m.cfg.Tui.DoneIdleAfterSecs)
-		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective) + " "
+		title += paneSepStyle.Render("────") + "  " + paneStateIndicator(&effective, m.cfg) + " "
 	}
 	return title
 }

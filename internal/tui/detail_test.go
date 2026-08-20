@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
 	"github.com/rtalexk/demux/internal/git"
 )
 
@@ -71,5 +73,28 @@ func TestDetailRender_showsSessionFields(t *testing.T) {
 		if !strings.Contains(rendered, want) {
 			t.Errorf("expected %q in session detail, got:\n%s", want, rendered)
 		}
+	}
+}
+
+func TestDetailToolStateShowsConfiguredToolName(t *testing.T) {
+	initStyles(Theme{IconStateWorking: "W"}, config.ProcessesConfig{}, nil)
+	cfg := config.Default()
+	d := DetailModel{
+		cfg: cfg,
+		sessionStates: []db.ToolState{{
+			Tool:  "opencode",
+			Value: db.StateWorking,
+		}},
+	}
+
+	got := strings.Join(d.renderStateSection(), "\n")
+	if !strings.Contains(got, "OpenCode") {
+		t.Errorf("detail must show configured tool name: %q", got)
+	}
+	if strings.Contains(got, "opencode") {
+		t.Errorf("detail must not show the raw configured tool ID: %q", got)
+	}
+	if strings.Index(got, "OpenCode") > strings.Index(got, "W") {
+		t.Errorf("detail must show the tool label before the lifecycle icon: %q", got)
 	}
 }

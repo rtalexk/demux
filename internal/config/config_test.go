@@ -38,6 +38,82 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+func TestDefaults_Tools(t *testing.T) {
+	cfg := config.Default()
+	cases := map[string]string{
+		"claude":   "Claude",
+		"opencode": "OpenCode",
+		"codex":    "Codex",
+	}
+	for id, wantName := range cases {
+		tool, ok := cfg.Tool(id)
+		if !ok {
+			t.Errorf("Tool(%q) not found", id)
+			continue
+		}
+		if tool.Name != wantName {
+			t.Errorf("Tool(%q).Name = %q, want %q", id, tool.Name, wantName)
+		}
+		if tool.Icon == "" {
+			t.Errorf("Tool(%q).Icon is empty", id)
+		}
+	}
+}
+
+func TestLoadFromFile_Tools(t *testing.T) {
+	path := writeTempConfig(t, `
+[tools.opencode]
+name = "OpenCode local"
+icon = "O"
+color = "#89b4fa"
+
+[tools."internal.tool"]
+icon = "I"
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opencode, ok := cfg.Tool("opencode")
+	if !ok {
+		t.Fatal("Tool(\"opencode\") not found")
+	}
+	if opencode != (config.ToolConfig{Name: "OpenCode local", Icon: "O", Color: "#89b4fa"}) {
+		t.Errorf("Tool(\"opencode\") = %+v, want configured entry", opencode)
+	}
+
+	internal, ok := cfg.Tool("internal.tool")
+	if !ok {
+		t.Fatal("Tool(\"internal.tool\") not found")
+	}
+	if internal.Name != "" || internal.Icon != "I" {
+		t.Errorf("Tool(\"internal.tool\") = %+v, want unnamed icon I", internal)
+	}
+}
+
+func TestLoadFromFile_Tools_EmptyIconFiltered(t *testing.T) {
+	path := writeTempConfig(t, `
+[tools.invalid]
+name = "Invalid"
+`)
+
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := cfg.Tool("invalid"); ok {
+		t.Error("Tool(\"invalid\") exists after loading an empty icon")
+	}
+}
+
+func TestConfig_Tool(t *testing.T) {
+	if _, ok := config.Default().Tool("missing"); ok {
+		t.Error("Tool(\"missing\") found")
+	}
+}
+
 func TestDefaults_IgnoredProcesses(t *testing.T) {
 	cfg := config.Default()
 	expected := []string{"zsh", "bash", "fish", "sh", "dash", "nu", "pwsh"}

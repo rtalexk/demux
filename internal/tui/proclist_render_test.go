@@ -1,7 +1,12 @@
 package tui
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/rtalexk/demux/internal/config"
+	"github.com/rtalexk/demux/internal/db"
+	"github.com/rtalexk/demux/internal/tmux"
 )
 
 func makeRenderedLines(n int) []renderedLine {
@@ -41,5 +46,39 @@ func TestComputeViewport(t *testing.T) {
 				t.Errorf("hasBelow: got %v, want %v", hasBelow, tt.wantBelow)
 			}
 		})
+	}
+}
+
+func TestProcListSelectedToolIndicatorPrecedesLifecycleIcon(t *testing.T) {
+	initStyles(Theme{IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	p := ProcListModel{
+		cfg: config.Default(),
+		states: []db.ToolState{{
+			Target: db.Target{Type: db.TargetTypePane, ID: "%1"},
+			Tool:   "opencode",
+			Value:  db.StateWaiting,
+		}},
+	}
+
+	got := stripANSI(p.renderPaneHeader(ProcListNode{Pane: tmux.Pane{PaneIndex: 1, PaneID: "%1"}}, true, 40, false))
+	if !strings.Contains(got, "O W") {
+		t.Errorf("selected pane header must show tool marker immediately before lifecycle icon: %q", got)
+	}
+}
+
+func TestProcListUnselectedToolIndicatorPrecedesLifecycleIcon(t *testing.T) {
+	initStyles(Theme{IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	p := ProcListModel{
+		cfg: config.Default(),
+		states: []db.ToolState{{
+			Target: db.Target{Type: db.TargetTypePane, ID: "%1"},
+			Tool:   "opencode",
+			Value:  db.StateWaiting,
+		}},
+	}
+
+	got := stripANSI(p.renderPaneHeader(ProcListNode{Pane: tmux.Pane{PaneIndex: 1, PaneID: "%1"}}, false, 40, false))
+	if !strings.Contains(got, "O W") {
+		t.Errorf("unselected pane header must show tool marker immediately before lifecycle icon: %q", got)
 	}
 }
