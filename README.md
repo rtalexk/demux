@@ -322,6 +322,26 @@ demux state ls --state waiting
 demux state ls --tool claude
 ```
 
+**Messages from a JSON payload**
+
+Agents deliver their events as JSON on stdin, and the interesting detail (an API
+error, a permission prompt) lives inside it. `--message-json` takes a
+comma-separated list of dot-separated paths and stores the first non-empty
+scalar it finds, falling back to `--message`:
+
+```bash
+# Claude Code StopFailure hook: log the real error, not a constant
+demux state set --target-id "$TMUX_PANE" --state error --tool claude \
+  --message-json '.last_assistant_message,.error_details,.error' \
+  --message "task failed"
+```
+
+Numeric segments index arrays (`.items.0.message`), objects and arrays are
+skipped so the next path is tried, and values are collapsed to a single line and
+capped at 400 characters. When nothing is piped in, or the payload is not JSON,
+`--message` is used unchanged. demux never learns any agent's schema: the paths
+come from the agent's own config file.
+
 **Conditional writes**
 
 Use `--if-state` to only update if the current state matches:

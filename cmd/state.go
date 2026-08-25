@@ -13,13 +13,14 @@ import (
 )
 
 var (
-	stateTarget  string
-	stateValue   string
-	stateTool    string
-	stateMessage string
-	stateSource  string
-	stateForce   bool
-	stateIfState string
+	stateTarget      string
+	stateValue       string
+	stateTool        string
+	stateMessage     string
+	stateMessageJSON string
+	stateSource      string
+	stateForce       bool
+	stateIfState     string
 
 	clearTarget string
 	clearYes    bool
@@ -53,6 +54,7 @@ func init() {
 	stateSetCmd.Flags().StringVar(&stateValue, "state", "", "State: working|waiting|done|error|flagged (required)")
 	stateSetCmd.Flags().StringVar(&stateTool, "tool", "", "Tool name")
 	stateSetCmd.Flags().StringVar(&stateMessage, "message", "", "Human-readable detail")
+	stateSetCmd.Flags().StringVar(&stateMessageJSON, "message-json", "", "Comma-separated JSON paths (e.g. '.error.message,.error'); the first non-empty scalar found in the JSON on stdin becomes the message, falling back to --message")
 	stateSetCmd.Flags().StringVar(&stateSource, "source", "tool", "Source: tool|user")
 	stateSetCmd.Flags().BoolVar(&stateForce, "force", false, "Override write-lock (allow overwriting another tool's active state)")
 	stateSetCmd.Flags().StringVar(&stateIfState, "if-state", "", "Only write if current state matches this value")
@@ -125,16 +127,18 @@ func applyStateSet(d *db.DB) error {
 		ifState = &sv
 	}
 
-	if err := d.StateSet(target, stateTool, val, stateMessage, src, stateForce, ifState); err != nil {
+	message := resolveMessage(stdinPayload(), stateMessageJSON, stateMessage)
+
+	if err := d.StateSet(target, stateTool, val, message, src, stateForce, ifState); err != nil {
 		if errors.Is(err, db.ErrStateLocked) {
-			demuxlog.Warn("state set rejected: lock", "target", target, "tool", stateTool, "state", stateValue, "err", err)
+			demuxlog.Warn("state set rejected: lock", "target", target, "tool", stateTool, "state", stateValue, "message", message, "err", err)
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
-		demuxlog.Error("state set failed", "target", target, "tool", stateTool, "state", stateValue, "err", err)
+		demuxlog.Error("state set failed", "target", target, "tool", stateTool, "state", stateValue, "message", message, "err", err)
 		return fmt.Errorf("state set: %w", err)
 	}
-	demuxlog.Debug("state set", "target", target, "tool", stateTool, "state", stateValue)
+	demuxlog.Debug("state set", "target", target, "tool", stateTool, "state", stateValue, "message", message)
 	return nil
 }
 

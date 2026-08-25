@@ -16,15 +16,16 @@ import (
 func saveStateVars(t *testing.T) {
 	t.Helper()
 	prev := struct {
-		target, value, tool, message, source, ifState string
-		force                                         bool
-		clearTarget                                   string
-		clearYes                                      bool
+		target, value, tool, message, messageJSON, source, ifState string
+		force                                                      bool
+		clearTarget                                                string
+		clearYes                                                   bool
 	}{
 		target:      stateTarget,
 		value:       stateValue,
 		tool:        stateTool,
 		message:     stateMessage,
+		messageJSON: stateMessageJSON,
 		source:      stateSource,
 		ifState:     stateIfState,
 		force:       stateForce,
@@ -36,6 +37,7 @@ func saveStateVars(t *testing.T) {
 		stateValue = prev.value
 		stateTool = prev.tool
 		stateMessage = prev.message
+		stateMessageJSON = prev.messageJSON
 		stateSource = prev.source
 		stateIfState = prev.ifState
 		stateForce = prev.force
