@@ -251,7 +251,7 @@ func (d *DB) StateSet(t Target, tool string, value StateValue, message string, s
 	// the caller provides one — the upsert's COALESCE logic will populate it.
 	parentIDMissing := current != nil && current.Target.SessionID == "" && t.SessionID != ""
 	if ifState == nil && current != nil && current.Value == value && current.Tool == tool && !parentIDMissing {
-		demuxlog.Debug("state set skipped: no change", "target_type", t.Type, "target_id", t.ID, "tool", tool, "state", value)
+		demuxlog.Debug("state set skipped: no change", "target_type", t.Type, "target_id", t.ID, "tool", tool, "state", value, "message", message)
 		return tx.Rollback()
 	}
 
