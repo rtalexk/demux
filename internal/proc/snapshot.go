@@ -97,6 +97,16 @@ func Environ(pid int32) ([]string, error) {
 	return environPlatform(pid)
 }
 
+// Descendants walks the process tree from pid depth-first, excluding pid itself.
+func Descendants(pid int32, tree map[int32][]Process) []Process {
+	var out []Process
+	for _, child := range tree[pid] {
+		out = append(out, child)
+		out = append(out, Descendants(child.PID, tree)...)
+	}
+	return out
+}
+
 func BuildTree(procs []Process) map[int32][]Process {
 	tree := make(map[int32][]Process, len(procs))
 	for _, p := range procs {

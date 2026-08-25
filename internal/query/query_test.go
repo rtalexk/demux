@@ -106,6 +106,27 @@ func TestRun_ProcessScope(t *testing.T) {
 	}
 }
 
+// A pane running its command directly (no shell wrapper) is matched by its
+// own root process.
+func TestRun_ProcessScope_PaneRootProcess(t *testing.T) {
+	panes := []tmux.Pane{
+		{Session: "work", WindowIndex: 0, WindowName: "main", PanePID: 100},
+	}
+	procs := []proc.Process{
+		{PID: 100, PPID: 1, Name: "opencode"},
+	}
+	result := query.RunWith(query.Parse("p:openc"), panes, procs)
+	if len(result.Sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(result.Sessions))
+	}
+	if len(result.Sessions[0].Procs) != 1 {
+		t.Fatalf("expected 1 proc match, got %d", len(result.Sessions[0].Procs))
+	}
+	if result.Sessions[0].Procs[0].Name != "opencode" {
+		t.Errorf("expected 'opencode', got %q", result.Sessions[0].Procs[0].Name)
+	}
+}
+
 func TestRun_SessionScope_Default(t *testing.T) {
 	// Bare text searches sessions only — window names are not matched.
 	panes := []tmux.Pane{

@@ -125,13 +125,19 @@ func matchWindowNames(pq ParsedQuery, sessions map[string]map[int][]tmux.Pane, a
 	}
 }
 
-// matchProcessNames fuzzy-matches the query term against descendant process names in each session.
-func matchProcessNames(pq ParsedQuery, sessions map[string]map[int][]tmux.Pane, tree map[int32][]proc.Process, acc map[string]*SessionMatch) {
+// matchProcessNames fuzzy-matches the query term against each pane's root
+// process and its descendants in each session.
+func matchProcessNames(pq ParsedQuery, sessions map[string]map[int][]tmux.Pane, byPID map[int32]proc.Process, tree map[int32][]proc.Process, acc map[string]*SessionMatch) {
 	for sessionName, windows := range sessions {
 		var descendants []proc.Process
 		for _, wPanes := range windows {
 			for _, pane := range wPanes {
-				descendants = append(descendants, collectDescendants(pane.PanePID, tree)...)
+				// The pane root is a real process when tmux runs a command
+				// directly, with no shell wrapper.
+				if root, ok := byPID[pane.PanePID]; ok {
+					descendants = append(descendants, root)
+				}
+				descendants = append(descendants, proc.Descendants(pane.PanePID, tree)...)
 			}
 		}
 		procNames := make([]string, len(descendants))
@@ -168,8 +174,11 @@ func RunWith(pq ParsedQuery, panes []tmux.Pane, procs []proc.Process) Result {
 	case ScopeWindow:
 		matchWindowNames(pq, sessions, acc)
 	case ScopeProcess:
-		tree := proc.BuildTree(procs)
-		matchProcessNames(pq, sessions, tree, acc)
+		byPID := make(map[int32]proc.Process, len(procs))
+		for _, p := range procs {
+			byPID[p.PID] = p
+		}
+		matchProcessNames(pq, sessions, byPID, proc.BuildTree(procs), acc)
 	}
 
 	result := Result{Sessions: make([]SessionMatch, 0, len(acc))}
@@ -193,14 +202,4 @@ func Run(pq ParsedQuery) (Result, error) {
 		}
 	}
 	return RunWith(pq, panes, procs), nil
-}
-
-// collectDescendants does a depth-first walk of the process tree from pid.
-func collectDescendants(pid int32, tree map[int32][]proc.Process) []proc.Process {
-	var result []proc.Process
-	for _, child := range tree[pid] {
-		result = append(result, child)
-		result = append(result, collectDescendants(child.PID, tree)...)
-	}
-	return result
 }
