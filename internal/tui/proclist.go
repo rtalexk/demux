@@ -74,11 +74,17 @@ func activeStateFor(states []db.ToolState, targetType db.TargetType, targetID st
 	return nil
 }
 
-// paneDirectChildren returns the immediate child processes for a pane.
-// When PanePID is set it reads directly from the tree; otherwise it falls
-// back to scanning procs by CWD.
-func paneDirectChildren(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process) []proc.Process {
+// paneRoots returns the level-0 processes for a pane: the pane root proc
+// itself (tmux may run a command directly, with no shell wrapper), its tree
+// children if the root PID is missing, or CWD-matched procs when PanePID is 0.
+// Ignored roots are flattened to their children by the caller.
+func paneRoots(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process) []proc.Process {
 	if pane.PanePID != 0 {
+		for _, pr := range procs {
+			if pr.PID == pane.PanePID {
+				return []proc.Process{pr}
+			}
+		}
 		return tree[pane.PanePID]
 	}
 	paneCWD := pane.CWD
@@ -111,11 +117,10 @@ func depth1Meta(pr proc.Process, tree map[int32][]proc.Process, collapsedPIDs ma
 }
 
 // buildProcNodesForPane builds ProcListNode entries for a single pane.
-// It collects direct children of the pane's shell process (or CWD-matched
-// processes when PanePID is 0) and recurses into their subtrees, applying
-// the same collapse/aggregate logic used by SetSessionData.
+// It collects the pane's level-0 processes and recurses into their subtrees,
+// applying the same collapse/aggregate logic used by SetSessionData.
 func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int32]string, tree map[int32][]proc.Process, collapsedPIDs map[int32]bool, primaryCWD string) []ProcListNode {
-	children := paneDirectChildren(pane, procs, cwdMap, tree)
+	roots := paneRoots(pane, procs, cwdMap, tree)
 	seen := make(map[int32]bool)
 	var nodes []ProcListNode
 	var addProc func(pr proc.Process, depth int)
@@ -156,7 +161,7 @@ func buildProcNodesForPane(pane tmux.Pane, procs []proc.Process, cwdMap map[int3
 			addProc(child, depth+1)
 		}
 	}
-	for _, pr := range children {
+	for _, pr := range roots {
 		addProc(pr, 1)
 	}
 	return nodes

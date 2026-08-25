@@ -1503,3 +1503,92 @@ func TestRender_SlotPaneRow_NoPathNoIdle(t *testing.T) {
 		t.Errorf("slot row should not show the idle label, got: %q", slotLine)
 	}
 }
+
+// ---------- pane root process (no shell wrapper) ----------
+
+// withIgnoredProcs sets activeIgnoredProcs for one test, restoring it after.
+func withIgnoredProcs(t *testing.T, ignored []string) {
+	t.Helper()
+	prev := activeIgnoredProcs
+	activeIgnoredProcs = ignored
+	t.Cleanup(func() { activeIgnoredProcs = prev })
+}
+
+// Pane whose pane_pid is the program itself (no shell wrapper).
+func TestSetSessionData_PaneRootProcess_NotIdle(t *testing.T) {
+	withIgnoredProcs(t, []string{"zsh", "bash"})
+	panes := []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/proj", PanePID: 100},
+	}
+	procs := []proc.Process{
+		{PID: 100, PPID: 1, Name: "opencode", Cmdline: "opencode"},
+	}
+	var m ProcListModel
+	m.SetSessionData(panes, "s",
+		procs, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	for _, n := range m.nodes {
+		if n.IsIdle {
+			t.Fatalf("pane running opencode as its root process should not be idle, nodes: %+v", m.nodes)
+		}
+	}
+	found := false
+	for _, n := range m.nodes {
+		if n.Proc.PID == 100 && n.Depth == 1 {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected depth-1 node for pane root proc 100, got: %+v", m.nodes)
+	}
+}
+
+// An ignored shell root is replaced by its children, never shown itself.
+func TestSetSessionData_ShellRoot_FlattensToChildren(t *testing.T) {
+	withIgnoredProcs(t, []string{"zsh", "bash"})
+	panes := []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/proj", PanePID: 200},
+	}
+	procs := []proc.Process{
+		{PID: 200, PPID: 1, Name: "zsh", Cmdline: "-zsh"},
+		{PID: 201, PPID: 200, Name: "nvim", Cmdline: "nvim"},
+	}
+	var m ProcListModel
+	m.SetSessionData(panes, "s",
+		procs, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	var pids []int32
+	for _, n := range m.nodes {
+		if n.IsPaneHeader || n.IsWindowHeader || n.IsIdle {
+			continue
+		}
+		pids = append(pids, n.Proc.PID)
+	}
+	if len(pids) != 1 || pids[0] != 201 {
+		t.Errorf("expected only nvim (201) shown, got pids %v", pids)
+	}
+}
+
+// A pane whose only process is a childless ignored shell stays idle.
+func TestSetSessionData_EmptyShellPane_StaysIdle(t *testing.T) {
+	withIgnoredProcs(t, []string{"zsh", "bash"})
+	panes := []tmux.Pane{
+		{Session: "s", WindowIndex: 0, PaneIndex: 0, CWD: "/proj", PanePID: 300},
+	}
+	procs := []proc.Process{
+		{PID: 300, PPID: 1, Name: "zsh", Cmdline: "-zsh"},
+	}
+	var m ProcListModel
+	m.SetSessionData(panes, "s",
+		procs, map[int32]string{}, map[string]git.Info{}, config.Config{},
+	)
+	idle := false
+	for _, n := range m.nodes {
+		if n.IsIdle {
+			idle = true
+		}
+	}
+	if !idle {
+		t.Errorf("empty shell pane should be idle, got: %+v", m.nodes)
+	}
+}
