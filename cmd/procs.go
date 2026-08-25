@@ -104,8 +104,23 @@ func resolvePaneGitCol(pane tmux.Pane, wi int, sessionName, primaryCWD string, g
 	return "—"
 }
 
-// buildPaneRows builds the pane header row plus one row per matching process.
-func buildPaneRows(pane tmux.Pane, wi int, sessionName string, allProcs []proc.Process, cwdByPID map[int32]string, portByPID map[int32]int, gitCol string, includeGit bool) []format.Row {
+// paneProcs returns the processes belonging to a pane: its root process plus
+// all descendants, or CWD-matched processes when the root PID is unknown.
+func paneProcs(pane tmux.Pane, allProcs []proc.Process, byPID map[int32]proc.Process, tree map[int32][]proc.Process, cwdByPID map[int32]string) []proc.Process {
+	if root, ok := byPID[pane.PanePID]; ok {
+		return append([]proc.Process{root}, proc.Descendants(root.PID, tree)...)
+	}
+	var out []proc.Process
+	for _, p := range allProcs {
+		if cwd, ok := cwdByPID[p.PID]; ok && cwd == pane.CWD {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// buildPaneRows builds the pane header row plus one row per pane process.
+func buildPaneRows(pane tmux.Pane, wi int, sessionName string, procs []proc.Process, portByPID map[int32]int, gitCol string, includeGit bool) []format.Row {
 	paneCWD := pane.CWD
 	rows := []format.Row{procRow{
 		session: sessionName, window: fmt.Sprint(wi),
@@ -113,11 +128,7 @@ func buildPaneRows(pane tmux.Pane, wi int, sessionName string, allProcs []proc.P
 		pid: "—", cpu: "—", mem: "—", port: "—", up: "—",
 		cwd: paneCWD, gitCol: gitCol, includeGit: includeGit,
 	}}
-	for _, p := range allProcs {
-		cwd, ok := cwdByPID[p.PID]
-		if !ok || cwd != paneCWD {
-			continue
-		}
+	for _, p := range procs {
 		portStr := "—"
 		if port, ok := portByPID[p.PID]; ok {
 			portStr = fmt.Sprintf(":%d", port)
@@ -137,6 +148,11 @@ func buildPaneRows(pane tmux.Pane, wi int, sessionName string, allProcs []proc.P
 // buildProcRows builds the display rows for all panes and their processes.
 func buildProcRows(grouped map[string]map[int][]tmux.Pane, allProcs []proc.Process, cwdByPID map[int32]string, portByPID map[int32]int, gitResults map[string]git.Info, cfg config.Config, sessionFilter, windowFilter string, includeGit bool) []format.Row {
 	var rows []format.Row
+	byPID := make(map[int32]proc.Process, len(allProcs))
+	for _, p := range allProcs {
+		byPID[p.PID] = p
+	}
+	tree := proc.BuildTree(allProcs)
 	for sessionName, windows := range grouped {
 		if sessionFilter != "" && sessionName != sessionFilter {
 			continue
@@ -154,7 +170,8 @@ func buildProcRows(grouped map[string]map[int][]tmux.Pane, allProcs []proc.Proce
 				if includeGit {
 					gitCol = resolvePaneGitCol(pane, wi, sessionName, primaryCWD, gitResults, cfg)
 				}
-				rows = append(rows, buildPaneRows(pane, wi, sessionName, allProcs, cwdByPID, portByPID, gitCol, includeGit)...)
+				procs := paneProcs(pane, allProcs, byPID, tree, cwdByPID)
+				rows = append(rows, buildPaneRows(pane, wi, sessionName, procs, portByPID, gitCol, includeGit)...)
 			}
 		}
 	}
