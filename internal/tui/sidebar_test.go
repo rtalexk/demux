@@ -1482,19 +1482,25 @@ func TestSidebar_SetProcLabels(t *testing.T) {
 	}
 }
 
-func TestSidebar_ProcLabelLeftmost(t *testing.T) {
-	var s SidebarModel
+func TestSidebar_StateIndicatorPrecedesRightmostProcLabel(t *testing.T) {
+	initStyles(Theme{IconStateWaiting: "W"}, config.ProcessesConfig{}, nil)
+	s := SidebarModel{
+		cfg: config.Default(),
+		states: []db.ToolState{{
+			Target: db.Target{Type: db.TargetTypeSession, ID: "sess-a"},
+			Tool:   "opencode",
+			Value:  db.StateWaiting,
+		}},
+	}
 	s.procLabels = map[string]procmatch.Label{
-		"sess-a": {Text: "node"},
+		"sess-a": {Text: "P"},
 	}
 	s.gitInfo = map[string]git.Info{
 		"sess-a": {Ahead: 1},
 	}
 	got := stripANSI(s.sessionIndicators(SidebarNode{Session: "sess-a"}, false, false))
-	li := strings.Index(got, "node")
-	gi := strings.Index(got, gitAheadGlyph)
-	if li < 0 || gi < 0 || li > gi {
-		t.Fatalf("expected proc label before git indicator, got %q", got)
+	if want := "O W " + gitAheadGlyph + "1 P"; got != want {
+		t.Fatalf("sessionIndicators() = %q, want state tool and lifecycle before git and rightmost process label %q", got, want)
 	}
 }
 

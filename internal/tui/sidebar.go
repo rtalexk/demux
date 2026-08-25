@@ -917,22 +917,22 @@ func (s SidebarModel) itemIndicator(node SidebarNode, selected, focused bool) st
 }
 
 // sessionIndicators assembles the right-side indicator string for a sidebar row.
-// Order: [proc] [git] [state] [todo] [last-seen] [watch]
+// Order: [state] [git] [todo] [last-seen] [proc] [watch]
 func (s SidebarModel) sessionIndicators(node SidebarNode, selected, focused bool) string {
 	var indParts []string
-	if ind := s.procLabelIndicator(node, selected, focused); ind != "" {
+	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.gitIndicator(node, selected, focused); ind != "" {
-		indParts = append(indParts, ind)
-	}
-	if ind := s.stateIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.itemIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	if ind := s.lastSeenIndicator(node, selected, focused); ind != "" {
+		indParts = append(indParts, ind)
+	}
+	if ind := s.procLabelIndicator(node, selected, focused); ind != "" {
 		indParts = append(indParts, ind)
 	}
 	var other string
