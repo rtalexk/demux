@@ -251,11 +251,27 @@ Sessions are sorted by priority, then last-seen time, then alphabetically. Chang
 sort = ["priority", "last_seen", "alphabetical"]
 ```
 
+The session you are attached to can be pinned near the top with `active_first`, so it does not get pushed down by sessions in less urgent states:
+
+```toml
+[sidebar]
+active_first = "error"   # default
+```
+
+The value is either a bool or a state name:
+
+- `"error"` (default) — the active session sorts above every state below `error`, so `waiting` and `error` sessions still come first, while `done`, `flagged`, `working`, `idle`, and stateless sessions fall below it.
+- Any other state name (`waiting`, `done`, `flagged`, `working`, `idle`) moves that cut line: the named state and everything above it still outrank the active session.
+- `true` (or `"always"`) — the active session is always the first row.
+- `false` (or `"never"`) — no pinning, sort purely by state priority.
+
+The boost only ever raises the active session, never lowers it: if it is itself `waiting`, it keeps that rank. Pinning applies to the `priority` sort key, so it has no effect when search results are sorted by score, and a filter that hides the active session (such as attention) still hides it.
+
 When you open the TUI, the sidebar can focus different rows based on `focus_on_open`:
 
 - `current_session` — select the currently active tmux session.
 - `first_session` — select the first row.
-- `state_session` — select the first session that has a visible state.
+- `state_session` — select the first session that has a visible state. When `active_first` pinned the attached session to the top row (meaning nothing more urgent exists), that row is selected instead.
 
 </details>
 
@@ -489,6 +505,7 @@ focus_on_open = "current_session"   # current_session | first_session | state_se
 focus_search_on_open = false        # start with cursor in the search input
 default_filter = "t"                # t | a | c | w | !
 sort = ["priority", "last_seen", "alphabetical"]
+active_first = "error"              # pin attached session above states below this one; true | false | state name
 switch_focus = "default"            # default | newest | oldest
 session_view = "row"                # row | card  (default for both modes; card = two-row layout)
 session_view_mode_compact = ""      # row | card  (override session_view in compact mode; "" = inherit)

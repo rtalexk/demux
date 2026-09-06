@@ -1065,3 +1065,94 @@ func TestAutoShowParsesFromTOML(t *testing.T) {
 		t.Error("auto_show = true did not parse into Sidebar.Sticky.AutoShow")
 	}
 }
+
+func TestDefaults_SidebarActiveFirst(t *testing.T) {
+	cfg := config.Default()
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirst("error") {
+		t.Errorf("expected Sidebar.ActiveFirst=%q, got %q", "error", cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_Absent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+width = 40`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirst("error") {
+		t.Errorf("expected default %q, got %q", "error", cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_BoolTrue(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+active_first = true`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirstAlways {
+		t.Errorf("expected %q, got %q", config.ActiveFirstAlways, cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_BoolFalse(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+active_first = false`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirstOff {
+		t.Errorf("expected off (%q), got %q", config.ActiveFirstOff, cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_StateName(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+active_first = "waiting"`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirst("waiting") {
+		t.Errorf("expected %q, got %q", "waiting", cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_NeverIsOff(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+active_first = "never"`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirstOff {
+		t.Errorf("expected off (%q), got %q", config.ActiveFirstOff, cfg.Sidebar.ActiveFirst)
+	}
+}
+
+func TestLoadFromFile_SidebarActiveFirst_InvalidFallsBackToDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demux.toml")
+	os.WriteFile(path, []byte(`[sidebar]
+active_first = "bogus"`), 0644)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Sidebar.ActiveFirst != config.ActiveFirst("error") {
+		t.Errorf("expected fallback %q, got %q", "error", cfg.Sidebar.ActiveFirst)
+	}
+}

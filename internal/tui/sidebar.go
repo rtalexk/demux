@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -380,17 +381,48 @@ func (s *SidebarModel) sessionWorktreeRoot(sess session.Session) string {
 	return ""
 }
 
+// activeBoostPriority returns the half-step priority the attached session is
+// lifted to, per sidebar.active_first. ok is false when pinning is off.
+func (s *SidebarModel) activeBoostPriority() (int, bool) {
+	switch v := s.cfg.Sidebar.ActiveFirst; v {
+	case config.ActiveFirstOff:
+		return 0, false
+	case config.ActiveFirstAlways:
+		return math.MaxInt, true
+	default:
+		sv, err := db.ParseStateValue(string(v))
+		if err != nil {
+			return 0, false
+		}
+		// One half step below the threshold state: the active session outranks
+		// every state under it, while the threshold state itself stays above.
+		return sv.Priority()*2 - 1, true
+	}
+}
+
+// effectivePriority returns a session's sort priority in half steps (state
+// priority doubled), lifted by the active-session boost when one applies. The
+// boost only ever raises: an active session with an urgent state keeps its own
+// rank.
+func (s *SidebarModel) effectivePriority(sess session.Session) int {
+	pri := -1
+	if st := s.stateForSession(sess.DisplayName); st != nil {
+		pri = st.Value.Priority()
+	}
+	pri *= 2
+	if s.activeSession != "" && sess.DisplayName == s.activeSession {
+		if boost, ok := s.activeBoostPriority(); ok && boost > pri {
+			pri = boost
+		}
+	}
+	return pri
+}
+
 // comparePriority compares two sessions by state priority.
 // Returns -1 if si sorts before sj, 1 if sj sorts before si, 0 if equal.
 func (s *SidebarModel) comparePriority(si, sj session.Session) int {
-	priI := -1
-	if stI := s.stateForSession(si.DisplayName); stI != nil {
-		priI = stI.Value.Priority()
-	}
-	priJ := -1
-	if stJ := s.stateForSession(sj.DisplayName); stJ != nil {
-		priJ = stJ.Value.Priority()
-	}
+	priI := s.effectivePriority(si)
+	priJ := s.effectivePriority(sj)
 	if priI != priJ {
 		if priI > priJ {
 			return -1
@@ -1368,6 +1400,29 @@ func (s *SidebarModel) TabNextSession(visibleRows int) {
 // SessionCount returns the number of visible (non-ignored) sessions.
 func (s SidebarModel) SessionCount() int {
 	return len(s.nodes)
+}
+
+// activePinnedTop reports whether sidebar.active_first lifted the attached
+// session into the first row, which means nothing more urgent than it exists.
+func (s *SidebarModel) activePinnedTop() bool {
+	if s.activeSession == "" || len(s.nodes) == 0 {
+		return false
+	}
+	if _, ok := s.activeBoostPriority(); !ok {
+		return false
+	}
+	return s.nodes[0].Session == s.activeSession
+}
+
+// StateFocusTarget returns the session the state_session focus mode should
+// select: the attached session when the pin put it on top, otherwise the first
+// session carrying a state. Used so focus follows sidebar.active_first instead
+// of skipping past the pinned row.
+func (s *SidebarModel) StateFocusTarget() string {
+	if s.activePinnedTop() {
+		return s.activeSession
+	}
+	return s.FirstStateSession()
 }
 
 // FirstStateSession returns the display name of the first node (in sorted order)

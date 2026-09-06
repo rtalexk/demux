@@ -1582,7 +1582,7 @@ func TestSidebar_IsIconLabel(t *testing.T) {
 		{"node", false},
 		{"", false},
 		{"🤖", true},
-		{"", true}, // Nerd Font PUA glyph
+		{"", true},   // Nerd Font PUA glyph
 		{" 🤖 ", true}, // padded with whitespace
 		{"Go!", false},
 		{"   ", false},
@@ -1958,5 +1958,202 @@ func TestRenderSession_DispatchesByView(t *testing.T) {
 	}
 	if !strings.Contains(cardOut, "\n") {
 		t.Errorf("card view should be multi-line: %q", cardOut)
+	}
+}
+
+// --- Active session pinning (sidebar.active_first) ---
+
+func activeFirstCfg(v config.ActiveFirst) config.Config {
+	return config.Config{Sidebar: config.SidebarConfig{
+		Sort:        []string{"priority", "last_seen", "alphabetical"},
+		ActiveFirst: v,
+	}}
+}
+
+func TestRebuildNodes_ActiveFirst_PinsAboveWorking(t *testing.T) {
+	// dm-main is attached and stateless; alpha is working. With the "error"
+	// threshold the active session outranks anything below error.
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWorking},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "dm-main" {
+		t.Errorf("expected dm-main (active) first, got %q", s.nodes[0].Session)
+	}
+}
+
+func TestRebuildNodes_ActiveFirst_StaysBelowWaiting(t *testing.T) {
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWaiting},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "alpha" {
+		t.Errorf("expected alpha (waiting) first, got %q", s.nodes[0].Session)
+	}
+}
+
+func TestRebuildNodes_ActiveFirst_ThresholdStateItselfOutranksActive(t *testing.T) {
+	// Threshold "error" means error is the cut line: an errored session still
+	// sorts above the stateless active session.
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateError},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "alpha" {
+		t.Errorf("expected alpha (error) first, got %q", s.nodes[0].Session)
+	}
+}
+
+func TestRebuildNodes_ActiveFirst_OffKeepsPriorityOrder(t *testing.T) {
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWorking},
+		},
+		cfg: activeFirstCfg(config.ActiveFirstOff),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "alpha" {
+		t.Errorf("expected alpha (working) first with pinning off, got %q", s.nodes[0].Session)
+	}
+}
+
+func TestRebuildNodes_ActiveFirst_AlwaysBeatsWaiting(t *testing.T) {
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWaiting},
+		},
+		cfg: activeFirstCfg(config.ActiveFirstAlways),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "dm-main" {
+		t.Errorf("expected dm-main (active, always) first, got %q", s.nodes[0].Session)
+	}
+}
+
+func TestRebuildNodes_ActiveFirst_DoesNotDemoteActiveSession(t *testing.T) {
+	// dm-main is active AND waiting; the boost must never lower its own rank
+	// below an errored session.
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateError},
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateWaiting},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if len(s.nodes) < 2 {
+		t.Fatalf("expected 2 nodes, got %d", len(s.nodes))
+	}
+	if s.nodes[0].Session != "dm-main" {
+		t.Errorf("expected dm-main (active, waiting) first, got %q", s.nodes[0].Session)
+	}
+}
+
+// --- state_session focus target with active pinning ---
+
+func TestStateFocusTarget_PinnedActiveWins(t *testing.T) {
+	// Nothing outranks dm-main, so the pin put it in row 0 and the state_session
+	// focus mode must land there instead of on the "done" session below it.
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateDone},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if got := s.StateFocusTarget(); got != "dm-main" {
+		t.Errorf("StateFocusTarget() = %q, want %q", got, "dm-main")
+	}
+}
+
+func TestStateFocusTarget_WaitingOutranksPin(t *testing.T) {
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateWaiting},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if got := s.StateFocusTarget(); got != "alpha" {
+		t.Errorf("StateFocusTarget() = %q, want %q", got, "alpha")
+	}
+}
+
+func TestStateFocusTarget_PinOffFallsBackToFirstState(t *testing.T) {
+	s := SidebarModel{
+		sessions:      makeSessions("alpha", "dm-main"),
+		nameToID:      map[string]string{"alpha": "$1", "dm-main": "$2"},
+		activeSession: "dm-main",
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$1", SessionID: "$1"}, Value: db.StateDone},
+		},
+		cfg: activeFirstCfg(config.ActiveFirstOff),
+	}
+	s.rebuildNodes()
+	if got := s.StateFocusTarget(); got != "alpha" {
+		t.Errorf("StateFocusTarget() = %q, want %q", got, "alpha")
+	}
+}
+
+func TestStateFocusTarget_NoActiveSessionFallsBackToFirstState(t *testing.T) {
+	s := SidebarModel{
+		sessions: makeSessions("alpha", "beta"),
+		nameToID: map[string]string{"alpha": "$1", "beta": "$2"},
+		states: []db.ToolState{
+			{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateDone},
+		},
+		cfg: activeFirstCfg("error"),
+	}
+	s.rebuildNodes()
+	if got := s.StateFocusTarget(); got != "beta" {
+		t.Errorf("StateFocusTarget() = %q, want %q", got, "beta")
 	}
 }

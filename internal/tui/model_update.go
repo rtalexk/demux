@@ -236,8 +236,10 @@ func (m Model) handlePanesMsg(msg panesMsg) (Model, tea.Cmd) {
 	healStateSessionIDs(m.states, m.paneIDMap, m.nameToIDMap)
 	grouped := tmux.GroupBySessions(msg.panes)
 	merged := session.Merge(msg.panes, m.sessionsConfig.Entries)
-	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
+	// Active session first: SetData rebuilds the node order, and sidebar.active_first
+	// can only pin the attached session if the sidebar already knows which it is.
 	m.sidebar.SetActiveSession(msg.currentSession)
+	m.sidebar.SetData(merged, m.states, m.gitInfo, m.cfg)
 	m.updateDetailFromSelection()
 	var cmds []tea.Cmd
 	visibleRows := max(1, m.height-1-2-searchBoxH)
@@ -383,7 +385,8 @@ func (m *Model) populateYankFields() {
 }
 
 // applyNonAlertFocusMode applies the configured focus_on_open mode to the sidebar.
-// Valid modes: current_session, first_session, state_session.
+// Valid modes: current_session, first_session, state_session. state_session
+// defers to the pinned active session when sidebar.active_first put it on top.
 // No-ops on empty or unrecognised mode.
 func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 	switch mode {
@@ -392,7 +395,7 @@ func (m *Model) applyNonAlertFocusMode(mode string, visibleRows int) {
 	case "first_session":
 		// cursor is already 0, which is always the first session — no-op
 	case "state_session":
-		if sess := m.sidebar.FirstStateSession(); sess != "" {
+		if sess := m.sidebar.StateFocusTarget(); sess != "" {
 			m.sidebar.FocusNode(sess, visibleRows)
 		}
 	}

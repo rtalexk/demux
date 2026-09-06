@@ -144,3 +144,44 @@ func TestStartupSort_StatesBeforePanes(t *testing.T) {
 		t.Errorf("expected beta (error state) to sort first, got %q", nodes[0].Session)
 	}
 }
+
+// TestStateSession_PinnedActiveFocused_StatesBeforePanes covers the startup
+// race: when states land before panes, handlePanesMsg applies state_session
+// focus in the same pass that populates the sidebar. The active session must
+// already be known at that point, otherwise the pin is missing from the node
+// order and focus skips past the pinned row.
+func TestStateSession_PinnedActiveFocused_StatesBeforePanes(t *testing.T) {
+	states := []db.ToolState{
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateDone},
+	}
+	m := focusTestModel("state_session")
+	m.height = 40
+	m, _ = applyStatesMsg(m, states)
+	m, _ = applyPanesMsg(m, "alpha")
+	if m.sidebar.nodes[0].Session != "alpha" {
+		t.Fatalf("expected alpha (active) pinned first, got %q", m.sidebar.nodes[0].Session)
+	}
+	node := m.sidebar.Selected()
+	if node == nil || node.Session != "alpha" {
+		t.Errorf("expected focus on alpha (pinned active session), got %+v", node)
+	}
+}
+
+// TestStateSession_PinnedActiveFocused_PanesBeforeStates covers the common
+// ordering: panes first, then states, with focus applied in handleStatesMsg.
+func TestStateSession_PinnedActiveFocused_PanesBeforeStates(t *testing.T) {
+	states := []db.ToolState{
+		{Target: db.Target{Type: db.TargetTypeSession, ID: "$2", SessionID: "$2"}, Value: db.StateDone},
+	}
+	m := focusTestModel("state_session")
+	m.height = 40
+	m, _ = applyPanesMsg(m, "alpha")
+	m, _ = applyStatesMsg(m, states)
+	if m.sidebar.nodes[0].Session != "alpha" {
+		t.Fatalf("expected alpha (active) pinned first, got %q", m.sidebar.nodes[0].Session)
+	}
+	node := m.sidebar.Selected()
+	if node == nil || node.Session != "alpha" {
+		t.Errorf("expected focus on alpha (pinned active session), got %+v", node)
+	}
+}

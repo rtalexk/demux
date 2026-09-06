@@ -62,7 +62,8 @@ show_last_seen = true
 active_session_icon = "►"
 
 # Where to position the sidebar cursor on open: current_session | first_session | state_session
-# state_session focuses the first session with a visible state (based on configured sort order)
+# state_session focuses the first session with a visible state (based on configured sort order),
+# or the attached session when active_first pinned it to the top row
 focus_on_open = "current_session"
 
 # Start with cursor in the search input (also available as --search flag)
@@ -74,6 +75,14 @@ default_filter = "t"
 # Session sort order — first key wins, missing keys filled from default order
 # Valid keys: priority | last_seen | alphabetical
 sort = ["priority", "last_seen", "alphabetical"]
+
+# Pin the attached tmux session above sessions in less urgent states.
+# Value is a bool or a state name naming the cut line:
+#   "error" (default) — waiting and error sessions still sort first
+#   "waiting" | "done" | "flagged" | "working" | "idle" — move the cut line
+#   true  (or "always") — active session is always the first row
+#   false (or "never")  — no pinning
+active_first = "error"
 
 # Which target to focus when switching to a session: default | newest | oldest
 #   default  — let tmux use its last-focused window

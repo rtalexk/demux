@@ -247,6 +247,50 @@ type SidebarStickyConfig struct {
 	AutoShow               bool `toml:"auto_show"`
 }
 
+// ActiveFirst controls whether the tmux session the user is attached to is
+// pinned above lower-priority sessions in the sidebar. Valid values are ""
+// (off), "always", or a state name naming the cut line: the active session
+// outranks every state below the named one, and the named state itself still
+// sorts above it.
+type ActiveFirst string
+
+const (
+	ActiveFirstOff     ActiveFirst = ""
+	ActiveFirstAlways  ActiveFirst = "always"
+	DefaultActiveFirst ActiveFirst = "error"
+)
+
+// UnmarshalTOML accepts either a bool (true = always, false = off) or a string
+// ("always", "never", or a state name). Invalid values warn and fall back to
+// DefaultActiveFirst, matching the other sidebar normalizers.
+func (a *ActiveFirst) UnmarshalTOML(v any) error {
+	switch val := v.(type) {
+	case bool:
+		*a = ActiveFirstOff
+		if val {
+			*a = ActiveFirstAlways
+		}
+	case string:
+		switch val {
+		case "", "never", "off":
+			*a = ActiveFirstOff
+		case string(ActiveFirstAlways), "waiting", "error", "done", "flagged", "working", "idle":
+			*a = ActiveFirst(val)
+		default:
+			fmt.Fprintf(os.Stderr,
+				"demux: ignoring sidebar.active_first %q: must be a bool or one of always|never|waiting|error|done|flagged|working|idle; using %q\n",
+				val, DefaultActiveFirst)
+			*a = DefaultActiveFirst
+		}
+	default:
+		fmt.Fprintf(os.Stderr,
+			"demux: ignoring sidebar.active_first: must be a bool or a string; using %q\n",
+			DefaultActiveFirst)
+		*a = DefaultActiveFirst
+	}
+	return nil
+}
+
 type SidebarConfig struct {
 	DefaultFilter          string              `toml:"default_filter"`
 	FocusOnOpen            string              `toml:"focus_on_open"`
@@ -255,6 +299,7 @@ type SidebarConfig struct {
 	ShowLastSeen           bool                `toml:"show_last_seen"`
 	ActiveSessionIcon      string              `toml:"active_session_icon"`
 	Sort                   []string            `toml:"sort"`
+	ActiveFirst            ActiveFirst         `toml:"active_first"`
 	SwitchFocus            string              `toml:"switch_focus"`
 	Width                  int                 `toml:"width"`
 	SessionView            string              `toml:"session_view"`
@@ -333,6 +378,7 @@ func Default() Config {
 			FocusOnOpen:       "",
 			SearchSort:        "score",
 			Sort:              []string{"priority", "last_seen", "alphabetical"},
+			ActiveFirst:       DefaultActiveFirst,
 			SwitchFocus:       "severity",
 			Width:             DefaultSidebarWidth,
 			ShowLastSeen:      true,
