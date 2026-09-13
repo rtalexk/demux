@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	gops "github.com/shirou/gopsutil/v3/process"
+	gops "github.com/shirou/gopsutil/v4/process"
 )
 
 // CWD returns the working directory of the given PID.
