@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
@@ -801,8 +802,12 @@ func isIconLabel(text string) bool {
 	if trimmed == "" {
 		return false
 	}
-	r, _ := utf8.DecodeRuneInString(trimmed)
-	return isIconRune(r)
+	r, size := utf8.DecodeRuneInString(trimmed)
+	if isIconRune(r) {
+		return true
+	}
+	// Narrow symbols such as "✳" are width 1 but still icons when alone.
+	return size == len(trimmed) && !unicode.IsLetter(r) && !unicode.IsDigit(r)
 }
 
 // resolveProcLabelColors picks the effective fg/bg for a sidebar proc label.
